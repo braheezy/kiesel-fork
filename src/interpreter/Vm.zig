@@ -695,7 +695,7 @@ fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Reg, value_reg: Bytec
 
     if (prototype_value.isObject() or prototype_value.isNull()) {
         const prototype = if (prototype_value.isObject()) prototype_value.asObject() else null;
-        _ = object.internal_methods.setPrototypeOf(
+        _ = object.internalMethods().setPrototypeOf(
             vm.agent,
             object,
             prototype,
@@ -1355,7 +1355,7 @@ fn executeGetProperty(
 
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(try vm.getString(name_index));
-    const result = try base_object.internal_methods.get(
+    const result = try base_object.internalMethods().get(
         vm.agent,
         base_object,
         property_key,
@@ -1404,7 +1404,7 @@ fn executeGetPropertyComputed(
 
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
-    const result = try base_object.internal_methods.get(
+    const result = try base_object.internalMethods().get(
         vm.agent,
         base_object,
         property_key,
@@ -1444,7 +1444,7 @@ fn executeGetPropertyIndexed(
 
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
-    const result = try base_object.internal_methods.get(
+    const result = try base_object.internalMethods().get(
         vm.agent,
         base_object,
         property_key,
@@ -1503,7 +1503,7 @@ fn executeSetProperty(
 
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(try vm.getString(name_index));
-    const success = try base_object.internal_methods.set(
+    const success = try base_object.internalMethods().set(
         vm.agent,
         base_object,
         property_key,
@@ -1546,7 +1546,7 @@ fn executeSetPropertyComputed(
 
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
-    const success = try base_object.internal_methods.set(
+    const success = try base_object.internalMethods().set(
         vm.agent,
         base_object,
         property_key,
@@ -1579,7 +1579,7 @@ fn executeSetPropertyIndexed(
 
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
-    const success = try base_object.internal_methods.set(
+    const success = try base_object.internalMethods().set(
         vm.agent,
         base_object,
         property_key,
@@ -1621,7 +1621,7 @@ fn executeDeleteProperty(
     const base_value = vm.store(base_reg);
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(try vm.getString(name_index));
-    const delete_status = try base_object.internal_methods.delete(
+    const delete_status = try base_object.internalMethods().delete(
         vm.agent,
         base_object,
         property_key,
@@ -1644,7 +1644,7 @@ fn executeDeletePropertyComputed(
     const property_value = vm.store(property_reg);
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = try property_value.toPropertyKey(vm.agent);
-    const delete_status = try base_object.internal_methods.delete(
+    const delete_status = try base_object.internalMethods().delete(
         vm.agent,
         base_object,
         property_key,
@@ -1666,7 +1666,7 @@ fn executeDeletePropertyIndexed(
     const base_value = vm.store(base_reg);
     const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
     const property_key = PropertyKey.from(@as(u53, index));
-    const delete_status = try base_object.internal_methods.delete(
+    const delete_status = try base_object.internalMethods().delete(
         vm.agent,
         base_object,
         property_key,
@@ -2321,7 +2321,7 @@ fn executeGetSuperProperty(vm: *Vm, dest: Bytecode.Reg, name_index: Bytecode.Str
     };
     const base_object = try base_value.toObject(vm.agent);
     const property_key = PropertyKey.from(try vm.getString(name_index));
-    const result = try base_object.internal_methods.get(vm.agent, base_object, property_key, actual_this);
+    const result = try base_object.internalMethods().get(vm.agent, base_object, property_key, actual_this);
     vm.load(dest, result);
 }
 
@@ -2336,7 +2336,7 @@ fn executeGetSuperPropertyComputed(vm: *Vm, dest: Bytecode.Reg, property_reg: By
     };
     const base_object = try base_value.toObject(vm.agent);
     const property_key = try property_value.toPropertyKey(vm.agent);
-    const result = try base_object.internal_methods.get(vm.agent, base_object, property_key, actual_this);
+    const result = try base_object.internalMethods().get(vm.agent, base_object, property_key, actual_this);
     vm.load(dest, result);
 }
 
@@ -2351,7 +2351,7 @@ fn executeSetSuperProperty(vm: *Vm, value_reg: Bytecode.Reg, name_index: Bytecod
     };
     const base_object = try base_value.toObject(vm.agent);
     const property_key = PropertyKey.from(try vm.getString(name_index));
-    const succeeded = try base_object.internal_methods.set(vm.agent, base_object, property_key, value, actual_this);
+    const succeeded = try base_object.internalMethods().set(vm.agent, base_object, property_key, value, actual_this);
     if (!succeeded and strict) {
         @branchHint(.unlikely);
         return vm.agent.throwException(.type_error, "Could not set super property", .{});
@@ -2370,7 +2370,7 @@ fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Reg, value_re
     };
     const base_object = try base_value.toObject(vm.agent);
     const property_key = try property_value.toPropertyKey(vm.agent);
-    const succeeded = try base_object.internal_methods.set(vm.agent, base_object, property_key, value, actual_this);
+    const succeeded = try base_object.internalMethods().set(vm.agent, base_object, property_key, value, actual_this);
     if (!succeeded and strict) {
         @branchHint(.unlikely);
         return vm.agent.throwException(.type_error, "Could not set super property", .{});

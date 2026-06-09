@@ -169,7 +169,7 @@ pub fn evaluateSuperCall(agent: *Agent, args: []const Value) Agent.Error!Value {
     const new_target = agent.getNewTarget();
 
     // 2. Assert: newTarget is a constructor.
-    std.debug.assert(new_target.?.internal_methods.construct != null);
+    std.debug.assert(new_target.?.internalMethods().construct != null);
 
     // 3. Let func be GetSuperConstructor().
     const function = try getSuperConstructor(agent);
@@ -221,7 +221,7 @@ pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!?*Object {
     const active_function = &env.function_environment.function_object.object;
 
     // 5. Let superConstructor be ! activeFunction.[[GetPrototypeOf]]().
-    const super_constructor = active_function.internal_methods.getPrototypeOf(
+    const super_constructor = active_function.internalMethods().getPrototypeOf(
         agent,
         active_function,
     ) catch |err| try noexcept(err);
@@ -2292,7 +2292,7 @@ pub fn classDefinitionEvaluation(
                     //    not.
 
                     // 2. Let func be ! F.[[GetPrototypeOf]]().
-                    const prototype_function = function.internal_methods.getPrototypeOf(
+                    const prototype_function = function.internalMethods().getPrototypeOf(
                         agent_,
                         function,
                     ) catch |err| try noexcept(err);

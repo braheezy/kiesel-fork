@@ -171,6 +171,15 @@ pub const ECMAScriptFunction = MakeObject(.{
     .display_name = "Function",
 });
 
+pub const internal_methods = Object.InternalMethods.initComptime(.{
+    .call = call,
+});
+
+pub const internal_methods_constructor = Object.InternalMethods.initComptime(.{
+    .call = call,
+    .construct = construct,
+});
+
 /// 10.2.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-call-thisargument-argumentslist
 fn call(
@@ -662,10 +671,8 @@ pub fn ordinaryFunctionCreate(
     // 1. Let internalSlotsList be the internal slots listed in Table 25.
     // 2. Let F be OrdinaryObjectCreate(functionPrototype, internalSlotsList).
     const function = try ECMAScriptFunction.create(agent, .{
-        .internal_methods = .initComptime(.{
-            // 3. Set F.[[Call]] to the definition specified in 10.2.1.
-            .call = call,
-        }),
+        // 3. Set F.[[Call]] to the definition specified in 10.2.1.
+        .internal_methods = internal_methods,
         .prototype = function_prototype,
         .fields = .{
             // 4. Set F.[[SourceText]] to sourceText.
@@ -746,10 +753,6 @@ pub fn ordinaryFunctionCreateFast(
 
     const function = try ECMAScriptFunction.createWithShape(agent, .{
         .shape = function_shape,
-        .internal_methods = .initComptime(.{
-            .call = call,
-            .construct = construct,
-        }),
         .fields = .{
             .source_text = source_text,
             .formal_parameters = parameter_list,
@@ -834,7 +837,7 @@ pub fn makeConstructor(
     // 1. If F is an ECMAScript function object, then
     if (function.is(ECMAScriptFunction)) {
         // a. Assert: IsConstructor(F) is false.
-        std.debug.assert(!Value.from(function).isConstructor());
+        std.debug.assert(function.internalMethods() == internal_methods);
 
         // b. Assert: F is an extensible object that does not have a "prototype" own property.
         std.debug.assert(
@@ -842,11 +845,17 @@ pub fn makeConstructor(
         );
 
         // c. Set F.[[Construct]] to the definition specified in 10.2.2.
-        function.internal_methods = try .init(agent.gc_allocator, function.internal_methods, .{ .construct = construct });
+        try function.setInternalMethods(agent, internal_methods_constructor);
     } else {
         // 2. Else,
+        // NOTE: ClassDefinitionEvaluation may synthesize the default constructor for a class via
+        //       CreateBuiltinFunction with a [[Construct]] internal method followed by calling
+        //       MakeConstructor on it to wire up the prototype/constructor properties.
+        std.debug.assert(function.internalMethods() == builtins.builtin_function.internal_methods or
+            function.internalMethods() == builtins.builtin_function.internal_methods_constructor);
+
         // a. Set F.[[Construct]] to the definition specified in 10.3.2.
-        function.internal_methods = try .init(agent.gc_allocator, function.internal_methods, .{ .construct = builtins.builtin_function.construct });
+        try function.setInternalMethods(agent, builtins.builtin_function.internal_methods_constructor);
     }
 
     // 3. Set F.[[ConstructorKind]] to base.

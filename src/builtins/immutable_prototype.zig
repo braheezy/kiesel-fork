@@ -22,7 +22,7 @@ pub fn setImmutablePrototype(
     prototype: ?*Object,
 ) Agent.Error!bool {
     // 1. Let current be ? O.[[GetPrototypeOf]]().
-    const current = try object.internal_methods.getPrototypeOf(agent, object);
+    const current = try object.internalMethods().getPrototypeOf(agent, object);
 
     // 2. If SameValue(V, current) is true, return true.
     if (prototype == current) return true;

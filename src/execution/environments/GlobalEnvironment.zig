@@ -267,7 +267,7 @@ pub fn hasRestrictedGlobalProperty(
     const global_object = self.object_record.binding_object;
 
     // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
-    const existing_property = try global_object.internal_methods.getOwnProperty(
+    const existing_property = try global_object.internalMethods().getOwnProperty(
         agent,
         global_object,
         property_key,
@@ -320,7 +320,7 @@ pub fn canDeclareGlobalFunction(
     const global_object = self.object_record.binding_object;
 
     // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
-    const existing_prop = try global_object.internal_methods.getOwnProperty(
+    const existing_prop = try global_object.internalMethods().getOwnProperty(
         agent,
         global_object,
         property_key,
@@ -390,7 +390,7 @@ pub fn createGlobalFunctionBinding(
     const global_object = self.object_record.binding_object;
 
     // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
-    const existing_prop = try global_object.internal_methods.getOwnProperty(
+    const existing_prop = try global_object.internalMethods().getOwnProperty(
         agent,
         global_object,
         property_key,

@@ -76,8 +76,8 @@ pub const constructor = struct {
         );
 
         // Non-standard
-        std.debug.assert(@"error".object.internal_methods == Object.InternalMethods.default);
-        @"error".object.internal_methods = .initComptime(.{ .set = internalSet });
+        std.debug.assert(@"error".object.internalMethods() == Object.InternalMethods.default);
+        try @"error".object.setInternalMethods(agent, .initComptime(.{ .set = internalSet }));
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {
@@ -389,8 +389,8 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             );
 
             // Non-standard
-            std.debug.assert(@"error".object.internal_methods == Object.InternalMethods.default);
-            @"error".object.internal_methods = .initComptime(.{ .set = internalSet });
+            std.debug.assert(@"error".object.internalMethods() == Object.InternalMethods.default);
+            try @"error".object.setInternalMethods(agent, .initComptime(.{ .set = internalSet }));
 
             // 3. If message is not undefined, then
             if (!message.isUndefined()) {

@@ -23,7 +23,7 @@ pub fn get(
     const shape = ic.shape orelse return null;
     if (base_object.shape != shape) return null;
 
-    if (!base_object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    if (!base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         .ordinary_get_own_property,
     }))) return null;
@@ -52,7 +52,7 @@ pub fn set(
     const shape = ic.shape orelse return false;
     if (base_object.shape != shape) return false;
 
-    if (!base_object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    if (!base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         .ordinary_get_own_property,
     }))) return false;
@@ -81,7 +81,7 @@ pub fn update(
     property_key: PropertyKey,
     comptime kind: enum { get, set },
 ) void {
-    if (!base_object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    if (!base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         switch (kind) {
             .get => .ordinary_get,
             .set => .ordinary_set,

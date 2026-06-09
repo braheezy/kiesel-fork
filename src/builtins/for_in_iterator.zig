@@ -78,7 +78,7 @@ pub const prototype = struct {
             // a. If O.[[ObjectWasVisited]] is false, then
             if (!for_in_iterator.fields.state.object_was_visited) {
                 // i. Let keys be ? object.[[OwnPropertyKeys]]().
-                const keys = try object.internal_methods.ownPropertyKeys(agent, object);
+                const keys = try object.internalMethods().ownPropertyKeys(agent, object);
                 defer agent.gc_allocator.free(keys);
 
                 // ii. For each element key of keys, do
@@ -103,7 +103,7 @@ pub const prototype = struct {
                 // iii. If O.[[VisitedKeys]] does not contain r, then
                 if (!for_in_iterator.fields.state.visited_keys.contains(remaining_key)) {
                     // 1. Let desc be ? object.[[GetOwnProperty]](r).
-                    const descriptor = try object.internal_methods.getOwnProperty(
+                    const descriptor = try object.internalMethods().getOwnProperty(
                         agent,
                         object,
                         remaining_key,
@@ -134,7 +134,7 @@ pub const prototype = struct {
             }
 
             // c. Set object to ? object.[[GetPrototypeOf]]().
-            object = (try object.internal_methods.getPrototypeOf(agent, object)) orelse {
+            object = (try object.internalMethods().getPrototypeOf(agent, object)) orelse {
                 // f. If object is null, return CreateIteratorResultObject(undefined, true).
                 for_in_iterator.fields = .completed;
                 return Value.from(try createIteratorResultObject(agent, .undefined, true));

@@ -25,6 +25,14 @@ const ordinaryGetOwnProperty = builtins.ordinaryGetOwnProperty;
 const ordinarySet = builtins.ordinarySet;
 const sameValue = types.sameValue;
 
+pub const internal_methods = Object.InternalMethods.initComptime(.{
+    .getOwnProperty = getOwnProperty,
+    .defineOwnProperty = defineOwnProperty,
+    .get = get,
+    .set = set,
+    .delete = delete,
+});
+
 /// 10.4.4.1 [[GetOwnProperty]] ( P )
 /// https://tc39.es/ecma262/#sec-arguments-exotic-objects-getownproperty-p
 fn getOwnProperty(
@@ -280,29 +288,16 @@ pub fn createMappedArgumentsObject(
     const len = arguments_list.len;
 
     // 3. Let obj be MakeBasicObject(« [[Prototype]], [[Extensible]], [[ParameterMap]] »).
+    // 4. Set obj.[[GetOwnProperty]] as specified in 10.4.4.1.
+    // 5. Set obj.[[DefineOwnProperty]] as specified in 10.4.4.2.
+    // 6. Set obj.[[Get]] as specified in 10.4.4.3.
+    // 7. Set obj.[[Set]] as specified in 10.4.4.4.
+    // 8. Set obj.[[Delete]] as specified in 10.4.4.5.
+    // 9. Set obj.[[Prototype]] to %Object.prototype%.
+    // NOTE: This is done via the shape.
     const shape, const offsets = try realm.shapes.mappedArgumentsObject();
     const arguments = try Arguments.createWithShape(agent, .{
         .shape = shape,
-        .internal_methods = .initComptime(.{
-            // 4. Set obj.[[GetOwnProperty]] as specified in 10.4.4.1.
-            .getOwnProperty = getOwnProperty,
-
-            // 5. Set obj.[[DefineOwnProperty]] as specified in 10.4.4.2.
-            .defineOwnProperty = defineOwnProperty,
-
-            // 6. Set obj.[[Get]] as specified in 10.4.4.3.
-            .get = get,
-
-            // 7. Set obj.[[Set]] as specified in 10.4.4.4.
-            .set = set,
-
-            // 8. Set obj.[[Delete]] as specified in 10.4.4.5.
-            .delete = delete,
-        }),
-
-        // 9. Set obj.[[Prototype]] to %Object.prototype%.
-        // NOTE: This is done via the shape.
-
         .fields = .{
             // 10. Let map be OrdinaryObjectCreate(null).
             // 11. Set obj.[[ParameterMap]] to map.

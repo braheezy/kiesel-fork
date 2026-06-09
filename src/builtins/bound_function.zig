@@ -75,7 +75,7 @@ pub fn boundFunctionCreate(
     bound_args: []const Value,
 ) Agent.Error!*BoundFunction {
     // 1. Let proto be ? targetFunction.[[GetPrototypeOf]]().
-    const prototype = try target_function.internal_methods.getPrototypeOf(agent, target_function);
+    const prototype = try target_function.internalMethods().getPrototypeOf(agent, target_function);
 
     // 2. Let internalSlotsList be the list-concatenation of « [[Prototype]], [[Extensible]] » and
     //    the internal slots listed in Table 26.

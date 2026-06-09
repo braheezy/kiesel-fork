@@ -46,10 +46,8 @@ pub fn MakeObject(
     const ArgsWithShape = if (has_fields) struct {
         fields: options.Fields,
         shape: *Object.Shape,
-        internal_methods: *const InternalMethods = .default,
     } else struct {
         shape: *Object.Shape,
-        internal_methods: *const InternalMethods = .default,
     };
 
     return struct {
@@ -69,7 +67,6 @@ pub fn MakeObject(
                 .fields = if (has_fields) args.fields,
                 .object = .{
                     .tag = options.tag,
-                    .internal_methods = args.internal_methods,
                     .shape = agent.empty_shape,
                     .property_storage = .{
                         .properties = .empty,
@@ -79,6 +76,9 @@ pub fn MakeObject(
                     .private_elements = .empty,
                 },
             };
+            if (args.internal_methods != Object.InternalMethods.default) {
+                try self.object.setInternalMethods(agent, args.internal_methods);
+            }
             if (args.prototype != null) {
                 try self.object.setPrototype(agent, args.prototype);
             }
@@ -103,7 +103,6 @@ pub fn MakeObject(
                 .fields = if (has_fields) args.fields,
                 .object = .{
                     .tag = options.tag,
-                    .internal_methods = args.internal_methods,
                     .shape = args.shape,
                     .property_storage = .{
                         .properties = .empty,

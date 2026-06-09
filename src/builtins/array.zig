@@ -35,6 +35,10 @@ const sameValueZero = types.sameValueZero;
 
 const array_fast_paths = @import("array_fast_paths.zig");
 
+pub const internal_methods = Object.InternalMethods.initComptime(.{
+    .defineOwnProperty = defineOwnProperty,
+});
+
 /// 10.4.2.1 [[DefineOwnProperty]] ( P, Desc )
 /// https://tc39.es/ecma262/#sec-array-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
@@ -117,9 +121,7 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_prototype: ?*Object) Agent.
         .prototype = prototype_,
 
         // 5. Set A.[[DefineOwnProperty]] as specified in 10.4.2.1.
-        .internal_methods = .initComptime(.{
-            .defineOwnProperty = defineOwnProperty,
-        }),
+        .internal_methods = internal_methods,
 
         // 6. Perform ! OrdinaryDefineOwnProperty(A, "length", PropertyDescriptor {
         //    [[Value]]: 𝔽(length), [[Writable]]: true, [[Enumerable]]: false,
@@ -147,9 +149,6 @@ pub fn arrayCreateFastWithShape(
 ) std.mem.Allocator.Error!*Array {
     return Array.createWithShape(agent, .{
         .shape = shape,
-        .internal_methods = .initComptime(.{
-            .defineOwnProperty = defineOwnProperty,
-        }),
         .fields = .{
             .length = length,
             .length_writable = true,

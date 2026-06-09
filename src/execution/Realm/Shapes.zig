@@ -2,6 +2,7 @@
 
 const std = @import("std");
 
+const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
@@ -33,6 +34,7 @@ pub fn array(self: *Shapes) std.mem.Allocator.Error!*Object.Shape {
         const realm = self.realm;
         const agent = realm.agent;
         const shape = try Object.Shape.init(agent.gc_allocator);
+        shape.setInternalMethodsWithoutTransition(builtins.array.internal_methods);
         shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Array.prototype%"());
         self.lazy_shapes.array = shape;
         break :blk shape;
@@ -78,6 +80,7 @@ pub fn ordinaryFunction(self: *Shapes) std.mem.Allocator.Error!struct {
         const realm = self.realm;
         const agent = realm.agent;
         const shape = try Object.Shape.init(agent.gc_allocator);
+        shape.setInternalMethodsWithoutTransition(builtins.ecmascript_function.internal_methods_constructor);
         shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Function.prototype%"());
         try shape.setPropertyWithoutTransition(
             agent.gc_allocator,
@@ -206,6 +209,7 @@ pub fn mappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
         const realm = self.realm;
         const agent = realm.agent;
         const shape = try Object.Shape.init(agent.gc_allocator);
+        shape.setInternalMethodsWithoutTransition(builtins.arguments.internal_methods);
         shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Object.prototype%"());
         try shape.setPropertyWithoutTransition(
             agent.gc_allocator,
@@ -282,6 +286,7 @@ pub fn regExpExecObject(self: *Shapes) std.mem.Allocator.Error!struct {
         const realm = self.realm;
         const agent = realm.agent;
         const shape = try Object.Shape.init(agent.gc_allocator);
+        shape.setInternalMethodsWithoutTransition(builtins.array.internal_methods);
         shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Array.prototype%"());
         try shape.setPropertyWithoutTransition(
             agent.gc_allocator,

@@ -94,7 +94,7 @@ pub fn every(
     done: bool,
     continue_slow: usize,
 } {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -154,7 +154,7 @@ pub fn fill(
     end: u53,
     value: Value,
 ) std.mem.Allocator.Error!?void {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         // Dependencies of ordinary [[Set]]
         .ordinary_get_own_property,
@@ -221,7 +221,7 @@ pub fn findViaPredicate(
     done: FindViaPredicateResult,
     continue_slow: ?usize,
 } {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         // Dependencies of ordinary [[Get]]
         .ordinary_get_own_property,
@@ -319,7 +319,7 @@ pub fn forEach(
     done,
     continue_slow: usize,
 } {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -364,7 +364,7 @@ pub fn forEach(
 /// - Dense indexed property storage with at least `len` items
 /// - Ordinary internal methods: `[[Get]]`
 pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Value) ?bool {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         // Dependencies of ordinary [[Get]]
         .ordinary_get_own_property,
@@ -420,7 +420,7 @@ pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Valu
 /// - Dense indexed property storage with at least `len` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
 pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value) ?Value {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -476,7 +476,7 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
 /// - Dense indexed property storage with at least `len` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
 pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: Value) ?Value {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -533,7 +533,7 @@ pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: V
 /// - Dense indexed property storage with exactly `len` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
 pub fn reverse(object: *Object, len: u53) ?void {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         .ordinary_set,
@@ -569,7 +569,7 @@ pub fn reverse(object: *Object, len: u53) ?void {
 /// - Dense indexed property storage with exactly `len` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
 pub fn pop(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         .ordinary_set,
@@ -608,7 +608,7 @@ pub fn pop(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
 /// - If the object has no property storage yet and `values.len` > 0 it must be extensible
 /// - No indexed properties on the prototype chain
 pub fn push(agent: *Agent, object: *Object, len: u53, values: []const Value) Agent.Error!?Value {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         // Dependencies of ordinary [[Set]]
         .ordinary_get_own_property,
@@ -651,7 +651,7 @@ pub fn push(agent: *Agent, object: *Object, len: u53, values: []const Value) Age
 /// - Dense indexed property storage with exactly `len` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
 pub fn shift(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         .ordinary_set,
@@ -700,7 +700,7 @@ pub fn some(
     done: bool,
     continue_slow: usize,
 } {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -758,7 +758,7 @@ pub fn unshift(
     len: u53,
     values: []const Value,
 ) Agent.Error!?Value {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         // Dependencies of ordinary [[Set]]
         .ordinary_get_own_property,

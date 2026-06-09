@@ -78,8 +78,8 @@ pub const constructor = struct {
         );
 
         // Non-standard
-        std.debug.assert(aggregate_error.object.internal_methods == Object.InternalMethods.default);
-        aggregate_error.object.internal_methods = .initComptime(.{ .set = builtins.@"error".internalSet });
+        std.debug.assert(aggregate_error.object.internalMethods() == Object.InternalMethods.default);
+        try aggregate_error.object.setInternalMethods(agent, .initComptime(.{ .set = builtins.@"error".internalSet }));
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {

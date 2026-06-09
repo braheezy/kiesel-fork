@@ -1430,7 +1430,7 @@ pub fn prettyPrintValue(
             try terminal.setColor(.reset);
             return;
         }
-        if (object.internal_methods.call != null)
+        if (object.internalMethods().call != null)
             return prettyPrintFunction(object, terminal);
         return prettyPrintObject(object, terminal);
     }

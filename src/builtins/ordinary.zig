@@ -90,7 +90,7 @@ pub fn ordinarySetPrototypeOf(
         // c. Else,
         // i. If p.[[GetPrototypeOf]] is not the ordinary object internal method defined in 10.1.1,
         //    set done to true.
-        if (parent_prototype_object.internal_methods.getPrototypeOf != getPrototypeOf) break;
+        if (parent_prototype_object.internalMethods().getPrototypeOf != getPrototypeOf) break;
 
         // ii. Else, set p to p.[[Prototype]].
         parent_prototype = parent_prototype_object.prototype();
@@ -198,7 +198,7 @@ pub fn ordinaryDefineOwnProperty(
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!bool {
     // 1. Let current be ? O.[[GetOwnProperty]](P).
-    const current = try object.internal_methods.getOwnProperty(agent, object, property_key);
+    const current = try object.internalMethods().getOwnProperty(agent, object, property_key);
 
     // 2. Let extensible be ? IsExtensible(O).
     const extensible = try object.isExtensible(agent);
@@ -475,7 +475,7 @@ pub fn ordinaryHasProperty(
         return true;
     }
 
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
     }));
@@ -484,22 +484,22 @@ pub fn ordinaryHasProperty(
     if (has_ordinary_internal_methods) {
         if (object.property_storage.contains(object, property_key)) return true;
         const parent = object.prototype() orelse return false;
-        return parent.internal_methods.hasProperty(agent, parent, property_key);
+        return parent.internalMethods().hasProperty(agent, parent, property_key);
     }
 
     // 1. Let hasOwn be ? O.[[GetOwnProperty]](P).
-    const has_own = try object.internal_methods.getOwnProperty(agent, object, property_key);
+    const has_own = try object.internalMethods().getOwnProperty(agent, object, property_key);
 
     // 2. If hasOwn is not undefined, return true.
     if (has_own != null) return true;
 
     // 3. Let parent be ? O.[[GetPrototypeOf]]().
-    const parent = try object.internal_methods.getPrototypeOf(agent, object);
+    const parent = try object.internalMethods().getPrototypeOf(agent, object);
 
     // 4. If parent is not null, then
     if (parent) |parent_object| {
         // a. Return ? parent.[[HasProperty]](P).
-        return parent_object.internal_methods.hasProperty(agent, parent_object, property_key);
+        return parent_object.internalMethods().hasProperty(agent, parent_object, property_key);
     }
 
     // 5. Return false.
@@ -531,7 +531,7 @@ pub fn ordinaryGet(
         return Value.from(object.as(builtins.Array).fields.length);
     }
 
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
     }));
@@ -547,7 +547,7 @@ pub fn ordinaryGet(
         // Otherwise go through the prototype chain and invoke the getter if necessary.
         const property_descriptor = try object.property_storage.getCreateLazyIfNeeded(object, property_key) orelse {
             const parent = object.prototype() orelse return .undefined;
-            return parent.internal_methods.get(agent, parent, property_key, receiver);
+            return parent.internalMethods().get(agent, parent, property_key, receiver);
         };
         switch (property_descriptor.value_or_accessor) {
             .value => |value| return value,
@@ -559,16 +559,16 @@ pub fn ordinaryGet(
     }
 
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
-    const descriptor = try object.internal_methods.getOwnProperty(agent, object, property_key) orelse {
+    const descriptor = try object.internalMethods().getOwnProperty(agent, object, property_key) orelse {
         // 2. If desc is undefined, then
         // a. Let parent be ? O.[[GetPrototypeOf]]().
-        const parent = try object.internal_methods.getPrototypeOf(agent, object) orelse {
+        const parent = try object.internalMethods().getPrototypeOf(agent, object) orelse {
             // b. If parent is null, return undefined.
             return .undefined;
         };
 
         // c. Return ? parent.[[Get]](P, Receiver).
-        return parent.internal_methods.get(agent, parent, property_key, receiver);
+        return parent.internalMethods().get(agent, parent, property_key, receiver);
     };
 
     // 3. If IsDataDescriptor(desc) is true, return desc.[[Value]].
@@ -610,7 +610,7 @@ pub fn ordinarySet(
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
         .ordinary_is_extensible,
@@ -626,7 +626,7 @@ pub fn ordinarySet(
     {
         const property_metadata = object.shape.properties.get(property_key) orelse {
             if (object.prototype()) |parent| {
-                return parent.internal_methods.set(agent, parent, property_key, value, receiver);
+                return parent.internalMethods().set(agent, parent, property_key, value, receiver);
             }
             if (!object.extensible()) return false;
             try object.property_storage.set(object, agent.gc_allocator, property_key, .{
@@ -663,7 +663,7 @@ pub fn ordinarySet(
     }
 
     // 1. Let ownDesc be ? O.[[GetOwnProperty]](P).
-    const own_descriptor = try object.internal_methods.getOwnProperty(agent, object, property_key);
+    const own_descriptor = try object.internalMethods().getOwnProperty(agent, object, property_key);
 
     // 2. Return ? OrdinarySetWithOwnDescriptor(O, P, V, Receiver, ownDesc).
     return ordinarySetWithOwnDescriptor(
@@ -689,11 +689,11 @@ pub fn ordinarySetWithOwnDescriptor(
     // 1. If ownDesc is undefined, then
     const own_descriptor = maybe_own_descriptor orelse blk: {
         // a. Let parent be ? O.[[GetPrototypeOf]]().
-        const parent = try object.internal_methods.getPrototypeOf(agent, object);
+        const parent = try object.internalMethods().getPrototypeOf(agent, object);
 
         // b. If parent is not null, return ? parent.[[Set]](P, V, Receiver).
         if (parent) |parent_object| {
-            return parent_object.internal_methods.set(
+            return parent_object.internalMethods().set(
                 agent,
                 parent_object,
                 property_key,
@@ -722,7 +722,7 @@ pub fn ordinarySetWithOwnDescriptor(
         const receiver = receiver_value.asObject();
 
         // c. Let existingDescriptor be ? Receiver.[[GetOwnProperty]](P).
-        const existing_descriptor = try receiver.internal_methods.getOwnProperty(
+        const existing_descriptor = try receiver.internalMethods().getOwnProperty(
             agent,
             receiver,
             property_key,
@@ -745,7 +745,7 @@ pub fn ordinarySetWithOwnDescriptor(
         const value_descriptor: PropertyDescriptor = .{ .value = value };
 
         // h. Return ? Receiver.[[DefineOwnProperty]](P, valueDesc).
-        return receiver.internal_methods.defineOwnProperty(
+        return receiver.internalMethods().defineOwnProperty(
             agent,
             receiver,
             property_key,
@@ -783,7 +783,7 @@ pub fn ordinaryDelete(agent: *Agent, object: *Object, property_key: PropertyKey)
     }
 
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
-    const descriptor = try object.internal_methods.getOwnProperty(
+    const descriptor = try object.internalMethods().getOwnProperty(
         agent,
         object,
         property_key,

@@ -77,6 +77,15 @@ pub const BuiltinFunction = MakeObject(.{
     .display_name = "Builtin Function",
 });
 
+pub const internal_methods = Object.InternalMethods.initComptime(.{
+    .call = call,
+});
+
+pub const internal_methods_constructor = Object.InternalMethods.initComptime(.{
+    .call = call,
+    .construct = construct,
+});
+
 /// 10.3.1 [[Call]] ( thisArgument, argumentsList )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
 fn call(
@@ -264,10 +273,10 @@ pub fn createBuiltinFunction(
     //    parameters specified by behaviour. The new function object has internal slots whose names
     //    are the elements of internalSlotsList, and an [[InitialName]] internal slot.
     const function = try BuiltinFunction.create(agent, .{
-        .internal_methods = .initComptime(.{
-            .call = call,
-            .construct = if (behaviour == .constructor) construct else null,
-        }),
+        .internal_methods = switch (behaviour) {
+            .function => internal_methods,
+            .constructor => internal_methods_constructor,
+        },
 
         // 7. Set func.[[Async]] to async.
         // NOTE: This is done via `flags`.

@@ -40,7 +40,7 @@ fn getPrototypeOf(agent: *Agent, object: *Object) Agent.Error!?*Object {
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("getPrototypeOf")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[GetPrototypeOf]]().
-        return target.internal_methods.getPrototypeOf(agent, target);
+        return target.internalMethods().getPrototypeOf(agent, target);
     };
 
     // 7. Let handlerProto be ? Call(trap, handler, « target »).
@@ -69,7 +69,7 @@ fn getPrototypeOf(agent: *Agent, object: *Object) Agent.Error!?*Object {
     }
 
     // 11. Let targetProto be ? target.[[GetPrototypeOf]]().
-    const target_prototype = try target.internal_methods.getPrototypeOf(agent, target);
+    const target_prototype = try target.internalMethods().getPrototypeOf(agent, target);
 
     // 12. If SameValue(handlerProto, targetProto) is false, throw a TypeError exception.
     if (!sameValue(
@@ -106,7 +106,7 @@ fn setPrototypeOf(agent: *Agent, object: *Object, prototype: ?*Object) Agent.Err
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("setPrototypeOf")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[SetPrototypeOf]](V).
-        return target.internal_methods.setPrototypeOf(agent, target, prototype);
+        return target.internalMethods().setPrototypeOf(agent, target, prototype);
     };
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, V »)).
@@ -126,7 +126,7 @@ fn setPrototypeOf(agent: *Agent, object: *Object, prototype: ?*Object) Agent.Err
     if (extensible_target) return true;
 
     // 11. Let targetProto be ? target.[[GetPrototypeOf]]().
-    const target_prototype = try target.internal_methods.getPrototypeOf(agent, target);
+    const target_prototype = try target.internalMethods().getPrototypeOf(agent, target);
 
     // 12. If SameValue(V, targetProto) is false, throw a TypeError exception.
     if (prototype != target_prototype) {
@@ -205,7 +205,7 @@ fn preventExtensions(agent: *Agent, object: *Object) Agent.Error!bool {
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("preventExtensions")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[PreventExtensions]]().
-        return target.internal_methods.preventExtensions(agent, target);
+        return target.internalMethods().preventExtensions(agent, target);
     };
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target »)).
@@ -260,7 +260,7 @@ fn getOwnProperty(
     ) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[GetOwnProperty]](P).
-        return target.internal_methods.getOwnProperty(agent, target, property_key);
+        return target.internalMethods().getOwnProperty(agent, target, property_key);
     };
 
     // 7. Let trapResultObj be ? Call(trap, handler, « target, P »).
@@ -281,7 +281,7 @@ fn getOwnProperty(
     }
 
     // 9. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(
+    const target_descriptor = try target.internalMethods().getOwnProperty(
         agent,
         target,
         property_key,
@@ -398,7 +398,7 @@ fn defineOwnProperty(
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("defineProperty")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[DefineOwnProperty]](P, Desc).
-        return target.internal_methods.defineOwnProperty(
+        return target.internalMethods().defineOwnProperty(
             agent,
             target,
             property_key,
@@ -424,7 +424,7 @@ fn defineOwnProperty(
     if (!boolean_trap_result) return false;
 
     // 10. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(
+    const target_descriptor = try target.internalMethods().getOwnProperty(
         agent,
         target,
         property_key,
@@ -520,7 +520,7 @@ fn hasProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("has")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[HasProperty]](P).
-        return target.internal_methods.hasProperty(agent, target, property_key);
+        return target.internalMethods().hasProperty(agent, target, property_key);
     };
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P »)).
@@ -533,7 +533,7 @@ fn hasProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.
     // 8. If booleanTrapResult is false, then
     if (!boolean_trap_result) {
         // a. Let targetDesc be ? target.[[GetOwnProperty]](P).
-        const target_descriptor = try target.internal_methods.getOwnProperty(
+        const target_descriptor = try target.internalMethods().getOwnProperty(
             agent,
             target,
             property_key,
@@ -592,7 +592,7 @@ fn get(
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("get")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[Get]](P, Receiver).
-        return target.internal_methods.get(agent, target, property_key, receiver);
+        return target.internalMethods().get(agent, target, property_key, receiver);
     };
 
     // 7. Let trapResult be ? Call(trap, handler, « target, P, Receiver »).
@@ -603,7 +603,7 @@ fn get(
     );
 
     // 8. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(
+    const target_descriptor = try target.internalMethods().getOwnProperty(
         agent,
         target,
         property_key,
@@ -666,7 +666,7 @@ fn set(
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("set")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[Set]](P, V, Receiver).
-        return target.internal_methods.set(agent, target, property_key, value, receiver);
+        return target.internalMethods().set(agent, target, property_key, value, receiver);
     };
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P, V, Receiver »)).
@@ -680,7 +680,7 @@ fn set(
     if (!boolean_trap_result) return false;
 
     // 9. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(
+    const target_descriptor = try target.internalMethods().getOwnProperty(
         agent,
         target,
         property_key,
@@ -736,7 +736,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("deleteProperty")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[Delete]](P).
-        return target.internal_methods.delete(agent, target, property_key);
+        return target.internalMethods().delete(agent, target, property_key);
     };
 
     // 7. Let booleanTrapResult be ToBoolean(? Call(trap, handler, « target, P »)).
@@ -750,7 +750,7 @@ fn delete(agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error
     if (!boolean_trap_result) return false;
 
     // 9. Let targetDesc be ? target.[[GetOwnProperty]](P).
-    const target_descriptor = try target.internal_methods.getOwnProperty(
+    const target_descriptor = try target.internalMethods().getOwnProperty(
         agent,
         target,
         property_key,
@@ -806,7 +806,7 @@ fn ownPropertyKeys(
     const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("ownKeys")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[OwnPropertyKeys]]().
-        return target.internal_methods.ownPropertyKeys(agent, target);
+        return target.internalMethods().ownPropertyKeys(agent, target);
     };
 
     // 7. Let trapResultArray be ? Call(trap, handler, « target »).
@@ -846,7 +846,7 @@ fn ownPropertyKeys(
     // 11. Let targetKeys be ? target.[[OwnPropertyKeys]]().
     // 12. Assert: targetKeys is a List of property keys.
     // 13. Assert: targetKeys contains no duplicate entries.
-    const target_keys = try target.internal_methods.ownPropertyKeys(agent, target);
+    const target_keys = try target.internalMethods().ownPropertyKeys(agent, target);
     defer agent.gc_allocator.free(target_keys);
 
     // 14. Let targetConfigurableKeys be a new empty List.
@@ -860,7 +860,7 @@ fn ownPropertyKeys(
     // 16. For each element key of targetKeys, do
     for (target_keys) |key| {
         // a. Let desc be ? target.[[GetOwnProperty]](key).
-        const property_descriptor = try target.internal_methods.getOwnProperty(agent, target, key);
+        const property_descriptor = try target.internalMethods().getOwnProperty(agent, target, key);
 
         // b. If desc is not undefined and desc.[[Configurable]] is false, then
         if (property_descriptor != null and property_descriptor.?.configurable == false) {
@@ -1049,8 +1049,25 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!*Proxy 
 
     // 3. Let P be MakeBasicObject(« [[ProxyHandler]], [[ProxyTarget]] »).
     const proxy = try Proxy.create(agent, .{
-        .prototype = undefined,
+        .internal_methods = blk: {
+            // 4. Set P's essential internal methods, except for [[Call]] and [[Construct]], to the
+            //    definitions specified in 10.5.
+            var internal_methods = proxyInternalMethods(false, false);
 
+            // 5. If IsCallable(target) is true, then
+            if (target.isCallable()) {
+                // a. Set P.[[Call]] as specified in 10.5.12.
+                internal_methods = proxyInternalMethods(true, false);
+
+                // b. If IsConstructor(target) is true, then
+                if (target.isConstructor()) {
+                    // i. Set P.[[Construct]] as specified in 10.5.13.
+                    internal_methods = proxyInternalMethods(true, true);
+                }
+            }
+            break :blk internal_methods;
+        },
+        .prototype = undefined,
         .fields = .{
             // 6. Set P.[[ProxyTarget]] to target.
             .proxy_target = target.asObject(),
@@ -1058,23 +1075,7 @@ fn proxyCreate(agent: *Agent, target: Value, handler: Value) Agent.Error!*Proxy 
             // 7. Set P.[[ProxyHandler]] to handler.
             .proxy_handler = handler.asObject(),
         },
-
-        // 4. Set P's essential internal methods, except for [[Call]] and [[Construct]], to the
-        //    definitions specified in 10.5.
-        .internal_methods = proxyInternalMethods(false, false),
     });
-
-    // 5. If IsCallable(target) is true, then
-    if (target.isCallable()) {
-        // a. Set P.[[Call]] as specified in 10.5.12.
-        proxy.object.internal_methods = proxyInternalMethods(true, false);
-
-        // b. If IsConstructor(target) is true, then
-        if (target.isConstructor()) {
-            // i. Set P.[[Construct]] as specified in 10.5.13.
-            proxy.object.internal_methods = proxyInternalMethods(true, true);
-        }
-    }
 
     // 8. Return P.
     return proxy;

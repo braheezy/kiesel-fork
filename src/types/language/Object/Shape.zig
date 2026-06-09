@@ -5,12 +5,14 @@ const types = @import("../../../types.zig");
 
 const Object = types.Object;
 const Attributes = Object.PropertyStorage.Attributes;
+const InternalMethods = Object.InternalMethods;
 const PropertyKey = types.PropertyKey;
 const PropertyType = Object.PropertyStorage.PropertyType;
 
 const Shape = @This();
 
 pub const Transition = union(enum) {
+    set_internal_methods: *const InternalMethods,
     set_prototype: ?*Object,
     set_non_extensible,
     set_is_htmldda,
@@ -21,6 +23,9 @@ pub const Transition = union(enum) {
         var hasher = std.hash.Wyhash.init(0);
         hasher.update(std.mem.asBytes(&std.meta.activeTag(self)));
         switch (self) {
+            .set_internal_methods => |internal_methods| {
+                hasher.update(std.mem.asBytes(&internal_methods));
+            },
             .set_prototype => |prototype| {
                 hasher.update(std.mem.asBytes(&prototype));
             },
@@ -41,6 +46,7 @@ pub const Transition = union(enum) {
     pub fn eql(a: Transition, b: Transition) bool {
         if (std.meta.activeTag(a) != std.meta.activeTag(b)) return false;
         return switch (a) {
+            .set_internal_methods => a.set_internal_methods == b.set_internal_methods,
             .set_prototype => return a.set_prototype == b.set_prototype,
             .set_non_extensible, .set_is_htmldda => true,
             .set_property => a.set_property[0].eql(b.set_property[0]) and
@@ -97,6 +103,7 @@ transition_count: TransitionCount,
 next_offset: PropertyOffset,
 transitions: Transition.HashMapUnmanaged(*Shape),
 properties: PropertyKey.ArrayHashMapUnmanaged(PropertyMetadata),
+internal_methods: *const InternalMethods,
 
 /// [[Prototype]]
 prototype: ?*Object,
@@ -114,6 +121,7 @@ pub fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!*Shape {
         .next_offset = .zero,
         .transitions = .empty,
         .properties = .empty,
+        .internal_methods = .default,
         .prototype = null,
         .extensible = true,
         .is_htmldda = if (build_options.enable_annex_b) false,
@@ -146,6 +154,7 @@ fn clone(self: *const Shape, allocator: std.mem.Allocator) std.mem.Allocator.Err
         .next_offset = self.next_offset,
         .transitions = .empty,
         .properties = try self.properties.clone(allocator),
+        .internal_methods = self.internal_methods,
         .prototype = self.prototype,
         .extensible = self.extensible,
         .is_htmldda = self.is_htmldda,
@@ -165,6 +174,26 @@ fn getOrCreateShape(
     shape.transition_count = @enumFromInt(@intFromEnum(self.transition_count) + 1);
     shape_gop.value_ptr.* = shape;
     return shape;
+}
+
+pub fn setInternalMethods(
+    self: *Shape,
+    allocator: std.mem.Allocator,
+    internal_methods: *const InternalMethods,
+) std.mem.Allocator.Error!*Shape {
+    const shape = switch (self.transition_count) {
+        .unique => self,
+        .max => try self.makeUnique(allocator),
+        else => try self.getOrCreateShape(allocator, .{ .set_internal_methods = internal_methods }),
+    };
+    shape.internal_methods = internal_methods;
+    return shape;
+}
+
+pub fn setInternalMethodsWithoutTransition(self: *Shape, internal_methods: *const InternalMethods) void {
+    // It's not valid to alter a shape that's part of a transition chain.
+    std.debug.assert(self.transition_count == .zero or self.transition_count == .unique);
+    self.internal_methods = internal_methods;
 }
 
 pub fn setPrototype(

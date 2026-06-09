@@ -37,7 +37,6 @@ pub const Shape = @import("Object/Shape.zig");
 const Object = @This();
 
 tag: Tag,
-internal_methods: *const InternalMethods,
 shape: *Shape,
 property_storage: PropertyStorage,
 
@@ -145,6 +144,18 @@ pub fn cast(self: *const Object, comptime T: type) ?*T {
     return if (self.is(T)) self.as(T) else null;
 }
 
+pub fn internalMethods(self: *const Object) *const InternalMethods {
+    return self.shape.internal_methods;
+}
+
+pub fn setInternalMethods(
+    self: *Object,
+    agent: *Agent,
+    new_internal_methods: *const InternalMethods,
+) std.mem.Allocator.Error!void {
+    self.shape = try self.shape.setInternalMethods(agent.gc_allocator, new_internal_methods);
+}
+
 pub fn prototype(self: *const Object) ?*Object {
     return self.shape.prototype;
 }
@@ -194,7 +205,7 @@ pub fn setAccessorAtPropertyOffset(
 }
 
 pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
-    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         // Dependencies of ordinary [[Get]]
         .ordinary_get_own_property,
@@ -216,7 +227,7 @@ pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
 }
 
 pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, value: Value) std.mem.Allocator.Error!bool {
-    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         // Dependencies of ordinary [[Set]]
         .ordinary_get_own_property,
@@ -282,7 +293,7 @@ pub fn createDataPropertyDirect(
     property_key: PropertyKey,
     value: Value,
 ) std.mem.Allocator.Error!void {
-    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_define_own_property,
         .ordinary_get_own_property,
         .ordinary_is_extensible,
@@ -304,7 +315,7 @@ pub fn createDataPropertyDirect(
         });
     } else {
         // Non-ordinary objects like arrays need to go through `[[DefineOwnProperty]]` to set the length.
-        const result = self.internal_methods.defineOwnProperty(agent, self, property_key, .{
+        const result = self.internalMethods().defineOwnProperty(agent, self, property_key, .{
             .value = value,
             .writable = true,
             .enumerable = true,
@@ -323,7 +334,7 @@ pub fn definePropertyDirect(
     property_key: PropertyKey,
     property_descriptor: PropertyStorage.CompletePropertyDescriptor,
 ) std.mem.Allocator.Error!void {
-    const has_ordinary_internal_methods = self.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_define_own_property,
         .ordinary_get_own_property,
         .ordinary_is_extensible,
@@ -343,7 +354,7 @@ pub fn definePropertyDirect(
             property_descriptor,
         );
     } else {
-        const result = self.internal_methods.defineOwnProperty(
+        const result = self.internalMethods().defineOwnProperty(
             agent,
             self,
             property_key,
@@ -660,14 +671,14 @@ pub fn ordinaryToPrimitive(self: *Object, agent: *Agent, hint: PreferredType) Ag
 /// https://tc39.es/ecma262/#sec-isextensible-o
 pub fn isExtensible(self: *Object, agent: *Agent) Agent.Error!bool {
     // 1. Return ? O.[[IsExtensible]]().
-    return self.internal_methods.isExtensible(agent, self);
+    return self.internalMethods().isExtensible(agent, self);
 }
 
 /// 7.3.2 Get ( O, P )
 /// https://tc39.es/ecma262/#sec-get-o-p
 pub fn get(self: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!Value {
     // 1. Return ? O.[[Get]](P, O).
-    return self.internal_methods.get(agent, self, property_key, Value.from(self));
+    return self.internalMethods().get(agent, self, property_key, Value.from(self));
 }
 
 /// 7.3.4 Set ( O, P, V, Throw )
@@ -680,7 +691,7 @@ pub fn set(
     throw: enum { throw, ignore },
 ) Agent.Error!void {
     // 1. Let success be ? O.[[Set]](P, V, O).
-    const success = try self.internal_methods.set(
+    const success = try self.internalMethods().set(
         agent,
         self,
         property_key,
@@ -708,7 +719,7 @@ pub fn createDataProperty(self: *Object, agent: *Agent, property_key: PropertyKe
     };
 
     // 2. Return ? O.[[DefineOwnProperty]](P, newDesc).
-    return self.internal_methods.defineOwnProperty(agent, self, property_key, new_descriptor);
+    return self.internalMethods().defineOwnProperty(agent, self, property_key, new_descriptor);
 }
 
 /// 7.3.6 CreateDataPropertyOrThrow ( O, P, V )
@@ -776,7 +787,7 @@ pub fn definePropertyOrThrow(
     property_descriptor: PropertyDescriptor,
 ) Agent.Error!void {
     // 1. Let success be ? O.[[DefineOwnProperty]](P, desc).
-    const success = try self.internal_methods.defineOwnProperty(
+    const success = try self.internalMethods().defineOwnProperty(
         agent,
         self,
         property_key,
@@ -794,7 +805,7 @@ pub fn definePropertyOrThrow(
 /// https://tc39.es/ecma262/#sec-deletepropertyorthrow
 pub fn deletePropertyOrThrow(self: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!void {
     // 1. Let success be ? O.[[Delete]](P).
-    const success = try self.internal_methods.delete(agent, self, property_key);
+    const success = try self.internalMethods().delete(agent, self, property_key);
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
@@ -807,14 +818,14 @@ pub fn deletePropertyOrThrow(self: *Object, agent: *Agent, property_key: Propert
 /// https://tc39.es/ecma262/#sec-hasproperty
 pub fn hasProperty(self: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!bool {
     // 1. Return ? O.[[HasProperty]](P).
-    return self.internal_methods.hasProperty(agent, self, property_key);
+    return self.internalMethods().hasProperty(agent, self, property_key);
 }
 
 /// 7.3.12 HasOwnProperty ( O, P )
 /// https://tc39.es/ecma262/#sec-hasownproperty
 pub fn hasOwnProperty(self: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!bool {
     // 1. Let desc be ? O.[[GetOwnProperty]](P).
-    const descriptor = try self.internal_methods.getOwnProperty(agent, self, property_key);
+    const descriptor = try self.internalMethods().getOwnProperty(agent, self, property_key);
 
     // 2. If desc is undefined, return false.
     // 3. Return true.
@@ -835,20 +846,20 @@ pub fn construct(
     // 2. If argumentsList is not present, set argumentsList to a new empty List.
 
     // 3. Return ? F.[[Construct]](argumentsList, newTarget).
-    return self.internal_methods.construct.?(agent, self, Arguments.from(arguments_list), new_target);
+    return self.internalMethods().construct.?(agent, self, Arguments.from(arguments_list), new_target);
 }
 
 /// 7.3.15 SetIntegrityLevel ( O, level )
 /// https://tc39.es/ecma262/#sec-setintegritylevel
 pub fn setIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Agent.Error!bool {
     // 1. Let status be ? O.[[PreventExtensions]]().
-    const status = try self.internal_methods.preventExtensions(agent, self);
+    const status = try self.internalMethods().preventExtensions(agent, self);
 
     // 2. If status is false, return false.
     if (!status) return false;
 
     // 3. Let keys be ? O.[[OwnPropertyKeys]]().
-    const keys = try self.internal_methods.ownPropertyKeys(agent, self);
+    const keys = try self.internalMethods().ownPropertyKeys(agent, self);
     defer agent.gc_allocator.free(keys);
 
     switch (level) {
@@ -869,7 +880,7 @@ pub fn setIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Ag
             // b. For each element k of keys, do
             for (keys) |property_key| {
                 // i. Let currentDesc be ? O.[[GetOwnProperty]](k).
-                const maybe_current_descriptor = try self.internal_methods.getOwnProperty(
+                const maybe_current_descriptor = try self.internalMethods().getOwnProperty(
                     agent,
                     self,
                     property_key,
@@ -912,13 +923,13 @@ pub fn testIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) A
     if (extensible_) return false;
 
     // 4. Let keys be ? O.[[OwnPropertyKeys]]().
-    const keys = try self.internal_methods.ownPropertyKeys(agent, self);
+    const keys = try self.internalMethods().ownPropertyKeys(agent, self);
     defer agent.gc_allocator.free(keys);
 
     // 5. For each element k of keys, do
     for (keys) |property_key| {
         // a. Let currentDesc be ? O.[[GetOwnProperty]](k).
-        const maybe_current_descriptor = try self.internal_methods.getOwnProperty(
+        const maybe_current_descriptor = try self.internalMethods().getOwnProperty(
             agent,
             self,
             property_key,
@@ -990,7 +1001,7 @@ pub fn enumerableOwnProperties(
     comptime kind: EnumerationKind,
 ) Agent.Error!std.ArrayList(Value) {
     // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
-    const own_keys = try self.internal_methods.ownPropertyKeys(agent, self);
+    const own_keys = try self.internalMethods().ownPropertyKeys(agent, self);
     defer agent.gc_allocator.free(own_keys);
 
     // 2. Let results be a new empty List.
@@ -1001,7 +1012,7 @@ pub fn enumerableOwnProperties(
         // a. If key is a String, then
         if (key == .string or key == .integer_index) {
             // i. Let desc be ? O.[[GetOwnProperty]](key).
-            const descriptor = try self.internal_methods.getOwnProperty(agent, self, key);
+            const descriptor = try self.internalMethods().getOwnProperty(agent, self, key);
 
             // ii. If desc is not undefined and desc.[[Enumerable]] is true, then
             if (descriptor != null and descriptor.?.enumerable == true) {
@@ -1045,7 +1056,7 @@ pub fn enumerableOwnProperties(
 /// https://tc39.es/ecma262/#sec-getfunctionrealm
 pub fn getFunctionRealm(self: *const Object, agent: *Agent) error{ExceptionThrown}!*Realm {
     // 1. If obj has a [[Realm]] internal slot, then
-    if (self.internal_methods.call != null) {
+    if (self.internalMethods().call != null) {
         // a. Return obj.[[Realm]].
         if (self.cast(builtins.BuiltinFunction)) |builtin_function| {
             return builtin_function.fields.realm;
@@ -1074,7 +1085,7 @@ pub fn getFunctionRealm(self: *const Object, agent: *Agent) error{ExceptionThrow
         const proxy_target = proxy.fields.proxy_target.?;
 
         // c. Assert: proxyTarget is a function object.
-        std.debug.assert(proxy_target.internal_methods.call != null);
+        std.debug.assert(proxy_target.internalMethods().call != null);
 
         // d. Return ? GetFunctionRealm(proxyTarget).
         return proxy_target.getFunctionRealm(agent);
@@ -1099,7 +1110,7 @@ pub fn copyDataProperties(
     const from = source.toObject(agent) catch |err| try noexcept(err);
 
     // 3. Let keys be ? from.[[OwnPropertyKeys]]().
-    const keys = try from.internal_methods.ownPropertyKeys(agent, from);
+    const keys = try from.internalMethods().ownPropertyKeys(agent, from);
     defer agent.gc_allocator.free(keys);
 
     // 4. For each element nextKey of keys, do
@@ -1117,7 +1128,7 @@ pub fn copyDataProperties(
         // c. If excluded is false, then
         if (!excluded) {
             // i. Let desc be ? from.[[GetOwnProperty]](nextKey).
-            const descriptor = try from.internal_methods.getOwnProperty(
+            const descriptor = try from.internalMethods().getOwnProperty(
                 agent,
                 from,
                 next_key,

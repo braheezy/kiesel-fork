@@ -118,7 +118,7 @@ pub const namespace = struct {
 
         // 4. Return ? target.[[DefineOwnProperty]](key, desc).
         return Value.from(
-            try target.asObject().internal_methods.defineOwnProperty(
+            try target.asObject().internalMethods().defineOwnProperty(
                 agent,
                 target.asObject(),
                 key,
@@ -142,7 +142,7 @@ pub const namespace = struct {
         const key = try property_key.toPropertyKey(agent);
 
         // 3. Return ? target.[[Delete]](key).
-        return Value.from(try target.asObject().internal_methods.delete(
+        return Value.from(try target.asObject().internalMethods().delete(
             agent,
             target.asObject(),
             key,
@@ -168,7 +168,7 @@ pub const namespace = struct {
         const receiver = arguments.getOrNull(2) orelse target;
 
         // 4. Return ? target.[[Get]](key, receiver).
-        return try target.asObject().internal_methods.get(
+        return try target.asObject().internalMethods().get(
             agent,
             target.asObject(),
             key,
@@ -191,7 +191,7 @@ pub const namespace = struct {
         const key = try property_key.toPropertyKey(agent);
 
         // 3. Let desc be ? target.[[GetOwnProperty]](key).
-        const maybe_descriptor = try target.asObject().internal_methods.getOwnProperty(
+        const maybe_descriptor = try target.asObject().internalMethods().getOwnProperty(
             agent,
             target.asObject(),
             key,
@@ -216,7 +216,7 @@ pub const namespace = struct {
 
         // 2. Return ? target.[[GetPrototypeOf]]().
         return Value.from(
-            try target.asObject().internal_methods.getPrototypeOf(
+            try target.asObject().internalMethods().getPrototypeOf(
                 agent,
                 target.asObject(),
             ) orelse return .null,
@@ -239,7 +239,7 @@ pub const namespace = struct {
 
         // 3. Return ? target.[[HasProperty]](key).
         return Value.from(
-            try target.asObject().internal_methods.hasProperty(agent, target.asObject(), key),
+            try target.asObject().internalMethods().hasProperty(agent, target.asObject(), key),
         );
     }
 
@@ -255,7 +255,7 @@ pub const namespace = struct {
 
         // 2. Return ? target.[[IsExtensible]]().
         return Value.from(
-            try target.asObject().internal_methods.isExtensible(agent, target.asObject()),
+            try target.asObject().internalMethods().isExtensible(agent, target.asObject()),
         );
     }
 
@@ -270,7 +270,7 @@ pub const namespace = struct {
         }
 
         // 2. Let keys be ? target.[[OwnPropertyKeys]]().
-        const keys = try target.asObject().internal_methods.ownPropertyKeys(
+        const keys = try target.asObject().internalMethods().ownPropertyKeys(
             agent,
             target.asObject(),
         );
@@ -297,7 +297,7 @@ pub const namespace = struct {
 
         // 2. Return ? target.[[PreventExtensions]]().
         return Value.from(
-            try target.asObject().internal_methods.preventExtensions(agent, target.asObject()),
+            try target.asObject().internalMethods().preventExtensions(agent, target.asObject()),
         );
     }
 
@@ -322,7 +322,7 @@ pub const namespace = struct {
 
         // 4. Return ? target.[[Set]](key, V, receiver).
         return Value.from(
-            try target.asObject().internal_methods.set(
+            try target.asObject().internalMethods().set(
                 agent,
                 target.asObject(),
                 key,
@@ -350,7 +350,7 @@ pub const namespace = struct {
 
         // 3. Return ? target.[[SetPrototypeOf]](proto).
         return Value.from(
-            try target.asObject().internal_methods.setPrototypeOf(
+            try target.asObject().internalMethods().setPrototypeOf(
                 agent,
                 target.asObject(),
                 if (prototype.isObject()) prototype.asObject() else null,

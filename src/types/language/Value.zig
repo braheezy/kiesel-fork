@@ -577,7 +577,7 @@ pub fn typeof(self: Value) *const String {
             }
 
             // 13. If val has a [[Call]] internal method, return "function".
-            if (self.asObject().internal_methods.call) |_| break :blk String.fromLiteral("function");
+            if (self.asObject().internalMethods().call) |_| break :blk String.fromLiteral("function");
 
             // 14. Return "object".
             break :blk String.fromLiteral("object");
@@ -1398,7 +1398,7 @@ pub fn isCallable(self: Value) bool {
     if (!self.isObject()) return false;
 
     // 2. If argument has a [[Call]] internal method, return true.
-    if (self.asObject().internal_methods.call != null) return true;
+    if (self.asObject().internalMethods().call != null) return true;
 
     // 3. Return false.
     return false;
@@ -1411,7 +1411,7 @@ pub fn isConstructor(self: Value) bool {
     if (!self.isObject()) return false;
 
     // 2. If argument has a [[Construct]] internal method, return true.
-    if (self.asObject().internal_methods.construct != null) return true;
+    if (self.asObject().internalMethods().construct != null) return true;
 
     // 3. Return false.
     return false;
@@ -1446,7 +1446,7 @@ pub fn get(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!Va
     const object = try self.toObject(agent);
 
     // 2. Return ? O.[[Get]](P, V).
-    return object.internal_methods.get(agent, object, property_key, self);
+    return object.internalMethods().get(agent, object, property_key, self);
 }
 
 /// 7.3.10 GetMethod ( V, P )
@@ -1484,7 +1484,7 @@ pub fn call(
 
     // 3. Return ? F.[[Call]](V, argumentsList).
     const object = self.asObject();
-    return object.internal_methods.call.?(
+    return object.internalMethods().call.?(
         agent,
         object,
         this_value,
@@ -1499,7 +1499,7 @@ pub fn callAssumeCallable(
     arguments_list: []const Value,
 ) Agent.Error!Value {
     const object = self.asObject();
-    return object.internal_methods.call.?(
+    return object.internalMethods().call.?(
         agent,
         object,
         this_value,
@@ -1617,7 +1617,7 @@ pub fn ordinaryHasInstance(self: Value, agent: *Agent, object_value: Value) Agen
     // 6. Repeat,
     while (true) {
         // a. Set O to ? O.[[GetPrototypeOf]]().
-        object = try object.internal_methods.getPrototypeOf(agent, object) orelse {
+        object = try object.internalMethods().getPrototypeOf(agent, object) orelse {
             // b. If O is null, return false.
             return false;
         };
@@ -1774,7 +1774,7 @@ pub fn setterThatIgnoresPrototypeProperties(
     }
 
     // 3. Let desc be ? thisValue.[[GetOwnProperty]](p).
-    const property_descriptor = try this_value.internal_methods.getOwnProperty(
+    const property_descriptor = try this_value.internalMethods().getOwnProperty(
         agent,
         this_value,
         property_key,

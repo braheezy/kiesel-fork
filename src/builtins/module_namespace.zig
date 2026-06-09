@@ -81,7 +81,7 @@ fn getOwnProperty(agent: *Agent, object: *Object, property_key: PropertyKey) Age
     }
 
     // 4. Let value be ? O.[[Get]](P, O).
-    const value = try object.internal_methods.get(agent, object, property_key, Value.from(object));
+    const value = try object.internalMethods().get(agent, object, property_key, Value.from(object));
 
     // 5. Return PropertyDescriptor { [[Value]]: value, [[Writable]]: true, [[Enumerable]]: true,
     //    [[Configurable]]: false }.
@@ -102,7 +102,7 @@ fn defineOwnProperty(
     }
 
     // 2. Let current be ? O.[[GetOwnProperty]](P).
-    const current = try object.internal_methods.getOwnProperty(agent, object, property_key) orelse {
+    const current = try object.internalMethods().getOwnProperty(agent, object, property_key) orelse {
         // 3. If current is undefined, return false.
         return false;
     };

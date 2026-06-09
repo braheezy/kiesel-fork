@@ -492,7 +492,7 @@ pub const constructor = struct {
         defer padding.deinit(agent.gc_allocator);
 
         // 10. Let allKeys be ? iterables.[[OwnPropertyKeys]]().
-        const all_keys = try iterables.internal_methods.ownPropertyKeys(
+        const all_keys = try iterables.internalMethods().ownPropertyKeys(
             agent,
             iterables,
         );
@@ -505,7 +505,7 @@ pub const constructor = struct {
         // 12. For each element key of allKeys, do
         for (all_keys) |key| {
             // a. Let desc be Completion(iterables.[[GetOwnProperty]](key)).
-            const descriptor = iterables.internal_methods.getOwnProperty(
+            const descriptor = iterables.internalMethods().getOwnProperty(
                 agent,
                 iterables,
                 key,

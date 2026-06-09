@@ -123,7 +123,7 @@ pub fn getSuperBase(self: *const FunctionEnvironment, agent: *Agent) std.mem.All
     // 3. Assert: home is an ordinary object.
     // 4. Return ! home.[[GetPrototypeOf]]().
     return .{
-        .object = home.internal_methods.getPrototypeOf(
+        .object = home.internalMethods().getPrototypeOf(
             agent,
             home,
         ) catch |err| try noexcept(err),

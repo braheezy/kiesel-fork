@@ -167,7 +167,7 @@ pub fn deleteBinding(self: *const ObjectEnvironment, agent: *Agent, name: *const
 
     // 1. Let bindingObject be envRec.[[BindingObject]].
     // 2. Return ? bindingObject.[[Delete]](N).
-    return self.binding_object.internal_methods.delete(
+    return self.binding_object.internalMethods().delete(
         agent,
         self.binding_object,
         property_key,
@@ -217,7 +217,7 @@ pub fn getBindingValueIfExists(
     strict: bool,
 ) Agent.Error!?Value {
     const object = self.binding_object;
-    const has_ordinary_internal_methods = object.internal_methods.flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
