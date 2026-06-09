@@ -232,7 +232,7 @@ const NanBoxingImpl = enum(u64) {
             return nan_mask | tag_bits | ptr_bits;
         } else if (@sizeOf(T) != 0) {
             // @bitCast() doesn't work on void
-            const payload_bits: std.meta.Int(.unsigned, @bitSizeOf(T)) = @bitCast(payload);
+            const payload_bits: @Int(.unsigned, @bitSizeOf(T)) = @bitCast(payload);
             return nan_mask | tag_bits | payload_bits;
         } else {
             return nan_mask | tag_bits;
@@ -264,7 +264,7 @@ const NanBoxingImpl = enum(u64) {
             const ptr_bits: if (@sizeOf(T) >= 8) u48 else usize = @truncate(bits);
             return @ptrFromInt(ptr_bits);
         } else {
-            const payload_bits: std.meta.Int(.unsigned, @bitSizeOf(T)) = @truncate(bits);
+            const payload_bits: @Int(.unsigned, @bitSizeOf(T)) = @truncate(bits);
             return @bitCast(payload_bits);
         }
     }
