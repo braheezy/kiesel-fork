@@ -59,13 +59,14 @@ fn prettyPrintArray(
     terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     const length = array.fields.length;
+    const indexed_properties = array.object.indexedProperties();
 
     try terminal.setColor(.white);
     try terminal.writer.writeAll("[");
     try terminal.setColor(.reset);
     if (length != 0) try terminal.writer.writeAll(" ");
     for (0..length) |i| {
-        if (array.object.property_storage.indexed_properties.get(@intCast(i))) |property_descriptor| {
+        if (indexed_properties.get(@intCast(i))) |property_descriptor| {
             switch (property_descriptor.value_or_accessor) {
                 .value => |value| {
                     try terminal.writer.print("{f}", .{value.fmtPretty(terminal.mode)});

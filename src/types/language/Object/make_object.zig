@@ -70,7 +70,6 @@ pub fn MakeObject(
                     .shape = agent.empty_shape,
                     .property_storage = .{
                         .properties = .empty,
-                        .indexed_properties = .empty,
                     },
                     .extra_data = null,
                 },
@@ -105,7 +104,6 @@ pub fn MakeObject(
                     .shape = args.shape,
                     .property_storage = .{
                         .properties = .empty,
-                        .indexed_properties = .empty,
                     },
                     .extra_data = null,
                 },

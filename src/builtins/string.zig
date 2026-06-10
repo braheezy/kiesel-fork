@@ -376,6 +376,8 @@ fn ownPropertyKeys(
     agent: *Agent,
     object: *Object,
 ) std.mem.Allocator.Error![]PropertyKey {
+    const indexed_properties = object.indexedProperties();
+
     // 2. Let str be O.[[StringData]].
     // 3. Assert: str is a String.
     const str = object.as(String).fields.string_data;
@@ -386,7 +388,7 @@ fn ownPropertyKeys(
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
-        object.property_storage.indexed_properties.count() +
+        indexed_properties.count() +
             object.shape.properties.count() +
             len,
     );
@@ -400,7 +402,7 @@ fn ownPropertyKeys(
     // 6. For each own property key P of O such that P is an array index and ! ToIntegerOrInfinity(
     //    P) ≥ len, in ascending numeric index order, do
     //     a. Append P to keys.
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         inline .sparse_value, .sparse_property_descriptor => |sparse| {
             var it = sparse.keyIterator();
@@ -416,7 +418,7 @@ fn ownPropertyKeys(
             }.lessThanFn);
         },
         else => {
-            for (len..object.property_storage.indexed_properties.count()) |index| {
+            for (len..indexed_properties.count()) |index| {
                 const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
                 keys.appendAssumeCapacity(property_key);
             }

@@ -11,7 +11,6 @@ const PropertyStorage = @This();
 
 /// Stores a single value for data properties and a pair of object/null for accessors.
 properties: std.ArrayList(Value),
-indexed_properties: Object.IndexedProperties,
 
 pub const PropertyType = enum {
     value,
@@ -115,12 +114,13 @@ pub const CompletePropertyDescriptor = struct {
 };
 
 pub fn contains(
-    self: *const PropertyStorage,
+    _: *const PropertyStorage,
     object: *Object,
     property_key: PropertyKey,
 ) bool {
     if (property_key.isArrayIndex()) {
-        return self.indexed_properties.contains(@intCast(property_key.integer_index));
+        const extra_data = object.extra_data orelse return false;
+        return extra_data.indexed_properties.contains(@intCast(property_key.integer_index));
     }
     return object.shape.properties.contains(property_key);
 }
@@ -131,7 +131,8 @@ pub fn getCreateLazyIfNeeded(
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?CompletePropertyDescriptor {
     if (property_key.isArrayIndex()) {
-        return self.indexed_properties.get(@intCast(property_key.integer_index));
+        const extra_data = object.extra_data orelse return null;
+        return extra_data.indexed_properties.get(@intCast(property_key.integer_index));
     }
     const property_metadata = object.shape.properties.get(property_key) orelse return null;
     switch (property_metadata.type) {
@@ -183,7 +184,8 @@ pub fn set(
     property_descriptor: CompletePropertyDescriptor,
 ) std.mem.Allocator.Error!void {
     if (property_key.isArrayIndex()) {
-        return self.indexed_properties.set(allocator, @intCast(property_key.integer_index), property_descriptor);
+        const indexed_properties = try object.ensureIndexedProperties(allocator);
+        return indexed_properties.set(allocator, @intCast(property_key.integer_index), property_descriptor);
     }
     const value_or_accessor = property_descriptor.value_or_accessor;
     const attributes = property_descriptor.attributes;
@@ -258,7 +260,8 @@ pub fn remove(
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!void {
     if (property_key.isArrayIndex()) {
-        return self.indexed_properties.remove(allocator, @intCast(property_key.integer_index));
+        const extra_data = object.extra_data.?;
+        return extra_data.indexed_properties.remove(allocator, @intCast(property_key.integer_index));
     }
     const property_metadata = object.shape.properties.get(property_key).?;
     object.shape = try object.shape.deleteProperty(allocator, property_key);

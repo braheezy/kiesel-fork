@@ -737,12 +737,16 @@ fn printValueDebugInfo(value: Value, terminal: std.Io.Terminal) std.Io.Terminal.
             value.asString().hash,
         }),
         .symbol => try terminal.writer.print(" (ptr: 0x{x})", .{@intFromPtr(value.asSymbol())}),
-        .object => try terminal.writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {t}, tag: {t})", .{
-            @intFromPtr(value.asObject()),
-            @intFromPtr(value.asObject().shape),
-            value.asObject().property_storage.indexed_properties.storage,
-            value.asObject().tag,
-        }),
+        .object => {
+            const object = value.asObject();
+            const indexed_properties = object.indexedProperties();
+            try terminal.writer.print(" (ptr: 0x{x}, shape: 0x{x}, indexed: {t}, tag: {t})", .{
+                @intFromPtr(object),
+                @intFromPtr(object.shape),
+                indexed_properties.storage,
+                object.tag,
+            });
+        },
         else => {},
     }
     try terminal.setColor(.reset);

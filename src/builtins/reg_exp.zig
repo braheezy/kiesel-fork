@@ -445,6 +445,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const realm = agent.currentRealm();
     const array_shape, const array_offsets = try realm.shapes.regExpExecObject();
     const array = try arrayCreateFastWithShape(agent, @intCast(n + 1), array_shape);
+    const array_indexed_properties = try array.object.ensureIndexedProperties(agent.gc_allocator);
 
     // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
     array.object.setValueAtPropertyOffset(array_offsets.index, Value.from(last_index));
@@ -470,7 +471,16 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const matched_substr = try getMatchString(agent, string, match);
 
     // 29. Perform ! CreateDataPropertyOrThrow(A, "0", matchedSubstr).
-    try array.object.createDataPropertyDirect(agent, PropertyKey.from(0), Value.from(matched_substr));
+    try array_indexed_properties.set(
+        agent.gc_allocator,
+        0,
+        .{
+            .value_or_accessor = .{
+                .value = Value.from(matched_substr),
+            },
+            .attributes = .all,
+        },
+    );
 
     var group_name_ptr = libregexp.c.lre_get_groupnames(re_bytecode);
     const has_groups = group_name_ptr != null;
@@ -532,7 +542,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), capturedValue).
         // OPTIMIZATION: Because the array is created with the right length we can set indexed
         //               properties directly here.
-        try array.object.property_storage.indexed_properties.set(
+        try array_indexed_properties.set(
             agent.gc_allocator,
             @intCast(i),
             .{

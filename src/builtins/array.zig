@@ -274,11 +274,12 @@ fn arraySetLength(
     }
     array.fields.length = new_len;
 
-    if (new_len < old_len) {
+    const extra_data = array.object.extra_data;
+    if (new_len < old_len and extra_data != null) {
         // 18. For each own property key P of A such that P is an array index and ! ToUint32(
         //     P) ≥ newLen, in descending numeric index order, do
         //     a. Let deleteSucceeded be ! A.[[Delete]](P).
-        switch (array.object.property_storage.indexed_properties.storage) {
+        switch (extra_data.?.indexed_properties.storage) {
             .none => {},
             // `shrinkRetainingCapacity()` asserts that the new length is less than the old length,
             // so we have to check the storage size first.

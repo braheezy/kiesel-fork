@@ -821,10 +821,12 @@ pub fn ordinaryOwnPropertyKeys(
     allocator: std.mem.Allocator,
     object: *Object,
 ) std.mem.Allocator.Error![]PropertyKey {
+    const indexed_properties = object.indexedProperties();
+
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         allocator,
-        object.property_storage.indexed_properties.count() +
+        indexed_properties.count() +
             object.shape.properties.count() +
             @intFromBool(object.is(builtins.Array)),
     );
@@ -832,7 +834,7 @@ pub fn ordinaryOwnPropertyKeys(
     // 2. For each own property key P of O such that P is an array index, in ascending numeric index
     //    order, do
     //     a. Append P to keys.
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         inline .sparse_value, .sparse_property_descriptor => |sparse| {
             var it = sparse.keyIterator();
@@ -847,7 +849,7 @@ pub fn ordinaryOwnPropertyKeys(
             }.lessThanFn);
         },
         else => {
-            for (0..object.property_storage.indexed_properties.count()) |index| {
+            for (0..indexed_properties.count()) |index| {
                 const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
                 keys.appendAssumeCapacity(property_key);
             }

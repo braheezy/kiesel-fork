@@ -45,6 +45,7 @@ pub const ExtraData = struct {
     /// [[PrivateElements]]
     private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
     lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
+    indexed_properties: Object.IndexedProperties,
 };
 
 pub const LazyProperty = struct {
@@ -165,9 +166,20 @@ pub fn ensureExtraData(self: *Object, allocator: std.mem.Allocator) std.mem.Allo
     extra_data.* = .{
         .private_elements = .empty,
         .lazy_properties = .empty,
+        .indexed_properties = .empty,
     };
     self.extra_data = extra_data;
     return extra_data;
+}
+
+pub fn indexedProperties(self: *const Object) *const IndexedProperties {
+    if (self.extra_data) |extra_data| return &extra_data.indexed_properties;
+    return comptime &.{ .storage = .none };
+}
+
+pub fn ensureIndexedProperties(self: *Object, allocator: std.mem.Allocator) std.mem.Allocator.Error!*IndexedProperties {
+    const extra_data = try self.ensureExtraData(allocator);
+    return &extra_data.indexed_properties;
 }
 
 pub fn internalMethods(self: *const Object) *const InternalMethods {
@@ -231,6 +243,7 @@ pub fn setAccessorAtPropertyOffset(
 }
 
 pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
+    const extra_data = self.extra_data orelse return null;
     const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         // Dependencies of ordinary [[Get]]
@@ -238,13 +251,13 @@ pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        self.property_storage.indexed_properties.count() <= index)
+        extra_data.indexed_properties.count() <= index)
     {
         @branchHint(.unlikely);
         return null;
     }
 
-    return switch (self.property_storage.indexed_properties.storage) {
+    return switch (extra_data.indexed_properties.storage) {
         .dense_i32 => |dense_i32| Value.from(dense_i32.items[index]),
         .dense_f64 => |dense_f64| Value.from(dense_f64.items[index]),
         .dense_value => |dense_value| dense_value.items[index],
@@ -253,6 +266,7 @@ pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
 }
 
 pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, value: Value) std.mem.Allocator.Error!bool {
+    const extra_data = self.extra_data orelse return false;
     const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         // Dependencies of ordinary [[Set]]
@@ -264,13 +278,13 @@ pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, v
     // Arrays have a custom [[DefineOwnProperty]] but it doesn't interfere with writeable
     // in-bounds indexed properties.
     if ((!has_ordinary_internal_methods and !self.is(builtins.Array)) or
-        self.property_storage.indexed_properties.count() <= index)
+        extra_data.indexed_properties.count() <= index)
     {
         @branchHint(.unlikely);
         return false;
     }
 
-    switch (self.property_storage.indexed_properties.storage) {
+    switch (extra_data.indexed_properties.storage) {
         .dense_i32 => |dense_i32| if (value.__isI32()) {
             dense_i32.items[index] = value.__asI32();
             return true;
@@ -285,7 +299,7 @@ pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, v
         },
         .none, .sparse_value, .sparse_property_descriptor => return false,
     }
-    try self.property_storage.indexed_properties.set(allocator, index, .{
+    try extra_data.indexed_properties.set(allocator, index, .{
         .value_or_accessor = .{ .value = value },
         .attributes = .all,
     });
@@ -296,7 +310,8 @@ pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, v
 pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Value {
     if (property_key.isArrayIndex()) {
         const index: u32 = @intCast(property_key.integer_index);
-        return switch (self.property_storage.indexed_properties.storage) {
+        const extra_data = self.extra_data.?;
+        return switch (extra_data.indexed_properties.storage) {
             .none => unreachable,
             .dense_i32 => |dense_i32| Value.from(dense_i32.items[index]),
             .dense_f64 => |dense_f64| Value.from(dense_f64.items[index]),
@@ -779,7 +794,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     std.debug.assert(
         self.extensible() and for (self.shape.properties.values()) |entry| {
             if (!entry.attributes.configurable) break false;
-        } else true and switch (self.property_storage.indexed_properties.storage) {
+        } else true and switch (self.indexedProperties().storage) {
             .sparse_property_descriptor => |sparse_property_descriptor| blk: {
                 var it = sparse_property_descriptor.valueIterator();
                 break :blk while (it.next()) |entry| {

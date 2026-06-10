@@ -94,6 +94,7 @@ pub fn every(
     done: bool,
     continue_slow: usize,
 } {
+    const indexed_properties = object.indexedProperties();
     const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
@@ -102,17 +103,17 @@ pub fn every(
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        object.property_storage.indexed_properties.count() < len) return null;
+        indexed_properties.count() < len) return null;
 
     const end_index: usize = @intCast(len);
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |*dense_i32| for (0..end_index) |index| {
             const value = Value.from(dense_i32.items[index]);
             if (!try cbToBool(agent, object, callback, this_arg, value, index)) {
                 return .{ .done = false };
             }
-            if (object.property_storage.indexed_properties.storage != .dense_i32 or
+            if (indexed_properties.storage != .dense_i32 or
                 dense_i32.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
@@ -121,7 +122,7 @@ pub fn every(
             if (!try cbToBool(agent, object, callback, this_arg, value, index)) {
                 return .{ .done = false };
             }
-            if (object.property_storage.indexed_properties.storage != .dense_f64 or
+            if (indexed_properties.storage != .dense_f64 or
                 dense_f64.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
@@ -130,7 +131,7 @@ pub fn every(
             if (!try cbToBool(agent, object, callback, this_arg, value, index)) {
                 return .{ .done = false };
             }
-            if (object.property_storage.indexed_properties.storage != .dense_value or
+            if (indexed_properties.storage != .dense_value or
                 dense_value.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
@@ -167,17 +168,19 @@ pub fn fill(
     if (start > std.math.maxInt(Object.IndexedProperties.Index) or
         end > std.math.maxInt(Object.IndexedProperties.Index)) return null;
     if (len > 0 and
-        object.property_storage.indexed_properties.storage == .none and
+        object.indexedProperties().storage == .none and
         !object.extensible()) return null;
 
     if (start >= end) return;
     const start_index: usize = @intCast(start);
     const end_index: usize = @intCast(@min(end, len));
-    try object.property_storage.indexed_properties.migrateStorageIfNeeded(allocator, 0, .{
+
+    const indexed_properties = try object.ensureIndexedProperties(allocator);
+    try indexed_properties.migrateStorageIfNeeded(allocator, 0, .{
         .value_or_accessor = .{ .value = value },
         .attributes = .all,
     });
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => unreachable,
         .dense_i32 => |*dense_i32| {
             try dense_i32.ensureTotalCapacity(allocator, end_index);
@@ -221,6 +224,7 @@ pub fn findViaPredicate(
     done: FindViaPredicateResult,
     continue_slow: ?usize,
 } {
+    const indexed_properties = object.indexedProperties();
     const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         // Dependencies of ordinary [[Get]]
@@ -228,10 +232,10 @@ pub fn findViaPredicate(
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        object.property_storage.indexed_properties.count() < len) return null;
+        indexed_properties.count() < len) return null;
 
     const end_index: usize = @intCast(len);
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |*dense_i32| switch (direction) {
             .ascending => for (0..end_index) |index| {
@@ -239,7 +243,7 @@ pub fn findViaPredicate(
                 if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
-                if (object.property_storage.indexed_properties.storage != .dense_i32 or
+                if (indexed_properties.storage != .dense_i32 or
                     dense_i32.items.len < end_index)
                     return .{ .continue_slow = index + 1 };
             },
@@ -249,7 +253,7 @@ pub fn findViaPredicate(
                 if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
-                if (object.property_storage.indexed_properties.storage != .dense_i32 or
+                if (indexed_properties.storage != .dense_i32 or
                     dense_i32.items.len < end_index)
                     return .{ .continue_slow = std.math.sub(usize, index, 1) catch null };
             },
@@ -260,7 +264,7 @@ pub fn findViaPredicate(
                 if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
-                if (object.property_storage.indexed_properties.storage != .dense_f64 or
+                if (indexed_properties.storage != .dense_f64 or
                     dense_f64.items.len < end_index)
                     return .{ .continue_slow = index + 1 };
             },
@@ -270,7 +274,7 @@ pub fn findViaPredicate(
                 if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
-                if (object.property_storage.indexed_properties.storage != .dense_f64 or
+                if (indexed_properties.storage != .dense_f64 or
                     dense_f64.items.len < end_index)
                     return .{ .continue_slow = std.math.sub(usize, index, 1) catch null };
             },
@@ -281,7 +285,7 @@ pub fn findViaPredicate(
                 if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
-                if (object.property_storage.indexed_properties.storage != .dense_value or
+                if (indexed_properties.storage != .dense_value or
                     dense_value.items.len < end_index)
                     return .{ .continue_slow = index + 1 };
             },
@@ -291,7 +295,7 @@ pub fn findViaPredicate(
                 if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
-                if (object.property_storage.indexed_properties.storage != .dense_value or
+                if (indexed_properties.storage != .dense_value or
                     dense_value.items.len < end_index)
                     return .{ .continue_slow = std.math.sub(usize, index, 1) catch null };
             },
@@ -319,6 +323,7 @@ pub fn forEach(
     done,
     continue_slow: usize,
 } {
+    const indexed_properties = object.indexedProperties();
     const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
@@ -327,29 +332,29 @@ pub fn forEach(
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        object.property_storage.indexed_properties.count() < len) return null;
+        indexed_properties.count() < len) return null;
 
     const end_index: usize = @intCast(len);
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |*dense_i32| for (0..end_index) |index| {
             const value = Value.from(dense_i32.items[index]);
             try cb(agent, object, callback, this_arg, value, index);
-            if (object.property_storage.indexed_properties.storage != .dense_i32 or
+            if (indexed_properties.storage != .dense_i32 or
                 dense_i32.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
         .dense_f64 => |*dense_f64| for (0..end_index) |index| {
             const value = Value.from(dense_f64.items[index]);
             try cb(agent, object, callback, this_arg, value, index);
-            if (object.property_storage.indexed_properties.storage != .dense_f64 or
+            if (indexed_properties.storage != .dense_f64 or
                 dense_f64.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
         .dense_value => |*dense_value| for (0..end_index) |index| {
             const value = dense_value.items[index];
             try cb(agent, object, callback, this_arg, value, index);
-            if (object.property_storage.indexed_properties.storage != .dense_value or
+            if (indexed_properties.storage != .dense_value or
                 dense_value.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
@@ -364,6 +369,7 @@ pub fn forEach(
 /// - Dense indexed property storage with at least `len` items
 /// - Ordinary internal methods: `[[Get]]`
 pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Value) ?bool {
+    const indexed_properties = object.indexedProperties();
     const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         // Dependencies of ordinary [[Get]]
@@ -371,13 +377,13 @@ pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Valu
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        object.property_storage.indexed_properties.count() < len or
+        indexed_properties.count() < len or
         from_index > std.math.maxInt(Object.IndexedProperties.Index)) return null;
 
     if (from_index >= len) return false;
     const start_index: usize = @intCast(from_index);
     const end_index: usize = @intCast(len);
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |dense_i32| {
             const search_element_i32 = toI32(search_element) orelse return false;
@@ -420,6 +426,7 @@ pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Valu
 /// - Dense indexed property storage with at least `len` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
 pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value) ?Value {
+    const indexed_properties = object.indexedProperties();
     const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
@@ -428,13 +435,13 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        object.property_storage.indexed_properties.count() < len or
+        indexed_properties.count() < len or
         from_index > std.math.maxInt(Object.IndexedProperties.Index)) return null;
 
     if (from_index >= len) return Value.from(-1);
     const start_index: usize = @intCast(from_index);
     const end_index: usize = @intCast(len);
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |dense_i32| {
             const search_element_i32 = toI32(search_element) orelse return Value.from(-1);
@@ -476,6 +483,7 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
 /// - Dense indexed property storage with at least `len` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
 pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: Value) ?Value {
+    const indexed_properties = object.indexedProperties();
     const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
@@ -484,12 +492,12 @@ pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: V
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        object.property_storage.indexed_properties.count() < len or
+        indexed_properties.count() < len or
         from_index > std.math.maxInt(Object.IndexedProperties.Index)) return null;
 
     if (from_index >= len) return Value.from(-1);
     const start_index: usize = @intCast(from_index);
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |dense_i32| {
             const search_element_i32 = toI32(search_element) orelse return Value.from(-1);
@@ -533,6 +541,7 @@ pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: V
 /// - Dense indexed property storage with exactly `len` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
 pub fn reverse(object: *Object, len: u53) ?void {
+    const indexed_properties = object.indexedProperties();
     const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
@@ -546,9 +555,9 @@ pub fn reverse(object: *Object, len: u53) ?void {
     }));
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
     if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
-    if (object.property_storage.indexed_properties.count() != len) return null;
+    if (indexed_properties.count() != len) return null;
 
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |dense_i32| {
             std.mem.reverse(i32, dense_i32.items);
@@ -582,14 +591,16 @@ pub fn pop(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
     }));
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
     if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
-    if (object.property_storage.indexed_properties.count() != len) return null;
+    if (object.indexedProperties().count() != len) return null;
 
     if (len == 0) {
         try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
         return .undefined;
     }
 
-    const element: Value = switch (object.property_storage.indexed_properties.storage) {
+    var extra_data = object.extra_data.?;
+    const indexed_properties = &extra_data.indexed_properties;
+    const element: Value = switch (indexed_properties.storage) {
         .none => unreachable,
         .dense_i32 => |*dense_i32| Value.from(dense_i32.pop().?),
         .dense_f64 => |*dense_f64| Value.from(dense_f64.pop().?),
@@ -622,20 +633,21 @@ pub fn push(agent: *Agent, object: *Object, len: u53, values: []const Value) Age
         const array = object.cast(builtins.Array) orelse return null;
         if (!array.fields.length_writable) return null;
     }
-    if (object.property_storage.indexed_properties.count() != len) return null;
+    if (object.indexedProperties().count() != len) return null;
     var prototype = object.prototype();
     while (prototype) |p| : (prototype = p.prototype()) {
-        if (p.property_storage.indexed_properties.count() > 0) return null;
+        if (p.indexedProperties().count() > 0) return null;
     }
 
     const new_len = std.math.add(u53, len, @intCast(values.len)) catch return null;
     if (new_len > std.math.maxInt(Object.IndexedProperties.Index)) return null;
     if (values.len > 0 and
-        object.property_storage.indexed_properties.storage == .none and
+        object.indexedProperties().storage == .none and
         !object.extensible()) return null;
 
+    const indexed_properties = try object.ensureIndexedProperties(agent.gc_allocator);
     for (values, 0..) |value, i| {
-        try object.property_storage.indexed_properties.set(
+        try indexed_properties.set(
             agent.gc_allocator,
             @intCast(len + i),
             .{ .value_or_accessor = .{ .value = value }, .attributes = .all },
@@ -664,14 +676,16 @@ pub fn shift(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
     }));
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
     if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
-    if (object.property_storage.indexed_properties.count() != len) return null;
+    if (object.indexedProperties().count() != len) return null;
 
     if (len == 0) {
         try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
         return .undefined;
     }
 
-    const element: Value = switch (object.property_storage.indexed_properties.storage) {
+    var extra_data = object.extra_data.?;
+    const indexed_properties = &extra_data.indexed_properties;
+    const element: Value = switch (indexed_properties.storage) {
         .none => unreachable,
         .dense_i32 => |*dense_i32| Value.from(dense_i32.orderedRemove(0)),
         .dense_f64 => |*dense_f64| Value.from(dense_f64.orderedRemove(0)),
@@ -700,6 +714,7 @@ pub fn some(
     done: bool,
     continue_slow: usize,
 } {
+    const indexed_properties = object.indexedProperties();
     const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
@@ -708,17 +723,17 @@ pub fn some(
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        object.property_storage.indexed_properties.count() < len) return null;
+        indexed_properties.count() < len) return null;
 
     const end_index: usize = @intCast(len);
-    switch (object.property_storage.indexed_properties.storage) {
+    switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |*dense_i32| for (0..end_index) |index| {
             const value = Value.from(dense_i32.items[index]);
             if (try cbToBool(agent, object, callback, this_arg, value, index)) {
                 return .{ .done = true };
             }
-            if (object.property_storage.indexed_properties.storage != .dense_i32 or
+            if (indexed_properties.storage != .dense_i32 or
                 dense_i32.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
@@ -727,7 +742,7 @@ pub fn some(
             if (try cbToBool(agent, object, callback, this_arg, value, index)) {
                 return .{ .done = true };
             }
-            if (object.property_storage.indexed_properties.storage != .dense_f64 or
+            if (indexed_properties.storage != .dense_f64 or
                 dense_f64.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
@@ -736,7 +751,7 @@ pub fn some(
             if (try cbToBool(agent, object, callback, this_arg, value, index)) {
                 return .{ .done = true };
             }
-            if (object.property_storage.indexed_properties.storage != .dense_value or
+            if (indexed_properties.storage != .dense_value or
                 dense_value.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
@@ -772,22 +787,23 @@ pub fn unshift(
         const array = object.cast(builtins.Array) orelse return null;
         if (!array.fields.length_writable) return null;
     }
-    if (object.property_storage.indexed_properties.count() != len) return null;
+    if (object.indexedProperties().count() != len) return null;
     var prototype = object.prototype();
     while (prototype) |p| : (prototype = p.prototype()) {
-        if (p.property_storage.indexed_properties.count() > 0) return null;
+        if (p.indexedProperties().count() > 0) return null;
     }
 
     const new_len = std.math.add(u53, len, @intCast(values.len)) catch return null;
     if (new_len > std.math.maxInt(Object.IndexedProperties.Index)) return null;
     if (values.len > 0 and
-        object.property_storage.indexed_properties.storage == .none and
+        object.indexedProperties().storage == .none and
         !object.extensible()) return null;
 
-    switch (object.property_storage.indexed_properties.storage) {
+    const indexed_properties = try object.ensureIndexedProperties(agent.gc_allocator);
+    switch (indexed_properties.storage) {
         .none => {
             for (values, 0..) |value, i| {
-                try object.property_storage.indexed_properties.set(
+                try indexed_properties.set(
                     agent.gc_allocator,
                     @intCast(i),
                     .{ .value_or_accessor = .{ .value = value }, .attributes = .all },

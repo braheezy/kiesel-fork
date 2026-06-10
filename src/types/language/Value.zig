@@ -2320,6 +2320,7 @@ pub fn createArrayFromList(
 
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, @intCast(elements.len), null) catch |err| try noexcept(err);
+    const indexed_properties = try array.object.ensureIndexedProperties(agent.gc_allocator);
 
     // 2. Let n be 0.
     // 3. For each element e of elements, do
@@ -2327,7 +2328,7 @@ pub fn createArrayFromList(
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
         // NOTE: This could use createDataPropertyDirect() but since we created the array with the
         //       right length upfront directly setting indexed properties is faster.
-        try array.object.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
+        try indexed_properties.set(agent.gc_allocator, @intCast(n), .{
             .value_or_accessor = .{
                 .value = element,
             },
@@ -2352,6 +2353,7 @@ pub fn createArrayFromListMapToValue(
 
     // 1. Let array be ! ArrayCreate(0).
     const array = arrayCreate(agent, @intCast(elements.len), null) catch |err| try noexcept(err);
+    const indexed_properties = try array.object.ensureIndexedProperties(agent.gc_allocator);
 
     // 2. Let n be 0.
     // 3. For each element e of elements, do
@@ -2359,7 +2361,7 @@ pub fn createArrayFromListMapToValue(
         // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
         // NOTE: This could use createDataPropertyDirect() but since we created the array with the
         //       right length upfront directly setting indexed properties is faster.
-        try array.object.property_storage.indexed_properties.set(agent.gc_allocator, @intCast(n), .{
+        try indexed_properties.set(agent.gc_allocator, @intCast(n), .{
             .value_or_accessor = .{
                 .value = try mapFn(agent, element),
             },

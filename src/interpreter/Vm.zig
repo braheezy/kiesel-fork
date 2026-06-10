@@ -625,7 +625,8 @@ fn executeArraySet(vm: *Vm, array_reg: Bytecode.Reg, elem_reg: Bytecode.Reg, ind
     const array_value = vm.store(array_reg);
     const elem_value = vm.store(elem_reg);
     const array = array_value.asObject().as(builtins.Array);
-    try array.object.property_storage.indexed_properties.set(vm.agent.gc_allocator, index, .{
+    const indexed_properties = try array.object.ensureIndexedProperties(vm.agent.gc_allocator);
+    try indexed_properties.set(vm.agent.gc_allocator, index, .{
         .value_or_accessor = .{ .value = elem_value },
         .attributes = .all,
     });
@@ -1693,7 +1694,7 @@ fn executeCopyDataProperties(vm: *Vm, dest: Bytecode.Reg, source_reg: Bytecode.R
         var excluded_items: std.ArrayList(PropertyKey) = try .initCapacity(gpa, excluded_len);
         defer excluded_items.deinit(gpa);
         for (0..excluded_len) |i| {
-            const descriptor = excluded_object.property_storage.indexed_properties.get(@intCast(i)).?;
+            const descriptor = excluded_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
             const prop_key = PropertyKey.from(descriptor.value_or_accessor.value.asString());
             excluded_items.appendAssumeCapacity(prop_key);
         }
@@ -1722,7 +1723,7 @@ fn executeCall(
     var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
     defer args_list.deinit(sfa);
     for (0..args_len) |i| {
-        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
         args_list.appendAssumeCapacity(arg);
     }
@@ -1767,7 +1768,7 @@ fn executeCallProperty(
     var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
     defer args_list.deinit(sfa);
     for (0..args_len) |i| {
-        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
         args_list.appendAssumeCapacity(arg);
     }
@@ -1813,7 +1814,7 @@ fn executeCallDirectEval(
     var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
     defer args_list.deinit(sfa);
     for (0..args_len) |i| {
-        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
         args_list.appendAssumeCapacity(arg);
     }
@@ -1846,7 +1847,7 @@ fn executeConstruct(
     var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
     defer args_list.deinit(sfa);
     for (0..args_len) |i| {
-        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
         args_list.appendAssumeCapacity(arg);
     }
@@ -2302,7 +2303,7 @@ fn executeSuperCall(
     var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
     defer args_list.deinit(sfa);
     for (0..args_len) |i| {
-        const descriptor = args_object.property_storage.indexed_properties.get(@intCast(i)).?;
+        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
         const arg = descriptor.value_or_accessor.value;
         args_list.appendAssumeCapacity(arg);
     }
