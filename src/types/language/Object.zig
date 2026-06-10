@@ -58,7 +58,7 @@ pub const LazyProperty = struct {
     initializer: Initializer,
 };
 
-pub const Tag = enum(u32) {
+pub const Tag = enum(u16) {
     unset,
 
     // ECMA-262
