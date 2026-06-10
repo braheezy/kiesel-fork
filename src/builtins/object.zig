@@ -1076,6 +1076,6 @@ pub const prototype = struct {
 /// 20.1.4 Properties of Object Instances
 /// https://tc39.es/ecma262/#sec-properties-of-object-instances
 pub const Object = MakeObject(.{
-    .tag = .unset,
+    .tag = .object,
     .display_name = "Object",
 });

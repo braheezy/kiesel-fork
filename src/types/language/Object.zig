@@ -59,8 +59,6 @@ pub const LazyProperty = struct {
 };
 
 pub const Tag = enum(u16) {
-    unset,
-
     // ECMA-262
     arguments,
     array,
@@ -85,6 +83,7 @@ pub const Tag = enum(u16) {
     map_iterator,
     module_namespace,
     number,
+    object,
     promise,
     proxy,
     raw_json,
@@ -145,7 +144,6 @@ pub fn format(self: *const Object, writer: *std.Io.Writer) std.Io.Writer.Error!v
 }
 
 pub fn is(self: *const Object, comptime T: type) bool {
-    comptime std.debug.assert(T.tag != .unset);
     return self.tag == T.tag;
 }
 
