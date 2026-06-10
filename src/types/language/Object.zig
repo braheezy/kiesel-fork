@@ -39,9 +39,12 @@ const Object = @This();
 tag: Tag,
 shape: *Shape,
 property_storage: PropertyStorage,
+extra_data: ?*ExtraData,
 
-/// [[PrivateElements]]
-private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
+pub const ExtraData = struct {
+    /// [[PrivateElements]]
+    private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
+};
 
 pub const Tag = enum(u32) {
     unset,
@@ -142,6 +145,17 @@ pub fn as(self: *const Object, comptime T: type) *T {
 
 pub fn cast(self: *const Object, comptime T: type) ?*T {
     return if (self.is(T)) self.as(T) else null;
+}
+
+pub fn ensureExtraData(self: *Object, allocator: std.mem.Allocator) std.mem.Allocator.Error!*ExtraData {
+    if (self.extra_data) |extra_data| return extra_data;
+
+    const extra_data = try allocator.create(ExtraData);
+    extra_data.* = .{
+        .private_elements = .empty,
+    };
+    self.extra_data = extra_data;
+    return extra_data;
 }
 
 pub fn internalMethods(self: *const Object) *const InternalMethods {
@@ -1154,7 +1168,8 @@ pub fn privateElementFind(self: *const Object, private_name: PrivateName) ?*Priv
     // 1. If O.[[PrivateElements]] contains a PrivateElement pe such that pe.[[Key]] is P, then
     //     a. Return pe.
     // 2. Return empty.
-    return self.private_elements.getPtr(private_name);
+    const extra_data = self.extra_data orelse return null;
+    return extra_data.private_elements.getPtr(private_name);
 }
 
 /// 7.3.27 PrivateFieldAdd ( O, P, value )
@@ -1178,7 +1193,8 @@ pub fn privateFieldAdd(self: *Object, agent: *Agent, private_name: PrivateName, 
 
     // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to
     //    O.[[PrivateElements]].
-    try self.private_elements.putNoClobber(agent.gc_allocator, private_name, .{ .field = value });
+    const extra_data = try self.ensureExtraData(agent.gc_allocator);
+    try extra_data.private_elements.putNoClobber(agent.gc_allocator, private_name, .{ .field = value });
 
     // 5. Return unused.
 }
@@ -1211,7 +1227,8 @@ pub fn privateMethodOrAccessorAdd(
     }
 
     // 5. Append method to O.[[PrivateElements]].
-    try self.private_elements.putNoClobber(agent.gc_allocator, private_name, method);
+    const extra_data = try self.ensureExtraData(agent.gc_allocator);
+    try extra_data.private_elements.putNoClobber(agent.gc_allocator, private_name, method);
 
     // 6. Return unused.
 }
