@@ -26,13 +26,13 @@ const GlobalObjectProperty = struct {
     []const u8,
     union(enum) {
         property_descriptor: PropertyDescriptor,
-        lazy_property: Object.PropertyStorage.LazyProperty.Initializer,
+        lazy_property: Object.LazyProperty.Initializer,
     },
 };
 
 fn LazyIntrinsicInitializer(
     comptime lazyIntrinsicFn: *const fn (*Realm.Intrinsics) std.mem.Allocator.Error!*Object,
-) Object.PropertyStorage.LazyProperty.Initializer {
+) Object.LazyProperty.Initializer {
     return .{
         .value = struct {
             fn initializer(_: *Agent, realm: *Realm) std.mem.Allocator.Error!Value {

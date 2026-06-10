@@ -1,13 +1,10 @@
 const std = @import("std");
 
-const execution = @import("../../../execution.zig");
 const types = @import("../../../types.zig");
 
-const Agent = execution.Agent;
 const Object = types.Object;
 const PropertyDescriptor = types.PropertyDescriptor;
 const PropertyKey = types.PropertyKey;
-const Realm = execution.Realm;
 const Value = types.Value;
 
 const PropertyStorage = @This();
@@ -15,17 +12,6 @@ const PropertyStorage = @This();
 /// Stores a single value for data properties and a pair of object/null for accessors.
 properties: std.ArrayList(Value),
 indexed_properties: Object.IndexedProperties,
-lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
-
-pub const LazyProperty = struct {
-    pub const Initializer = union(PropertyType) {
-        value: *const fn (*Agent, *Realm) std.mem.Allocator.Error!Value,
-        accessor: *const fn (*Agent, *Realm) std.mem.Allocator.Error!Accessor,
-    };
-
-    realm: *Realm,
-    initializer: Initializer,
-};
 
 pub const PropertyType = enum {
     value,
@@ -153,7 +139,8 @@ pub fn getCreateLazyIfNeeded(
             var value = &self.properties.items[@intFromEnum(property_metadata.offset)];
             if (value.isUninitialized()) {
                 @branchHint(.unlikely);
-                const lazy_property = self.lazy_properties.fetchRemove(property_key).?.value;
+                const extra_data = object.extra_data.?;
+                const lazy_property = extra_data.lazy_properties.fetchRemove(property_key).?.value;
                 const realm = lazy_property.realm;
                 const agent = realm.agent;
                 value.* = try lazy_property.initializer.value(agent, realm);
@@ -169,7 +156,8 @@ pub fn getCreateLazyIfNeeded(
             if (getter_value.isUninitialized()) {
                 @branchHint(.unlikely);
                 std.debug.assert(setter_value.isUninitialized());
-                const lazy_property = self.lazy_properties.fetchRemove(property_key).?.value;
+                const extra_data = object.extra_data.?;
+                const lazy_property = extra_data.lazy_properties.fetchRemove(property_key).?.value;
                 const realm = lazy_property.realm;
                 const agent = realm.agent;
                 const accessor = try lazy_property.initializer.accessor(agent, realm);

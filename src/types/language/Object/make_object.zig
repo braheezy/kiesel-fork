@@ -71,7 +71,6 @@ pub fn MakeObject(
                     .property_storage = .{
                         .properties = .empty,
                         .indexed_properties = .empty,
-                        .lazy_properties = .empty,
                     },
                     .extra_data = null,
                 },
@@ -107,7 +106,6 @@ pub fn MakeObject(
                     .property_storage = .{
                         .properties = .empty,
                         .indexed_properties = .empty,
-                        .lazy_properties = .empty,
                     },
                     .extra_data = null,
                 },

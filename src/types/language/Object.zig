@@ -44,6 +44,17 @@ extra_data: ?*ExtraData,
 pub const ExtraData = struct {
     /// [[PrivateElements]]
     private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
+    lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
+};
+
+pub const LazyProperty = struct {
+    pub const Initializer = union(PropertyStorage.PropertyType) {
+        value: *const fn (*Agent, *Realm) std.mem.Allocator.Error!Value,
+        accessor: *const fn (*Agent, *Realm) std.mem.Allocator.Error!PropertyStorage.Accessor,
+    };
+
+    realm: *Realm,
+    initializer: Initializer,
 };
 
 pub const Tag = enum(u32) {
@@ -153,6 +164,7 @@ pub fn ensureExtraData(self: *Object, allocator: std.mem.Allocator) std.mem.Allo
     const extra_data = try allocator.create(ExtraData);
     extra_data.* = .{
         .private_elements = .empty,
+        .lazy_properties = .empty,
     };
     self.extra_data = extra_data;
     return extra_data;
@@ -630,6 +642,7 @@ pub fn defineBuiltinPropertyLazy(
     attributes: Object.PropertyStorage.Attributes,
 ) std.mem.Allocator.Error!void {
     const property_key = getPropertyKey(name, agent);
+    const extra_data = try self.ensureExtraData(agent.gc_allocator);
     if (!self.shape.isUnique()) {
         self.shape = try self.shape.makeUnique(agent.gc_allocator);
     }
@@ -640,7 +653,7 @@ pub fn defineBuiltinPropertyLazy(
         .value,
     );
     try self.property_storage.properties.append(agent.gc_allocator, .uninitialized);
-    try self.property_storage.lazy_properties.putNoClobber(
+    try extra_data.lazy_properties.putNoClobber(
         agent.gc_allocator,
         property_key,
         .{
