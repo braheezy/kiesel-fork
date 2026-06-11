@@ -197,11 +197,10 @@ jobs:
           components: "rust-src"
       - name: Build kiesel.wasm
         run: |
-          # Building with Intl almost doubles the size, let's try to keep the final blob
-          # reasonably small - as a result we build this twice
-          # ReleaseSmall is used to get some additional size savings and because it appears
-          # to be less memory hungry. See: https://codeberg.org/ziglang/zig/issues/31215
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall
+          # Building with Intl and Temporal adds nearly 10MB to the binary, so we build it twice:
+          # - ReleaseSafe with everything enabled to ensure it keeps building
+          # - ReleaseSmall with Intl and Temporal disabled for the published binary
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
           zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall -Denable-intl=false -Denable-temporal=false
           # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
       - name: Build kiesel-freebsd-aarch64
