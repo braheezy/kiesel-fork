@@ -1292,7 +1292,7 @@ fn prettyPrintObject(
 
     var printed_properties: usize = 0;
     for (property_keys) |property_key| {
-        const property_descriptor = (object.property_storage.getCreateLazyIfNeeded(object, property_key) catch return).?;
+        const property_descriptor = (object.getPropertyCreateLazyIfNeeded(property_key) catch return).?;
         if (!property_descriptor.attributes.enumerable) continue;
 
         if (printed_properties > 0) try terminal.writer.writeAll(",");

@@ -2,8 +2,7 @@ const std = @import("std");
 
 const types = @import("../../../types.zig");
 
-const Attributes = Object.PropertyStorage.Attributes;
-const CompletePropertyDescriptor = Object.PropertyStorage.CompletePropertyDescriptor;
+const CompletePropertyDescriptor = Object.CompletePropertyDescriptor;
 const Object = types.Object;
 const Value = types.Value;
 
@@ -63,7 +62,7 @@ pub fn migrateStorageIfNeeded(
         if (maybe_property_descriptor) |property_descriptor| {
             if (old_storage_type == .sparse_property_descriptor or // No downgrades
                 property_descriptor.value_or_accessor == .accessor or // Accessor property
-                property_descriptor.attributes != Attributes.all // Non-default properties
+                property_descriptor.attributes != Object.Shape.Property.Attributes.all // Non-default properties
             ) {
                 break :blk .sparse_property_descriptor;
             }

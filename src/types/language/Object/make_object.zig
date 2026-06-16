@@ -68,9 +68,7 @@ pub fn MakeObject(
                 .object = .{
                     .tag = options.tag,
                     .shape = agent.empty_shape,
-                    .property_storage = .{
-                        .properties = .empty,
-                    },
+                    .properties = .empty,
                     .extra_data = null,
                 },
             };
@@ -102,13 +100,11 @@ pub fn MakeObject(
                 .object = .{
                     .tag = options.tag,
                     .shape = args.shape,
-                    .property_storage = .{
-                        .properties = .empty,
-                    },
+                    .properties = .empty,
                     .extra_data = null,
                 },
             };
-            try self.object.property_storage.properties.resize(
+            try self.object.ensureProperties(
                 agent.gc_allocator,
                 @intFromEnum(args.shape.next_offset),
             );

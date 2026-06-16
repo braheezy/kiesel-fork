@@ -141,7 +141,7 @@ pub const ECMAScriptFunction = MakeObject(.{
             if (self.cached_bytecode) |bc| return bc;
 
             const gpa = agent.gpa;
-            const function: *ECMAScriptFunction = @fieldParentPtr("fields", self);
+            const function: *ECMAScriptFunction = @alignCast(@fieldParentPtr("fields", self));
             const object = &function.object;
             const name_value = object.getPropertyValueDirect(PropertyKey.from("name"));
             const name = try name_value.asString().toUtf8(gpa);
@@ -793,7 +793,7 @@ pub fn addRestrictedFunctionProperties(
     // 2. Let thrower be realm.[[Intrinsics]].[[%ThrowTypeError%]].
     const thrower = try realm.intrinsics.@"%ThrowTypeError%"();
 
-    const property_descriptor: Object.PropertyStorage.CompletePropertyDescriptor = .{
+    const property_descriptor: Object.CompletePropertyDescriptor = .{
         .value_or_accessor = .{
             .accessor = .{
                 .get = thrower,
@@ -841,7 +841,7 @@ pub fn makeConstructor(
 
         // b. Assert: F is an extensible object that does not have a "prototype" own property.
         std.debug.assert(
-            function.extensible() and !function.property_storage.contains(function, PropertyKey.from("prototype")),
+            function.extensible() and !function.containsProperty(PropertyKey.from("prototype")),
         );
 
         // c. Set F.[[Construct]] to the definition specified in 10.2.2.
@@ -987,7 +987,7 @@ pub fn setFunctionName(
 
     // 1. Assert: F is an extensible object that does not have a "name" own property.
     std.debug.assert(
-        function.extensible() and !function.property_storage.contains(function, PropertyKey.from("name")),
+        function.extensible() and !function.containsProperty(PropertyKey.from("name")),
     );
 
     var name: *const String = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
@@ -1068,7 +1068,7 @@ pub fn setFunctionLength(agent: *Agent, function: *Object, length: f64) std.mem.
 
     // 1. Assert: F is an extensible object that does not have a "length" own property.
     std.debug.assert(
-        function.extensible() and !function.property_storage.contains(function, PropertyKey.from("length")),
+        function.extensible() and !function.containsProperty(PropertyKey.from("length")),
     );
 
     // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor { [[Value]]: 𝔽(length),

@@ -11,8 +11,8 @@ const Value = types.Value;
 const InlineCache = @This();
 
 shape: ?*Object.Shape,
-offset: Object.Shape.PropertyOffset,
-type: Object.PropertyStorage.PropertyType,
+offset: Object.Shape.Property.Offset,
+type: Object.Shape.Property.Type,
 
 pub fn get(
     ic: *const InlineCache,
@@ -29,9 +29,9 @@ pub fn get(
     }))) return null;
 
     switch (ic.type) {
-        .value => return base_object.property_storage.properties.items[@intFromEnum(ic.offset)],
+        .value => return base_object.getValueAtPropertyOffset(ic.offset),
         .accessor => {
-            const getter_value = base_object.property_storage.properties.items[@intFromEnum(ic.offset)];
+            const getter_value = base_object.getValueAtPropertyOffset(ic.offset);
             if (getter_value.isNull()) {
                 @branchHint(.unlikely);
                 return .undefined;
@@ -59,11 +59,13 @@ pub fn set(
 
     switch (ic.type) {
         .value => {
-            base_object.property_storage.properties.items[@intFromEnum(ic.offset)] = value;
+            base_object.setValueAtPropertyOffset(ic.offset, value);
             return true;
         },
         .accessor => {
-            const setter_value = base_object.property_storage.properties.items[@intFromEnum(ic.offset) + 1];
+            const setter_value = base_object.getValueAtPropertyOffset(
+                @enumFromInt(@intFromEnum(ic.offset) + 1),
+            );
             if (setter_value.isNull()) {
                 @branchHint(.unlikely);
                 return false;
@@ -91,12 +93,12 @@ pub fn update(
 
     if (base_object.shape.isUnique()) return;
 
-    if (base_object.shape.properties.get(property_key)) |property_metadata| {
-        if (kind == .set and property_metadata.type == .value and !property_metadata.attributes.writable) return;
+    if (base_object.shape.properties.get(property_key)) |property| {
+        if (kind == .set and property.type == .value and !property.attributes.writable) return;
         ic.* = .{
             .shape = base_object.shape,
-            .offset = property_metadata.offset,
-            .type = property_metadata.type,
+            .offset = property.offset,
+            .type = property.type,
         };
     }
 }

@@ -4,10 +4,8 @@ const build_options = @import("build-options");
 const types = @import("../../../types.zig");
 
 const Object = types.Object;
-const Attributes = Object.PropertyStorage.Attributes;
 const InternalMethods = Object.InternalMethods;
 const PropertyKey = types.PropertyKey;
-const PropertyType = Object.PropertyStorage.PropertyType;
 
 const Shape = @This();
 
@@ -16,7 +14,7 @@ pub const Transition = union(enum) {
     set_prototype: ?*Object,
     set_non_extensible,
     set_is_htmldda,
-    set_property: struct { PropertyKey, Attributes, PropertyType },
+    set_property: struct { PropertyKey, Property.Attributes, Property.Type },
     delete_property: PropertyKey,
 
     pub fn hash(self: Transition) u64 {
@@ -68,15 +66,44 @@ pub const Transition = union(enum) {
     }
 };
 
-pub const PropertyOffset = enum(u32) {
-    zero = 0,
-    _,
-};
-
-pub const PropertyMetadata = struct {
-    type: PropertyType,
-    offset: PropertyOffset,
+pub const Property = struct {
+    offset: Offset,
+    type: Type,
     attributes: Attributes,
+
+    pub const Offset = enum(u32) {
+        zero = 0,
+        _,
+    };
+
+    pub const Type = enum {
+        value,
+        accessor,
+    };
+
+    pub const Attributes = packed struct(u3) {
+        writable: bool,
+        enumerable: bool,
+        configurable: bool,
+
+        pub const all: Attributes = .{
+            .writable = true,
+            .enumerable = true,
+            .configurable = true,
+        };
+
+        pub const none: Attributes = .{
+            .writable = false,
+            .enumerable = false,
+            .configurable = false,
+        };
+
+        pub const builtin_default: Attributes = .{
+            .writable = true,
+            .enumerable = false,
+            .configurable = true,
+        };
+    };
 };
 
 const TransitionCount = enum(u8) {
@@ -89,10 +116,10 @@ const TransitionCount = enum(u8) {
     /// time a transition is requested.
     ///
     /// The value is made up, here is what some other engines use:
-    /// - V8:   1536 - https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/transitions.h;l=153;drc=0afc9ac9afcaab79fc54299039f4d27abf3a086d
-    /// - SM: 32-100 - https://searchfox.org/mozilla-central/rev/5f2c1701846a54c484d7dd46a291b796f5a67cac/js/src/vm/PropMap.h#625-626
-    /// - JSC:    64 - https://github.com/WebKit/WebKit/blob/55a405ffb60198aee3fa68ee8af63e352c9bcdda/Source/JavaScriptCore/runtime/Structure.h#L214
-    /// - LibJS:  64 - https://github.com/SerenityOS/serenity/blob/7c710805ec4ef80a1dcc8f5b60fa9964fa010aa9/Userland/Libraries/LibJS/Runtime/Object.cpp#L1218
+    /// - V8:     1536 - https://source.chromium.org/chromium/chromium/src/+/main:v8/src/objects/transitions.h;l=149;drc=b047b59ea986553e7e56c1ede3d4a6bac33db846
+    /// - SM:   32-100 - https://searchfox.org/firefox-main/rev/ccf89bb4e01e2a64f86cce9a39757535df9a693d/js/src/vm/PropMap.h#624-625
+    /// - JSC: 128/512 - https://github.com/WebKit/WebKit/blob/f906531f9489f965c27ea3c5b7a5a819513d0270/Source/JavaScriptCore/runtime/Structure.h#L209-L211
+    /// - LibJS:    64 - https://github.com/SerenityOS/serenity/blob/db49c7322225aa0671c6f61f20f5c4a5a6327307/Userland/Libraries/LibJS/Runtime/Object.cpp#L1220
     max = 64,
 
     /// Number of transitions that led to this shape.
@@ -100,9 +127,9 @@ const TransitionCount = enum(u8) {
 };
 
 transition_count: TransitionCount,
-next_offset: PropertyOffset,
+next_offset: Property.Offset,
 transitions: Transition.HashMapUnmanaged(*Shape),
-properties: PropertyKey.ArrayHashMapUnmanaged(PropertyMetadata),
+properties: PropertyKey.ArrayHashMapUnmanaged(Property),
 internal_methods: *const InternalMethods,
 
 /// [[Prototype]]
@@ -258,8 +285,8 @@ pub fn setProperty(
     self: *Shape,
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
-    attributes: Attributes,
-    property_type: PropertyType,
+    attributes: Property.Attributes,
+    property_type: Property.Type,
 ) std.mem.Allocator.Error!*Shape {
     const shape = switch (self.transition_count) {
         .unique => self,
@@ -274,8 +301,8 @@ pub fn setProperty(
         return shape;
     }
     property_gop.value_ptr.* = .{
-        .type = property_type,
         .offset = shape.next_offset,
+        .type = property_type,
         .attributes = attributes,
     };
     shape.next_offset = switch (property_type) {
@@ -289,8 +316,8 @@ pub fn setPropertyWithoutTransition(
     self: *Shape,
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
-    attributes: Attributes,
-    property_type: PropertyType,
+    attributes: Property.Attributes,
+    property_type: Property.Type,
 ) std.mem.Allocator.Error!void {
     // It's not valid to alter a shape that's part of a transition chain.
     std.debug.assert(self.transition_count == .zero or self.transition_count == .unique);
@@ -300,8 +327,8 @@ pub fn setPropertyWithoutTransition(
         return;
     }
     property_gop.value_ptr.* = .{
-        .type = property_type,
         .offset = self.next_offset,
+        .type = property_type,
         .attributes = attributes,
     };
     self.next_offset = switch (property_type) {

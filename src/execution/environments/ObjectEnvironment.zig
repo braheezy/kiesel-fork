@@ -228,10 +228,8 @@ pub fn getBindingValueIfExists(
     // OPTIMIZATION: Fast path for ordinary objects
     if (has_ordinary_internal_methods and !self.is_with_environment) fast_path: {
         @branchHint(.likely);
-        const property_descriptor = try object.property_storage.getCreateLazyIfNeeded(
-            object,
-            .{ .string = name },
-        ) orelse {
+        const property_key: PropertyKey = .{ .string = name };
+        const property_descriptor = try object.getPropertyCreateLazyIfNeeded(property_key) orelse {
             // Don't bother with doing prototype chain traversal here, fall through to slow path
             break :fast_path;
         };

@@ -67,9 +67,9 @@ pub fn ordinaryObject(self: *Shapes) std.mem.Allocator.Error!*Object.Shape {
 }
 
 pub const OrdinaryFunctionOffsets = struct {
-    length: Object.Shape.PropertyOffset,
-    name: Object.Shape.PropertyOffset,
-    prototype: Object.Shape.PropertyOffset,
+    length: Object.Shape.Property.Offset,
+    name: Object.Shape.Property.Offset,
+    prototype: Object.Shape.Property.Offset,
 };
 
 pub fn ordinaryFunction(self: *Shapes) std.mem.Allocator.Error!struct {
@@ -124,7 +124,7 @@ pub fn ordinaryFunction(self: *Shapes) std.mem.Allocator.Error!struct {
 }
 
 pub const OrdinaryFunctionPrototypeOffsets = struct {
-    constructor: Object.Shape.PropertyOffset,
+    constructor: Object.Shape.Property.Offset,
 };
 
 pub fn ordinaryFunctionPrototype(self: *Shapes) std.mem.Allocator.Error!struct {
@@ -152,9 +152,9 @@ pub fn ordinaryFunctionPrototype(self: *Shapes) std.mem.Allocator.Error!struct {
 }
 
 pub const UnmappedArgumentsObjectOffsets = struct {
-    length: Object.Shape.PropertyOffset,
-    @"%Symbol.iterator%": Object.Shape.PropertyOffset,
-    callee: Object.Shape.PropertyOffset,
+    length: Object.Shape.Property.Offset,
+    @"%Symbol.iterator%": Object.Shape.Property.Offset,
+    callee: Object.Shape.Property.Offset,
 };
 
 pub fn unmappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
@@ -196,9 +196,9 @@ pub fn unmappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
 }
 
 pub const MappedArgumentsObjectOffsets = struct {
-    length: Object.Shape.PropertyOffset,
-    @"%Symbol.iterator%": Object.Shape.PropertyOffset,
-    callee: Object.Shape.PropertyOffset,
+    length: Object.Shape.Property.Offset,
+    @"%Symbol.iterator%": Object.Shape.Property.Offset,
+    callee: Object.Shape.Property.Offset,
 };
 
 pub fn mappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
@@ -241,7 +241,7 @@ pub fn mappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
 }
 
 pub const RegExpObjectOffsets = struct {
-    lastIndex: Object.Shape.PropertyOffset,
+    lastIndex: Object.Shape.Property.Offset,
 };
 
 pub fn regExpObject(self: *Shapes) std.mem.Allocator.Error!struct {
@@ -273,9 +273,9 @@ pub fn regExpObject(self: *Shapes) std.mem.Allocator.Error!struct {
 }
 
 pub const RegExpExecObjectOffsets = struct {
-    index: Object.Shape.PropertyOffset,
-    input: Object.Shape.PropertyOffset,
-    groups: Object.Shape.PropertyOffset,
+    index: Object.Shape.Property.Offset,
+    input: Object.Shape.Property.Offset,
+    groups: Object.Shape.Property.Offset,
 };
 
 pub fn regExpExecObject(self: *Shapes) std.mem.Allocator.Error!struct {

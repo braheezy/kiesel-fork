@@ -181,7 +181,7 @@ fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
     // Why export a constant when you can do reflection instead!
     const global_properties_count = @typeInfo(@typeInfo(@TypeOf(globalObjectProperties)).@"fn".return_type.?).array.len;
     const lazy_properties_count = global_properties_count - 4; // globalThis, Infinity, NaN, undefined
-    try global.property_storage.properties.ensureUnusedCapacity(self.agent.gc_allocator, global_properties_count);
+    try global.ensureProperties(self.agent.gc_allocator, global_properties_count);
     const extra_data = try global.ensureExtraData(self.agent.gc_allocator);
     try extra_data.lazy_properties.ensureUnusedCapacity(self.agent.gc_allocator, lazy_properties_count);
 

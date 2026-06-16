@@ -28,18 +28,25 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
+pub const CompletePropertyDescriptor = @import("Object/CompletePropertyDescriptor.zig");
 pub const IndexedProperties = @import("Object/IndexedProperties.zig");
 pub const InternalMethods = @import("Object/InternalMethods.zig");
 pub const PropertyKey = @import("Object/property_key.zig").PropertyKey;
-pub const PropertyStorage = @import("Object/PropertyStorage.zig");
 pub const Shape = @import("Object/Shape.zig");
 
 const Object = @This();
 
 tag: Tag,
 shape: *Shape,
-property_storage: PropertyStorage,
+properties: Properties,
 extra_data: ?*ExtraData,
+
+pub const Properties = union(enum) {
+    fixed: [4]Value,
+    dynamic: std.ArrayList(Value),
+
+    pub const empty: Properties = .{ .fixed = undefined };
+};
 
 pub const ExtraData = struct {
     /// [[PrivateElements]]
@@ -49,13 +56,18 @@ pub const ExtraData = struct {
 };
 
 pub const LazyProperty = struct {
-    pub const Initializer = union(PropertyStorage.PropertyType) {
+    pub const Initializer = union(enum) {
         value: *const fn (*Agent, *Realm) std.mem.Allocator.Error!Value,
-        accessor: *const fn (*Agent, *Realm) std.mem.Allocator.Error!PropertyStorage.Accessor,
+        accessor: *const fn (*Agent, *Realm) std.mem.Allocator.Error!Accessor,
     };
 
     realm: *Realm,
     initializer: Initializer,
+};
+
+pub const Accessor = struct {
+    get: ?*Object,
+    set: ?*Object,
 };
 
 pub const Tag = enum(u16) {
@@ -157,6 +169,37 @@ pub fn cast(self: *const Object, comptime T: type) ?*T {
     return if (self.is(T)) self.as(T) else null;
 }
 
+fn propertyPtr(self: *Object, offset: Shape.Property.Offset) *Value {
+    return switch (self.properties) {
+        .fixed => &self.properties.fixed[@intFromEnum(offset)],
+        .dynamic => &self.properties.dynamic.items[@intFromEnum(offset)],
+    };
+}
+
+pub fn ensureProperties(
+    self: *Object,
+    allocator: std.mem.Allocator,
+    count: usize,
+) std.mem.Allocator.Error!void {
+    switch (self.properties) {
+        .fixed => |fixed| {
+            if (count <= fixed.len) return;
+            var dynamic: std.ArrayList(Value) = try .initCapacity(allocator, count);
+            dynamic.items.len = count;
+            @memcpy(dynamic.items[0..fixed.len], &fixed);
+            self.properties = .{ .dynamic = dynamic };
+        },
+        .dynamic => |*dynamic| {
+            if (count <= dynamic.items.len) return;
+            // Unlike arrays most objects stay small, so we don't want to use
+            // `ensureTotalCapacity()`'s super-linear growth for properties.
+            // The additional item is a workaround for https://github.com/bdwgc/bdwgc/issues/941
+            try dynamic.ensureTotalCapacityPrecise(allocator, count + 1);
+            dynamic.items.len = count;
+        },
+    }
+}
+
 pub fn ensureExtraData(self: *Object, allocator: std.mem.Allocator) std.mem.Allocator.Error!*ExtraData {
     if (self.extra_data) |extra_data| return extra_data;
 
@@ -219,25 +262,191 @@ pub fn setIsHTMLDDA(self: *Object, agent: *Agent) std.mem.Allocator.Error!void {
     self.shape = try self.shape.setIsHTMLDDA(agent.gc_allocator);
 }
 
-pub fn getValueAtPropertyOffset(self: *const Object, offset: Shape.PropertyOffset) Value {
-    const value = self.property_storage.properties.items[@intFromEnum(offset)];
+pub fn containsProperty(self: *Object, property_key: PropertyKey) bool {
+    if (property_key.isArrayIndex()) {
+        const extra_data = self.extra_data orelse return false;
+        return extra_data.indexed_properties.contains(@intCast(property_key.integer_index));
+    }
+    return self.shape.properties.contains(property_key);
+}
+
+pub fn getPropertyCreateLazyIfNeeded(
+    self: *Object,
+    property_key: PropertyKey,
+) std.mem.Allocator.Error!?CompletePropertyDescriptor {
+    if (property_key.isArrayIndex()) {
+        const extra_data = self.extra_data orelse return null;
+        return extra_data.indexed_properties.get(@intCast(property_key.integer_index));
+    }
+    const property = self.shape.properties.get(property_key) orelse return null;
+    switch (property.type) {
+        .value => {
+            var value = self.propertyPtr(property.offset);
+            if (value.isUninitialized()) {
+                @branchHint(.unlikely);
+                const extra_data = self.extra_data.?;
+                const lazy_property = extra_data.lazy_properties.fetchRemove(property_key).?.value;
+                const realm = lazy_property.realm;
+                const agent = realm.agent;
+                value.* = try lazy_property.initializer.value(agent, realm);
+            }
+            return .{
+                .value_or_accessor = .{ .value = value.* },
+                .attributes = property.attributes,
+            };
+        },
+        .accessor => {
+            var getter_value = self.propertyPtr(property.offset);
+            var setter_value = self.propertyPtr(@enumFromInt(@intFromEnum(property.offset) + 1));
+            if (getter_value.isUninitialized()) {
+                @branchHint(.unlikely);
+                std.debug.assert(setter_value.isUninitialized());
+                const extra_data = self.extra_data.?;
+                const lazy_property = extra_data.lazy_properties.fetchRemove(property_key).?.value;
+                const realm = lazy_property.realm;
+                const agent = realm.agent;
+                const accessor = try lazy_property.initializer.accessor(agent, realm);
+                getter_value.* = if (accessor.get) |getter| Value.from(getter) else .null;
+                setter_value.* = if (accessor.set) |setter| Value.from(setter) else .null;
+            }
+            return .{
+                .value_or_accessor = .{ .accessor = .{
+                    .get = if (getter_value.isObject()) getter_value.asObject() else null,
+                    .set = if (setter_value.isObject()) setter_value.asObject() else null,
+                } },
+                .attributes = property.attributes,
+            };
+        },
+    }
+}
+
+pub fn setProperty(
+    self: *Object,
+    allocator: std.mem.Allocator,
+    property_key: PropertyKey,
+    property_descriptor: CompletePropertyDescriptor,
+) std.mem.Allocator.Error!void {
+    if (property_key.isArrayIndex()) {
+        const indexed_properties = try self.ensureIndexedProperties(allocator);
+        return indexed_properties.set(allocator, @intCast(property_key.integer_index), property_descriptor);
+    }
+    const value_or_accessor = property_descriptor.value_or_accessor;
+    const attributes = property_descriptor.attributes;
+    const property_type: Shape.Property.Type = switch (value_or_accessor) {
+        .value => .value,
+        .accessor => .accessor,
+    };
+    if (self.shape.properties.get(property_key)) |property| {
+        const property_attributes_change = property.attributes != attributes;
+        const property_type_change = property.type != property_type;
+        if (property_attributes_change or property_type_change) {
+            self.shape = try self.shape.setProperty(
+                allocator,
+                property_key,
+                attributes,
+                property_type,
+            );
+        }
+        if (property_type_change) {
+            const new_property = self.shape.properties.get(property_key).?;
+            // Clear value(s) at the previous offset(s)
+            switch (property.type) {
+                .value => {
+                    self.setValueAtPropertyOffset(property.offset, undefined);
+                },
+                .accessor => {
+                    // We can't use `setAccessorAtPropertyOffset()` here because it branches on the args
+                    self.propertyPtr(property.offset).* = undefined;
+                    self.propertyPtr(@enumFromInt(@intFromEnum(property.offset) + 1)).* = undefined;
+                },
+            }
+            switch (value_or_accessor) {
+                .value => |value| {
+                    try self.ensureProperties(allocator, @intFromEnum(new_property.offset) + 1);
+                    self.setValueAtPropertyOffset(new_property.offset, value);
+                },
+                .accessor => |accessor| {
+                    try self.ensureProperties(allocator, @intFromEnum(new_property.offset) + 2);
+                    self.setAccessorAtPropertyOffset(new_property.offset, accessor);
+                },
+            }
+        } else {
+            switch (value_or_accessor) {
+                .value => |value| {
+                    self.setValueAtPropertyOffset(property.offset, value);
+                },
+                .accessor => |accessor| {
+                    self.setAccessorAtPropertyOffset(property.offset, accessor);
+                },
+            }
+        }
+    } else {
+        const offset = self.shape.next_offset;
+        self.shape = try self.shape.setProperty(
+            allocator,
+            property_key,
+            attributes,
+            property_type,
+        );
+        switch (value_or_accessor) {
+            .value => |value| {
+                try self.ensureProperties(allocator, @intFromEnum(offset) + 1);
+                self.setValueAtPropertyOffset(offset, value);
+            },
+            .accessor => |accessor| {
+                try self.ensureProperties(allocator, @intFromEnum(offset) + 2);
+                self.setAccessorAtPropertyOffset(offset, accessor);
+            },
+        }
+    }
+}
+
+pub fn removeProperty(
+    self: *Object,
+    allocator: std.mem.Allocator,
+    property_key: PropertyKey,
+) std.mem.Allocator.Error!void {
+    if (property_key.isArrayIndex()) {
+        const extra_data = self.extra_data.?;
+        return extra_data.indexed_properties.remove(allocator, @intCast(property_key.integer_index));
+    }
+    const property = self.shape.properties.get(property_key).?;
+    self.shape = try self.shape.deleteProperty(allocator, property_key);
+    // By overwriting the value and keeping subsequent offsets intact we can make property
+    // deletions part of the regular transition chain without making them unique and invalidating
+    // ICs. Additionally we save the cost of moving all elements after this one around, at the
+    // memory cost of wasting one element.
+    switch (property.type) {
+        .value => {
+            self.setValueAtPropertyOffset(property.offset, undefined);
+        },
+        .accessor => {
+            // We can't use `setAccessorAtPropertyOffset()` here because it branches on the args
+            self.propertyPtr(property.offset).* = undefined;
+            self.propertyPtr(@enumFromInt(@intFromEnum(property.offset) + 1)).* = undefined;
+        },
+    }
+}
+
+pub fn getValueAtPropertyOffset(self: *const Object, offset: Shape.Property.Offset) Value {
+    const value = @constCast(self).propertyPtr(offset).*;
     std.debug.assert(!value.isUninitialized());
     return value;
 }
 
-pub fn setValueAtPropertyOffset(self: *Object, offset: Shape.PropertyOffset, value: Value) void {
-    self.property_storage.properties.items[@intFromEnum(offset)] = value;
+pub fn setValueAtPropertyOffset(self: *Object, offset: Shape.Property.Offset, value: Value) void {
+    self.propertyPtr(offset).* = value;
 }
 
 pub fn setAccessorAtPropertyOffset(
     self: *Object,
-    offset: Shape.PropertyOffset,
-    accessor: PropertyStorage.Accessor,
+    offset: Shape.Property.Offset,
+    accessor: Accessor,
 ) void {
     const getter_value: Value = if (accessor.get) |getter| Value.from(getter) else .null;
     const setter_value: Value = if (accessor.set) |setter| Value.from(setter) else .null;
-    self.property_storage.properties.items[@intFromEnum(offset)] = getter_value;
-    self.property_storage.properties.items[@intFromEnum(offset) + 1] = setter_value;
+    self.propertyPtr(offset).* = getter_value;
+    self.propertyPtr(@enumFromInt(@intFromEnum(offset) + 1)).* = setter_value;
 }
 
 pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
@@ -318,9 +527,9 @@ pub fn getPropertyValueDirect(self: *const Object, property_key: PropertyKey) Va
             .sparse_property_descriptor => |sparse_property_descriptor| sparse_property_descriptor.get(index).?.value_or_accessor.value,
         };
     }
-    const property_metadata = self.shape.properties.get(property_key).?;
-    std.debug.assert(property_metadata.type == .value);
-    return self.getValueAtPropertyOffset(property_metadata.offset);
+    const property = self.shape.properties.get(property_key).?;
+    std.debug.assert(property.type == .value);
+    return self.getValueAtPropertyOffset(property.offset);
 }
 
 /// Fast version of `createDataPropertyOrThrow()` that assumes the property does not exist yet or
@@ -346,7 +555,7 @@ pub fn createDataPropertyDirect(
 
     if (has_ordinary_internal_methods or use_fast_path_for_array) {
         // Go directly to the property storage.
-        try self.property_storage.set(self, agent.gc_allocator, property_key, .{
+        try self.setProperty(agent.gc_allocator, property_key, .{
             .value_or_accessor = .{
                 .value = value,
             },
@@ -371,7 +580,7 @@ pub fn definePropertyDirect(
     self: *Object,
     agent: *Agent,
     property_key: PropertyKey,
-    property_descriptor: PropertyStorage.CompletePropertyDescriptor,
+    property_descriptor: CompletePropertyDescriptor,
 ) std.mem.Allocator.Error!void {
     const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_define_own_property,
@@ -386,12 +595,7 @@ pub fn definePropertyDirect(
         !property_key.isLength();
 
     if (has_ordinary_internal_methods or use_fast_path_for_array) {
-        try self.property_storage.set(
-            self,
-            agent.gc_allocator,
-            property_key,
-            property_descriptor,
-        );
+        try self.setProperty(agent.gc_allocator, property_key, property_descriptor);
     } else {
         const result = self.internalMethods().defineOwnProperty(
             agent,
@@ -476,7 +680,7 @@ pub fn defineBuiltinAccessorWithAttributes(
         );
     } else {};
     const property_key = getPropertyKey(name, agent);
-    const attributes_: Object.PropertyStorage.Attributes = .{
+    const attributes_: Object.Shape.Property.Attributes = .{
         .writable = false,
         .enumerable = attributes.enumerable,
         .configurable = attributes.configurable,
@@ -484,17 +688,17 @@ pub fn defineBuiltinAccessorWithAttributes(
     if (!self.shape.isUnique()) {
         self.shape = try self.shape.makeUnique(agent.gc_allocator);
     }
+    const offset = self.shape.next_offset;
     try self.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes_,
         .accessor,
     );
-    const getter_value: Value = if (@TypeOf(getter_function) != void) Value.from(&getter_function.object) else .null;
-    const setter_value: Value = if (@TypeOf(setter_function) != void) Value.from(&setter_function.object) else .null;
-    try self.property_storage.properties.appendSlice(agent.gc_allocator, &.{
-        getter_value,
-        setter_value,
+    try self.ensureProperties(agent.gc_allocator, @intFromEnum(offset) + 2);
+    self.setAccessorAtPropertyOffset(offset, .{
+        .get = if (@TypeOf(getter_function) != void) &getter_function.object else null,
+        .set = if (@TypeOf(setter_function) != void) &setter_function.object else null,
     });
 }
 
@@ -523,7 +727,7 @@ pub fn defineBuiltinFunctionWithAttributes(
     comptime function: Behaviour.Function,
     comptime length: u32,
     realm: *Realm,
-    attributes: Object.PropertyStorage.Attributes,
+    attributes: Object.Shape.Property.Attributes,
 ) std.mem.Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
     const builtin_function = try createBuiltinFunction(
@@ -566,7 +770,7 @@ pub fn defineBuiltinAsyncFunctionWithAttributes(
     comptime function: Behaviour.Function,
     comptime length: u32,
     realm: *Realm,
-    attributes: Object.PropertyStorage.Attributes,
+    attributes: Object.Shape.Property.Attributes,
 ) std.mem.Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
     const builtin_function = try createBuiltinFunction(
@@ -594,7 +798,7 @@ pub fn defineBuiltinFunctionLazy(
     comptime function: Behaviour.Function,
     comptime length: u32,
     realm: *Realm,
-    attributes: Object.PropertyStorage.Attributes,
+    attributes: Object.Shape.Property.Attributes,
 ) std.mem.Allocator.Error!void {
     const function_name = comptime getFunctionName(name);
     try self.defineBuiltinPropertyLazy(
@@ -631,19 +835,21 @@ pub fn defineBuiltinPropertyWithAttributes(
     agent: *Agent,
     comptime name: []const u8,
     value: Value,
-    attributes: Object.PropertyStorage.Attributes,
+    attributes: Object.Shape.Property.Attributes,
 ) std.mem.Allocator.Error!void {
     const property_key = getPropertyKey(name, agent);
     if (!self.shape.isUnique()) {
         self.shape = try self.shape.makeUnique(agent.gc_allocator);
     }
+    const offset = self.shape.next_offset;
     try self.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes,
         .value,
     );
-    try self.property_storage.properties.append(agent.gc_allocator, value);
+    try self.ensureProperties(agent.gc_allocator, @intFromEnum(offset) + 1);
+    self.setValueAtPropertyOffset(offset, value);
 }
 
 pub fn defineBuiltinPropertyLazy(
@@ -652,20 +858,22 @@ pub fn defineBuiltinPropertyLazy(
     comptime name: []const u8,
     comptime initializer: fn (*Agent, *Realm) std.mem.Allocator.Error!Value,
     realm: *Realm,
-    attributes: Object.PropertyStorage.Attributes,
+    attributes: Object.Shape.Property.Attributes,
 ) std.mem.Allocator.Error!void {
     const property_key = getPropertyKey(name, agent);
     const extra_data = try self.ensureExtraData(agent.gc_allocator);
     if (!self.shape.isUnique()) {
         self.shape = try self.shape.makeUnique(agent.gc_allocator);
     }
+    const offset = self.shape.next_offset;
     try self.shape.setPropertyWithoutTransition(
         agent.gc_allocator,
         property_key,
         attributes,
         .value,
     );
-    try self.property_storage.properties.append(agent.gc_allocator, .uninitialized);
+    try self.ensureProperties(agent.gc_allocator, @intFromEnum(offset) + 1);
+    self.setValueAtPropertyOffset(offset, .uninitialized);
     try extra_data.lazy_properties.putNoClobber(
         agent.gc_allocator,
         property_key,
@@ -805,7 +1013,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
 
     // 2. Let newDesc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true,
     //    [[Enumerable]]: false, [[Configurable]]: true }.
-    const new_descriptor: PropertyStorage.CompletePropertyDescriptor = .{
+    const new_descriptor: CompletePropertyDescriptor = .{
         .value_or_accessor = .{
             .value = value,
         },
