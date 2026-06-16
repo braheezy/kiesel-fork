@@ -2000,7 +2000,7 @@ pub const prototype = struct {
         }
 
         // 11. If S is the empty String, return CreateArrayFromList(« S »).
-        if (separator.isEmpty()) {
+        if (string.isEmpty()) {
             const array = try createArrayFromList(agent, &.{Value.from(string)});
             return Value.from(&array.object);
         }
