@@ -1,6 +1,8 @@
 //! 9.1.1.2 Object Environment Records
 //! https://tc39.es/ecma262/#sec-object-environment-records
 
+const std = @import("std");
+
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -225,7 +227,7 @@ pub fn getBindingValueIfExists(
         .ordinary_get_prototype_of,
     }));
 
-    // OPTIMIZATION: Fast path for ordinary objects
+    // OPTIMIZATION: Fast path for ordinary objects, no `with` environment
     if (has_ordinary_internal_methods and !self.is_with_environment) fast_path: {
         @branchHint(.likely);
         const property_key: PropertyKey = .{ .string = name };
@@ -254,8 +256,51 @@ pub fn setMutableBindingIfExists(
     value: Value,
     strict: bool,
 ) Agent.Error!bool {
-    // The repeated `hasProperty()` call is observable so for now we don't attempt to optimize it.
-    // This could be done for ordinary objects in the future.
+    const object = self.binding_object;
+    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+        .ordinary_has_property,
+        .ordinary_set,
+        // Dependencies of ordinary [[HasProperty]] and [[Set]]
+        .ordinary_get_own_property,
+    }));
+
+    // OPTIMIZATION: Fast path for ordinary objects, no `with` environment
+    if (has_ordinary_internal_methods and !self.is_with_environment) fast_path: {
+        @branchHint(.likely);
+        const property_key: PropertyKey = .{ .string = name };
+        const property = object.shape.properties.get(property_key) orelse {
+            // Don't bother with doing prototype chain traversal here, fall through to slow path
+            break :fast_path;
+        };
+        switch (property.type) {
+            .value => {
+                if (!property.attributes.writable) {
+                    @branchHint(.unlikely);
+                    if (strict) {
+                        return agent.throwException(.type_error, "Could not set property", .{});
+                    }
+                    return true;
+                }
+                object.setValueAtPropertyOffset(property.offset, value);
+            },
+            .accessor => {
+                const setter_value = object.getValueAtPropertyOffset(
+                    @enumFromInt(@intFromEnum(property.offset) + 1),
+                );
+                if (setter_value.isNull()) {
+                    @branchHint(.unlikely);
+                    if (strict) {
+                        return agent.throwException(.type_error, "Could not set property", .{});
+                    }
+                    return true;
+                }
+                std.debug.assert(setter_value.isObject());
+                _ = try setter_value.callAssumeCallable(agent, Value.from(object), &.{value});
+            },
+        }
+        return true;
+    }
+
     if (!try self.hasBinding(agent, name)) return false;
     try self.setMutableBinding(agent, name, value, strict);
     return true;

@@ -467,7 +467,5 @@ pub fn setMutableBindingIfExists(
         }
         return true;
     }
-    if (!try self.object_record.hasBinding(agent, name)) return false;
-    try self.object_record.setMutableBinding(agent, name, value, strict);
-    return true;
+    return self.object_record.setMutableBindingIfExists(agent, name, value, strict);
 }

@@ -613,7 +613,10 @@ pub fn ordinarySet(
         };
         switch (property.type) {
             .value => {
-                if (!property.attributes.writable) return false;
+                if (!property.attributes.writable) {
+                    @branchHint(.unlikely);
+                    return false;
+                }
                 object.setValueAtPropertyOffset(property.offset, value);
             },
             .accessor => {
