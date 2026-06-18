@@ -1725,7 +1725,9 @@ pub const prototype = struct {
                     const element_len = try element.asObject().lengthOfArrayLike(agent);
 
                     // NOTE: flattenIntoArray() is being called recursively here.
-                    try agent.checkStackOverflow();
+                    if (agent.platform.checkStackOverflow()) {
+                        return agent.throwException(.internal_error, "Stack overflow", .{});
+                    }
 
                     // 4. Set targetIndex to ? FlattenIntoArray(target, element, elementLen,
                     //    targetIndex, newDepth).

@@ -112,9 +112,13 @@ fn mainWithErrorHandling() Error!void {
         .stdout = stdout,
         .stderr = stderr,
         .terminal_mode = .no_color,
-        .stack_info = null,
         .default_locale = {},
         .default_time_zone = {},
+        .checkStackOverflow = struct {
+            fn checkStackOverflow() bool {
+                return false;
+            }
+        }.checkStackOverflow,
     };
     defer platform.deinit();
     var agent = try Agent.init(gpa, io, &platform, .{});

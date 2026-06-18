@@ -2682,4 +2682,68 @@
         \\
         ,
     },
+
+    // Unbounded recursion
+    .{
+        .source =
+        \\try {
+        \\  (function f() { f(); })();
+        \\} catch (e) {
+        \\  e.toString();
+        \\}
+        \\
+        ,
+        .expected_result = .{ .value = .{ .string = "Error: Stack overflow" } },
+        .expected_output =
+        \\IR (test)
+        \\  %0: [  0..6  ]                       label
+        \\  %1: [  1..2  ]                       create_function @0
+        \\  %2: [  2..4  ]                       call %1, none, []
+        \\  %3: [  3..6  ]                       label
+        \\  %4: [  4..4  ]                       br %15, %2
+        \\  %5: [  5..6  ]                       label
+        \\  %6: [  6..9  ]                       exception_handler %0, %3, %5, 0
+        \\  %7: [  7..7  ]                       push_scope
+        \\  %8: [  8..8  ]                       create_mutable_binding @1 ("e")
+        \\  %9: [  9..9  ]                       initialize_binding @1 ("e"), %6
+        \\ %10: [ 10..12 ]                       get_binding @1 ("e")
+        \\ %11: [ 11..12 ]                       get_property %10, @2 ("toString")
+        \\ %12: [ 12..14 ]                       call %11, %10, []
+        \\ %13: [ 13..13 ]                       pop_scope
+        \\ %14: [ 14..14 ]                       br %15, %12
+        \\ %15: [ 15..16 ]                       label
+        \\ %16: [ 16..16 ]                       return %15
+        \\
+        \\Bytecode (test)
+        \\   0: 78 01 00 00 00                   create_function r1, @0
+        \\   5: 5b 02 00 01 00                   call0 r2, r1
+        \\  10: 0c 00 00 02 00                   move r0, r2
+        \\  15: 74 00 00                         return r0
+        \\  18: 3e                               push_scope
+        \\  19: 43 01 00 00 00                   create_mutable_binding @1 ("e")
+        \\  24: 45 01 00 00 00 03 00             initialize_binding @1 ("e"), r3
+        \\  31: 46 00 00 01 00 00 00             get_binding r0, @1 ("e")
+        \\  38: 47 01 00 00 00 02 00 00 00 00 00 get_property r1, r0, @2 ("toString"), @0
+        \\  49: 5f 02 00 01 00 00 00             call_property0 r2, r1, r0
+        \\  56: 41                               pop_scope
+        \\  57: 0c 00 00 02 00                   move r0, r2
+        \\  62: 00 cc ff ff ff                   jump -52
+        \\
+        \\Exception handlers
+        \\  [   0..10  ) →   18, r3, 0
+        \\
+        \\IR (f)
+        \\  %0: [  0..0  ]                       push_scope
+        \\  %1: [  1..2  ]                       get_binding @0 ("f")
+        \\  %2: [  2..2  ]                       call %1, none, []
+        \\  %3: [  3..3  ]                       return none
+        \\
+        \\Bytecode (f)
+        \\   0: 3e                               push_scope
+        \\   1: 46 00 00 00 00 00 00             get_binding r0, @0 ("f")
+        \\   8: 5b 01 00 00 00                   call0 r1, r0
+        \\  13: 74 ff ff                         return
+        \\
+        ,
+    },
 }

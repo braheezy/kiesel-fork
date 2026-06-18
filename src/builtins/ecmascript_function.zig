@@ -190,7 +190,9 @@ fn call(
 ) Agent.Error!Value {
     const function = object.as(ECMAScriptFunction);
 
-    try agent.checkStackOverflow();
+    if (agent.platform.checkStackOverflow()) {
+        return agent.throwException(.internal_error, "Stack overflow", .{});
+    }
 
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to restore the context, which is a simple pop().
@@ -561,7 +563,9 @@ fn construct(
 ) Agent.Error!*Object {
     const function = object.as(ECMAScriptFunction);
 
-    try agent.checkStackOverflow();
+    if (agent.platform.checkStackOverflow()) {
+        return agent.throwException(.internal_error, "Stack overflow", .{});
+    }
 
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to restore the context, which is a simple pop().
