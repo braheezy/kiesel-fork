@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -17,7 +16,6 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -85,11 +83,11 @@ pub const constructor = struct {
             const msg = try message.toString(agent);
 
             // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
-            @"error".object.createNonEnumerableDataPropertyOrThrow(
+            try @"error".object.createNonEnumerableDataPropertyOrThrow(
                 agent,
                 PropertyKey.from("message"),
                 Value.from(msg),
-            ) catch |err| try noexcept(err);
+            );
 
             @"error".fields.message = msg;
         }
@@ -398,11 +396,11 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 const msg = try message.toString(agent);
 
                 // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
-                @"error".object.createNonEnumerableDataPropertyOrThrow(
+                try @"error".object.createNonEnumerableDataPropertyOrThrow(
                     agent,
                     PropertyKey.from("message"),
                     Value.from(msg),
-                ) catch |err| try noexcept(err);
+                );
 
                 @"error".fields.message = msg;
             }
@@ -478,11 +476,11 @@ pub fn installErrorCause(agent: *Agent, object: *Object, options: Value) Agent.E
         const cause = try options.get(agent, PropertyKey.from("cause"));
 
         // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "cause", cause).
-        object.createNonEnumerableDataPropertyOrThrow(
+        try object.createNonEnumerableDataPropertyOrThrow(
             agent,
             PropertyKey.from("cause"),
             cause,
-        ) catch |err| try noexcept(err);
+        );
     }
 
     // 2. Return unused.

@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -20,7 +19,6 @@ const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getIterator = types.getIterator;
 const installErrorCause = builtins.installErrorCause;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -87,11 +85,11 @@ pub const constructor = struct {
             const msg = try message.toString(agent);
 
             // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
-            aggregate_error.object.createNonEnumerableDataPropertyOrThrow(
+            try aggregate_error.object.createNonEnumerableDataPropertyOrThrow(
                 agent,
                 PropertyKey.from("message"),
                 Value.from(msg),
-            ) catch |err| try noexcept(err);
+            );
 
             aggregate_error.fields.message = msg;
         }

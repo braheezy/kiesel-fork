@@ -995,7 +995,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     agent: *Agent,
     property_key: PropertyKey,
     value: Value,
-) Agent.Error!void {
+) std.mem.Allocator.Error!void {
     // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(
         self.extensible() and for (self.shape.properties.values()) |entry| {
@@ -1021,7 +1021,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     };
 
     // 3. Perform ! DefinePropertyOrThrow(O, P, newDesc).
-    try self.definePropertyDirect(agent, property_key, new_descriptor);
+    self.definePropertyDirect(agent, property_key, new_descriptor) catch |err| try noexcept(err);
 
     // 4. Return unused.
 }
