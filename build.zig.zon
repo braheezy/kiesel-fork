@@ -9,8 +9,8 @@
             .hash = "args-0.0.0-CiLiqmvgAADyJmrzcQTP9IOYNvTzR_KGrg3ZNNsH2Qv0",
         },
         .bdwgc_zig = .{
-            .url = "git+https://github.com/bdwgc/bdwgc-zig#1cfcd9ea8947e172f20b028fbc52e778632fa407",
-            .hash = "bdwgc_zig-0.1.0-ffcEgVh8AAAhDLt3oykzvhRx_WDGdHCoqmswDTnmei6b",
+            .url = "git+https://github.com/bdwgc/bdwgc-zig#81e92063debddd226f3a660cee43665a04c926f3",
+            .hash = "bdwgc_zig-0.1.0-ffcEgYd6AAA_rlVpPv9GN2Olt2DCBle_4Ageca2NDNUy",
             .lazy = true,
         },
         .icu4zig = .{

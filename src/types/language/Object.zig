@@ -193,8 +193,7 @@ pub fn ensureProperties(
             if (count <= dynamic.items.len) return;
             // Unlike arrays most objects stay small, so we don't want to use
             // `ensureTotalCapacity()`'s super-linear growth for properties.
-            // The additional item is a workaround for https://github.com/bdwgc/bdwgc/issues/941
-            try dynamic.ensureTotalCapacityPrecise(allocator, count + 1);
+            try dynamic.ensureTotalCapacityPrecise(allocator, count);
             dynamic.items.len = count;
         },
     }
