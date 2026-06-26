@@ -674,7 +674,7 @@ pub fn defineBuiltinAccessorWithAttributes(
         break :blk try createBuiltinFunction(
             agent,
             .{ .function = function },
-            0,
+            1,
             function_name,
             .{ .realm = realm },
         );

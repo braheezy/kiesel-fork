@@ -6508,7 +6508,7 @@
   "test/built-ins/Error/prototype/stack/getter-this-not-object.js": "PASS",
   "test/built-ins/Error/prototype/stack/instance-no-own-stack.js": "PASS",
   "test/built-ins/Error/prototype/stack/instance-not-enumerable.js": "PASS",
-  "test/built-ins/Error/prototype/stack/prop-desc.js": "FAIL",
+  "test/built-ins/Error/prototype/stack/prop-desc.js": "PASS",
   "test/built-ins/Error/prototype/stack/setter-creates-own-property.js": "PASS",
   "test/built-ins/Error/prototype/stack/setter-cross-realm.js": "PASS",
   "test/built-ins/Error/prototype/stack/setter-delete-round-trip.js": "PASS",
