@@ -207,6 +207,7 @@ pub fn build(b: *std.Build) !void {
             .target = target,
             .optimize = optimize,
             .@"enable-intl" = enable_intl,
+            .@"enable-temporal" = enable_temporal,
         })) |zement| {
             // NOTE: Rust outputs 'libzement.a' instead of 'zement.lib' when targeting
             // *-pc-windows-gnu, so we can hardcode the name here instead of using
