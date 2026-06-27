@@ -541,7 +541,8 @@ pub fn parseDateTimeString(string: []const u8) error{InvalidFormat}!f64 {
         if (parser.consume() != ':') break :blk .{ hour, minute, 0, 0 };
         const second = parser.consumeDigits(Second, 2) orelse return error.InvalidFormat;
         if (second > 59) return error.InvalidFormat;
-        if (parser.consume() != '.') break :blk .{ hour, minute, second, 0 };
+        if (parser.peek() != '.') break :blk .{ hour, minute, second, 0 };
+        _ = parser.consume().?;
         const millisecond = parser.consumeDigits(Millisecond, 3) orelse return error.InvalidFormat;
         break :blk .{ hour, minute, second, millisecond };
     };
@@ -553,10 +554,10 @@ pub fn parseDateTimeString(string: []const u8) error{InvalidFormat}!f64 {
         }) {
             '+', '-' => |sign| {
                 const offset_hour = parser.consumeDigits(Hour, 2) orelse return error.InvalidFormat;
-                if (hour > 23) return error.InvalidFormat;
+                if (offset_hour > 23) return error.InvalidFormat;
                 if (parser.consume() != ':') return error.InvalidFormat;
                 const offset_minute = parser.consumeDigits(Minute, 2) orelse return error.InvalidFormat;
-                if (minute > 59) return error.InvalidFormat;
+                if (offset_minute > 59) return error.InvalidFormat;
                 var value =
                     @as(f64, @floatFromInt(offset_hour)) * std.time.ms_per_hour +
                     @as(f64, @floatFromInt(offset_minute)) * std.time.ms_per_min;
@@ -649,9 +650,9 @@ pub fn parseOtherString(string: []const u8) error{InvalidFormat}!f64 {
         switch (parser.consume() orelse return error.InvalidFormat) {
             '+', '-' => |sign| {
                 const offset_hour = parser.consumeDigits(Hour, 2) orelse return error.InvalidFormat;
-                if (hour > 23) return error.InvalidFormat;
+                if (offset_hour > 23) return error.InvalidFormat;
                 const offset_minute = parser.consumeDigits(Minute, 2) orelse return error.InvalidFormat;
-                if (minute > 59) return error.InvalidFormat;
+                if (offset_minute > 59) return error.InvalidFormat;
                 var value =
                     @as(f64, @floatFromInt(offset_hour)) * std.time.ms_per_hour +
                     @as(f64, @floatFromInt(offset_minute)) * std.time.ms_per_min;
@@ -2624,6 +2625,41 @@ pub const Date = MakeObject(.{
     .tag = .date,
     .display_name = "Date",
 });
+
+test parseDateTimeString {
+    const test_cases = [_]struct { []const u8, f64 }{
+        .{ "1970", 0 },
+        .{ "1970-01", 0 },
+        .{ "1970-01-01", 0 },
+        .{ "+001970-01-01", 0 },
+        .{ "1970-01-01T01:00", 3_600_000 },
+        .{ "1970-01-01T01:00:00", 3_600_000 },
+        .{ "1970-01-01T01:00:00.123", 3_600_123 },
+        .{ "1970-01-01T01:00:00+00:00", 3_600_000 },
+        .{ "1970-01-01T01:00:00Z", 3_600_000 },
+        .{ "1970-01-01T01:00:00+05:00", -14_400_000 },
+        .{ "1970-01-01T01:00:00-05:00", 21_600_000 },
+        .{ "2025-03-15T12:34:56Z", 1742042096000 },
+    };
+    for (test_cases) |test_case| {
+        const value, const expected = test_case;
+        try std.testing.expectEqual(expected, parseDateTimeString(value));
+    }
+    inline for (.{
+        "",
+        "abc",
+        "1970-13-01",
+        "1970-01-99",
+        "1970-01-01T99:00:00",
+        "1970-01-01T01:99:00",
+        "1970-01-01T01:00:99",
+        "1970-01-01T01:00:00+99:00",
+        "1970-01-01T01:00:00+00:99",
+        "1970-01-01T01:00:00+00:00x",
+    }) |value| {
+        try std.testing.expectError(error.InvalidFormat, parseDateTimeString(value));
+    }
+}
 
 test parseOtherString {
     const test_cases = [_]struct { []const u8, f64 }{
