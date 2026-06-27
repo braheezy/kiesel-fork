@@ -540,36 +540,10 @@ pub fn createDataPropertyDirect(
     property_key: PropertyKey,
     value: Value,
 ) std.mem.Allocator.Error!void {
-    const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
-        .ordinary_define_own_property,
-        .ordinary_get_own_property,
-        .ordinary_is_extensible,
-    }));
-    // Arrays have a custom `[[DefineOwnProperty]]` but only use it for indexed properties and
-    // 'length' so we can use the fast path for everything else.
-    const use_fast_path_for_array =
-        self.is(builtins.Array) and
-        !property_key.isArrayIndex() and
-        !property_key.isLength();
-
-    if (has_ordinary_internal_methods or use_fast_path_for_array) {
-        // Go directly to the property storage.
-        try self.setProperty(agent.gc_allocator, property_key, .{
-            .value_or_accessor = .{
-                .value = value,
-            },
-            .attributes = .all,
-        });
-    } else {
-        // Non-ordinary objects like arrays need to go through `[[DefineOwnProperty]]` to set the length.
-        const result = self.internalMethods().defineOwnProperty(agent, self, property_key, .{
-            .value = value,
-            .writable = true,
-            .enumerable = true,
-            .configurable = true,
-        }) catch |err| try noexcept(err);
-        std.debug.assert(result);
-    }
+    return self.definePropertyDirect(agent, property_key, .{
+        .value_or_accessor = .{ .value = value },
+        .attributes = .all,
+    });
 }
 
 /// Fast version of `definePropertyOrThrow()` that assumes the property does not exist yet or
