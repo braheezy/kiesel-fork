@@ -2132,13 +2132,25 @@ pub fn isLessThan(
     }
 
     // 4. If px is a BigInt and py is a String, then
-    //     a. Let ny be StringToBigInt(py).
-    //     b. If ny is undefined, return undefined.
-    //     c. Return BigInt::lessThan(px, ny).
+    if (px.isBigInt() and py.isString()) {
+        // a. Let ny be StringToBigInt(py).
+        // b. If ny is undefined, return undefined.
+        const ny = try stringToBigInt(agent, py.asString()) orelse return null;
+
+        // c. Return BigInt::lessThan(px, ny).
+        return px.asBigInt().lessThan(ny);
+    }
+
     // 5. If px is a String and py is a BigInt, then
-    //     a. Let nx be StringToBigInt(px).
-    //     b. If nx is undefined, return undefined.
-    //     c. Return BigInt::lessThan(nx, py).
+    if (px.isString() and py.isBigInt()) {
+        // a. Let nx be StringToBigInt(px).
+        // b. If nx is undefined, return undefined.
+        const nx = try stringToBigInt(agent, px.asString()) orelse return null;
+
+        // c. Return BigInt::lessThan(nx, py).
+        return nx.lessThan(py.asBigInt());
+    }
+
     // 6. NOTE: Because px and py are primitive values, evaluation order is not important.
 
     // 7. Let nx be ? ToNumeric(px).
@@ -2177,13 +2189,11 @@ pub fn isLessThan(
         (ny == .number and ny.number.isNegativeInf())) return false;
 
     // 14. If ℝ(nx) < ℝ(ny), return true.
-    if (switch (nx) {
-        .number => nx.number.asFloat() < ny.big_int.asFloat(),
-        .big_int => nx.big_int.asFloat() < ny.number.asFloat(),
-    }) return true;
-
-    // 15. Return false.
-    return false;
+    const gpa = agent.gpa;
+    return switch (nx) {
+        .number => (try ny.big_int.orderWithFloat(gpa, nx.number.asFloat(), .floor)) == .gt,
+        .big_int => (try nx.big_int.orderWithFloat(gpa, ny.number.asFloat(), .ceil)) == .lt,
+    };
 }
 
 /// 7.2.13 IsLooselyEqual ( x, y )
@@ -2277,16 +2287,15 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
 
     // 13. If x is a BigInt and y is a Number, or if x is a Number and y is a BigInt, then
     if ((x.isBigInt() and y.isNumber()) or (x.isNumber() and y.isBigInt())) {
-        // a. If x is not finite or y is not finite, return false.
-        if ((x.isNumber() and !x.asNumber().isFinite()) or
-            (y.isNumber() and !y.asNumber().isFinite())) return false;
+        const gpa = agent.gpa;
+        const number = if (x.isNumber()) x.asNumber() else y.asNumber();
+        const big_int = if (x.isBigInt()) x.asBigInt() else y.asBigInt();
 
+        // a. If x is not finite or y is not finite, return false.
         // b. If ℝ(x) = ℝ(y), return true.
         // c. Return false.
-        // TODO: Implement more efficient BigInt to f64 comparison
-        if ((x.isNumber() and !x.asNumber().isIntegral()) or
-            (y.isNumber() and !y.asNumber().isIntegral())) return false;
-        return (try x.toString(agent)).eql(try y.toString(agent));
+        if (!number.isIntegral()) return false;
+        return (try big_int.orderWithFloat(gpa, number.asFloat(), .nearest_even)) == .eq;
     }
 
     // 14. Return false.

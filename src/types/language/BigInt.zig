@@ -83,6 +83,30 @@ pub fn asFloat(self: *const BigInt) f64 {
     return self.managed.toFloat(f64, .nearest_even)[0];
 }
 
+pub fn orderWithFloat(
+    self: *const BigInt,
+    gpa: std.mem.Allocator,
+    value: f64,
+    round: std.math.big.int.Round,
+) std.mem.Allocator.Error!std.math.Order {
+    std.debug.assert(std.math.isFinite(value));
+    var temp = try std.math.big.int.Managed.init(gpa);
+    defer temp.deinit();
+
+    const Repr = std.math.FloatRepr(f64);
+    const repr: Repr = @bitCast(value);
+    const biased_exp = @intFromEnum(repr.exponent);
+    const bias = @intFromEnum(Repr.BiasedExponent.zero);
+    const int_bits = (biased_exp -| (bias - 1));
+    const limb_bits = @bitSizeOf(std.math.big.Limb);
+    const needed = std.math.divCeil(usize, int_bits, limb_bits) catch unreachable;
+    try temp.ensureCapacity(needed);
+
+    var mutable = temp.toMutable();
+    _ = mutable.setFloat(value, round);
+    return self.managed.toConst().order(mutable.toConst());
+}
+
 /// 6.1.6.2.1 BigInt::unaryMinus ( x )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
 pub fn unaryMinus(x: *const BigInt, agent: *Agent) std.mem.Allocator.Error!*const BigInt {
