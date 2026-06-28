@@ -487,9 +487,7 @@ pub const Inst = struct {
     };
 
     pub fn print(inst: Inst, ir: *const Ir, terminal: std.Io.Terminal) PrintError!void {
-        try terminal.setColor(.cyan);
         try terminal.writer.print("{t}", .{inst.tag});
-        try terminal.setColor(.reset);
         try printData(ir, inst.tag, inst.data, terminal);
     }
 
