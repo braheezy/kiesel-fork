@@ -320,7 +320,7 @@ pub const constructor = struct {
         if (new_target == null) {
             return agent.throwException(
                 .type_error,
-                "ArrayBuffer must be constructed with 'new'",
+                "DataView must be constructed with 'new'",
                 .{},
             );
         }
