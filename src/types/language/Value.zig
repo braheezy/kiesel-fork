@@ -424,11 +424,12 @@ pub inline fn from(value: anytype) Value {
 }
 
 pub fn @"type"(self: Value) Type {
+    std.debug.assert(!self.isUninitialized());
     return self.impl.type();
 }
 
 pub fn isUninitialized(value: Value) bool {
-    return value.isObject() and value.impl.asObject() == uninitialized.impl.asObject();
+    return value.impl.type() == .object and value.impl.asObject() == uninitialized.impl.asObject();
 }
 
 pub fn isUndefined(self: Value) bool {
@@ -480,14 +481,20 @@ pub fn asBigInt(self: Value) *const BigInt {
 }
 
 pub fn isObject(self: Value) bool {
-    return self.impl.type() == .object;
+    if (self.impl.type() != .object) return false;
+    if (safety) {
+        // The `uninitialized` sentinel value is an object value with a made-up pointer, make sure
+        // we don't branch on it by accident in safe builds.
+        std.debug.assert(!self.isUninitialized());
+    }
+    return true;
 }
 
 pub fn asObject(self: Value) *Object {
     if (safety) {
         // The `uninitialized` sentinel value is an object value with a made-up pointer, make sure
         // we don't return it by accident in safe builds.
-        std.debug.assert(self.impl.asObject() != uninitialized.impl.asObject());
+        std.debug.assert(!self.isUninitialized());
     }
     return self.impl.asObject();
 }
