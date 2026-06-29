@@ -182,7 +182,7 @@ pub const ElementType = enum {
             .uint32 => "toUint32",
             .bigint64 => "toBigInt64",
             .biguint64 => "toBigUint64",
-            else => unreachable,
+            else => comptime unreachable,
         };
         return @field(Value, field_name);
     }

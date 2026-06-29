@@ -322,7 +322,7 @@ fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.
             Ir.Inst.Ref,
             Ir.StringIndex,
             => @intFromEnum(value),
-            else => unreachable,
+            else => comptime unreachable,
         });
     }
     return extra_index;

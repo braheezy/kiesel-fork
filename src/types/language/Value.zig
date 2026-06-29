@@ -513,7 +513,7 @@ pub fn __isI32(self: Value) bool {
     return switch (Impl) {
         NanBoxingImpl => self.impl.getTag() == .number_i32,
         TaggedUnionImpl => self.impl == .number_i32,
-        else => unreachable,
+        else => comptime unreachable,
     };
 }
 
@@ -522,7 +522,7 @@ pub fn __asI32(self: Value) i32 {
     return switch (Impl) {
         NanBoxingImpl => self.impl.getPayload(.number_i32),
         TaggedUnionImpl => self.impl.number_i32,
-        else => unreachable,
+        else => comptime unreachable,
     };
 }
 
@@ -531,7 +531,7 @@ pub fn __isF64(self: Value) bool {
     return switch (Impl) {
         NanBoxingImpl => self.impl.getTag() == .number_f64,
         TaggedUnionImpl => self.impl == .number_f64,
-        else => unreachable,
+        else => comptime unreachable,
     };
 }
 
@@ -540,7 +540,7 @@ pub fn __asF64(self: Value) f64 {
     return switch (Impl) {
         NanBoxingImpl => self.impl.getPayload(.number_f64),
         TaggedUnionImpl => self.impl.number_f64,
-        else => unreachable,
+        else => comptime unreachable,
     };
 }
 

@@ -558,7 +558,7 @@ pub const Inst = struct {
                         .set_property => SetProperty,
                         .set_property_computed => SetPropertyComputed,
                         .set_property_indexed => SetPropertyIndexed,
-                        else => unreachable,
+                        else => comptime unreachable,
                     };
                     const extra = ir.extraData(ExtraType, field_data);
                     inline for (@typeInfo(ExtraType).@"struct".fields) |extra_field| {
@@ -609,7 +609,7 @@ pub fn extraData(ir: *const Ir, comptime T: type, extra_index: ExtraIndex) Extra
             Inst.Ref,
             StringIndex,
             => @enumFromInt(ir.extra[i]),
-            else => unreachable,
+            else => comptime unreachable,
         };
         i += 1;
     }
@@ -753,7 +753,7 @@ fn printData(
                     .set_property => Inst.SetProperty,
                     .set_property_computed => Inst.SetPropertyComputed,
                     .set_property_indexed => Inst.SetPropertyIndexed,
-                    else => unreachable,
+                    else => comptime unreachable,
                 };
                 const extra = ir.extraData(ExtraType, field_data);
                 const extra_fields = @typeInfo(ExtraType).@"struct".fields;
