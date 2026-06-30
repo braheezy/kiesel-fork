@@ -25,6 +25,33 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateWithType = builtins.ordinaryObjectCreateWithType;
 const sameValue = types.sameValue;
 
+const SetData = std.array_hash_map.Custom(Value, void, struct {
+    pub fn hash(_: @This(), key: Value) u32 {
+        if (key.isUninitialized()) return 0;
+        return key.hash();
+    }
+    pub fn eql(_: @This(), a: Value, b: Value, _: usize) bool {
+        if (a.isUninitialized() or b.isUninitialized()) return false;
+        return sameValue(a, b);
+    }
+}, false);
+
+fn compactSetData(
+    gpa: std.mem.Allocator,
+    set_data: *SetData,
+    dead_entries: usize,
+) std.mem.Allocator.Error!SetData {
+    var compacted: SetData = .empty;
+    try compacted.ensureUnusedCapacity(gpa, set_data.count() - dead_entries);
+    for (set_data.keys()) |key| {
+        if (!key.isUninitialized()) {
+            compacted.putAssumeCapacity(key, {});
+        }
+    }
+    set_data.deinit(gpa);
+    return compacted;
+}
+
 /// 24.2.1.1 Set Records
 /// https://tc39.es/ecma262/#sec-set-records
 const SetRecord = struct {
@@ -141,12 +168,12 @@ fn setDataIndex(set_data: SetData, value: Value) ?usize {
 
 /// 24.2.1.5 SetDataSize ( setData )
 /// https://tc39.es/ecma262/#sec-setdatasize
-fn setDataSize(set_data: SetData) usize {
+fn setDataSize(set_data: SetData, dead_entries: usize) usize {
     // 1. Let count be 0.
     // 2. For each element e of setData, do
     //     a. If e is not empty, set count to count + 1.
     // 3. Return count.
-    return set_data.count();
+    return set_data.count() - dead_entries;
 }
 
 /// 24.2.3 Properties of the Set Constructor
@@ -309,9 +336,6 @@ pub const prototype = struct {
         const result = try set.fields.set_data.getOrPut(agent.gc_allocator, value);
         if (!result.found_existing) {
             result.value_ptr.* = {};
-            if (set.fields.iterable_values) |*iterable_values| {
-                try iterable_values.append(agent.gc_allocator, value);
-            }
         }
 
         // 6. Return S.
@@ -328,10 +352,9 @@ pub const prototype = struct {
         // 3. For each element e of S.[[SetData]], do
         //     a. Replace the element of S.[[SetData]] whose value is e with an element whose value
         //        is empty.
-        set.fields.set_data.clearAndFree(agent.gc_allocator);
-        if (set.fields.iterable_values) |*iterable_values| {
-            iterable_values.clearAndFree(agent.gc_allocator);
-        }
+        @memset(set.fields.set_data.keys(), .uninitialized);
+        set.fields.dead_entries = set.fields.set_data.count();
+        try set.fields.compactIfNeeded(agent.gc_allocator);
 
         // 4. Return undefined.
         return .undefined;
@@ -351,14 +374,18 @@ pub const prototype = struct {
 
         // 4. For each element e of S.[[SetData]], do
         //     a. If e is not empty and SameValue(e, value) is true, then
-        //         i. Replace the element of S.[[SetData]] whose value is e with an element whose
-        //            value is empty.
-        //         ii. Return true.
         if (set.fields.set_data.getIndex(value)) |index| {
-            set.fields.set_data.orderedRemoveAt(index);
-            if (set.fields.iterable_values) |*iterable_values| {
-                iterable_values.items[index] = null;
-            }
+            // i. Replace the element of S.[[SetData]] whose value is e with an element whose value
+            //    is empty.
+            set.fields.set_data.entries.set(index, .{
+                .hash = {},
+                .key = .uninitialized,
+                .value = {},
+            });
+            set.fields.dead_entries += 1;
+            try set.fields.compactIfNeeded(agent.gc_allocator);
+
+            // ii. Return true.
             return .true;
         }
 
@@ -381,11 +408,10 @@ pub const prototype = struct {
         // 4. Let resultSetData be a copy of O.[[SetData]].
         var result_set_data = try object.fields.set_data.clone(agent.gc_allocator);
 
-        // 5. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
-        if (setDataSize(object.fields.set_data) <= other_rec.size) {
-            var indexes_to_remove: std.ArrayList(usize) = .empty;
-            defer indexes_to_remove.deinit(agent.gc_allocator);
+        var dead_entries: usize = 0;
 
+        // 5. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
+        if (setDataSize(object.fields.set_data, object.fields.dead_entries) <= other_rec.size) {
             // a. Let thisSize be the number of elements in O.[[SetData]].
             const this_size = object.fields.set_data.count();
 
@@ -395,7 +421,7 @@ pub const prototype = struct {
             // c. Repeat, while index < thisSize,
             while (index < this_size) : (index += 1) {
                 // i. Let e be resultSetData[index].
-                const element = result_set_data.keys()[index];
+                const entry = result_set_data.entries.get(index);
 
                 // ii. If e is not empty, then
                 // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]],
@@ -403,20 +429,22 @@ pub const prototype = struct {
                 const in_other = (try Value.from(other_rec.has).callAssumeCallable(
                     agent,
                     Value.from(other_rec.set_object),
-                    &.{element},
+                    &.{entry.key},
                 )).toBoolean();
 
                 // 2. If inOther is true, then
                 if (in_other) {
                     // a. Set resultSetData[index] to empty.
-                    try indexes_to_remove.append(agent.gc_allocator, index);
+                    result_set_data.entries.set(index, .{
+                        .hash = {},
+                        .key = .uninitialized,
+                        .value = {},
+                    });
+                    dead_entries += 1;
                 }
 
                 // iii. Set index to index + 1.
             }
-
-            std.mem.reverse(usize, indexes_to_remove.items);
-            for (indexes_to_remove.items) |i| result_set_data.orderedRemoveAt(i);
         } else {
             // 6. Else,
             // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]],
@@ -441,9 +469,22 @@ pub const prototype = struct {
                 // 3. If valueIndex is not not-found, then
                 if (maybe_value_index) |value_index| {
                     // a. Set resultSetData[valueIndex] to empty.
-                    result_set_data.orderedRemoveAt(value_index);
+                    result_set_data.entries.set(value_index, .{
+                        .hash = {},
+                        .key = .uninitialized,
+                        .value = {},
+                    });
+                    dead_entries += 1;
                 }
             }
+        }
+
+        if (dead_entries > 0) {
+            result_set_data = try compactSetData(
+                agent.gc_allocator,
+                &result_set_data,
+                dead_entries,
+            );
         }
 
         // 7. Let result be OrdinaryObjectCreate(%Set.prototype%, « [[SetData]] »).
@@ -488,11 +529,13 @@ pub const prototype = struct {
         }
 
         // 4. Let entries be S.[[SetData]].
-        const iterable_values = try set.fields.registerIterator(agent.gc_allocator);
-        defer set.fields.unregisterIterator(agent.gc_allocator);
+        const entries_ = &set.fields.set_data;
+
+        set.fields.active_iterators += 1;
+        defer set.fields.active_iterators -= 1;
 
         // 5. Let numEntries be the number of elements in entries.
-        var num_entries = iterable_values.items.len;
+        var num_entries = entries_.count();
 
         // 6. Let index be 0.
         var index: usize = 0;
@@ -500,20 +543,23 @@ pub const prototype = struct {
         // 7. Repeat, while index < numEntries,
         while (index < num_entries) : (index += 1) {
             // a. Let e be entries[index].
+            const entry = entries_.entries.get(index);
+
             // b. Set index to index + 1.
+
             // c. If e is not empty, then
-            if (iterable_values.items[index]) |value| {
+            if (!entry.key.isUninitialized()) {
                 // i. Perform ? Call(callback, thisArg, « e, e, S »).
                 _ = try callback.callAssumeCallable(
                     agent,
                     this_arg,
-                    &.{ value, value, Value.from(&set.object) },
+                    &.{ entry.key, entry.key, Value.from(&set.object) },
                 );
 
                 // ii. NOTE: The number of elements in entries may have increased during execution
                 //     of callback.
                 // iii. Set numEntries to the number of elements in entries.
-                num_entries = iterable_values.items.len;
+                num_entries = entries_.count();
             }
         }
 
@@ -555,7 +601,7 @@ pub const prototype = struct {
         var result_set_data: SetData = .empty;
 
         // 5. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
-        if (setDataSize(object.fields.set_data) <= other_rec.size) {
+        if (setDataSize(object.fields.set_data, object.fields.dead_entries) <= other_rec.size) {
             // a. Let thisSize be the number of elements in O.[[SetData]].
             var this_size = object.fields.set_data.count();
 
@@ -565,7 +611,7 @@ pub const prototype = struct {
             // c. Repeat, while index < thisSize,
             while (index < this_size) : (index += 1) {
                 // i. Let e be O.[[SetData]][index].
-                const element = object.fields.set_data.keys()[index];
+                const entry = object.fields.set_data.entries.get(index);
 
                 // ii. Set index to index + 1.
                 // iii. If e is not empty, then
@@ -575,7 +621,7 @@ pub const prototype = struct {
                 const in_other = (try Value.from(other_rec.has).callAssumeCallable(
                     agent,
                     Value.from(other_rec.set_object),
-                    &.{element},
+                    &.{entry.key},
                 )).toBoolean();
 
                 // 2. If inOther is true, then
@@ -586,7 +632,7 @@ pub const prototype = struct {
                     // b. If SetDataHas(resultSetData, e) is false, then
                     //     i. Append e to resultSetData.
                     // NOTE: We do not need to check because put allows clobbers.
-                    try result_set_data.put(agent.gc_allocator, element, {});
+                    try result_set_data.put(agent.gc_allocator, entry.key, {});
                 }
 
                 // 3. NOTE: The number of elements in O.[[SetData]] may have increased during
@@ -655,7 +701,7 @@ pub const prototype = struct {
         const other_rec = try getSetRecord(agent, other);
 
         // 4. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
-        if (setDataSize(object.fields.set_data) <= other_rec.size) {
+        if (setDataSize(object.fields.set_data, object.fields.dead_entries) <= other_rec.size) {
             // a. Let thisSize be the number of elements in O.[[SetData]].
             var this_size = object.fields.set_data.count();
 
@@ -665,7 +711,7 @@ pub const prototype = struct {
             // c. Repeat, while index < thisSize,
             while (index < this_size) : (index += 1) {
                 // i. Let e be O.[[SetData]][index].
-                const element = object.fields.set_data.keys()[index];
+                const entry = object.fields.set_data.entries.get(index);
 
                 // ii. Set index to index + 1.
                 // iii. If e is not empty, then
@@ -675,7 +721,7 @@ pub const prototype = struct {
                 const in_other = (try Value.from(other_rec.has).callAssumeCallable(
                     agent,
                     Value.from(other_rec.set_object),
-                    &.{element},
+                    &.{entry.key},
                 )).toBoolean();
 
                 // 2. If inOther is true, return false.
@@ -731,7 +777,7 @@ pub const prototype = struct {
         const other_rec = try getSetRecord(agent, other);
 
         // 4. If SetDataSize(O.[[SetData]]) > otherRec.[[Size]], return false.
-        if (setDataSize(object.fields.set_data) > other_rec.size) {
+        if (setDataSize(object.fields.set_data, object.fields.dead_entries) > other_rec.size) {
             return .false;
         }
 
@@ -744,7 +790,7 @@ pub const prototype = struct {
         // 7. Repeat, while index < thisSize,
         while (index < this_size) : (index += 1) {
             // a. Let e be O.[[SetData]][index].
-            const element = object.fields.set_data.keys()[index];
+            const entry = object.fields.set_data.entries.get(index);
 
             // b. Set index to index + 1.
             // c. If e is not empty, then
@@ -753,7 +799,7 @@ pub const prototype = struct {
             const in_other = (try Value.from(other_rec.has).callAssumeCallable(
                 agent,
                 Value.from(other_rec.set_object),
-                &.{element},
+                &.{entry.key},
             )).toBoolean();
 
             // ii. If inOther is false, return false.
@@ -784,7 +830,7 @@ pub const prototype = struct {
         const other_rec = try getSetRecord(agent, other);
 
         // 4. If SetDataSize(O.[[SetData]]) < otherRec.[[Size]], return false.
-        if (setDataSize(object.fields.set_data) < other_rec.size) {
+        if (setDataSize(object.fields.set_data, object.fields.dead_entries) < other_rec.size) {
             return .false;
         }
 
@@ -822,7 +868,7 @@ pub const prototype = struct {
         const set = try this_value.requireInternalSlot(agent, Set);
 
         // 3. Let size be SetDataSize(S.[[SetData]]).
-        const size_ = setDataSize(set.fields.set_data);
+        const size_ = setDataSize(set.fields.set_data, set.fields.dead_entries);
 
         // 4. Return 𝔽(size).
         return Value.from(@as(u53, @intCast(size_)));
@@ -850,6 +896,8 @@ pub const prototype = struct {
         // 5. Let resultSetData be a copy of O.[[SetData]].
         var result_set_data = try object.fields.set_data.clone(agent.gc_allocator);
 
+        var dead_entries: usize = 0;
+
         // 6. Let next be not-started.
         // 7. Repeat, while next is not done,
         //     a. Set next to ? IteratorStepValue(keysIter).
@@ -867,7 +915,12 @@ pub const prototype = struct {
             if (setDataHas(object.fields.set_data, next)) {
                 // 1. If alreadyInResult is true, set resultSetData[resultIndex] to empty.
                 if (maybe_result_index) |result_index| {
-                    result_set_data.orderedRemoveAt(result_index);
+                    result_set_data.entries.set(result_index, .{
+                        .hash = {},
+                        .key = .uninitialized,
+                        .value = {},
+                    });
+                    dead_entries += 1;
                 }
             } else {
                 // v. Else,
@@ -876,6 +929,14 @@ pub const prototype = struct {
                     try result_set_data.put(agent.gc_allocator, next, {});
                 }
             }
+        }
+
+        if (dead_entries > 0) {
+            result_set_data = try compactSetData(
+                agent.gc_allocator,
+                &result_set_data,
+                dead_entries,
+            );
         }
 
         // 8. Let result be OrdinaryObjectCreate(%Set.prototype%, « [[SetData]] »).
@@ -956,9 +1017,6 @@ pub const prototype = struct {
     }
 };
 
-const SetData = Value.ArrayHashMapUnmanaged(void, sameValue);
-const IterableValues = std.ArrayList(?Value);
-
 /// 24.2.5 Properties of Set Instances
 /// https://tc39.es/ecma262/#sec-properties-of-set-instances
 pub const Set = MakeObject(.{
@@ -966,33 +1024,13 @@ pub const Set = MakeObject(.{
         /// [[SetData]]
         set_data: SetData,
 
-        /// List of values and their deletion status for SetIterator and Set.prototype.forEach(),
-        /// created and destroyed on demand.
-        iterable_values: ?IterableValues = null,
+        dead_entries: usize = 0,
         active_iterators: usize = 0,
 
-        pub fn registerIterator(
-            self: *@This(),
-            allocator: std.mem.Allocator,
-        ) std.mem.Allocator.Error!*IterableValues {
-            if (self.active_iterators == 0) {
-                std.debug.assert(self.iterable_values == null);
-                self.iterable_values = try .initCapacity(allocator, self.set_data.count());
-                for (self.set_data.keys()) |value| {
-                    self.iterable_values.?.appendAssumeCapacity(value);
-                }
-            }
-            self.active_iterators += 1;
-            return &self.iterable_values.?;
-        }
-
-        pub fn unregisterIterator(self: *@This(), allocator: std.mem.Allocator) void {
-            self.active_iterators -= 1;
-            if (self.active_iterators == 0) {
-                std.debug.assert(self.iterable_values != null);
-                self.iterable_values.?.deinit(allocator);
-                self.iterable_values = null;
-            }
+        pub fn compactIfNeeded(self: *@This(), gpa: std.mem.Allocator) std.mem.Allocator.Error!void {
+            if (self.active_iterators > 0 or self.dead_entries <= self.set_data.count() / 4) return;
+            self.set_data = try compactSetData(gpa, &self.set_data, self.dead_entries);
+            self.dead_entries = 0;
         }
     },
     .tag = .set,

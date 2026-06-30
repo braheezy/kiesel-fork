@@ -2472,23 +2472,27 @@ pub fn toIntegerIfIntegral(self: Value, agent: *Agent) Agent.Error!f64 {
     return number.asFloat();
 }
 
+pub fn hash(value: Value) u32 {
+    const value_hash = switch (value.type()) {
+        .undefined, .null => 0,
+        .boolean => std.array_hash_map.getAutoHashFn(bool, void)({}, value.asBoolean()),
+        .string => @as(u32, @truncate(value.asString().hash)),
+        .symbol => std.array_hash_map.getAutoHashStratFn(*const Symbol, void, .Shallow)({}, value.asSymbol()),
+        .number => switch (value.asNumber()) {
+            .i32 => |n| std.array_hash_map.getAutoHashFn(i32, void)({}, n),
+            .f64 => |n| std.array_hash_map.getAutoHashFn(i64, void)({}, @bitCast(n)),
+        },
+        .big_int => std.array_hash_map.getAutoHashStratFn(*const BigInt, void, .Shallow)({}, value.asBigInt()),
+        .object => std.array_hash_map.getAutoHashStratFn(*Object, void, .Shallow)({}, value.asObject()),
+    };
+    const tag: u32 = @intFromEnum(value.type());
+    return tag ^ value_hash;
+}
+
 pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
     return std.array_hash_map.Custom(Value, V, struct {
         pub fn hash(_: @This(), key: Value) u32 {
-            const value_hash = switch (key.type()) {
-                .undefined, .null => 0,
-                .boolean => std.array_hash_map.getAutoHashFn(bool, void)({}, key.asBoolean()),
-                .string => @as(u32, @truncate(key.asString().hash)),
-                .symbol => std.array_hash_map.getAutoHashStratFn(*const Symbol, void, .Shallow)({}, key.asSymbol()),
-                .number => switch (key.asNumber()) {
-                    .i32 => |n| std.array_hash_map.getAutoHashFn(i32, void)({}, n),
-                    .f64 => |n| std.array_hash_map.getAutoHashFn(i64, void)({}, @bitCast(n)),
-                },
-                .big_int => std.array_hash_map.getAutoHashStratFn(*const BigInt, void, .Shallow)({}, key.asBigInt()),
-                .object => std.array_hash_map.getAutoHashStratFn(*Object, void, .Shallow)({}, key.asObject()),
-            };
-            const tag: u32 = @intFromEnum(key.type());
-            return tag ^ value_hash;
+            return key.hash();
         }
 
         pub fn eql(_: @This(), a: Value, b: Value, _: usize) bool {

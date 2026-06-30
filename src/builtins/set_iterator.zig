@@ -87,35 +87,38 @@ pub const prototype = struct {
 
         std.debug.assert(kind != .key);
 
-        if (index == 0) _ = try set.fields.registerIterator(agent.gc_allocator);
-        const iterable_values = &set.fields.iterable_values.?;
+        if (index == 0) set.fields.active_iterators += 1;
 
         // a. Let index be 0.
 
         // b. Let entries be set.[[SetData]].
         const entries = &set.fields.set_data;
-        _ = entries;
 
         // c. Let numEntries be the number of elements in entries.
-        const num_entries = iterable_values.items.len;
+        const num_entries = entries.count();
 
         // d. Repeat, while index < numEntries,
-        const value = while (index < num_entries) : (index += 1) {
+        const entry = while (index < num_entries) : (index += 1) {
             // i. Let e be entries[index].
+            const entry = entries.entries.get(index);
+
             // ii. Set index to index + 1.
+
             // iii. If e is not empty, then
-            if (iterable_values.items[index]) |value| {
+            if (!entry.key.isUninitialized()) {
                 index += 1;
-                break value;
+                break entry;
             }
         } else {
             // e. Return NormalCompletion(unused).
             set_iterator.fields = .completed;
-            set.fields.unregisterIterator(agent.gc_allocator);
+            set.fields.active_iterators -= 1;
+            try set.fields.compactIfNeeded(agent.gc_allocator);
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         };
 
         set_iterator.fields.state.index = index;
+        const value = entry.key;
 
         switch (kind) {
             // 1. If kind is key+value, then

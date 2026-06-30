@@ -24,6 +24,33 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const sameValue = types.sameValue;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
+const MapData = std.array_hash_map.Custom(Value, Value, struct {
+    pub fn hash(_: @This(), key: Value) u32 {
+        if (key.isUninitialized()) return 0;
+        return key.hash();
+    }
+    pub fn eql(_: @This(), a: Value, b: Value, _: usize) bool {
+        if (a.isUninitialized() or b.isUninitialized()) return false;
+        return sameValue(a, b);
+    }
+}, false);
+
+fn compactMapData(
+    gpa: std.mem.Allocator,
+    map_data: *MapData,
+    dead_entries: usize,
+) std.mem.Allocator.Error!MapData {
+    var compacted: MapData = .empty;
+    try compacted.ensureUnusedCapacity(gpa, map_data.count() - dead_entries);
+    for (map_data.keys(), map_data.values()) |key, value| {
+        if (!key.isUninitialized()) {
+            compacted.putAssumeCapacity(key, value);
+        }
+    }
+    map_data.deinit(gpa);
+    return compacted;
+}
+
 /// 24.1.1.2 AddEntriesFromIterable ( target, iterable, adder )
 /// https://tc39.es/ecma262/#sec-add-entries-from-iterable
 pub fn addEntriesFromIterable(
@@ -243,10 +270,10 @@ pub const prototype = struct {
         // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
         //     a. Set p.[[Key]] to empty.
         //     b. Set p.[[Value]] to empty.
-        map.fields.map_data.clearAndFree(agent.gc_allocator);
-        if (map.fields.iterable_keys) |*iterable_keys| {
-            iterable_keys.clearAndFree(agent.gc_allocator);
-        }
+        @memset(map.fields.map_data.keys(), .uninitialized);
+        @memset(map.fields.map_data.values(), undefined);
+        map.fields.dead_entries = map.fields.map_data.count();
+        try map.fields.compactIfNeeded(agent.gc_allocator);
 
         // 4. Return undefined.
         return .undefined;
@@ -266,14 +293,18 @@ pub const prototype = struct {
 
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
         //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
-        //         i. Set p.[[Key]] to empty.
-        //         ii. Set p.[[Value]] to empty.
-        //         iii. Return true.
         if (map.fields.map_data.getIndex(key)) |index| {
-            map.fields.map_data.orderedRemoveAt(index);
-            if (map.fields.iterable_keys) |*iterable_keys| {
-                iterable_keys.items[index] = null;
-            }
+            // i. Set p.[[Key]] to empty.
+            // ii. Set p.[[Value]] to empty.
+            map.fields.map_data.entries.set(index, .{
+                .hash = {},
+                .key = .uninitialized,
+                .value = undefined,
+            });
+            map.fields.dead_entries += 1;
+            try map.fields.compactIfNeeded(agent.gc_allocator);
+
+            // iii. Return true.
             return .true;
         }
 
@@ -307,14 +338,14 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
-        const iterable_keys = try map.fields.registerIterator(agent.gc_allocator);
-        defer map.fields.unregisterIterator(agent.gc_allocator);
+        map.fields.active_iterators += 1;
+        defer map.fields.active_iterators -= 1;
 
         // 4. Let entries be M.[[MapData]].
         const entries_ = &map.fields.map_data;
 
         // 5. Let numEntries be the number of elements in entries.
-        var num_entries = iterable_keys.items.len;
+        var num_entries = entries_.count();
 
         // 6. Let index be 0.
         var index: usize = 0;
@@ -322,22 +353,23 @@ pub const prototype = struct {
         // 7. Repeat, while index < numEntries,
         while (index < num_entries) : (index += 1) {
             // a. Let e be entries[index].
-            // b. Set index to index + 1.
-            // c. If e.[[Key]] is not empty, then
-            if (iterable_keys.items[index]) |key| {
-                const value = entries_.get(key).?;
+            const entry = entries_.entries.get(index);
 
+            // b. Set index to index + 1.
+
+            // c. If e.[[Key]] is not empty, then
+            if (!entry.key.isUninitialized()) {
                 // i. Perform ? Call(callback, thisArg, « e.[[Value]], e.[[Key]], M »).
                 _ = try callback.callAssumeCallable(
                     agent,
                     this_arg,
-                    &.{ value, key, Value.from(&map.object) },
+                    &.{ entry.value, entry.key, Value.from(&map.object) },
                 );
 
                 // ii. NOTE: The number of elements in entries may have increased during execution
                 //     of callback.
                 // iii. Set numEntries to the number of elements in entries.
-                num_entries = iterable_keys.items.len;
+                num_entries = entries_.count();
             }
         }
 
@@ -480,13 +512,7 @@ pub const prototype = struct {
         //         ii. Return M.
         // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
         // 6. Append p to M.[[MapData]].
-        const result = try map.fields.map_data.getOrPut(agent.gc_allocator, key);
-        result.value_ptr.* = value;
-        if (!result.found_existing) {
-            if (map.fields.iterable_keys) |*iterable_keys| {
-                try iterable_keys.append(agent.gc_allocator, key);
-            }
-        }
+        try map.fields.map_data.put(agent.gc_allocator, key, value);
 
         // 7. Return M.
         return Value.from(&map.object);
@@ -502,7 +528,7 @@ pub const prototype = struct {
         // 3. Let count be 0.
         // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
         //     a. If p.[[Key]] is not empty, set count to count + 1.
-        const count = map.fields.map_data.count();
+        const count = map.fields.map_data.count() - map.fields.dead_entries;
 
         // 5. Return 𝔽(count).
         return Value.from(@as(u53, @intCast(count)));
@@ -520,9 +546,6 @@ pub const prototype = struct {
     }
 };
 
-const MapData = Value.ArrayHashMapUnmanaged(Value, sameValue);
-const IterableKeys = std.ArrayList(?Value);
-
 /// 24.1.4 Properties of Map Instances
 /// https://tc39.es/ecma262/#sec-properties-of-map-instances
 pub const Map = MakeObject(.{
@@ -530,33 +553,13 @@ pub const Map = MakeObject(.{
         /// [[MapData]]
         map_data: MapData,
 
-        /// List of keys and their deletion status for MapIterator and Map.prototype.forEach(),
-        /// created and destroyed on demand.
-        iterable_keys: ?IterableKeys = null,
+        dead_entries: usize = 0,
         active_iterators: usize = 0,
 
-        pub fn registerIterator(
-            self: *@This(),
-            allocator: std.mem.Allocator,
-        ) std.mem.Allocator.Error!*IterableKeys {
-            if (self.active_iterators == 0) {
-                std.debug.assert(self.iterable_keys == null);
-                self.iterable_keys = try .initCapacity(allocator, self.map_data.count());
-                for (self.map_data.keys()) |key| {
-                    self.iterable_keys.?.appendAssumeCapacity(key);
-                }
-            }
-            self.active_iterators += 1;
-            return &self.iterable_keys.?;
-        }
-
-        pub fn unregisterIterator(self: *@This(), allocator: std.mem.Allocator) void {
-            self.active_iterators -= 1;
-            if (self.active_iterators == 0) {
-                std.debug.assert(self.iterable_keys != null);
-                self.iterable_keys.?.deinit(allocator);
-                self.iterable_keys = null;
-            }
+        pub fn compactIfNeeded(self: *@This(), gpa: std.mem.Allocator) std.mem.Allocator.Error!void {
+            if (self.active_iterators > 0 or self.dead_entries <= self.map_data.count() / 4) return;
+            self.map_data = try compactMapData(gpa, &self.map_data, self.dead_entries);
+            self.dead_entries = 0;
         }
     },
     .tag = .map,

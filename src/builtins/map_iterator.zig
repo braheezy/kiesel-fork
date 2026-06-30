@@ -85,8 +85,7 @@ pub const prototype = struct {
         const kind = map_iterator.fields.state.kind;
         var index = map_iterator.fields.state.index;
 
-        if (index == 0) _ = try map.fields.registerIterator(agent.gc_allocator);
-        const iterable_keys = &map.fields.iterable_keys.?;
+        if (index == 0) map.fields.active_iterators += 1;
 
         // a. Let entries be map.[[MapData]].
         const entries = &map.fields.map_data;
@@ -94,28 +93,31 @@ pub const prototype = struct {
         // b. Let index be 0.
 
         // c. Let numEntries be the number of elements in entries.
-        const num_entries = iterable_keys.items.len;
+        const num_entries = entries.count();
 
         // d. Repeat, while index < numEntries,
         const entry = while (index < num_entries) : (index += 1) {
             // i. Let e be entries[index].
+            const entry = entries.entries.get(index);
+
             // ii. Set index to index + 1.
+
             // iii. If e.[[Key]] is not empty, then
-            if (iterable_keys.items[index]) |key| {
-                const value = entries.get(key).?;
+            if (!entry.key.isUninitialized()) {
                 index += 1;
-                break .{ key, value };
+                break entry;
             }
         } else {
             // e. Return NormalCompletion(unused).
             map_iterator.fields = .completed;
-            map.fields.unregisterIterator(agent.gc_allocator);
+            map.fields.active_iterators -= 1;
+            try map.fields.compactIfNeeded(agent.gc_allocator);
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         };
 
         map_iterator.fields.state.index = index;
-        const key = entry.@"0";
-        const value = entry.@"1";
+        const key = entry.key;
+        const value = entry.value;
 
         const result = switch (kind) {
             // 1. If kind is key, then
