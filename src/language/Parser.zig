@@ -1479,6 +1479,25 @@ pub fn acceptNumericLiteral(self: *Parser) AcceptError!ast.NumericLiteral {
     const token = try self.core.accept(RuleSet.is(.numeric));
     var numeric_literal = parseNumericLiteral(token.text, .complete) catch unreachable;
     numeric_literal.text = try self.allocator.dupe(u8, numeric_literal.text);
+
+    switch (numeric_literal.production) {
+        // DecimalIntegerLiteral :: NonOctalDecimalIntegerLiteral
+        // NumericLiteral :: LegacyOctalIntegerLiteral
+        .non_octal_decimal_integer_literal,
+        .legacy_octal_integer_literal,
+        => {
+            // - It is a Syntax Error if IsStrict(this production) is true.
+            if (self.state.in_strict_mode) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Numeric literal with leading zero is not allowed in strict mode",
+                    .{},
+                );
+            }
+        },
+        .regular => {},
+    }
+
     return numeric_literal;
 }
 
