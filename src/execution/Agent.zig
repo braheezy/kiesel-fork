@@ -273,10 +273,10 @@ pub fn getActiveScriptOrModule(self: *const Agent) ?ExecutionContext.ScriptOrMod
     // 1. If the execution context stack is empty, return null.
     if (self.execution_context_stack.items.len == 0) return null;
 
-    // 2. Let ec be the topmost execution context on the execution context stack whose
+    // 2. Let executionContext be the topmost execution context on the execution context stack whose
     //    ScriptOrModule component is not null.
     // 3. If no such execution context exists, return null.
-    // 4. Return ec's ScriptOrModule.
+    // 4. Return executionContext's ScriptOrModule.
     var it = std.mem.reverseIterator(self.execution_context_stack.items);
     while (it.next()) |execution_context| {
         if (execution_context.script_or_module) |script_or_module|
@@ -288,24 +288,24 @@ pub fn getActiveScriptOrModule(self: *const Agent) ?ExecutionContext.ScriptOrMod
 /// 9.4.3 GetThisEnvironment ( )
 /// https://tc39.es/ecma262/#sec-getthisenvironment
 pub fn getThisEnvironment(self: *const Agent) Environment {
-    // 1. Let env be the running execution context's LexicalEnvironment.
+    // 1. Let envRecord be the running execution context's LexicalEnvironment.
     var env = self.runningExecutionContext().ecmascript_code.lexical_environment;
 
     // 2. Repeat,
     while (true) {
-        // a. Let exists be env.HasThisBinding().
+        // a. Let exists be envRecord.HasThisBinding().
         const exists = env.hasThisBinding();
 
-        // b. If exists is true, return env.
+        // b. If exists is true, return envRecord.
         if (exists) return env;
 
-        // c. Let outer be env.[[OuterEnv]].
+        // c. Let outer be envRecord.[[OuterEnv]].
         const outer = env.outerEnv();
 
         // d. Assert: outer is not null.
         std.debug.assert(outer != null);
 
-        // e. Set env to outer.
+        // e. Set envRecord to outer.
         env = outer.?;
     }
 
@@ -317,23 +317,23 @@ pub fn getThisEnvironment(self: *const Agent) Environment {
 /// 9.4.4 ResolveThisBinding ( )
 /// https://tc39.es/ecma262/#sec-resolvethisbinding
 pub fn resolveThisBinding(self: *Agent) Error!Value {
-    // 1. Let envRec be GetThisEnvironment().
+    // 1. Let envRecord be GetThisEnvironment().
     const env = self.getThisEnvironment();
 
-    // 2. Return ? envRec.GetThisBinding().
+    // 2. Return ? envRecord.GetThisBinding().
     return env.getThisBinding(self);
 }
 
 /// 9.4.5 GetNewTarget ( )
 /// https://tc39.es/ecma262/#sec-getnewtarget
 pub fn getNewTarget(self: *const Agent) ?*Object {
-    // 1. Let envRec be GetThisEnvironment().
+    // 1. Let envRecord be GetThisEnvironment().
     const env = self.getThisEnvironment();
 
-    // 2. Assert: envRec has a [[NewTarget]] field.
+    // 2. Assert: envRecord has a [[NewTarget]] field.
     std.debug.assert(env == .function_environment);
 
-    // 3. Return envRec.[[NewTarget]].
+    // 3. Return envRecord.[[NewTarget]].
     return env.function_environment.new_target;
 }
 
@@ -350,9 +350,9 @@ pub fn getGlobalObject(self: *const Agent) *Object {
 /// 9.6.3 IncrementModuleAsyncEvaluationCount ( )
 /// https://tc39.es/ecma262/#sec-IncrementModuleAsyncEvaluationCount
 pub fn incrementModuleAsyncEvaluationCount(self: *Agent) u32 {
-    // 1. Let AR be the Agent Record of the surrounding agent.
-    // 2. Let count be AR.[[ModuleAsyncEvaluationCount]].
-    // 3. Set AR.[[ModuleAsyncEvaluationCount]] to count + 1.
+    // 1. Let agentRecord be the Agent Record of the surrounding agent.
+    // 2. Let count be agentRecord.[[ModuleAsyncEvaluationCount]].
+    // 3. Set agentRecord.[[ModuleAsyncEvaluationCount]] to count + 1.
     defer self.module_async_evaluation_count += 1;
 
     // 4. Return count.

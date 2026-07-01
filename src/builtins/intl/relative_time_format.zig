@@ -33,7 +33,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "RelativeTimeFormat",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -96,21 +96,21 @@ pub const constructor = struct {
         // 4. Set options to optionsResolution.[[Options]].
         const options = options_resolution.options;
 
-        // 5. Let r be optionsResolution.[[ResolvedLocale]].
-        const r = options_resolution.resolved_locale;
+        // 5. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+        const resolved_locale = options_resolution.resolved_locale;
 
-        // 6. Let locale be r.[[Locale]].
-        const locale = r.locale;
+        // 6. Let locale be resolvedLocale.[[Locale]].
+        const locale = resolved_locale.locale;
 
         // 7. Set relativeTimeFormat.[[Locale]] to locale.
-        // 8. Set relativeTimeFormat.[[LocaleData]] to r.[[LocaleData]].
+        // 8. Set relativeTimeFormat.[[LocaleData]] to resolvedLocale.[[LocaleData]].
         relative_time_format.fields.locale = locale;
 
-        // 9. Set relativeTimeFormat.[[NumberingSystem]] to r.[[nu]].
+        // 9. Set relativeTimeFormat.[[NumberingSystem]] to resolvedLocale.[[nu]].
         const numbering_system = if (try locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
             try String.fromAscii(agent, nu)
         else
-            r.options.nu orelse String.fromLiteral("latn");
+            resolved_locale.options.nu orelse String.fromLiteral("latn");
         relative_time_format.fields.numbering_system = numbering_system;
 
         // 10. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow" »,
@@ -217,11 +217,11 @@ pub const prototype = struct {
         );
 
         // 4. For each row of Table 33, except the header row, in table order, do
-        //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of relativeTimeFormat's internal slot whose name is the
+        //     a. Let propertyKey be the Property value of the current row.
+        //     b. Let value be the value of relativeTimeFormat's internal slot whose name is the
         //        Internal Slot value of the current row.
-        //     c. Assert: v is not undefined.
-        //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //     c. Assert: value is not undefined.
+        //     d. Perform ! CreateDataPropertyOrThrow(options, propertyKey, value).
         const resolved_options = relative_time_format.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,

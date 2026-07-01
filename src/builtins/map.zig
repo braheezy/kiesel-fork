@@ -79,20 +79,20 @@ pub fn addEntriesFromIterable(
             return iterator.close(agent, @as(Agent.Error!*Object, @"error"));
         }
 
-        // d. Let k be Completion(Get(next, "0")).
-        const k = next.asObject().get(agent, PropertyKey.from(0)) catch |err| {
-            // e. IfAbruptCloseIterator(k, iteratorRecord).
+        // d. Let key be Completion(Get(next, "0")).
+        const key = next.asObject().get(agent, PropertyKey.from(0)) catch |err| {
+            // e. IfAbruptCloseIterator(key, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
 
-        // f. Let v be Completion(Get(next, "1")).
-        const v = next.asObject().get(agent, PropertyKey.from(1)) catch |err| {
-            // g. IfAbruptCloseIterator(v, iteratorRecord).
+        // f. Let value be Completion(Get(next, "1")).
+        const value = next.asObject().get(agent, PropertyKey.from(1)) catch |err| {
+            // g. IfAbruptCloseIterator(value, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
 
-        // h. Let status be Completion(Call(adder, target, « k, v »)).
-        _ = Value.from(adder).callAssumeCallable(agent, Value.from(target), &.{ k, v }) catch |err| {
+        // h. Let status be Completion(Call(adder, target, « key, value »)).
+        _ = Value.from(adder).callAssumeCallable(agent, Value.from(target), &.{ key, value }) catch |err| {
             // i. IfAbruptCloseIterator(status, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
@@ -110,7 +110,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Map",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -185,13 +185,13 @@ pub const constructor = struct {
         ) catch |err| try noexcept(err);
         const map = map_object.as(Map);
 
-        // 3. For each Record { [[Key]], [[Elements]] } g of groups, do
+        // 3. For each Record { [[Key]], [[Elements]] } group of groups, do
         var it = groups.iterator();
         while (it.next()) |entry| {
-            // a. Let elements be CreateArrayFromList(g.[[Elements]]).
+            // a. Let elements be CreateArrayFromList(group.[[Elements]]).
             const elements = try createArrayFromList(agent, entry.value_ptr.items);
 
-            // b. Let entry be the Record { [[Key]]: g.[[Key]], [[Value]]: elements }.
+            // b. Let entry be the Record { [[Key]]: group.[[Key]], [[Value]]: elements }.
             // c. Append entry to map.[[MapData]].
             try map.fields.map_data.putNoClobber(
                 agent.gc_allocator,
@@ -263,13 +263,13 @@ pub const prototype = struct {
     /// 24.1.3.1 Map.prototype.clear ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.clear
     fn clear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
-        // 3. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. Set p.[[Key]] to empty.
-        //     b. Set p.[[Value]] to empty.
+        // 3. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. Set entry.[[Key]] to empty.
+        //     b. Set entry.[[Value]] to empty.
         @memset(map.fields.map_data.keys(), .uninitialized);
         @memset(map.fields.map_data.values(), undefined);
         map.fields.dead_entries = map.fields.map_data.count();
@@ -284,18 +284,18 @@ pub const prototype = struct {
     fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. Set key to CanonicalizeKeyedCollectionKey(key).
         key = key.canonicalizeKeyedCollectionKey();
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
+        // 4. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, then
         if (map.fields.map_data.getIndex(key)) |index| {
-            // i. Set p.[[Key]] to empty.
-            // ii. Set p.[[Value]] to empty.
+            // i. Set entry.[[Key]] to empty.
+            // ii. Set entry.[[Value]] to empty.
             map.fields.map_data.entries.set(index, .{
                 .hash = {},
                 .key = .uninitialized,
@@ -315,10 +315,10 @@ pub const prototype = struct {
     /// 24.1.3.4 Map.prototype.entries ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.entries
     fn entries(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let M be the this value.
+        // 1. Let map be the this value.
         const map = this_value;
 
-        // 2. Return ? CreateMapIterator(M, key+value).
+        // 2. Return ? CreateMapIterator(map, key+value).
         const map_iterator = try createMapIterator(agent, map, .key_value);
         return Value.from(&map_iterator.object);
     }
@@ -329,8 +329,8 @@ pub const prototype = struct {
         const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
@@ -341,25 +341,25 @@ pub const prototype = struct {
         map.fields.active_iterators += 1;
         defer map.fields.active_iterators -= 1;
 
-        // 4. Let entries be M.[[MapData]].
+        // 4. Let entries be map.[[MapData]].
         const entries_ = &map.fields.map_data;
 
-        // 5. Let numEntries be the number of elements in entries.
-        var num_entries = entries_.count();
+        // 5. Let entriesCount be the number of elements in entries.
+        var entries_count = entries_.count();
 
         // 6. Let index be 0.
         var index: usize = 0;
 
-        // 7. Repeat, while index < numEntries,
-        while (index < num_entries) : (index += 1) {
-            // a. Let e be entries[index].
+        // 7. Repeat, while index < entriesCount,
+        while (index < entries_count) : (index += 1) {
+            // a. Let entry be entries[index].
             const entry = entries_.entries.get(index);
 
             // b. Set index to index + 1.
 
-            // c. If e.[[Key]] is not empty, then
+            // c. If entry.[[Key]] is not empty, then
             if (!entry.key.isUninitialized()) {
-                // i. Perform ? Call(callback, thisArg, « e.[[Value]], e.[[Key]], M »).
+                // i. Perform ? Call(callback, thisArg, « entry.[[Value]], entry.[[Key]], map »).
                 _ = try callback.callAssumeCallable(
                     agent,
                     this_arg,
@@ -368,8 +368,8 @@ pub const prototype = struct {
 
                 // ii. NOTE: The number of elements in entries may have increased during execution
                 //     of callback.
-                // iii. Set numEntries to the number of elements in entries.
-                num_entries = entries_.count();
+                // iii. Set entriesCount to the number of elements in entries.
+                entries_count = entries_.count();
             }
         }
 
@@ -382,16 +382,16 @@ pub const prototype = struct {
     fn get(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. Set key to CanonicalizeKeyedCollectionKey(key).
         key = key.canonicalizeKeyedCollectionKey();
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
-        //        p.[[Value]].
+        // 4. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return
+        //        entry.[[Value]].
         if (map.fields.map_data.get(key)) |value| return value;
 
         // 5. Return undefined.
@@ -404,21 +404,21 @@ pub const prototype = struct {
         var key = arguments.get(0);
         const value = arguments.get(1);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. Set key to CanonicalizeKeyedCollectionKey(key).
         key = key.canonicalizeKeyedCollectionKey();
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
-        //        p.[[Value]].
+        // 4. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return
+        //        entry.[[Value]].
         const gop = try map.fields.map_data.getOrPut(agent.gc_allocator, key);
         if (gop.found_existing) return gop.value_ptr.*;
 
-        // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
-        // 6. Append p to M.[[MapData]].
+        // 5. Let entry be the Record { [[Key]]: key, [[Value]]: value }.
+        // 6. Append entry to map.[[MapData]].
         gop.value_ptr.* = value;
 
         // 7. Return value.
@@ -431,8 +431,8 @@ pub const prototype = struct {
         var key = arguments.get(0);
         const callback = arguments.get(1);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
@@ -443,21 +443,21 @@ pub const prototype = struct {
         // 4. Set key to CanonicalizeKeyedCollectionKey(key).
         key = key.canonicalizeKeyedCollectionKey();
 
-        // 5. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
-        //        p.[[Value]].
+        // 5. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return
+        //        entry.[[Value]].
         if (map.fields.map_data.get(key)) |value| return value;
 
         // 6. Let value be ? Call(callback, undefined, « key »).
         const value = try callback.callAssumeCallable(agent, .undefined, &.{key});
 
         // 7. NOTE: The Map may have been modified during execution of callback.
-        // 8. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
-        //         i. Set p.[[Value]] to value.
+        // 8. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, then
+        //         i. Set entry.[[Value]] to value.
         //         ii. Return value.
-        // 9. Let p be the Record { [[Key]]: key, [[Value]]: value }.
-        // 10. Append p to M.[[MapData]].
+        // 9. Let entry be the Record { [[Key]]: key, [[Value]]: value }.
+        // 10. Append entry to map.[[MapData]].
         try map.fields.map_data.put(agent.gc_allocator, key, value);
 
         // 11. Return value.
@@ -469,15 +469,16 @@ pub const prototype = struct {
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. Set key to CanonicalizeKeyedCollectionKey(key).
         key = key.canonicalizeKeyedCollectionKey();
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return true.
+        // 4. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return
+        //        true.
         // 5. Return false.
         return Value.from(map.fields.map_data.contains(key));
     }
@@ -485,10 +486,10 @@ pub const prototype = struct {
     /// 24.1.3.10 Map.prototype.keys ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.keys
     fn keys(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let M be the this value.
+        // 1. Let map be the this value.
         const map = this_value;
 
-        // 2. Return ? CreateMapIterator(M, key).
+        // 2. Return ? CreateMapIterator(map, key).
         const map_iterator = try createMapIterator(agent, map, .key);
         return Value.from(&map_iterator.object);
     }
@@ -499,35 +500,35 @@ pub const prototype = struct {
         var key = arguments.get(0);
         const value = arguments.get(1);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. Set key to CanonicalizeKeyedCollectionKey(key).
         key = key.canonicalizeKeyedCollectionKey();
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
-        //         i. Set p.[[Value]] to value.
-        //         ii. Return M.
-        // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
-        // 6. Append p to M.[[MapData]].
+        // 4. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, then
+        //         i. Set entry.[[Value]] to value.
+        //         ii. Return map.
+        // 5. Let entry be the Record { [[Key]]: key, [[Value]]: value }.
+        // 6. Append entry to map.[[MapData]].
         try map.fields.map_data.put(agent.gc_allocator, key, value);
 
-        // 7. Return M.
+        // 7. Return map.
         return Value.from(&map.object);
     }
 
     /// 24.1.3.12 get Map.prototype.size
     /// https://tc39.es/ecma262/#sec-get-map.prototype.size
     fn size(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[MapData]]).
+        // 1. Let map be the this value.
+        // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. Let count be 0.
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[MapData]], do
-        //     a. If p.[[Key]] is not empty, set count to count + 1.
+        // 4. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do
+        //     a. If entry.[[Key]] is not empty, set count to count + 1.
         const count = map.fields.map_data.count() - map.fields.dead_entries;
 
         // 5. Return 𝔽(count).
@@ -537,10 +538,10 @@ pub const prototype = struct {
     /// 24.1.3.13 Map.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-map.prototype.values
     fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let M be the this value.
+        // 1. Let map be the this value.
         const map = this_value;
 
-        // 2. Return ? CreateMapIterator(M, value).
+        // 2. Return ? CreateMapIterator(map, value).
         const map_iterator = try createMapIterator(agent, map, .value);
         return Value.from(&map_iterator.object);
     }

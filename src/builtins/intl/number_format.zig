@@ -37,7 +37,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "NumberFormat",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -118,19 +118,19 @@ pub const constructor = struct {
         // 4. Set options to optionsResolution.[[Options]].
         const options = options_resolution.options;
 
-        // 5. Let r be optionsResolution.[[ResolvedLocale]].
-        const r = options_resolution.resolved_locale;
-        const locale = r.locale;
+        // 5. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+        const resolved_locale = options_resolution.resolved_locale;
+        const locale = resolved_locale.locale;
 
-        // 6. Set numberFormat.[[Locale]] to r.[[Locale]].
-        // 7. Set numberFormat.[[LocaleData]] to r.[[LocaleData]].
+        // 6. Set numberFormat.[[Locale]] to resolvedLocale.[[Locale]].
+        // 7. Set numberFormat.[[LocaleData]] to resolvedLocale.[[LocaleData]].
         number_format.fields.locale = locale;
 
-        // 8. Set numberFormat.[[NumberingSystem]] to r.[[nu]].
+        // 8. Set numberFormat.[[NumberingSystem]] to resolvedLocale.[[nu]].
         const numbering_system = if (try locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
             try String.fromAscii(agent, nu)
         else
-            r.options.nu orelse String.fromLiteral("latn");
+            resolved_locale.options.nu orelse String.fromLiteral("latn");
         number_format.fields.numbering_system = numbering_system;
 
         // 9. Perform ? SetNumberFormatUnitOptions(numberFormat, options).
@@ -324,7 +324,7 @@ pub const constructor = struct {
     pub fn setNumberFormatDigitOptions(
         comptime T: type,
         agent: *Agent,
-        intl_object: *T,
+        intl_obj: *T,
         options: *Object,
         mnfd_default: u8,
         mxfd_default_arg: u8,
@@ -348,7 +348,7 @@ pub const constructor = struct {
         const mxsd_value = try options.get(agent, PropertyKey.from("maximumSignificantDigits"));
 
         // 6. Set intlObj.[[MinimumIntegerDigits]] to mnid.
-        intl_object.fields.minimum_integer_digits = @intCast(mnid);
+        intl_obj.fields.minimum_integer_digits = @intCast(mnid);
 
         // 7. Let roundingIncrement be ? GetNumberOption(options, "roundingIncrement", 1, 5000, 1).
         const rounding_increment_value = (try getNumberOption(agent, options, "roundingIncrement", 1, 5000, 1)).?;
@@ -444,13 +444,13 @@ pub const constructor = struct {
         if (rounding_increment != .@"1") mxfd_default = mnfd_default;
 
         // 14. Set intlObj.[[RoundingIncrement]] to roundingIncrement.
-        intl_object.fields.rounding_increment = rounding_increment;
+        intl_obj.fields.rounding_increment = rounding_increment;
 
         // 15. Set intlObj.[[RoundingMode]] to roundingMode.
-        intl_object.fields.rounding_mode = rounding_mode;
+        intl_obj.fields.rounding_mode = rounding_mode;
 
         // 16. Set intlObj.[[TrailingZeroDisplay]] to trailingZeroDisplay.
-        intl_object.fields.trailing_zero_display = trailing_zero_display;
+        intl_obj.fields.trailing_zero_display = trailing_zero_display;
 
         // 17. If mnsd is undefined and mxsd is undefined, let hasSd be false. Otherwise, let hasSd
         //     be true.
@@ -484,7 +484,7 @@ pub const constructor = struct {
             if (has_sd) {
                 // i. Set intlObj.[[MinimumSignificantDigits]] to ? DefaultNumberOption(mnsd, 1, 21,
                 //    1).
-                intl_object.fields.minimum_significant_digits = @intCast((try defaultNumberOption(
+                intl_obj.fields.minimum_significant_digits = @intCast((try defaultNumberOption(
                     agent,
                     mnsd_value,
                     "minimumSignificantDigits",
@@ -495,11 +495,11 @@ pub const constructor = struct {
 
                 // ii. Set intlObj.[[MaximumSignificantDigits]] to ? DefaultNumberOption(mxsd,
                 //     intlObj.[[MinimumSignificantDigits]], 21, 21).
-                intl_object.fields.maximum_significant_digits = @intCast((try defaultNumberOption(
+                intl_obj.fields.maximum_significant_digits = @intCast((try defaultNumberOption(
                     agent,
                     mxsd_value,
                     "maximumSignificantDigits",
-                    intl_object.fields.minimum_significant_digits.?,
+                    intl_obj.fields.minimum_significant_digits.?,
                     21,
                     21,
                 )).?);
@@ -507,10 +507,10 @@ pub const constructor = struct {
             // b. Else,
             else {
                 // i. Set intlObj.[[MinimumSignificantDigits]] to 1.
-                intl_object.fields.minimum_significant_digits = 1;
+                intl_obj.fields.minimum_significant_digits = 1;
 
                 // ii. Set intlObj.[[MaximumSignificantDigits]] to 21.
-                intl_object.fields.maximum_significant_digits = 21;
+                intl_obj.fields.maximum_significant_digits = 21;
             }
         }
 
@@ -554,78 +554,78 @@ pub const constructor = struct {
                 }
 
                 // vi. Set intlObj.[[MinimumFractionDigits]] to mnfd.
-                intl_object.fields.minimum_fraction_digits = mnfd;
+                intl_obj.fields.minimum_fraction_digits = mnfd;
 
                 // vii. Set intlObj.[[MaximumFractionDigits]] to mxfd.
-                intl_object.fields.maximum_fraction_digits = mxfd;
+                intl_obj.fields.maximum_fraction_digits = mxfd;
             }
             // b. Else,
             else {
                 // i. Set intlObj.[[MinimumFractionDigits]] to mnfdDefault.
-                intl_object.fields.minimum_fraction_digits = mnfd_default;
+                intl_obj.fields.minimum_fraction_digits = mnfd_default;
 
                 // ii. Set intlObj.[[MaximumFractionDigits]] to mxfdDefault.
-                intl_object.fields.maximum_fraction_digits = mxfd_default;
+                intl_obj.fields.maximum_fraction_digits = mxfd_default;
             }
         }
 
         // 24. If needSd is false and needFd is false, then
         if (!need_sd and !need_fd) {
             // a. Set intlObj.[[MinimumFractionDigits]] to 0.
-            intl_object.fields.minimum_fraction_digits = 0;
+            intl_obj.fields.minimum_fraction_digits = 0;
 
             // b. Set intlObj.[[MaximumFractionDigits]] to 0.
-            intl_object.fields.maximum_fraction_digits = 0;
+            intl_obj.fields.maximum_fraction_digits = 0;
 
             // c. Set intlObj.[[MinimumSignificantDigits]] to 1.
-            intl_object.fields.minimum_significant_digits = 0;
+            intl_obj.fields.minimum_significant_digits = 0;
 
             // d. Set intlObj.[[MaximumSignificantDigits]] to 2.
-            intl_object.fields.maximum_significant_digits = 0;
+            intl_obj.fields.maximum_significant_digits = 0;
 
             // e. Set intlObj.[[RoundingType]] to more-precision.
-            intl_object.fields.rounding_type = .more_precision;
+            intl_obj.fields.rounding_type = .more_precision;
 
             // f. Set intlObj.[[ComputedRoundingPriority]] to "morePrecision".
-            intl_object.fields.computed_rounding_priority = .more_precision;
+            intl_obj.fields.computed_rounding_priority = .more_precision;
         }
         // 25. Else if roundingPriority is "morePrecision", then
         else if (rounding_priority == .more_precision) {
             // a. Set intlObj.[[RoundingType]] to more-precision.
-            intl_object.fields.rounding_type = .more_precision;
+            intl_obj.fields.rounding_type = .more_precision;
 
             // b. Set intlObj.[[ComputedRoundingPriority]] to "morePrecision".
-            intl_object.fields.computed_rounding_priority = .more_precision;
+            intl_obj.fields.computed_rounding_priority = .more_precision;
         }
         // 26. Else if roundingPriority is "lessPrecision", then
         else if (rounding_priority == .less_precision) {
             // a. Set intlObj.[[RoundingType]] to less-precision.
-            intl_object.fields.rounding_type = .less_precision;
+            intl_obj.fields.rounding_type = .less_precision;
 
             // b. Set intlObj.[[ComputedRoundingPriority]] to "lessPrecision".
-            intl_object.fields.computed_rounding_priority = .less_precision;
+            intl_obj.fields.computed_rounding_priority = .less_precision;
         }
         // 27. Else if hasSd is true, then
         else if (has_sd) {
             // a. Set intlObj.[[RoundingType]] to significant-digits.
-            intl_object.fields.rounding_type = .significant_digits;
+            intl_obj.fields.rounding_type = .significant_digits;
 
             // b. Set intlObj.[[ComputedRoundingPriority]] to "auto".
-            intl_object.fields.computed_rounding_priority = .auto;
+            intl_obj.fields.computed_rounding_priority = .auto;
         }
         // 28. Else,
         else {
             // a. Set intlObj.[[RoundingType]] to fraction-digits.
-            intl_object.fields.rounding_type = .fraction_digits;
+            intl_obj.fields.rounding_type = .fraction_digits;
 
             // b. Set intlObj.[[ComputedRoundingPriority]] to "auto".
-            intl_object.fields.computed_rounding_priority = .auto;
+            intl_obj.fields.computed_rounding_priority = .auto;
         }
 
         // 29. If roundingIncrement is not 1, then
         if (rounding_increment != .@"1") {
             // a. If intlObj.[[RoundingType]] is not fraction-digits, throw a TypeError exception.
-            if (intl_object.fields.rounding_type != .fraction_digits) {
+            if (intl_obj.fields.rounding_type != .fraction_digits) {
                 return agent.throwException(
                     .type_error,
                     "Invalid value for option 'roundingIncrement'",
@@ -635,7 +635,7 @@ pub const constructor = struct {
 
             // b. If intlObj.[[MaximumFractionDigits]] is not intlObj.[[MinimumFractionDigits]],
             //    throw a RangeError exception.
-            if (intl_object.fields.maximum_fraction_digits != intl_object.fields.minimum_fraction_digits) {
+            if (intl_obj.fields.maximum_fraction_digits != intl_obj.fields.minimum_fraction_digits) {
                 return agent.throwException(
                     .range_error,
                     "Options 'maximumFractionDigits' and 'minimumFractionDigits' must be equal",
@@ -850,14 +850,14 @@ pub const prototype = struct {
         );
 
         // 5. For each row of Table 28, except the header row, in table order, do
-        // a. Let p be the Property value of the current row.
-        // b. Let v be the value of nf's internal slot whose name is the Internal Slot value of the
-        //    current row.
-        // c. If v is not undefined, then
+        // a. Let propertyKey be the Property value of the current row.
+        // b. Let value be the value of nf's internal slot whose name is the Internal Slot value of
+        //    the current row.
+        // c. If value is not undefined, then
         //     i. If there is a Conversion value in the current row, then
         //             1. Assert: The Conversion value of the current row is number.
-        //             2. Set v to 𝔽(v).
-        //     ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //             2. Set value to 𝔽(value).
+        //     ii. Perform ! CreateDataPropertyOrThrow(options, propertyKey, value).
         const resolved_options = number_format.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,
@@ -1009,9 +1009,9 @@ pub const prototype = struct {
 
         // 4. If nf.[[BoundFormat]] is undefined, then
         if (number_format.fields.bound_format == null) {
-            // a. Let F be a new built-in function object as defined in Number Format Functions
+            // a. Let func be a new built-in function object as defined in Number Format Functions
             //    (16.5.2).
-            // b. Set F.[[NumberFormat]] to nf.
+            // b. Set func.[[NumberFormat]] to nf.
             const Captures = struct {
                 number_format: *NumberFormat,
             };
@@ -1026,7 +1026,7 @@ pub const prototype = struct {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
 
-                    // 1. Let nf be F.[[NumberFormat]].
+                    // 1. Let nf be func.[[NumberFormat]].
                     // 2. Assert: nf is an Object and nf has an [[InitializedNumberFormat]] internal
                     //    slot.
                     const number_format_ = captures_.number_format;
@@ -1050,7 +1050,7 @@ pub const prototype = struct {
                 .{ .additional_fields = captures },
             );
 
-            // c. Set nf.[[BoundFormat]] to F.
+            // c. Set nf.[[BoundFormat]] to func.
             number_format.fields.bound_format = bound_format;
         }
 

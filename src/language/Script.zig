@@ -109,15 +109,15 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
     //     execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, &script_context);
 
-    // 11. Let script be scriptRecord.[[ECMAScriptCode]].
+    // 11. Let scriptNode be scriptRecord.[[ECMAScriptCode]].
     const script = self.ecmascript_code;
 
-    // 12. Let result be Completion(GlobalDeclarationInstantiation(script, globalEnv)).
+    // 12. Let result be Completion(GlobalDeclarationInstantiation(scriptNode, globalEnv)).
     const result_no_value = globalDeclarationInstantiation(agent, script, global_env, self.source);
 
     // 13. If result is a normal completion, then
     const result: Agent.Error!Value = if (result_no_value) |_| blk: {
-        // a. Set result to Completion(Evaluation of script).
+        // a. Set result to Completion(Evaluation of scriptNode).
         // b. If result is a normal completion and result.[[Value]] is empty, then
         if (interpreter.compileAndRun(agent, .{ .script = &script }, name)) |value|
             // i. Set result to NormalCompletion(undefined).
@@ -139,7 +139,7 @@ pub fn evaluate(self: *Script, name: []const u8) Agent.Error!Value {
     return try result;
 }
 
-/// 16.1.7 GlobalDeclarationInstantiation ( script, env )
+/// 16.1.7 GlobalDeclarationInstantiation ( script, envRecord )
 /// https://tc39.es/ecma262/#sec-globaldeclarationinstantiation
 pub fn globalDeclarationInstantiation(
     agent: *Agent,
@@ -147,21 +147,21 @@ pub fn globalDeclarationInstantiation(
     env: *GlobalEnvironment,
     source: []const u8,
 ) Agent.Error!void {
-    // 1. Let lexNames be the LexicallyDeclaredNames of script.
+    // 1. Let lexicalNames be the LexicallyDeclaredNames of script.
     var lexical_names: std.ArrayList(ast.Identifier) = .empty;
     defer lexical_names.deinit(agent.gc_allocator);
     try script.collectLexicallyDeclaredNames(agent.gc_allocator, &lexical_names);
 
-    // 2. Let varNames be the VarDeclaredNames of script.
-    var var_names: std.ArrayList(ast.Identifier) = .empty;
-    defer var_names.deinit(agent.gc_allocator);
-    try script.collectVarDeclaredNames(agent.gc_allocator, &var_names);
+    // 2. Let variableNames be the VarDeclaredNames of script.
+    var variable_names: std.ArrayList(ast.Identifier) = .empty;
+    defer variable_names.deinit(agent.gc_allocator);
+    try script.collectVarDeclaredNames(agent.gc_allocator, &variable_names);
 
-    // 3. For each element name of lexNames, do
+    // 3. For each element name of lexicalNames, do
     for (lexical_names.items) |name_utf8| {
         const name = try String.fromUtf8(agent, name_utf8);
 
-        // a. If HasLexicalDeclaration(env, name) is true, throw a SyntaxError exception.
+        // a. If HasLexicalDeclaration(envRecord, name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
                 .syntax_error,
@@ -170,7 +170,7 @@ pub fn globalDeclarationInstantiation(
             );
         }
 
-        // b. Let hasRestrictedGlobal be ? HasRestrictedGlobalProperty(env, name).
+        // b. Let hasRestrictedGlobal be ? HasRestrictedGlobalProperty(envRecord, name).
         const has_restricted_global = try env.hasRestrictedGlobalProperty(agent, name);
 
         // c. NOTE: Global `var` and `function` bindings (except those that are introduced by
@@ -187,11 +187,11 @@ pub fn globalDeclarationInstantiation(
         }
     }
 
-    // 4. For each element name of varNames, do
-    for (var_names.items) |name_utf8| {
+    // 4. For each element name of variableNames, do
+    for (variable_names.items) |name_utf8| {
         const name = try String.fromUtf8(agent, name_utf8);
 
-        // a. If HasLexicalDeclaration(env, name) is true, throw a SyntaxError exception.
+        // a. If HasLexicalDeclaration(envRecord, name) is true, throw a SyntaxError exception.
         if (env.hasLexicalDeclaration(name)) {
             return agent.throwException(
                 .syntax_error,
@@ -201,96 +201,98 @@ pub fn globalDeclarationInstantiation(
         }
     }
 
-    // 5. Let varDeclarations be the VarScopedDeclarations of script.
-    var var_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
-    defer var_declarations.deinit(agent.gc_allocator);
-    try script.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
+    // 5. Let variableDecls be the VarScopedDeclarations of script.
+    var variable_decls: std.ArrayList(ast.VarScopedDeclaration) = .empty;
+    defer variable_decls.deinit(agent.gc_allocator);
+    try script.collectVarScopedDeclarations(agent.gc_allocator, &variable_decls);
 
-    // 6. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
-    defer functions_to_initialize.deinit(agent.gc_allocator);
+    // 6. Let funcsToInitialize be a new empty List.
+    var funcs_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
+    defer funcs_to_initialize.deinit(agent.gc_allocator);
 
-    // 7. Let declaredFunctionNames be a new empty List.
-    var declared_function_names: String.HashMapUnmanaged(void) = .empty;
-    defer declared_function_names.deinit(agent.gc_allocator);
+    // 7. Let declaredFuncNames be a new empty List.
+    var declared_func_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_func_names.deinit(agent.gc_allocator);
 
-    // 8. For each element d of varDeclarations, in reverse List order, do
-    var it = std.mem.reverseIterator(var_declarations.items);
-    while (it.next()) |var_declaration| {
-        // a. If d is not either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
-        if (var_declaration == .hoistable_declaration) {
-            // i. Assert: d is either a FunctionDeclaration, a GeneratorDeclaration, an
+    // 8. For each element variableDecl of variableDecls, in reverse List order, do
+    var it = std.mem.reverseIterator(variable_decls.items);
+    while (it.next()) |variable_decl| {
+        // a. If variableDecl is not either a VariableDeclaration, a ForBinding, or a
+        //    BindingIdentifier, then
+        if (variable_decl == .hoistable_declaration) {
+            // i. Assert: variableDecl is either a FunctionDeclaration, a GeneratorDeclaration, an
             //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration.
-            const hoistable_declaration = var_declaration.hoistable_declaration;
+            const hoistable_decl = variable_decl.hoistable_declaration;
 
             // ii. NOTE: If there are multiple function declarations for the same name, the last
             //     declaration is used.
 
-            // iii. Let fn be the sole element of the BoundNames of d.
-            const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
+            // iii. Let funcName be the sole element of the BoundNames of variableDecl.
+            const func_name = switch (hoistable_decl) {
+                inline else => |func_decl| try String.fromUtf8(agent, func_decl.identifier.?),
             };
 
-            // iv. If declaredFunctionNames does not contain fn, then
-            if (!declared_function_names.contains(function_name)) {
-                // 1. Let fnDefinable be ? CanDeclareGlobalFunction(env, fn).
-                const function_definable = try env.canDeclareGlobalFunction(agent, function_name);
+            // iv. If declaredFuncNames does not contain funcName, then
+            if (!declared_func_names.contains(func_name)) {
+                // 1. Let funcDefinable be ? CanDeclareGlobalFunction(envRecord, funcName).
+                const func_definable = try env.canDeclareGlobalFunction(agent, func_name);
 
-                // 2. If fnDefinable is false, throw a TypeError exception.
-                if (!function_definable) {
+                // 2. If funcDefinable is false, throw a TypeError exception.
+                if (!func_definable) {
                     return agent.throwException(
                         .type_error,
                         "Cannot declare '{f}' in global environment",
-                        .{function_name.fmtRaw()},
+                        .{func_name.fmtRaw()},
                     );
                 }
 
-                // 3. Append fn to declaredFunctionNames.
-                try declared_function_names.putNoClobber(agent.gc_allocator, function_name, {});
+                // 3. Append funcName to declaredFuncNames.
+                try declared_func_names.putNoClobber(agent.gc_allocator, func_name, {});
 
-                // 4. Insert d as the first element of functionsToInitialize.
+                // 4. Insert variableDecl as the first element of funcsToInitialize.
                 // NOTE: AFAICT the order isn't observable, so we can append.
-                try functions_to_initialize.append(agent.gc_allocator, hoistable_declaration);
+                try funcs_to_initialize.append(agent.gc_allocator, hoistable_decl);
             }
         }
     }
 
-    // 9. Let declaredVarNames be a new empty List.
-    var declared_var_names: String.HashMapUnmanaged(void) = .empty;
-    defer declared_var_names.deinit(agent.gc_allocator);
+    // 9. Let declaredVariableNames be a new empty List.
+    var declared_variable_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_variable_names.deinit(agent.gc_allocator);
 
     var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(agent.gc_allocator);
 
-    // 10. For each element d of varDeclarations, do
-    for (var_declarations.items) |var_declaration| {
-        // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
-        if (var_declaration == .variable_declaration) {
+    // 10. For each element variableDecl of variableDecls, do
+    for (variable_decls.items) |variable_decl| {
+        // a. If variableDecl is either a VariableDeclaration, a ForBinding, or a BindingIdentifier,
+        //    then
+        if (variable_decl == .variable_declaration) {
             bound_names.clearRetainingCapacity();
-            try var_declaration.variable_declaration.collectBoundNames(agent.gc_allocator, &bound_names);
+            try variable_decl.variable_declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
-            // i. For each String vn of the BoundNames of d, do
-            for (bound_names.items) |var_name_utf8| {
-                const var_name = try String.fromUtf8(agent, var_name_utf8);
+            // i. For each String name of the BoundNames of variableDecl, do
+            for (bound_names.items) |name_utf8| {
+                const name = try String.fromUtf8(agent, name_utf8);
 
-                // 1. If declaredFunctionNames does not contain vn, then
-                if (!declared_function_names.contains(var_name)) {
-                    // a. Let vnDefinable be ? CanDeclareGlobalVar(env, vn).
-                    const var_name_definable = try env.canDeclareGlobalVar(agent, var_name);
+                // 1. If declaredFuncNames does not contain name, then
+                if (!declared_func_names.contains(name)) {
+                    // a. Let variableDefinable be ? CanDeclareGlobalVar(envRecord, name).
+                    const variable_definable = try env.canDeclareGlobalVar(agent, name);
 
-                    // b. If vnDefinable is false, throw a TypeError exception.
-                    if (!var_name_definable) {
+                    // b. If variableDefinable is false, throw a TypeError exception.
+                    if (!variable_definable) {
                         return agent.throwException(
                             .type_error,
                             "Cannot declare '{f}' in global environment",
-                            .{var_name.fmtRaw()},
+                            .{name.fmtRaw()},
                         );
                     }
 
-                    // c. If declaredVarNames does not contain vn, then
-                    if (!declared_var_names.contains(var_name)) {
-                        // i. Append vn to declaredVarNames.
-                        try declared_var_names.putNoClobber(agent.gc_allocator, var_name, {});
+                    // c. If declaredVariableNames does not contain name, then
+                    if (!declared_variable_names.contains(name)) {
+                        // i. Append name to declaredVariableNames.
+                        try declared_variable_names.putNoClobber(agent.gc_allocator, name, {});
                     }
                 }
             }
@@ -305,68 +307,69 @@ pub fn globalDeclarationInstantiation(
     //     Legacy Compatibility Semantics, then
     //     [...]
 
-    // 13. Let lexDeclarations be the LexicallyScopedDeclarations of script.
-    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
-    defer lex_declarations.deinit(agent.gc_allocator);
-    try script.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
+    // 13. Let lexicalDecls be the LexicallyScopedDeclarations of script.
+    var lexical_decls: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
+    defer lexical_decls.deinit(agent.gc_allocator);
+    try script.collectLexicallyScopedDeclarations(agent.gc_allocator, &lexical_decls);
 
     // 14. Let privateEnv be null.
     const private_env = null;
 
-    // 15. For each element d of lexDeclarations, do
-    for (lex_declarations.items) |declaration| {
+    // 15. For each element lexicalDecl of lexicalDecls, do
+    for (lexical_decls.items) |lexical_decl| {
         // a. NOTE: Lexically declared names are only instantiated here but not initialized.
 
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
+        try lexical_decl.collectBoundNames(agent.gc_allocator, &bound_names);
 
-        // b. For each element dn of the BoundNames of d, do
+        // b. For each element name of the BoundNames of lexicalDecl, do
         for (bound_names.items) |name_utf8| {
             const name = try String.fromUtf8(agent, name_utf8);
 
-            // i. If IsConstantDeclaration of d is true, then
-            if (declaration.isConstantDeclaration()) {
-                // 1. Perform ? env.CreateImmutableBinding(dn, true).
+            // i. If IsConstantDeclaration of lexicalDecl is true, then
+            if (lexical_decl.isConstantDeclaration()) {
+                // 1. Perform ? envRecord.CreateImmutableBinding(name, true).
                 try env.createImmutableBinding(agent, name, true);
             } else {
                 // ii. Else,
-                // 1. Perform ? env.CreateMutableBinding(dn, false).
+                // 1. Perform ? envRecord.CreateMutableBinding(name, false).
                 try env.createMutableBinding(agent, name, false);
             }
         }
     }
 
-    // 16. For each Parse Node f of functionsToInitialize, do
-    for (functions_to_initialize.items) |hoistable_declaration| {
-        // a. Let fn be the sole element of the BoundNames of f.
-        const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
+    // 16. For each Parse Node funcDecl of funcsToInitialize, do
+    for (funcs_to_initialize.items) |hoistable_decl| {
+        // a. Let funcName be the sole element of the BoundNames of funcDecl.
+        const func_name = switch (hoistable_decl) {
+            inline else => |func_decl| try String.fromUtf8(agent, func_decl.identifier.?),
         };
 
-        // b. Let fo be InstantiateFunctionObject of f with arguments env and privateEnv.
-        const function_object = try switch (hoistable_declaration) {
-            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, .{ .global_environment = env }, private_env, source),
-            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, .{ .global_environment = env }, private_env, source),
-            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, .{ .global_environment = env }, private_env, source),
-            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, .{ .global_environment = env }, private_env, source),
+        // b. Let funcObj be InstantiateFunctionObject of funcDecl with arguments envRecord and
+        //    privateEnv.
+        const func_obj = try switch (hoistable_decl) {
+            .function_declaration => |func_decl| instantiateOrdinaryFunctionObject(agent, func_decl, .{ .global_environment = env }, private_env, source),
+            .generator_declaration => |gen_decl| instantiateGeneratorFunctionObject(agent, gen_decl, .{ .global_environment = env }, private_env, source),
+            .async_function_declaration => |async_func_decl| instantiateAsyncFunctionObject(agent, async_func_decl, .{ .global_environment = env }, private_env, source),
+            .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorFunctionObject(agent, async_gen_decl, .{ .global_environment = env }, private_env, source),
         };
 
-        // c. Perform ? CreateGlobalFunctionBinding(env, fn, fo, false).
+        // c. Perform ? CreateGlobalFunctionBinding(envRecord, funcName, funcObj, false).
         try env.createGlobalFunctionBinding(
             agent,
-            function_name,
-            function_object,
+            func_name,
+            func_obj,
             false,
         );
     }
 
-    // 17. For each String vn of declaredVarNames, do
-    var it_ = declared_var_names.keyIterator();
+    // 17. For each String variableName of declaredVariableNames, do
+    var it_ = declared_variable_names.keyIterator();
     while (it_.next()) |ptr| {
-        const var_name = ptr.*;
+        const variable_name = ptr.*;
 
-        // a. Perform ? CreateGlobalVarBinding(env, vn, false).
-        try env.createGlobalVarBinding(agent, var_name, false);
+        // a. Perform ? CreateGlobalVarBinding(envRecord, variableName, false).
+        try env.createGlobalVarBinding(agent, variable_name, false);
     }
 
     // 18. Return unused.

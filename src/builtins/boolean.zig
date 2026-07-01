@@ -25,7 +25,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Boolean",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -46,13 +46,13 @@ pub const constructor = struct {
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. Let b be ToBoolean(value).
-        const b = value.toBoolean();
+        // 1. Let bool be ToBoolean(value).
+        const @"bool" = value.toBoolean();
 
-        // 2. If NewTarget is undefined, return b.
-        if (new_target == null) return Value.from(b);
+        // 2. If NewTarget is undefined, return bool.
+        if (new_target == null) return Value.from(@"bool");
 
-        // 3. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Boolean.prototype%",
+        // 3. Let obj be ? OrdinaryCreateFromConstructor(NewTarget, "%Boolean.prototype%",
         //    « [[BooleanData]] »).
         const boolean = try ordinaryCreateFromConstructor(
             Boolean,
@@ -60,12 +60,12 @@ pub const constructor = struct {
             new_target.?,
             "%Boolean.prototype%",
             .{
-                // 4. Set O.[[BooleanData]] to b.
-                .boolean_data = b,
+                // 4. Set obj.[[BooleanData]] to bool.
+                .boolean_data = @"bool",
             },
         );
 
-        // 5. Return O.
+        // 5. Return obj.
         return Value.from(&boolean.object);
     }
 };
@@ -96,17 +96,17 @@ pub const prototype = struct {
         );
     }
 
-    /// 20.3.3.3.1 ThisBooleanValue ( value )
+    /// 20.3.3.3.1 ThisBooleanValue ( arg )
     /// https://tc39.es/ecma262/#sec-thisbooleanvalue
-    fn thisBooleanValue(agent: *Agent, value: Value) error{ExceptionThrown}!bool {
-        // 1. If value is a Boolean, return value.
-        if (value.isBoolean()) return value.asBoolean();
+    fn thisBooleanValue(agent: *Agent, arg: Value) error{ExceptionThrown}!bool {
+        // 1. If arg is a Boolean, return arg.
+        if (arg.isBoolean()) return arg.asBoolean();
 
-        // 2. If value is an Object and value has a [[BooleanData]] internal slot, then
-        if (value.castObject(Boolean)) |boolean| {
-            // a. Let b be value.[[BooleanData]].
-            // b. Assert: b is a Boolean.
-            // c. Return b.
+        // 2. If arg is an Object and arg has a [[BooleanData]] internal slot, then
+        if (arg.castObject(Boolean)) |boolean| {
+            // a. Let bool be arg.[[BooleanData]].
+            // b. Assert: bool is a Boolean.
+            // c. Return bool.
             return boolean.fields.boolean_data;
         }
 
@@ -121,12 +121,12 @@ pub const prototype = struct {
     /// 20.3.3.2 Boolean.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-boolean.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let b be ? ThisBooleanValue(this value).
-        const b = try thisBooleanValue(agent, this_value);
+        // 1. Let bool be ? ThisBooleanValue(this value).
+        const @"bool" = try thisBooleanValue(agent, this_value);
 
-        // 2. If b is true, return "true".
+        // 2. If bool is true, return "true".
         // 3. Return "false".
-        return if (b) Value.from("true") else Value.from("false");
+        return if (@"bool") Value.from("true") else Value.from("false");
     }
 
     /// 20.3.3.3 Boolean.prototype.valueOf ( )

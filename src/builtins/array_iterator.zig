@@ -80,10 +80,10 @@ pub const prototype = struct {
     /// 23.1.5.2.1 %ArrayIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%arrayiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
-        // 3. If O does not have all of the internal slots of an Array Iterator Instance (23.1.5.3),
-        //    throw a TypeError exception.
+        // 1. Let iteratorObj be the this value.
+        // 2. If iteratorObj is not an Object, throw a TypeError exception.
+        // 3. If iteratorObj does not have all of the internal slots of an Array Iterator Instance
+        //    (23.1.5.3), throw a TypeError exception.
         const array_iterator = try this_value.requireInternalSlot(agent, ArrayIterator);
 
         // 5. If array is undefined, return CreateIteratorResultObject(undefined, true).
@@ -91,17 +91,17 @@ pub const prototype = struct {
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
-        // 4. Let array be O.[[IteratedArrayLike]].
+        // 4. Let array be iteratorObj.[[IteratedArrayLike]].
         const array = array_iterator.fields.state.iterated_array_like;
 
-        // 6. Let index be O.[[ArrayLikeNextIndex]].
+        // 6. Let index be iteratorObj.[[ArrayLikeNextIndex]].
         const index = array_iterator.fields.state.array_like_next_index;
 
-        // 7. Let kind be O.[[ArrayLikeIterationKind]].
+        // 7. Let kind be iteratorObj.[[ArrayLikeIterationKind]].
         const kind = array_iterator.fields.state.array_like_iteration_kind;
 
         // 8. If array has a [[TypedArrayName]] internal slot, then
-        const len = if (array.cast(builtins.TypedArray)) |typed_array| blk: {
+        const length = if (array.cast(builtins.TypedArray)) |typed_array| blk: {
             // a. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(array, seq-cst).
             const ta = makeTypedArrayWithBufferWitnessRecord(
                 typed_array,
@@ -113,24 +113,24 @@ pub const prototype = struct {
                 return agent.throwException(.type_error, "Typed array is out of bounds", .{});
             }
 
-            // c. Let len be TypedArrayLength(taRecord).
+            // c. Let length be TypedArrayLength(taRecord).
             break :blk @intFromEnum(typedArrayLength(ta));
         } else blk: {
             // 9. Else,
-            // a. Let len be ? LengthOfArrayLike(array).
+            // a. Let length be ? LengthOfArrayLike(array).
             break :blk try array.lengthOfArrayLike(agent);
         };
 
-        // 10. If index ≥ len, then
-        if (index >= len) {
-            // a. Set O.[[IteratedArrayLike]] to undefined.
+        // 10. If index ≥ length, then
+        if (index >= length) {
+            // a. Set iteratorObj.[[IteratedArrayLike]] to undefined.
             array_iterator.fields = .completed;
 
             // b. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
-        // 11. Set O.[[ArrayLikeNextIndex]] to index + 1.
+        // 11. Set iteratorObj.[[ArrayLikeNextIndex]] to index + 1.
         array_iterator.fields.state.array_like_next_index += 1;
 
         // 12. Let indexNumber be 𝔽(index).

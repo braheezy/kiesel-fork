@@ -32,19 +32,19 @@ declarative_record: *DeclarativeEnvironment,
 /// [[OuterEnv]]
 outer_env: ?Environment,
 
-/// 9.1.1.4.1 HasBinding ( N )
+/// 9.1.1.4.1 HasBinding ( name )
 /// https://tc39.es/ecma262/#sec-global-environment-records-hasbinding-n
 pub fn hasBinding(self: *const GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
-    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
-    // 2. If ! DclRec.HasBinding(N) is true, return true.
+    // 1. Let declRecord be envRecord.[[DeclarativeRecord]].
+    // 2. If ! declRecord.HasBinding(name) is true, return true.
     if (self.declarative_record.hasBinding(name)) return true;
 
-    // 3. Let ObjRec be envRec.[[ObjectRecord]].
-    // 4. Return ? ObjRec.HasBinding(N).
+    // 3. Let objRecord be envRecord.[[ObjectRecord]].
+    // 4. Return ? objRecord.HasBinding(name).
     return self.object_record.hasBinding(agent, name);
 }
 
-/// 9.1.1.4.2 CreateMutableBinding ( N, D )
+/// 9.1.1.4.2 CreateMutableBinding ( name, deletable )
 /// https://tc39.es/ecma262/#sec-global-environment-records-createmutablebinding-n-d
 pub fn createMutableBinding(
     self: *GlobalEnvironment,
@@ -52,8 +52,8 @@ pub fn createMutableBinding(
     name: *const String,
     deletable: bool,
 ) Agent.Error!void {
-    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
-    // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
+    // 1. Let declRecord be envRecord.[[DeclarativeRecord]].
+    // 2. If ! declRecord.HasBinding(name) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
         @branchHint(.unlikely);
         return agent.throwException(
@@ -63,11 +63,11 @@ pub fn createMutableBinding(
         );
     }
 
-    // 3. Return ! DclRec.CreateMutableBinding(N, D).
+    // 3. Return ! declRecord.CreateMutableBinding(name, deletable).
     return self.declarative_record.createMutableBinding(agent, name, deletable);
 }
 
-/// 9.1.1.4.3 CreateImmutableBinding ( N, S )
+/// 9.1.1.4.3 CreateImmutableBinding ( name, strict )
 /// https://tc39.es/ecma262/#sec-global-environment-records-createimmutablebinding-n-s
 pub fn createImmutableBinding(
     self: *GlobalEnvironment,
@@ -75,8 +75,8 @@ pub fn createImmutableBinding(
     name: *const String,
     strict: bool,
 ) Agent.Error!void {
-    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
-    // 2. If ! DclRec.HasBinding(N) is true, throw a TypeError exception.
+    // 1. Let declRecord be envRecord.[[DeclarativeRecord]].
+    // 2. If ! declRecord.HasBinding(name) is true, throw a TypeError exception.
     if (self.declarative_record.hasBinding(name)) {
         @branchHint(.unlikely);
         return agent.throwException(
@@ -86,11 +86,11 @@ pub fn createImmutableBinding(
         );
     }
 
-    // 3. Return ! DclRec.CreateImmutableBinding(N, S).
+    // 3. Return ! declRecord.CreateImmutableBinding(name, strict).
     return self.declarative_record.createImmutableBinding(agent, name, strict);
 }
 
-/// 9.1.1.4.4 InitializeBinding ( N, V )
+/// 9.1.1.4.4 InitializeBinding ( name, value )
 /// https://tc39.es/ecma262/#sec-global-environment-records-initializebinding-n-v
 pub fn initializeBinding(
     self: *const GlobalEnvironment,
@@ -98,10 +98,10 @@ pub fn initializeBinding(
     name: *const String,
     value: Value,
 ) Agent.Error!void {
-    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
-    // 2. If ! DclRec.HasBinding(N) is true, then
+    // 1. Let declRecord be envRecord.[[DeclarativeRecord]].
+    // 2. If ! declRecord.HasBinding(name) is true, then
     if (self.declarative_record.bindings.getPtr(name)) |binding| {
-        // a. Return ! DclRec.InitializeBinding(N, V).
+        // a. Return ! declRecord.InitializeBinding(name, value).
         std.debug.assert(binding.initialized == false);
         binding.value = value;
         binding.initialized = true;
@@ -109,12 +109,12 @@ pub fn initializeBinding(
     }
 
     // 3. Assert: If the binding exists, it must be in the Object Environment Record.
-    // 4. Let ObjRec be envRec.[[ObjectRecord]].
-    // 5. Return ? ObjRec.InitializeBinding(N, V).
+    // 4. Let objRecord be envRecord.[[ObjectRecord]].
+    // 5. Return ? objRecord.InitializeBinding(name, value).
     return self.object_record.initializeBinding(agent, name, value);
 }
 
-/// 9.1.1.4.5 SetMutableBinding ( N, V, S )
+/// 9.1.1.4.5 SetMutableBinding ( name, value, strict )
 /// https://tc39.es/ecma262/#sec-global-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(
     self: *const GlobalEnvironment,
@@ -123,10 +123,10 @@ pub fn setMutableBinding(
     value: Value,
     strict: bool,
 ) Agent.Error!void {
-    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
-    // 2. If ! DclRec.HasBinding(N) is true, then
+    // 1. Let declRecord be envRecord.[[DeclarativeRecord]].
+    // 2. If ! declRecord.HasBinding(name) is true, then
     if (self.declarative_record.bindings.getPtr(name)) |binding| {
-        // a. Return ? DclRec.SetMutableBinding(N, V, S).
+        // a. Return ? declRecord.SetMutableBinding(name, value, strict).
         const final_strict = binding.strict or strict;
         if (!binding.initialized) {
             @branchHint(.unlikely);
@@ -149,12 +149,12 @@ pub fn setMutableBinding(
         return;
     }
 
-    // 3. Let ObjRec be envRec.[[ObjectRecord]].
-    // 4. Return ? ObjRec.SetMutableBinding(N, V, S).
+    // 3. Let objRecord be envRecord.[[ObjectRecord]].
+    // 4. Return ? objRecord.SetMutableBinding(name, value, strict).
     return self.object_record.setMutableBinding(agent, name, value, strict);
 }
 
-/// 9.1.1.4.6 GetBindingValue ( N, S )
+/// 9.1.1.4.6 GetBindingValue ( name, strict )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
     self: *const GlobalEnvironment,
@@ -162,10 +162,10 @@ pub fn getBindingValue(
     name: *const String,
     strict: bool,
 ) Agent.Error!Value {
-    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
-    // 2. If ! DclRec.HasBinding(N) is true, then
+    // 1. Let declRecord be envRecord.[[DeclarativeRecord]].
+    // 2. If ! declRecord.HasBinding(name) is true, then
     if (self.declarative_record.bindings.get(name)) |binding| {
-        // a. Return ? DclRec.GetBindingValue(N, S).
+        // a. Return ? declRecord.GetBindingValue(name, strict).
         if (!binding.initialized) {
             @branchHint(.unlikely);
             return agent.throwException(
@@ -177,20 +177,20 @@ pub fn getBindingValue(
         return binding.value;
     }
 
-    // 3. Let ObjRec be envRec.[[ObjectRecord]].
-    // 4. Return ? ObjRec.GetBindingValue(N, S).
+    // 3. Let objRecord be envRecord.[[ObjectRecord]].
+    // 4. Return ? objRecord.GetBindingValue(name, strict).
     return self.object_record.getBindingValue(agent, name, strict);
 }
 
-/// 9.1.1.4.7 DeleteBinding ( N )
+/// 9.1.1.4.7 DeleteBinding ( name )
 /// https://tc39.es/ecma262/#sec-global-environment-records-deletebinding-n
 pub fn deleteBinding(self: *const GlobalEnvironment, agent: *Agent, name: *const String) Agent.Error!bool {
     const property_key: PropertyKey = .{ .string = name };
 
-    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
-    // 2. If ! DclRec.HasBinding(N) is true, then
+    // 1. Let declRecord be envRecord.[[DeclarativeRecord]].
+    // 2. If ! declRecord.HasBinding(name) is true, then
     if (self.declarative_record.bindings.get(name)) |binding| {
-        // a. Return ! DclRec.DeleteBinding(N).
+        // a. Return ! declRecord.DeleteBinding(name).
         if (!binding.deletable) {
             @branchHint(.unlikely);
             return false;
@@ -199,17 +199,17 @@ pub fn deleteBinding(self: *const GlobalEnvironment, agent: *Agent, name: *const
         return true;
     }
 
-    // 3. Let ObjRec be envRec.[[ObjectRecord]].
-    // 4. Let globalObject be ObjRec.[[BindingObject]].
-    const global_object = self.object_record.binding_object;
+    // 3. Let objRecord be envRecord.[[ObjectRecord]].
+    // 4. Let globalObj be objRecord.[[BindingObject]].
+    const global_obj = self.object_record.binding_object;
 
-    // 5. Let existingProp be ? HasOwnProperty(globalObject, N).
-    const existing_prop = try global_object.hasOwnProperty(agent, property_key);
+    // 5. Let existingProperty be ? HasOwnProperty(globalObj, name).
+    const existing_property = try global_obj.hasOwnProperty(agent, property_key);
 
-    // 6. If existingProp is true, then
-    if (existing_prop) {
+    // 6. If existingProperty is true, then
+    if (existing_property) {
         @branchHint(.likely);
-        // a. Return ? ObjRec.DeleteBinding(N).
+        // a. Return ? objRecord.DeleteBinding(name).
         return self.object_record.deleteBinding(agent, name);
     }
 
@@ -227,7 +227,7 @@ pub fn hasThisBinding(_: *const GlobalEnvironment) bool {
 /// 9.1.1.4.9 GetThisBinding ( )
 /// https://tc39.es/ecma262/#sec-global-environment-records-getthisbinding
 pub fn getThisBinding(self: *const GlobalEnvironment) Value {
-    // 1. Return envRec.[[GlobalThisValue]].
+    // 1. Return envRecord.[[GlobalThisValue]].
     return Value.from(self.global_this_value);
 }
 
@@ -245,15 +245,15 @@ pub fn withBaseObject(_: *const GlobalEnvironment) ?*Object {
     return null;
 }
 
-/// 9.1.1.4.12 HasLexicalDeclaration ( envRec, N )
+/// 9.1.1.4.12 HasLexicalDeclaration ( envRecord, name )
 /// https://tc39.es/ecma262/#sec-haslexicaldeclaration
 pub fn hasLexicalDeclaration(self: *const GlobalEnvironment, name: *const String) bool {
-    // 1. Let DclRec be envRec.[[DeclarativeRecord]].
-    // 2. Return ! DclRec.HasBinding(N).
+    // 1. Let declRecord be envRecord.[[DeclarativeRecord]].
+    // 2. Return ! declRecord.HasBinding(name).
     return self.declarative_record.hasBinding(name);
 }
 
-/// 9.1.1.4.13 HasRestrictedGlobalProperty ( envRec, N )
+/// 9.1.1.4.13 HasRestrictedGlobalProperty ( envRecord, name )
 /// https://tc39.es/ecma262/#sec-hasrestrictedglobalproperty
 pub fn hasRestrictedGlobalProperty(
     self: *const GlobalEnvironment,
@@ -262,28 +262,28 @@ pub fn hasRestrictedGlobalProperty(
 ) Agent.Error!bool {
     const property_key: PropertyKey = .{ .string = name };
 
-    // 1. Let ObjRec be envRec.[[ObjectRecord]].
-    // 2. Let globalObject be ObjRec.[[BindingObject]].
-    const global_object = self.object_record.binding_object;
+    // 1. Let objRecord be envRecord.[[ObjectRecord]].
+    // 2. Let globalObj be objRecord.[[BindingObject]].
+    const global_obj = self.object_record.binding_object;
 
-    // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
-    const existing_property = try global_object.internalMethods().getOwnProperty(
+    // 3. Let existingProperty be ? globalObj.[[GetOwnProperty]](name).
+    const existing_property = try global_obj.internalMethods().getOwnProperty(
         agent,
-        global_object,
+        global_obj,
         property_key,
     ) orelse {
-        // 4. If existingProp is undefined, return false.
+        // 4. If existingProperty is undefined, return false.
         return false;
     };
 
-    // 5. If existingProp.[[Configurable]] is true, return false.
+    // 5. If existingProperty.[[Configurable]] is true, return false.
     if (existing_property.configurable == true) return false;
 
     // 6. Return true.
     return true;
 }
 
-/// 9.1.1.4.14 CanDeclareGlobalVar ( envRec, N )
+/// 9.1.1.4.14 CanDeclareGlobalVar ( envRecord, name )
 /// https://tc39.es/ecma262/#sec-candeclareglobalvar
 pub fn canDeclareGlobalVar(
     self: *const GlobalEnvironment,
@@ -292,21 +292,21 @@ pub fn canDeclareGlobalVar(
 ) Agent.Error!bool {
     const property_key: PropertyKey = .{ .string = name };
 
-    // 1. Let ObjRec be envRec.[[ObjectRecord]].
-    // 2. Let globalObject be ObjRec.[[BindingObject]].
-    const global_object = self.object_record.binding_object;
+    // 1. Let objRecord be envRecord.[[ObjectRecord]].
+    // 2. Let globalObj be objRecord.[[BindingObject]].
+    const global_obj = self.object_record.binding_object;
 
-    // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
-    const has_property = try global_object.hasOwnProperty(agent, property_key);
+    // 3. Let hasProperty be ? HasOwnProperty(globalObj, name).
+    const has_property = try global_obj.hasOwnProperty(agent, property_key);
 
     // 4. If hasProperty is true, return true.
     if (has_property) return true;
 
-    // 5. Return ? IsExtensible(globalObject).
-    return global_object.isExtensible(agent);
+    // 5. Return ? IsExtensible(globalObj).
+    return global_obj.isExtensible(agent);
 }
 
-/// 9.1.1.4.15 CanDeclareGlobalFunction ( envRec, N )
+/// 9.1.1.4.15 CanDeclareGlobalFunction ( envRecord, name )
 /// https://tc39.es/ecma262/#sec-candeclareglobalfunction
 pub fn canDeclareGlobalFunction(
     self: *const GlobalEnvironment,
@@ -315,34 +315,34 @@ pub fn canDeclareGlobalFunction(
 ) Agent.Error!bool {
     const property_key: PropertyKey = .{ .string = name };
 
-    // 1. Let ObjRec be envRec.[[ObjectRecord]].
-    // 2. Let globalObject be ObjRec.[[BindingObject]].
-    const global_object = self.object_record.binding_object;
+    // 1. Let objRecord be envRecord.[[ObjectRecord]].
+    // 2. Let globalObj be objRecord.[[BindingObject]].
+    const global_obj = self.object_record.binding_object;
 
-    // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
-    const existing_prop = try global_object.internalMethods().getOwnProperty(
+    // 3. Let existingProperty be ? globalObj.[[GetOwnProperty]](name).
+    const existing_property = try global_obj.internalMethods().getOwnProperty(
         agent,
-        global_object,
+        global_obj,
         property_key,
     ) orelse {
-        // 4. If existingProp is undefined, return ? IsExtensible(globalObject).
-        return global_object.isExtensible(agent);
+        // 4. If existingProperty is undefined, return ? IsExtensible(globalObj).
+        return global_obj.isExtensible(agent);
     };
 
-    // 5. If existingProp.[[Configurable]] is true, return true.
-    if (existing_prop.configurable == true) return true;
+    // 5. If existingProperty.[[Configurable]] is true, return true.
+    if (existing_property.configurable == true) return true;
 
-    // 6. If IsDataDescriptor(existingProp) is true and existingProp has attribute values {
+    // 6. If IsDataDescriptor(existingProperty) is true and existingProperty has attribute values {
     //    [[Writable]]: true, [[Enumerable]]: true }, return true.
-    if (existing_prop.isDataDescriptor() and
-        existing_prop.writable == true and
-        existing_prop.enumerable == true) return true;
+    if (existing_property.isDataDescriptor() and
+        existing_property.writable == true and
+        existing_property.enumerable == true) return true;
 
     // 7. Return false.
     return false;
 }
 
-/// 9.1.1.4.16 CreateGlobalVarBinding ( envRec, N, D )
+/// 9.1.1.4.16 CreateGlobalVarBinding ( envRecord, name, deletable )
 /// https://tc39.es/ecma262/#sec-createglobalvarbinding
 pub fn createGlobalVarBinding(
     self: *const GlobalEnvironment,
@@ -352,29 +352,29 @@ pub fn createGlobalVarBinding(
 ) Agent.Error!void {
     const property_key: PropertyKey = .{ .string = name };
 
-    // 1. Let ObjRec be envRec.[[ObjectRecord]].
-    // 2. Let globalObject be ObjRec.[[BindingObject]].
-    const global_object = self.object_record.binding_object;
+    // 1. Let objRecord be envRecord.[[ObjectRecord]].
+    // 2. Let globalObj be objRecord.[[BindingObject]].
+    const global_obj = self.object_record.binding_object;
 
-    // 3. Let hasProperty be ? HasOwnProperty(globalObject, N).
-    const has_property = try global_object.hasOwnProperty(agent, property_key);
+    // 3. Let hasProperty be ? HasOwnProperty(globalObj, name).
+    const has_property = try global_obj.hasOwnProperty(agent, property_key);
 
-    // 4. Let extensible be ? IsExtensible(globalObject).
-    const extensible = try global_object.isExtensible(agent);
+    // 4. Let extensible be ? IsExtensible(globalObj).
+    const extensible = try global_obj.isExtensible(agent);
 
     // 5. If hasProperty is false and extensible is true, then
     if (!has_property and extensible) {
-        // a. Perform ? ObjRec.CreateMutableBinding(N, D).
+        // a. Perform ? objRecord.CreateMutableBinding(name, deletable).
         try self.object_record.createMutableBinding(agent, name, deletable);
 
-        // b. Perform ? ObjRec.InitializeBinding(N, undefined).
+        // b. Perform ? objRecord.InitializeBinding(name, undefined).
         try self.object_record.initializeBinding(agent, name, .undefined);
     }
 
     // 6. Return unused.
 }
 
-/// 9.1.1.4.17 CreateGlobalFunctionBinding ( envRec, N, V, D )
+/// 9.1.1.4.17 CreateGlobalFunctionBinding ( envRecord, name, value, deletable )
 /// https://tc39.es/ecma262/#sec-createglobalfunctionbinding
 pub fn createGlobalFunctionBinding(
     self: *const GlobalEnvironment,
@@ -385,33 +385,33 @@ pub fn createGlobalFunctionBinding(
 ) Agent.Error!void {
     const property_key: PropertyKey = .{ .string = name };
 
-    // 1. Let ObjRec be envRec.[[ObjectRecord]].
-    // 2. Let globalObject be ObjRec.[[BindingObject]].
-    const global_object = self.object_record.binding_object;
+    // 1. Let objRecord be envRecord.[[ObjectRecord]].
+    // 2. Let globalObj be objRecord.[[BindingObject]].
+    const global_obj = self.object_record.binding_object;
 
-    // 3. Let existingProp be ? globalObject.[[GetOwnProperty]](N).
-    const existing_prop = try global_object.internalMethods().getOwnProperty(
+    // 3. Let existingProperty be ? globalObj.[[GetOwnProperty]](name).
+    const existing_property = try global_obj.internalMethods().getOwnProperty(
         agent,
-        global_object,
+        global_obj,
         property_key,
     );
 
-    // 4. If existingProp is undefined or existingProp.[[Configurable]] is true, then
-    const property_descriptor: PropertyDescriptor = if (existing_prop == null or existing_prop.?.configurable == true) blk: {
-        // a. Let desc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true,
-        //    [[Enumerable]]: true, [[Configurable]]: D }.
+    // 4. If existingProperty is undefined or existingProperty.[[Configurable]] is true, then
+    const property_desc: PropertyDescriptor = if (existing_property == null or existing_property.?.configurable == true) blk: {
+        // a. Let propertyDesc be the PropertyDescriptor { [[Value]]: value, [[Writable]]: true,
+        //    [[Enumerable]]: true, [[Configurable]]: deletable }.
         break :blk .{ .value = Value.from(&value.object), .writable = true, .enumerable = true, .configurable = deletable };
     } else blk: {
         // 5. Else,
-        // a. Let desc be the PropertyDescriptor { [[Value]]: V }.
+        // a. Let propertyDesc be the PropertyDescriptor { [[Value]]: value }.
         break :blk .{ .value = Value.from(&value.object) };
     };
 
-    // 6. Perform ? DefinePropertyOrThrow(globalObject, N, desc).
-    try global_object.definePropertyOrThrow(agent, property_key, property_descriptor);
+    // 6. Perform ? DefinePropertyOrThrow(globalObj, name, propertyDesc).
+    try global_obj.definePropertyOrThrow(agent, property_key, property_desc);
 
-    // 7. Perform ? Set(globalObject, N, V, false).
-    try global_object.set(agent, property_key, Value.from(&value.object), .ignore);
+    // 7. Perform ? Set(globalObj, name, value, false).
+    try global_obj.set(agent, property_key, Value.from(&value.object), .ignore);
 
     // 8. Return unused.
 }

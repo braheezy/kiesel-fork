@@ -692,14 +692,13 @@ fn executeObjectSetSetterComputed(vm: *Vm, object_reg: Bytecode.Reg, key_reg: By
 
 fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Reg, value_reg: Bytecode.Reg) std.mem.Allocator.Error!void {
     const object = vm.store(object_reg).asObject();
-    const prototype_value = vm.store(value_reg);
+    const proto = vm.store(value_reg);
 
-    if (prototype_value.isObject() or prototype_value.isNull()) {
-        const prototype = if (prototype_value.isObject()) prototype_value.asObject() else null;
+    if (proto.isObject() or proto.isNull()) {
         _ = object.internalMethods().setPrototypeOf(
             vm.agent,
             object,
-            prototype,
+            if (proto.isObject()) proto.asObject() else null,
         ) catch |err| try noexcept(err);
     }
 }

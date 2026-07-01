@@ -175,14 +175,14 @@ pub fn loadRequestedModules(
 
     // 1. If hostDefined is not present, set hostDefined to empty.
 
-    // 2. Let pc be ! NewPromiseCapability(%Promise%).
+    // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
         agent,
         Value.from(try realm.intrinsics.@"%Promise%"()),
     ) catch |err| try noexcept(err);
 
     // 3. Let state be the GraphLoadingState Record { [[IsLoading]]: true,
-    //    [[PendingModulesCount]]: 1, [[Visited]]: « », [[PromiseCapability]]: pc,
+    //    [[PendingModulesCount]]: 1, [[Visited]]: « », [[PromiseCapability]]: promiseCapability,
     //    [[HostDefined]]: hostDefined }.
     const state = try agent.gc_allocator.create(GraphLoadingState);
     state.* = .{
@@ -196,7 +196,7 @@ pub fn loadRequestedModules(
     // 4. Perform InnerModuleLoading(state, module).
     try innerModuleLoading(agent, state, .{ .source_text_module = self });
 
-    // 5. Return pc.[[Promise]].
+    // 5. Return promiseCapability.[[Promise]].
     return promise_capability.promise.as(builtins.Promise);
 }
 
@@ -351,13 +351,13 @@ pub fn link(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
 
     // 4. If result is an abrupt completion, then
     _ = result catch |err| {
-        // a. For each Cyclic Module Record m of stack, do
-        for (stack.items) |module| {
-            // i. Assert: m.[[Status]] is linking.
-            std.debug.assert(module.status == .linking);
+        // a. For each Cyclic Module Record requiredModule of stack, do
+        for (stack.items) |required_module| {
+            // i. Assert: requiredModule.[[Status]] is linking.
+            std.debug.assert(required_module.status == .linking);
 
-            // ii. Set m.[[Status]] to unlinked.
-            module.status = .unlinked;
+            // ii. Set requiredModule.[[Status]] to unlinked.
+            required_module.status = .unlinked;
         }
 
         // b. Assert: module.[[Status]] is unlinked.
@@ -534,9 +534,9 @@ pub fn parse(
     defer export_entries.deinit(agent.gc_allocator);
     try body.collectExportEntries(agent.gc_allocator, &export_entries);
 
-    // 10. For each ExportEntry Record ee of exportEntries, do
+    // 10. For each ExportEntry Record exportEntry of exportEntries, do
     for (export_entries.items) |export_entry| {
-        // a. If ee.[[ModuleRequest]] is null, then
+        // a. If exportEntry.[[ModuleRequest]] is null, then
         if (export_entry.module_request == null) {
             const import_entry_with_bound_name: ?ImportEntry = for (import_entries.items) |import_entry| {
                 if (export_entry.local_name != null and
@@ -544,9 +544,9 @@ pub fn parse(
                     break import_entry;
             } else null;
 
-            // i. If importedBoundNames does not contain ee.[[LocalName]], then
+            // i. If importedBoundNames does not contain exportEntry.[[LocalName]], then
             if (import_entry_with_bound_name == null) {
-                // 1. Append ee to localExportEntries.
+                // 1. Append exportEntry to localExportEntries.
                 try local_export_entries.append(agent.gc_allocator, export_entry);
             } else {
                 // ii. Else,
@@ -558,13 +558,14 @@ pub fn parse(
                 //    twice under the same name through `export * from` to be ignored rather than
                 //    being treated as ambiguous in step 9.e.iii of the ResolveExport concrete
                 //    method of Source Text Module Records.
-                // 2. Let ie be the element of importEntries whose [[LocalName]] is
-                //    ee.[[LocalName]].
+                // 2. Let importEntry be the element of importEntries whose [[LocalName]] is
+                //    exportEntry.[[LocalName]].
                 const import_entry = import_entry_with_bound_name.?;
 
-                // 3. Append the ExportEntry Record { [[ModuleRequest]]: ie.[[ModuleRequest]],
-                //    [[ImportName]]: ie.[[ImportName]], [[LocalName]]: null,
-                //    [[ExportName]]: ee.[[ExportName]] } to indirectExportEntries.
+                // 3. Append the ExportEntry Record {
+                //    [[ModuleRequest]]: importEntry.[[ModuleRequest]],
+                //    [[ImportName]]: importEntry.[[ImportName]], [[LocalName]]: null,
+                //    [[ExportName]]: exportEntry.[[ExportName]] } to indirectExportEntries.
                 try indirect_export_entries.append(agent.gc_allocator, .{
                     .module_request = import_entry.module_request,
                     .import_name = if (import_entry.import_name) |import_name|
@@ -579,16 +580,16 @@ pub fn parse(
                 });
             }
         }
-        // b. Else if ee.[[ImportName]] is all-but-default, then
+        // b. Else if exportEntry.[[ImportName]] is all-but-default, then
         else if (export_entry.import_name != null and export_entry.import_name.? == .all_but_default) {
-            // i. Assert: ee.[[ExportName]] is null.
+            // i. Assert: exportEntry.[[ExportName]] is null.
             std.debug.assert(export_entry.export_name == null);
 
-            // ii. Append ee to starExportEntries.
+            // ii. Append exportEntry to starExportEntries.
             try star_export_entries.append(agent.gc_allocator, export_entry);
         } else {
             // c. Else,
-            // i. Append ee to indirectExportEntries.
+            // i. Append exportEntry to indirectExportEntries.
             try indirect_export_entries.append(agent.gc_allocator, export_entry);
         }
     }
@@ -676,14 +677,14 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
     var stack: std.ArrayList(*SourceTextModule) = .empty;
     defer stack.deinit(agent.gc_allocator);
 
-    // 6. Let capability be ! NewPromiseCapability(%Promise%).
-    const capability = newPromiseCapability(
+    // 6. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+    const promise_capability = newPromiseCapability(
         agent,
         Value.from(try realm.intrinsics.@"%Promise%"()),
     ) catch |err| try noexcept(err);
 
-    // 7. Set module.[[TopLevelCapability]] to capability.
-    module.top_level_capability = capability;
+    // 7. Set module.[[TopLevelCapability]] to promiseCapability.
+    module.top_level_capability = promise_capability;
 
     // 8. Let result be Completion(InnerModuleEvaluation(module, stack, 0)).
     const result = innerModuleEvaluation(agent, .{ .source_text_module = module }, &stack, 0);
@@ -695,16 +696,16 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
         error.ExceptionThrown => {
             const exception = agent.clearException();
 
-            // a. For each Cyclic Module Record m of stack, do
-            for (stack.items) |m| {
-                // i. Assert: m.[[Status]] is evaluating.
-                std.debug.assert(m.status == .evaluating);
+            // a. For each Cyclic Module Record requiredModule of stack, do
+            for (stack.items) |required_module| {
+                // i. Assert: requiredModule.[[Status]] is evaluating.
+                std.debug.assert(required_module.status == .evaluating);
 
-                // ii. Set m.[[Status]] to evaluated.
-                m.status = .evaluated;
+                // ii. Set requiredModule.[[Status]] to evaluated.
+                required_module.status = .evaluated;
 
-                // iii. Set m.[[EvaluationError]] to result.
-                m.evaluation_error = exception;
+                // iii. Set requiredModule.[[EvaluationError]] to result.
+                required_module.evaluation_error = exception;
             }
 
             // b. Assert: module.[[Status]] is evaluated.
@@ -712,8 +713,8 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
 
             // c. Assert: module.[[EvaluationError]] and result are the same Completion Record.
 
-            // d. Perform ! Call(capability.[[Reject]], undefined, « result.[[Value]] »).
-            _ = Value.from(capability.reject).callAssumeCallable(
+            // d. Perform ! Call(promiseCapability.[[Reject]], undefined, « result.[[Value]] »).
+            _ = Value.from(promise_capability.reject).callAssumeCallable(
                 agent,
                 .undefined,
                 &.{exception.value},
@@ -740,8 +741,8 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
                 else => false,
             });
 
-            // iii. Perform ! Call(capability.[[Resolve]], undefined, « undefined »).
-            _ = Value.from(capability.resolve).callAssumeCallable(
+            // iii. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
+            _ = Value.from(promise_capability.resolve).callAssumeCallable(
                 agent,
                 .undefined,
                 &.{.undefined},
@@ -755,8 +756,8 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
     // Ensures the promise returned by an async module is resolved
     agent.drainJobQueue();
 
-    // 11. Return capability.[[Promise]].
-    return capability.promise.as(builtins.Promise);
+    // 11. Return promiseCapability.[[Promise]].
+    return promise_capability.promise.as(builtins.Promise);
 }
 
 /// 16.2.1.6.1.3.1 InnerModuleEvaluation ( module, stack, index )
@@ -941,8 +942,8 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     // 2. Assert: module.[[HasTLA]] is true.
     std.debug.assert(module.has_tla);
 
-    // 3. Let capability be ! NewPromiseCapability(%Promise%).
-    const capability = newPromiseCapability(
+    // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
+    const promise_capability = newPromiseCapability(
         agent,
         Value.from(try realm.intrinsics.@"%Promise%"()),
     ) catch |err| try noexcept(err);
@@ -1007,17 +1008,17 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
         .{ .additional_fields = captures },
     );
 
-    // 8. Perform PerformPromiseThen(capability.[[Promise]], onFulfilled, onRejected).
+    // 8. Perform PerformPromiseThen(promiseCapability.[[Promise]], onFulfilled, onRejected).
     _ = try performPromiseThen(
         agent,
-        capability.promise.as(builtins.Promise),
+        promise_capability.promise.as(builtins.Promise),
         Value.from(&on_fulfilled.object),
         Value.from(&on_rejected.object),
         null,
     );
 
-    // 9. Perform ! module.ExecuteModule(capability).
-    module.executeModule(agent, capability) catch |err| try noexcept(err);
+    // 9. Perform ! module.ExecuteModule(promiseCapability).
+    module.executeModule(agent, promise_capability) catch |err| try noexcept(err);
 
     // 10. Return unused.
 }
@@ -1029,35 +1030,38 @@ fn gatherAvailableAncestors(
     module: *SourceTextModule,
     exec_list: *std.ArrayList(*SourceTextModule),
 ) std.mem.Allocator.Error!void {
-    // 1. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
-    for (module.async_parent_modules.items) |m| {
-        // a. If execList does not contain m and m.[[CycleRoot]].[[EvaluationError]] is empty, then
-        if (std.mem.findScalar(*SourceTextModule, exec_list.items, m) == null and
-            m.cycle_root.?.evaluation_error == null)
+    // 1. For each Cyclic Module Record ancestorModule of module.[[AsyncParentModules]], do
+    for (module.async_parent_modules.items) |ancestor_module| {
+        // a. If execList does not contain ancestorModule and
+        //    ancestorModule.[[CycleRoot]].[[EvaluationError]] is empty, then
+        if (std.mem.findScalar(*SourceTextModule, exec_list.items, ancestor_module) == null and
+            ancestor_module.cycle_root.?.evaluation_error == null)
         {
-            // i. Assert: m.[[Status]] is evaluating-async.
-            std.debug.assert(m.status == .evaluating_async);
+            // i. Assert: ancestorModule.[[Status]] is evaluating-async.
+            std.debug.assert(ancestor_module.status == .evaluating_async);
 
-            // ii. Assert: m.[[EvaluationError]] is empty.
-            std.debug.assert(m.evaluation_error == null);
+            // ii. Assert: ancestorModule.[[EvaluationError]] is empty.
+            std.debug.assert(ancestor_module.evaluation_error == null);
 
-            // iii. Assert: m.[[AsyncEvaluationOrder]] is an integer.
-            std.debug.assert(m.async_evaluation_order == .integer);
+            // iii. Assert: ancestorModule.[[AsyncEvaluationOrder]] is an integer.
+            std.debug.assert(ancestor_module.async_evaluation_order == .integer);
 
-            // iv. Assert: m.[[PendingAsyncDependencies]] > 0.
-            std.debug.assert(m.pending_async_dependencies.? > 0);
+            // iv. Assert: ancestorModule.[[PendingAsyncDependencies]] > 0.
+            std.debug.assert(ancestor_module.pending_async_dependencies.? > 0);
 
-            // v. Set m.[[PendingAsyncDependencies]] to m.[[PendingAsyncDependencies]] - 1.
-            m.pending_async_dependencies.? -= 1;
+            // v. Set ancestorModule.[[PendingAsyncDependencies]] to
+            //    ancestorModule.[[PendingAsyncDependencies]] - 1.
+            ancestor_module.pending_async_dependencies.? -= 1;
 
-            // vi. If m.[[PendingAsyncDependencies]] = 0, then
-            if (m.pending_async_dependencies.? == 0) {
-                // 1. Append m to execList.
-                try exec_list.append(agent.gc_allocator, m);
+            // vi. If ancestorModule.[[PendingAsyncDependencies]] = 0, then
+            if (ancestor_module.pending_async_dependencies.? == 0) {
+                // 1. Append ancestorModule to execList.
+                try exec_list.append(agent.gc_allocator, ancestor_module);
 
-                // 2. If m.[[HasTLA]] is false, perform GatherAvailableAncestors(m, execList).
-                if (!m.has_tla) {
-                    try gatherAvailableAncestors(agent, m, exec_list);
+                // 2. If ancestorModule.[[HasTLA]] is false, perform GatherAvailableAncestors(
+                //    ancestorModule, execList).
+                if (!ancestor_module.has_tla) {
+                    try gatherAvailableAncestors(agent, ancestor_module, exec_list);
                 }
             }
         }
@@ -1133,21 +1137,21 @@ fn asyncModuleExecutionFulfilled(
         }
     }.lessThanFn);
 
-    // 12. For each Cyclic Module Record m of sortedExecList, do
-    for (exec_list.items) |m| {
-        // a. If m.[[Status]] is evaluated, then
-        if (m.status == .evaluated) {
-            // i. Assert: m.[[EvaluationError]] is not empty.
-            std.debug.assert(m.evaluation_error != null);
+    // 12. For each Cyclic Module Record ancestorModule of sortedExecList, do
+    for (exec_list.items) |ancestor_module| {
+        // a. If ancestorModule.[[Status]] is evaluated, then
+        if (ancestor_module.status == .evaluated) {
+            // i. Assert: ancestorModule.[[EvaluationError]] is not empty.
+            std.debug.assert(ancestor_module.evaluation_error != null);
         }
-        // b. Else if m.[[HasTLA]] is true, then
-        else if (m.has_tla) {
-            // i. Perform ExecuteAsyncModule(m).
-            try executeAsyncModule(agent, m);
+        // b. Else if ancestorModule.[[HasTLA]] is true, then
+        else if (ancestor_module.has_tla) {
+            // i. Perform ExecuteAsyncModule(ancestorModule).
+            try executeAsyncModule(agent, ancestor_module);
         } else {
             // c. Else,
-            // i. Let result be Completion(m.ExecuteModule()).
-            const result = m.executeModule(agent, null);
+            // i. Let result be Completion(ancestorModule.ExecuteModule()).
+            const result = ancestor_module.executeModule(agent, null);
 
             // ii. If result is an abrupt completion, then
             _ = result catch |err| switch (err) {
@@ -1156,24 +1160,25 @@ fn asyncModuleExecutionFulfilled(
                 error.ExceptionThrown => {
                     const exception = agent.clearException();
 
-                    // 1. Perform AsyncModuleExecutionRejected(m, result.[[Value]]).
-                    try asyncModuleExecutionRejected(agent, m, exception);
+                    // 1. Perform AsyncModuleExecutionRejected(ancestorModule, result.[[Value]]).
+                    try asyncModuleExecutionRejected(agent, ancestor_module, exception);
                 },
             };
             // iii. Else,
 
-            // 1. Set m.[[AsyncEvaluationOrder]] to done.
-            m.async_evaluation_order = .done;
+            // 1. Set ancestorModule.[[AsyncEvaluationOrder]] to done.
+            ancestor_module.async_evaluation_order = .done;
 
-            // 2. Set m.[[Status]] to evaluated.
-            m.status = .evaluated;
+            // 2. Set ancestorModule.[[Status]] to evaluated.
+            ancestor_module.status = .evaluated;
 
-            // 3. If m.[[TopLevelCapability]] is not empty, then
-            if (m.top_level_capability) |top_level_capability| {
-                // a. Assert: m.[[CycleRoot]] and m are the same Module Record.
-                std.debug.assert(m.cycle_root == m);
+            // 3. If ancestorModule.[[TopLevelCapability]] is not empty, then
+            if (ancestor_module.top_level_capability) |top_level_capability| {
+                // a. Assert: ancestorModule.[[CycleRoot]] and ancestorModule are the same Module
+                //    Record.
+                std.debug.assert(ancestor_module.cycle_root == ancestor_module);
 
-                // b. Perform ! Call(m.[[TopLevelCapability]].[[Resolve]], undefined,
+                // b. Perform ! Call(ancestorModule.[[TopLevelCapability]].[[Resolve]], undefined,
                 //    « undefined »).
                 _ = Value.from(top_level_capability.resolve).callAssumeCallable(
                     agent,
@@ -1238,10 +1243,10 @@ fn asyncModuleExecutionRejected(
         ) catch |err| try noexcept(err);
     }
 
-    // 10. For each Cyclic Module Record m of module.[[AsyncParentModules]], do
-    for (module.async_parent_modules.items) |m| {
-        // a. Perform AsyncModuleExecutionRejected(m, error).
-        try asyncModuleExecutionRejected(agent, m, @"error");
+    // 10. For each Cyclic Module Record ancestorModule of module.[[AsyncParentModules]], do
+    for (module.async_parent_modules.items) |ancestor_module| {
+        // a. Perform AsyncModuleExecutionRejected(ancestorModule, error).
+        try asyncModuleExecutionRejected(agent, ancestor_module, @"error");
     }
 
     // 11. Return unused.
@@ -1280,40 +1285,40 @@ pub fn getExportedNames(
     // 5. Let exportedNames be a new empty List.
     var exported_names: std.ArrayList([]const u8) = .empty;
 
-    // 6. For each ExportEntry Record e of module.[[LocalExportEntries]], do
+    // 6. For each ExportEntry Record exportEntry of module.[[LocalExportEntries]], do
     for (self.local_export_entries.items) |export_entry| {
         // a. Assert: module provides the direct binding for this export.
-        // b. Assert: e.[[ExportName]] is not null.
-        // c. Append e.[[ExportName]] to exportedNames.
+        // b. Assert: exportEntry.[[ExportName]] is not null.
+        // c. Append exportEntry.[[ExportName]] to exportedNames.
         try exported_names.append(agent.gc_allocator, export_entry.export_name.?);
     }
 
-    // 7. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
+    // 7. For each ExportEntry Record exportEntry of module.[[IndirectExportEntries]], do
     for (self.indirect_export_entries.items) |export_entry| {
         // a. Assert: module imports a specific binding for this export.
-        // b. Assert: e.[[ExportName]] is not null.
-        // c. Append e.[[ExportName]] to exportedNames.
+        // b. Assert: exportEntry.[[ExportName]] is not null.
+        // c. Append exportEntry.[[ExportName]] to exportedNames.
         try exported_names.append(agent.gc_allocator, export_entry.export_name.?);
     }
 
-    // 8. For each ExportEntry Record e of module.[[StarExportEntries]], do
+    // 8. For each ExportEntry Record exportEntry of module.[[StarExportEntries]], do
     for (self.star_export_entries.items) |export_entry| {
-        // a. Assert: e.[[ModuleRequest]] is not null.
+        // a. Assert: exportEntry.[[ModuleRequest]] is not null.
         std.debug.assert(export_entry.module_request != null);
 
-        // b. Let requestedModule be GetImportedModule(module, e.[[ModuleRequest]]).
+        // b. Let requestedModule be GetImportedModule(module, exportEntry.[[ModuleRequest]]).
         const requested_module = getImportedModule(self, export_entry.module_request.?);
 
         // c. Let starNames be requestedModule.GetExportedNames(exportStarSet).
         const star_names = try requested_module.getExportedNames(agent, export_star_set);
 
-        // d. For each element n of starNames, do
+        // d. For each element name of starNames, do
         for (star_names) |name| {
-            // i. If n is not "default", then
+            // i. If name is not "default", then
             if (!std.mem.eql(u8, name, "default")) {
-                // 1. If exportedNames does not contain n, then
+                // 1. If exportedNames does not contain name, then
                 if (!containsSlice(exported_names.items, name)) {
-                    // a. Append n to exportedNames.
+                    // a. Append name to exportedNames.
                     try exported_names.append(agent.gc_allocator, name);
                 }
             }
@@ -1348,9 +1353,9 @@ pub fn resolveExport(
         .export_name = export_name,
     };
 
-    // 3. For each Record { [[Module]], [[ExportName]] } r of resolveSet, do
-    //     a. If module and r.[[Module]] are the same Module Record and exportName is
-    //        r.[[ExportName]], then
+    // 3. For each Record { [[Module]], [[ExportName]] } record of resolveSet, do
+    //     a. If module and record.[[Module]] are the same Module Record and exportName is
+    //        record.[[ExportName]], then
     if (resolve_set.contains(resolve_set_key)) {
         // i. Assert: This is a circular import request.
         // ii. Return null.
@@ -1360,13 +1365,13 @@ pub fn resolveExport(
     // 4. Append the Record { [[Module]]: module, [[ExportName]]: exportName } to resolveSet.
     try resolve_set.putNoClobber(agent.gc_allocator, resolve_set_key, {});
 
-    // 5. For each ExportEntry Record e of module.[[LocalExportEntries]], do
+    // 5. For each ExportEntry Record exportEntry of module.[[LocalExportEntries]], do
     for (self.local_export_entries.items) |export_entry| {
-        // a. If e.[[ExportName]] is exportName, then
+        // a. If exportEntry.[[ExportName]] is exportName, then
         if (std.mem.eql(u8, export_entry.export_name.?, export_name)) {
             // i. Assert: module provides the direct binding for this export.
             // ii. Return ResolvedBinding Record { [[Module]]: module,
-            //     [[BindingName]]: e.[[LocalName]] }.
+            //     [[BindingName]]: exportEntry.[[LocalName]] }.
             return .{
                 .resolved_binding = .{
                     .module = .{ .source_text_module = self },
@@ -1376,17 +1381,17 @@ pub fn resolveExport(
         }
     }
 
-    // 6. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
+    // 6. For each ExportEntry Record exportEntry of module.[[IndirectExportEntries]], do
     for (self.indirect_export_entries.items) |export_entry| {
-        // a. If e.[[ExportName]] is exportName, then
+        // a. If exportEntry.[[ExportName]] is exportName, then
         if (std.mem.eql(u8, export_entry.export_name.?, export_name)) {
-            // i. Assert: e.[[ModuleRequest]] is not null.
+            // i. Assert: exportEntry.[[ModuleRequest]] is not null.
             std.debug.assert(export_entry.module_request != null);
 
-            // ii. Let importedModule be GetImportedModule(module, e.[[ModuleRequest]]).
+            // ii. Let importedModule be GetImportedModule(module, exportEntry.[[ModuleRequest]]).
             const imported_module = getImportedModule(self, export_entry.module_request.?);
 
-            // iii. If e.[[ImportName]] is namespace, then
+            // iii. If exportEntry.[[ImportName]] is namespace, then
             if (export_entry.import_name != null and export_entry.import_name.? == .namespace) {
                 // 1. Assert: module does not provide the direct binding for this export.
                 // 2. Return ResolvedBinding Record { [[Module]]: importedModule,
@@ -1400,8 +1405,8 @@ pub fn resolveExport(
             }
 
             // iv. Assert: module imports a specific binding for this export.
-            // v. Assert: e.[[ImportName]] is a String.
-            // vi. Return importedModule.ResolveExport(e.[[ImportName]], resolveSet).
+            // v. Assert: exportEntry.[[ImportName]] is a String.
+            // vi. Return importedModule.ResolveExport(exportEntry.[[ImportName]], resolveSet).
             return imported_module.resolveExport(
                 agent,
                 export_entry.import_name.?.string,
@@ -1421,12 +1426,12 @@ pub fn resolveExport(
     // 8. Let starResolution be null.
     var maybe_star_resolution: ?ResolvedBinding = null;
 
-    // 9. For each ExportEntry Record e of module.[[StarExportEntries]], do
+    // 9. For each ExportEntry Record exportEntry of module.[[StarExportEntries]], do
     for (self.star_export_entries.items) |export_entry| {
-        // a. Assert: e.[[ModuleRequest]] is not null.
+        // a. Assert: exportEntry.[[ModuleRequest]] is not null.
         std.debug.assert(export_entry.module_request != null);
 
-        // b. Let importedModule be GetImportedModule(module, e.[[ModuleRequest]]).
+        // b. Let importedModule be GetImportedModule(module, exportEntry.[[ModuleRequest]]).
         const imported_module = getImportedModule(self, export_entry.module_request.?);
 
         // c. Let resolution be importedModule.ResolveExport(exportName, resolveSet).
@@ -1482,10 +1487,10 @@ pub fn resolveExport(
 /// 16.2.1.7.3.1 InitializeEnvironment ( )
 /// https://tc39.es/ecma262/#sec-source-text-module-record-initialize-environment
 fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!void {
-    // 1. For each ExportEntry Record e of module.[[IndirectExportEntries]], do
+    // 1. For each ExportEntry Record exportEntry of module.[[IndirectExportEntries]], do
     for (self.indirect_export_entries.items) |export_entry| {
-        // a. Assert: e.[[ExportName]] is not null.
-        // b. Let resolution be module.ResolveExport(e.[[ExportName]]).
+        // a. Assert: exportEntry.[[ExportName]] is not null.
+        // b. Let resolution be module.ResolveExport(exportEntry.[[ExportName]]).
         const maybe_resolution = try self.resolveExport(agent, export_entry.export_name.?, null);
 
         // c. If resolution is either null or ambiguous, throw a SyntaxError exception.
@@ -1513,35 +1518,35 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
     // 4. Assert: realm is not undefined.
     const realm = self.realm;
 
-    // 5. Let env be NewModuleEnvironment(realm.[[GlobalEnv]]).
+    // 5. Let envRecord be NewModuleEnvironment(realm.[[GlobalEnv]]).
     const env: Environment = .{
         .module_environment = try newModuleEnvironment(agent.gc_allocator, realm.global_env),
     };
 
-    // 6. Set module.[[Environment]] to env.
+    // 6. Set module.[[Environment]] to envRecord.
     self.environment = env;
 
-    // 7. For each ImportEntry Record in of module.[[ImportEntries]], do
+    // 7. For each ImportEntry Record importEntry of module.[[ImportEntries]], do
     for (self.import_entries.items) |import_entry| {
-        // a. Let importedModule be GetImportedModule(module, in.[[ModuleRequest]]).
+        // a. Let importedModule be GetImportedModule(module, importEntry.[[ModuleRequest]]).
         const imported_module = getImportedModule(self, import_entry.module_request);
 
         const local_name = try String.fromUtf8(agent, import_entry.local_name);
 
         switch (import_entry.import_name.?) {
-            // b. If in.[[ImportName]] is namespace, then
+            // b. If importEntry.[[ImportName]] is namespace, then
             .namespace => {
                 // i. Let namespace be GetModuleNamespace(importedModule).
                 const namespace = try getModuleNamespace(agent, imported_module);
 
-                // ii. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
+                // ii. Perform ! envRecord.CreateImmutableBinding(importEntry.[[LocalName]], true).
                 env.createImmutableBinding(
                     agent,
                     local_name,
                     true,
                 ) catch |err| try noexcept(err);
 
-                // iii. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
+                // iii. Perform ! envRecord.InitializeBinding(importEntry.[[LocalName]], namespace).
                 env.initializeBinding(
                     agent,
                     local_name,
@@ -1549,9 +1554,9 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                 ) catch |err| try noexcept(err);
             },
             // c. Else,
-            // i. Assert: in.[[ImportName]] is a String.
+            // i. Assert: importEntry.[[ImportName]] is a String.
             .string => |import_name| {
-                // ii. Let resolution be importedModule.ResolveExport(in.[[ImportName]]).
+                // ii. Let resolution be importedModule.ResolveExport(importEntry.[[ImportName]]).
                 const maybe_resolution = try imported_module.resolveExport(
                     agent,
                     import_name,
@@ -1580,14 +1585,16 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                         // 1. Let namespace be GetModuleNamespace(resolution.[[Module]]).
                         const namespace = try getModuleNamespace(agent, resolution.module);
 
-                        // 2. Perform ! env.CreateImmutableBinding(in.[[LocalName]], true).
+                        // 2. Perform ! envRecord.CreateImmutableBinding(importEntry.[[LocalName]],
+                        //    true).
                         env.createImmutableBinding(
                             agent,
                             local_name,
                             true,
                         ) catch |err| try noexcept(err);
 
-                        // 3. Perform ! env.InitializeBinding(in.[[LocalName]], namespace).
+                        // 3. Perform ! envRecord.InitializeBinding(importEntry.[[LocalName]],
+                        //    namespace).
                         env.initializeBinding(
                             agent,
                             local_name,
@@ -1596,7 +1603,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                     },
                     .string => |binding_name| {
                         // v. Else,
-                        // 1. Perform CreateImportBinding(env, in.[[LocalName]],
+                        // 1. Perform CreateImportBinding(envRecord, importEntry.[[LocalName]],
                         //    resolution.[[Module]], resolution.[[BindingName]]).
                         try env.module_environment.createImportBinding(
                             agent,
@@ -1645,91 +1652,92 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
     // 18. Let code be module.[[ECMAScriptCode]].
     const code = self.ecmascript_code;
 
-    // 19. Let varDeclarations be the VarScopedDeclarations of code.
-    var var_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
-    defer var_declarations.deinit(agent.gc_allocator);
-    try code.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
+    // 19. Let variableDecls be the VarScopedDeclarations of code.
+    var variable_decls: std.ArrayList(ast.VarScopedDeclaration) = .empty;
+    defer variable_decls.deinit(agent.gc_allocator);
+    try code.collectVarScopedDeclarations(agent.gc_allocator, &variable_decls);
 
-    // 20. Let declaredVarNames be a new empty List.
-    var declared_var_names: String.HashMapUnmanaged(void) = .empty;
-    defer declared_var_names.deinit(agent.gc_allocator);
+    // 20. Let declaredVariableNames be a new empty List.
+    var declared_variable_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_variable_names.deinit(agent.gc_allocator);
 
     var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(agent.gc_allocator);
 
-    // 21. For each element d of varDeclarations, do
-    for (var_declarations.items) |var_declaration| {
+    // 21. For each element variableDecl of variableDecls, do
+    for (variable_decls.items) |variable_scoped_decl| {
         bound_names.clearRetainingCapacity();
-        switch (var_declaration) {
-            .variable_declaration => |variable_declaration| try variable_declaration.collectBoundNames(agent.gc_allocator, &bound_names),
-            .hoistable_declaration => |hoistable_declaration| switch (hoistable_declaration) {
-                inline else => |function_declaration| try bound_names.append(agent.gc_allocator, function_declaration.identifier.?),
+        switch (variable_scoped_decl) {
+            .variable_declaration => |variable_decl| try variable_decl.collectBoundNames(agent.gc_allocator, &bound_names),
+            .hoistable_declaration => |hoistable_decl| switch (hoistable_decl) {
+                inline else => |func_decl| try bound_names.append(agent.gc_allocator, func_decl.identifier.?),
             },
         }
 
-        // a. For each element dn of the BoundNames of d, do
-        for (bound_names.items) |var_name_utf8| {
-            const var_name = try String.fromUtf8(agent, var_name_utf8);
+        // a. For each element name of the BoundNames of variableDecl, do
+        for (bound_names.items) |name_utf8| {
+            const name = try String.fromUtf8(agent, name_utf8);
 
-            // i. If declaredVarNames does not contain dn, then
-            if (!declared_var_names.contains(var_name)) {
-                // 1. Perform ! env.CreateMutableBinding(dn, false).
-                env.createMutableBinding(agent, var_name, false) catch |err| try noexcept(err);
+            // i. If declaredVariableNames does not contain name, then
+            if (!declared_variable_names.contains(name)) {
+                // 1. Perform ! envRecord.CreateMutableBinding(name, false).
+                env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
 
-                // 2. Perform ! env.InitializeBinding(dn, undefined).
-                env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
+                // 2. Perform ! envRecord.InitializeBinding(name, undefined).
+                env.initializeBinding(agent, name, .undefined) catch |err| try noexcept(err);
 
-                // 3. Append dn to declaredVarNames.
-                try declared_var_names.putNoClobber(agent.gc_allocator, var_name, {});
+                // 3. Append name to declaredVariableNames.
+                try declared_variable_names.putNoClobber(agent.gc_allocator, name, {});
             }
         }
     }
 
-    // 22. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
-    defer lex_declarations.deinit(agent.gc_allocator);
-    try code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
+    // 22. Let lexicalDecls be the LexicallyScopedDeclarations of code.
+    var lexical_decls: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
+    defer lexical_decls.deinit(agent.gc_allocator);
+    try code.collectLexicallyScopedDeclarations(agent.gc_allocator, &lexical_decls);
 
     // 23. Let privateEnv be null.
     const private_env = null;
 
-    // 24. For each element d of lexDeclarations, do
-    for (lex_declarations.items) |declaration| {
+    // 24. For each element lexicalDecl of lexicalDecls, do
+    for (lexical_decls.items) |lexical_decl| {
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
+        try lexical_decl.collectBoundNames(agent.gc_allocator, &bound_names);
 
-        // a. For each element dn of the BoundNames of d, do
+        // a. For each element name of the BoundNames of lexicalDecl, do
         for (bound_names.items) |name_utf8| {
             const name = try String.fromUtf8(agent, name_utf8);
 
-            // i. If IsConstantDeclaration of d is true, then
-            if (declaration.isConstantDeclaration()) {
-                // 1. Perform ! env.CreateImmutableBinding(dn, true).
+            // i. If IsConstantDeclaration of lexicalDecl is true, then
+            if (lexical_decl.isConstantDeclaration()) {
+                // 1. Perform ! envRecord.CreateImmutableBinding(name, true).
                 env.createImmutableBinding(agent, name, true) catch |err| try noexcept(err);
             } else {
                 // ii. Else,
-                // 1. Perform ! env.CreateMutableBinding(dn, false).
+                // 1. Perform ! envRecord.CreateMutableBinding(name, false).
                 env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
             }
 
-            // iii. If d is either a FunctionDeclaration, a GeneratorDeclaration, an
+            // iii. If lexicalDecl is either a FunctionDeclaration, a GeneratorDeclaration, an
             //      AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration, then
-            if (declaration == .hoistable_declaration) {
-                const hoistable_declaration = declaration.hoistable_declaration;
+            if (lexical_decl == .hoistable_declaration) {
+                const hoistable_decl = lexical_decl.hoistable_declaration;
 
-                // 1. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
-                const function_object = try switch (hoistable_declaration) {
-                    .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, env, private_env, self.source),
-                    .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, env, private_env, self.source),
-                    .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, env, private_env, self.source),
-                    .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, env, private_env, self.source),
+                // 1. Let funcObj be InstantiateFunctionObject of lexicalDecl with arguments
+                //    envRecord and privateEnv.
+                const func_obj = try switch (hoistable_decl) {
+                    .function_declaration => |func_decl| instantiateOrdinaryFunctionObject(agent, func_decl, env, private_env, self.source),
+                    .generator_declaration => |gen_decl| instantiateGeneratorFunctionObject(agent, gen_decl, env, private_env, self.source),
+                    .async_function_declaration => |async_func_decl| instantiateAsyncFunctionObject(agent, async_func_decl, env, private_env, self.source),
+                    .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorFunctionObject(agent, async_gen_decl, env, private_env, self.source),
                 };
 
-                // 2. Perform ! env.InitializeBinding(dn, fo).
+                // 2. Perform ! envRecord.InitializeBinding(name, funcObj).
                 env.initializeBinding(
                     agent,
                     name,
-                    Value.from(&function_object.object),
+                    Value.from(&func_obj.object),
                 ) catch |err| try noexcept(err);
             }
         }

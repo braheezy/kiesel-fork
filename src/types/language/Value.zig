@@ -592,84 +592,85 @@ pub fn typeof(self: Value) *const String {
     };
 }
 
-/// 6.2.6.5 ToPropertyDescriptor ( Obj )
+/// 6.2.6.5 ToPropertyDescriptor ( obj )
 /// https://tc39.es/ecma262/#sec-topropertydescriptor
 pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDescriptor {
-    // 1. If Obj is not an Object, throw a TypeError exception.
+    // 1. If obj is not an Object, throw a TypeError exception.
     if (!self.isObject()) {
         return agent.throwException(.type_error, "{f} is not an Object", .{self});
     }
+    const obj = self.asObject();
 
-    // 2. Let desc be a new Property Descriptor that initially has no fields.
-    var descriptor: PropertyDescriptor = .{};
+    // 2. Let propertyDesc be a new Property Descriptor that initially has no fields.
+    var property_desc: PropertyDescriptor = .{};
 
-    // 3. Let hasEnumerable be ? HasProperty(Obj, "enumerable").
-    const has_enumerable = try self.asObject().hasProperty(agent, PropertyKey.from("enumerable"));
+    // 3. Let hasEnumerable be ? HasProperty(obj, "enumerable").
+    const has_enumerable = try obj.hasProperty(agent, PropertyKey.from("enumerable"));
 
     // 4. If hasEnumerable is true, then
     if (has_enumerable) {
-        // a. Let enumerable be ToBoolean(? Get(Obj, "enumerable")).
-        const enumerable = (try self.asObject().get(
+        // a. Let enumerable be ToBoolean(? Get(obj, "enumerable")).
+        const enumerable = (try obj.get(
             agent,
             PropertyKey.from("enumerable"),
         )).toBoolean();
 
-        // b. Set desc.[[Enumerable]] to enumerable.
-        descriptor.enumerable = enumerable;
+        // b. Set propertyDesc.[[Enumerable]] to enumerable.
+        property_desc.enumerable = enumerable;
     }
 
-    // 5. Let hasConfigurable be ? HasProperty(Obj, "configurable").
-    const has_configurable = try self.asObject().hasProperty(
+    // 5. Let hasConfigurable be ? HasProperty(obj, "configurable").
+    const has_configurable = try obj.hasProperty(
         agent,
         PropertyKey.from("configurable"),
     );
 
     // 6. If hasConfigurable is true, then
     if (has_configurable) {
-        // a. Let configurable be ToBoolean(? Get(Obj, "configurable")).
-        const configurable = (try self.asObject().get(
+        // a. Let configurable be ToBoolean(? Get(obj, "configurable")).
+        const configurable = (try obj.get(
             agent,
             PropertyKey.from("configurable"),
         )).toBoolean();
 
-        // b. Set desc.[[Configurable]] to configurable.
-        descriptor.configurable = configurable;
+        // b. Set propertyDesc.[[Configurable]] to configurable.
+        property_desc.configurable = configurable;
     }
 
-    // 7. Let hasValue be ? HasProperty(Obj, "value").
-    const has_value = try self.asObject().hasProperty(agent, .from("value"));
+    // 7. Let hasValue be ? HasProperty(obj, "value").
+    const has_value = try obj.hasProperty(agent, PropertyKey.from("value"));
 
     // 8. If hasValue is true, then
     if (has_value) {
-        // a. Let value be ? Get(Obj, "value").
-        const value = try self.asObject().get(agent, PropertyKey.from("value"));
+        // a. Let value be ? Get(obj, "value").
+        const value = try obj.get(agent, PropertyKey.from("value"));
 
-        // b. Set desc.[[Value]] to value.
-        descriptor.value = value;
+        // b. Set propertyDesc.[[Value]] to value.
+        property_desc.value = value;
     }
 
-    // 9. Let hasWritable be ? HasProperty(Obj, "writable").
-    const has_writable = try self.asObject().hasProperty(agent, PropertyKey.from("writable"));
+    // 9. Let hasWritable be ? HasProperty(obj, "writable").
+    const has_writable = try obj.hasProperty(agent, PropertyKey.from("writable"));
 
     // 10. If hasWritable is true, then
     if (has_writable) {
-        // a. Let writable be ToBoolean(? Get(Obj, "writable")).
-        const writable = (try self.asObject().get(
+        // a. Let writable be ToBoolean(? Get(obj, "writable")).
+        const writable = (try obj.get(
             agent,
             PropertyKey.from("writable"),
         )).toBoolean();
 
-        // b. Set desc.[[Writable]] to writable.
-        descriptor.writable = writable;
+        // b. Set propertyDesc.[[Writable]] to writable.
+        property_desc.writable = writable;
     }
 
-    // 11. Let hasGet be ? HasProperty(Obj, "get").
-    const has_get = try self.asObject().hasProperty(agent, PropertyKey.from("get"));
+    // 11. Let hasGet be ? HasProperty(obj, "get").
+    const has_get = try obj.hasProperty(agent, PropertyKey.from("get"));
 
     // 12. If hasGet is true, then
     if (has_get) {
-        // a. Let getter be ? Get(Obj, "get").
-        const getter = try self.asObject().get(agent, PropertyKey.from("get"));
+        // a. Let getter be ? Get(obj, "get").
+        const getter = try obj.get(agent, PropertyKey.from("get"));
 
         // b. If IsCallable(getter) is false and getter is not undefined, throw a TypeError
         //    exception.
@@ -677,17 +678,17 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
             return agent.throwException(.type_error, "{f} is not callable", .{getter});
         }
 
-        // c. Set desc.[[Get]] to getter.
-        descriptor.get = if (!getter.isUndefined()) getter.asObject() else @as(?*Object, null);
+        // c. Set propertyDesc.[[Get]] to getter.
+        property_desc.get = if (!getter.isUndefined()) getter.asObject() else @as(?*Object, null);
     }
 
-    // 13. Let hasSet be ? HasProperty(Obj, "set").
-    const has_set = try self.asObject().hasProperty(agent, PropertyKey.from("set"));
+    // 13. Let hasSet be ? HasProperty(obj, "set").
+    const has_set = try obj.hasProperty(agent, PropertyKey.from("set"));
 
     // 14. If hasSet is true, then
     if (has_set) {
-        // a. Let setter be ? Get(Obj, "set").
-        const setter = try self.asObject().get(agent, PropertyKey.from("set"));
+        // a. Let setter be ? Get(obj, "set").
+        const setter = try obj.get(agent, PropertyKey.from("set"));
 
         // b. If IsCallable(setter) is false and setter is not undefined, throw a TypeError
         //    exception.
@@ -695,15 +696,15 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
             return agent.throwException(.type_error, "{f} is not callable", .{setter});
         }
 
-        // c. Set desc.[[Set]] to setter.
-        descriptor.set = if (!setter.isUndefined()) setter.asObject() else @as(?*Object, null);
+        // c. Set propertyDesc.[[Set]] to setter.
+        property_desc.set = if (!setter.isUndefined()) setter.asObject() else @as(?*Object, null);
     }
 
-    // 15. If desc has a [[Get]] field or desc has a [[Set]] field, then
-    if (descriptor.get != null or descriptor.set != null) {
-        // a. If desc has a [[Value]] field or desc has a [[Writable]] field, throw a TypeError
-        //    exception.
-        if (descriptor.value != null or descriptor.writable != null) {
+    // 15. If propertyDesc has a [[Get]] field or propertyDesc has a [[Set]] field, then
+    if (property_desc.get != null or property_desc.set != null) {
+        // a. If propertyDesc has a [[Value]] field or propertyDesc has a [[Writable]] field, throw
+        //    a TypeError exception.
+        if (property_desc.value != null or property_desc.writable != null) {
             return agent.throwException(
                 .type_error,
                 "Descriptor with 'get' or 'set' property must not have 'value' or 'writable property'",
@@ -712,8 +713,8 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
         }
     }
 
-    // 16. Return desc.
-    return descriptor;
+    // 16. Return propertyDesc.
+    return property_desc;
 }
 
 pub inline fn toPrimitive(self: Value, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Value {
@@ -730,13 +731,13 @@ pub inline fn toPrimitive(self: Value, agent: *Agent, preferred_type: ?Preferred
 fn toPrimitiveImpl(self: Value, agent: *Agent, preferred_type: ?PreferredType) Agent.Error!Value {
     // 1. If input is an Object, then
     if (self.isObject()) {
-        // a. Let exoticToPrim be ? GetMethod(input, %Symbol.toPrimitive%).
+        // a. Let exoticToPrimitive be ? GetMethod(input, %Symbol.toPrimitive%).
         const maybe_exotic_to_primitive = try self.getMethod(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.toPrimitive%"),
         );
 
-        // b. If exoticToPrim is not undefined, then
+        // b. If exoticToPrimitive is not undefined, then
         if (maybe_exotic_to_primitive) |exotic_to_primitive| {
             const hint = blk: {
                 // i. If preferredType is not present, then
@@ -755,7 +756,7 @@ fn toPrimitiveImpl(self: Value, agent: *Agent, preferred_type: ?PreferredType) A
                 };
             };
 
-            // iv. Let result be ? Call(exoticToPrim, input, « hint »).
+            // iv. Let result be ? Call(exoticToPrimitive, input, « hint »).
             const result = try from(exotic_to_primitive).callAssumeCallable(
                 agent,
                 self,
@@ -783,33 +784,33 @@ fn toPrimitiveImpl(self: Value, agent: *Agent, preferred_type: ?PreferredType) A
     unreachable;
 }
 
-pub inline fn toBoolean(self: Value) bool {
+pub inline fn toBoolean(arg: Value) bool {
     // OPTIMIZATION: Inline the fast path.
-    if (self.isBoolean()) {
+    if (arg.isBoolean()) {
         @branchHint(.likely);
-        return self.asBoolean();
+        return arg.asBoolean();
     }
-    return self.toBooleanImpl();
+    return arg.toBooleanImpl();
 }
 
-/// 7.1.2 ToBoolean ( argument )
+/// 7.1.2 ToBoolean ( arg )
 /// https://tc39.es/ecma262/#sec-toboolean
-fn toBooleanImpl(self: Value) bool {
-    switch (self.type()) {
-        // 1. If argument is a Boolean, return argument.
+fn toBooleanImpl(arg: Value) bool {
+    switch (arg.type()) {
+        // 1. If arg is a Boolean, return arg.
         // NOTE: This is handled by the fast path.
         .boolean => unreachable,
 
-        // 2. If argument is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return
+        // 2. If arg is one of undefined, null, +0𝔽, -0𝔽, NaN, 0ℤ, or the empty String, return
         //    false.
         .undefined, .null => return false,
-        .number => if (self.asNumber().isZero() or self.asNumber().isNan()) {
+        .number => if (arg.asNumber().isZero() or arg.asNumber().isNan()) {
             return false;
         },
-        .big_int => if (self.asBigInt().managed.eqlZero()) {
+        .big_int => if (arg.asBigInt().managed.eqlZero()) {
             return false;
         },
-        .string => if (self.asString().isEmpty()) {
+        .string => if (arg.asString().isEmpty()) {
             return false;
         },
         else => {},
@@ -817,46 +818,45 @@ fn toBooleanImpl(self: Value) bool {
 
     // 3. If the host is a web browser or otherwise supports The [[IsHTMLDDA]] Internal Slot, then
     if (build_options.enable_annex_b) {
-        // a. If argument is an Object and argument has an [[IsHTMLDDA]] internal slot, return
-        //    false.
-        if (self.isObject() and self.asObject().isHTMLDDA()) return false;
+        // a. If arg is an Object and arg has an [[IsHTMLDDA]] internal slot, return false.
+        if (arg.isObject() and arg.asObject().isHTMLDDA()) return false;
     }
 
     // 4. Return true.
     return true;
 }
 
-/// 7.1.3 ToNumeric ( value )
+/// 7.1.3 ToNumeric ( arg )
 /// https://tc39.es/ecma262/#sec-tonumeric
-pub fn toNumeric(self: Value, agent: *Agent) Agent.Error!Numeric {
-    // 1. Let primValue be ? ToPrimitive(value, number).
-    const primitive_value = try self.toPrimitive(agent, .number);
+pub fn toNumeric(arg: Value, agent: *Agent) Agent.Error!Numeric {
+    // 1. Let primitiveValue be ? ToPrimitive(arg, number).
+    const primitive_value = try arg.toPrimitive(agent, .number);
 
-    // 2. If primValue is a BigInt, return primValue.
+    // 2. If primitiveValue is a BigInt, return primitiveValue.
     if (primitive_value.isBigInt()) return .{ .big_int = primitive_value.asBigInt() };
 
-    // 3. Return ? ToNumber(primValue).
+    // 3. Return ? ToNumber(primitiveValue).
     return .{ .number = try primitive_value.toNumber(agent) };
 }
 
-pub inline fn toNumber(self: Value, agent: *Agent) Agent.Error!Number {
+pub inline fn toNumber(arg: Value, agent: *Agent) Agent.Error!Number {
     // OPTIMIZATION: Inline the fast path.
-    if (self.isNumber()) {
+    if (arg.isNumber()) {
         @branchHint(.likely);
-        return self.asNumber();
+        return arg.asNumber();
     }
-    return self.toNumberImpl(agent);
+    return arg.toNumberImpl(agent);
 }
 
-/// 7.1.4 ToNumber ( argument )
+/// 7.1.4 ToNumber ( arg )
 /// https://tc39.es/ecma262/#sec-tonumber
-fn toNumberImpl(self: Value, agent: *Agent) Agent.Error!Number {
-    switch (self.type()) {
-        // 1. If argument is a Number, return argument.
+fn toNumberImpl(arg: Value, agent: *Agent) Agent.Error!Number {
+    switch (arg.type()) {
+        // 1. If arg is a Number, return arg.
         // NOTE: This is handled by the fast path.
         .number => unreachable,
 
-        // 2. If argument is either a Symbol or a BigInt, throw a TypeError exception.
+        // 2. If arg is either a Symbol or a BigInt, throw a TypeError exception.
         .symbol => return agent.throwException(
             .type_error,
             "Cannot convert Symbol to number",
@@ -868,45 +868,45 @@ fn toNumberImpl(self: Value, agent: *Agent) Agent.Error!Number {
             .{},
         ),
 
-        // 3. If argument is undefined, return NaN.
+        // 3. If arg is undefined, return NaN.
         .undefined => return Number.from(std.math.nan(f64)),
 
-        // 4. If argument is either null or false, return +0𝔽.
-        // 5. If argument is true, return 1𝔽.
+        // 4. If arg is either null or false, return +0𝔽.
+        // 5. If arg is true, return 1𝔽.
         .null => return Number.from(0),
-        .boolean => return Number.from(@intFromBool(self.asBoolean())),
+        .boolean => return Number.from(@intFromBool(arg.asBoolean())),
 
-        // 6. If argument is a String, return StringToNumber(argument).
-        .string => return stringToNumber(agent, self.asString()),
+        // 6. If arg is a String, return StringToNumber(arg).
+        .string => return stringToNumber(agent, arg.asString()),
 
-        // 7. Assert: argument is an Object.
+        // 7. Assert: arg is an Object.
         .object => {
-            // 8. Let primValue be ? ToPrimitive(argument, number).
-            const primitive_value = try self.toPrimitive(agent, .number);
+            // 8. Let primitiveValue be ? ToPrimitive(arg, number).
+            const primitive_value = try arg.toPrimitive(agent, .number);
 
-            // 9. Assert: primValue is not an Object.
+            // 9. Assert: primitiveValue is not an Object.
             std.debug.assert(!primitive_value.isObject());
 
-            // 10. Return ? ToNumber(primValue).
+            // 10. Return ? ToNumber(primitiveValue).
             return primitive_value.toNumber(agent);
         },
     }
 }
 
-pub inline fn toIntegerOrInfinity(self: Value, agent: *Agent) Agent.Error!f64 {
+pub inline fn toIntegerOrInfinity(arg: Value, agent: *Agent) Agent.Error!f64 {
     // OPTIMIZATION: Inline the fast path.
-    if (self.__isI32()) {
+    if (arg.__isI32()) {
         @branchHint(.likely);
-        return @floatFromInt(self.__asI32());
+        return @floatFromInt(arg.__asI32());
     }
-    return self.toIntegerOrInfinityImpl(agent);
+    return arg.toIntegerOrInfinityImpl(agent);
 }
 
-/// 7.1.5 ToIntegerOrInfinity ( argument )
+/// 7.1.5 ToIntegerOrInfinity ( arg )
 /// https://tc39.es/ecma262/#sec-tointegerorinfinity
-fn toIntegerOrInfinityImpl(self: Value, agent: *Agent) Agent.Error!f64 {
-    // 1. Let number be ? ToNumber(argument).
-    const number = try self.toNumber(agent);
+fn toIntegerOrInfinityImpl(arg: Value, agent: *Agent) Agent.Error!f64 {
+    // 1. Let number be ? ToNumber(arg).
+    const number = try arg.toNumber(agent);
 
     // 2. If number is one of NaN, +0𝔽, or -0𝔽, return 0.
     if (number.isNan() or number.asFloat() == 0) return 0;
@@ -954,108 +954,108 @@ pub fn toFixedSizeInteger(int: f64, comptime T: type) T {
     return @bitCast(fixed_int);
 }
 
-/// 7.1.7 ToInt32 ( argument )
+/// 7.1.7 ToInt32 ( arg )
 /// https://tc39.es/ecma262/#sec-toint32
-pub fn toInt32(self: Value, agent: *Agent) Agent.Error!i32 {
+pub fn toInt32(arg: Value, agent: *Agent) Agent.Error!i32 {
     // OPTIMIZATION: Fast path for i32 values
-    if (self.__isI32()) {
+    if (arg.__isI32()) {
         @branchHint(.likely);
-        return self.__asI32();
+        return arg.__asI32();
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
+    // 1. Let int be ? ToIntegerOrInfinity(arg).
     // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 32)).
-    const number = try self.toNumber(agent);
+    const number = try arg.toNumber(agent);
     return number.toInt32();
 }
 
-/// 7.1.8 ToUint32 ( argument )
+/// 7.1.8 ToUint32 ( arg )
 /// https://tc39.es/ecma262/#sec-touint32
-pub fn toUint32(self: Value, agent: *Agent) Agent.Error!u32 {
+pub fn toUint32(arg: Value, agent: *Agent) Agent.Error!u32 {
     // OPTIMIZATION: Fast path for i32 values
-    if (self.__isI32()) {
+    if (arg.__isI32()) {
         @branchHint(.likely);
-        return @bitCast(self.__asI32());
+        return @bitCast(arg.__asI32());
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
-    const int = try self.toIntegerOrInfinity(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(arg).
+    const int = try arg.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 32)).
     return toFixedSizeInteger(int, u32);
 }
 
-/// 7.1.9 ToInt16 ( argument )
+/// 7.1.9 ToInt16 ( arg )
 /// https://tc39.es/ecma262/#sec-toint16
-pub fn toInt16(self: Value, agent: *Agent) Agent.Error!i16 {
+pub fn toInt16(arg: Value, agent: *Agent) Agent.Error!i16 {
     // OPTIMIZATION: Fast path for i32 values
-    if (self.__isI32()) {
+    if (arg.__isI32()) {
         @branchHint(.likely);
-        const fixed_int: u16 = @truncate(@as(u32, @bitCast(self.__asI32())));
+        const fixed_int: u16 = @truncate(@as(u32, @bitCast(arg.__asI32())));
         return @bitCast(fixed_int);
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
-    const int = try self.toIntegerOrInfinity(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(arg).
+    const int = try arg.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 16)).
     return toFixedSizeInteger(int, i16);
 }
 
-/// 7.1.10 ToUint16 ( argument )
+/// 7.1.10 ToUint16 ( arg )
 /// https://tc39.es/ecma262/#sec-touint16
-pub fn toUint16(self: Value, agent: *Agent) Agent.Error!u16 {
+pub fn toUint16(arg: Value, agent: *Agent) Agent.Error!u16 {
     // OPTIMIZATION: Fast path for i32 values
-    if (self.__isI32()) {
+    if (arg.__isI32()) {
         @branchHint(.likely);
-        return @truncate(@as(u32, @bitCast(self.__asI32())));
+        return @truncate(@as(u32, @bitCast(arg.__asI32())));
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
-    const int = try self.toIntegerOrInfinity(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(arg).
+    const int = try arg.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 16)).
     return toFixedSizeInteger(int, u16);
 }
 
-/// 7.1.11 ToInt8 ( argument )
+/// 7.1.11 ToInt8 ( arg )
 /// https://tc39.es/ecma262/#sec-toint8
-pub fn toInt8(self: Value, agent: *Agent) Agent.Error!i8 {
+pub fn toInt8(arg: Value, agent: *Agent) Agent.Error!i8 {
     // OPTIMIZATION: Fast path for i32 values
-    if (self.__isI32()) {
+    if (arg.__isI32()) {
         @branchHint(.likely);
-        const fixed_int: u8 = @truncate(@as(u32, @bitCast(self.__asI32())));
+        const fixed_int: u8 = @truncate(@as(u32, @bitCast(arg.__asI32())));
         return @bitCast(fixed_int);
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
-    const int = try self.toIntegerOrInfinity(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(arg).
+    const int = try arg.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, signed, 8)).
     return toFixedSizeInteger(int, i8);
 }
 
-/// 7.1.12 ToUint8 ( argument )
+/// 7.1.12 ToUint8 ( arg )
 /// https://tc39.es/ecma262/#sec-touint8
-pub fn toUint8(self: Value, agent: *Agent) Agent.Error!u8 {
+pub fn toUint8(arg: Value, agent: *Agent) Agent.Error!u8 {
     // OPTIMIZATION: Fast path for i32 values
-    if (self.__isI32()) {
+    if (arg.__isI32()) {
         @branchHint(.likely);
-        return @truncate(@as(u32, @bitCast(self.__asI32())));
+        return @truncate(@as(u32, @bitCast(arg.__asI32())));
     }
 
-    // 1. Let int be ? ToIntegerOrInfinity(argument).
-    const int = try self.toIntegerOrInfinity(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(arg).
+    const int = try arg.toIntegerOrInfinity(agent);
 
     // 2. Return 𝔽(ToFixedSizeInteger(int, unsigned, 8)).
     return toFixedSizeInteger(int, u8);
 }
 
-/// 7.1.13 ToUint8Clamp ( argument )
+/// 7.1.13 ToUint8Clamp ( arg )
 /// https://tc39.es/ecma262/#sec-touint8clamp
-pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
-    // 1. Let number be ? ToNumber(argument).
-    const number = try self.toNumber(agent);
+pub fn toUint8Clamp(arg: Value, agent: *Agent) Agent.Error!u8 {
+    // 1. Let number be ? ToNumber(arg).
+    const number = try arg.toNumber(agent);
 
     // 2. If number is NaN, return +0𝔽.
     if (number.isNan()) return 0;
@@ -1081,20 +1081,20 @@ pub fn toUint8Clamp(self: Value, agent: *Agent) Agent.Error!u8 {
     return f_int + 1;
 }
 
-pub inline fn toBigInt(self: Value, agent: *Agent) Agent.Error!*const BigInt {
+pub inline fn toBigInt(arg: Value, agent: *Agent) Agent.Error!*const BigInt {
     // OPTIMIZATION: Inline the fast path.
-    if (self.isBigInt()) {
+    if (arg.isBigInt()) {
         @branchHint(.likely);
-        return self.asBigInt();
+        return arg.asBigInt();
     }
-    return self.toBigIntImpl(agent);
+    return arg.toBigIntImpl(agent);
 }
 
-/// 7.1.14 ToBigInt ( argument )
+/// 7.1.14 ToBigInt ( arg )
 /// https://tc39.es/ecma262/#sec-tobigint
-fn toBigIntImpl(self: Value, agent: *Agent) Agent.Error!*const BigInt {
+fn toBigIntImpl(arg: Value, agent: *Agent) Agent.Error!*const BigInt {
     // 1. Let prim be ? ToPrimitive(argument, number).
-    const primitive = try self.toPrimitive(agent, .number);
+    const primitive = try arg.toPrimitive(agent, .number);
 
     // 2. Return the value that prim corresponds to in Table 12.
     return switch (primitive.type()) {
@@ -1131,168 +1131,168 @@ fn toBigIntImpl(self: Value, agent: *Agent) Agent.Error!*const BigInt {
     };
 }
 
-/// 7.1.16 ToBigInt64 ( argument )
+/// 7.1.16 ToBigInt64 ( arg )
 /// https://tc39.es/ecma262/#sec-tobigint64
-pub fn toBigInt64(self: Value, agent: *Agent) Agent.Error!i64 {
-    // 1. Let int be ℝ(? ToBigInt(argument)).
-    const n = try self.toBigInt(agent);
+pub fn toBigInt64(arg: Value, agent: *Agent) Agent.Error!i64 {
+    // 1. Let int be ℝ(? ToBigInt(arg)).
+    const int = try arg.toBigInt(agent);
 
     // 2. Return ℤ(ToFixedSizeInteger(int, signed, 64)).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
-    try int64bit.truncate(&n.managed, .signed, 64);
+    try int64bit.truncate(&int.managed, .signed, 64);
     return int64bit.toInt(i64) catch unreachable;
 }
 
-/// 7.1.17 ToBigUint64 ( argument )
+/// 7.1.17 ToBigUint64 ( arg )
 /// https://tc39.es/ecma262/#sec-tobiguint64
-pub fn toBigUint64(self: Value, agent: *Agent) Agent.Error!u64 {
-    // 1. Let int be ℝ(? ToBigInt(argument)).
-    const n = try self.toBigInt(agent);
+pub fn toBigUint64(arg: Value, agent: *Agent) Agent.Error!u64 {
+    // 1. Let int be ℝ(? ToBigInt(arg)).
+    const int = try arg.toBigInt(agent);
 
     // 2. Return ℤ(ToFixedSizeInteger(int, unsigned, 64)).
     var int64bit = try std.math.big.int.Managed.init(agent.gc_allocator);
-    try int64bit.truncate(&n.managed, .unsigned, 64);
+    try int64bit.truncate(&int.managed, .unsigned, 64);
     return int64bit.toInt(u64) catch unreachable;
 }
 
-pub inline fn toString(self: Value, agent: *Agent) Agent.Error!*const String {
+pub inline fn toString(arg: Value, agent: *Agent) Agent.Error!*const String {
     // OPTIMIZATION: Inline the fast path.
-    if (self.isString()) {
+    if (arg.isString()) {
         @branchHint(.likely);
-        return self.asString();
+        return arg.asString();
     }
-    return self.toStringImpl(agent);
+    return arg.toStringImpl(agent);
 }
 
-/// 7.1.18 ToString ( argument )
+/// 7.1.18 ToString ( arg )
 /// https://tc39.es/ecma262/#sec-tostring
-fn toStringImpl(self: Value, agent: *Agent) Agent.Error!*const String {
-    return switch (self.type()) {
-        // 1. If argument is a String, return argument.
+fn toStringImpl(arg: Value, agent: *Agent) Agent.Error!*const String {
+    return switch (arg.type()) {
+        // 1. If arg is a String, return arg.
         // NOTE: This is handled by the fast path.
         .string => unreachable,
 
-        // 2. If argument is a Symbol, throw a TypeError exception.
+        // 2. If arg is a Symbol, throw a TypeError exception.
         .symbol => return agent.throwException(
             .type_error,
             "Cannot convert Symbol to string",
             .{},
         ),
 
-        // 3. If argument is undefined, return "undefined".
+        // 3. If arg is undefined, return "undefined".
         .undefined => String.fromLiteral("undefined"),
 
-        // 4. If argument is null, return "null".
+        // 4. If arg is null, return "null".
         .null => String.fromLiteral("null"),
 
-        // 5. If argument is true, return "true".
-        // 6. If argument is false, return "false".
-        .boolean => if (self.asBoolean())
+        // 5. If arg is true, return "true".
+        // 6. If arg is false, return "false".
+        .boolean => if (arg.asBoolean())
             String.fromLiteral("true")
         else
             String.fromLiteral("false"),
 
-        // 7. If argument is a Number, return Number::toString(argument, 10).
-        .number => self.asNumber().toString(agent, 10),
+        // 7. If arg is a Number, return Number::toString(arg, 10).
+        .number => arg.asNumber().toString(agent, 10),
 
-        // 8. If argument is a BigInt, return BigInt::toString(argument, 10).
-        .big_int => self.asBigInt().toString(agent, 10),
+        // 8. If arg is a BigInt, return BigInt::toString(arg, 10).
+        .big_int => arg.asBigInt().toString(agent, 10),
 
-        // 9. Assert: argument is an Object.
+        // 9. Assert: arg is an Object.
         .object => {
-            // 10. Let primValue be ? ToPrimitive(argument, string).
-            const primitive_value = try self.toPrimitive(agent, .string);
+            // 10. Let primitiveValue be ? ToPrimitive(arg, string).
+            const primitive_value = try arg.toPrimitive(agent, .string);
 
-            // 11. Assert: primValue is not an Object.
+            // 11. Assert: primitiveValue is not an Object.
             std.debug.assert(!primitive_value.isObject());
 
-            // 12. Return ? ToString(primValue).
+            // 12. Return ? ToString(primitiveValue).
             return primitive_value.toString(agent);
         },
     };
 }
 
-pub inline fn toObject(self: Value, agent: *Agent) Agent.Error!*Object {
+pub inline fn toObject(arg: Value, agent: *Agent) Agent.Error!*Object {
     // OPTIMIZATION: Inline the fast path.
-    if (self.isObject()) {
+    if (arg.isObject()) {
         @branchHint(.likely);
-        return self.asObject();
+        return arg.asObject();
     }
-    return self.toObjectImpl(agent);
+    return arg.toObjectImpl(agent);
 }
 
-/// 7.1.19 ToObject ( argument )
+/// 7.1.19 ToObject ( arg )
 /// https://tc39.es/ecma262/#sec-toobject
-fn toObjectImpl(self: Value, agent: *Agent) Agent.Error!*Object {
+fn toObjectImpl(arg: Value, agent: *Agent) Agent.Error!*Object {
     const realm = agent.currentRealm();
-    return switch (self.type()) {
-        // 1. If argument is either undefined or null, throw a TypeError exception.
+    return switch (arg.type()) {
+        // 1. If arg is either undefined or null, throw a TypeError exception.
         .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
         .null => agent.throwException(.type_error, "Cannot convert null to Object", .{}),
 
-        // 2. If argument is a Boolean, return a new Boolean object whose [[BooleanData]] internal
-        //    slot is set to argument. See 20.3 for a description of Boolean objects.
+        // 2. If arg is a Boolean, return a new Boolean object whose [[BooleanData]] internal slot
+        //    is set to arg. See 20.3 for a description of Boolean objects.
         .boolean => {
             const boolean = try builtins.Boolean.create(agent, .{
-                .fields = .{ .boolean_data = self.asBoolean() },
+                .fields = .{ .boolean_data = arg.asBoolean() },
                 .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
             });
             return &boolean.object;
         },
 
-        // 3. If argument is a Number, return a new Number object whose [[NumberData]] internal slot
-        //    is set to argument. See 21.1 for a description of Number objects.
+        // 3. If arg is a Number, return a new Number object whose [[NumberData]] internal slot is
+        //    set to arg. See 21.1 for a description of Number objects.
         .number => {
             const number = try builtins.Number.create(agent, .{
-                .fields = .{ .number_data = self.asNumber() },
+                .fields = .{ .number_data = arg.asNumber() },
                 .prototype = try realm.intrinsics.@"%Number.prototype%"(),
             });
             return &number.object;
         },
 
-        // 4. If argument is a String, return a new String object whose [[StringData]] internal slot
-        //    is set to argument. See 22.1 for a description of String objects.
+        // 4. If arg is a String, return a new String object whose [[StringData]] internal slot is
+        //    set to arg. See 22.1 for a description of String objects.
         .string => {
             const string = try stringCreate(
                 agent,
-                self.asString(),
+                arg.asString(),
                 try realm.intrinsics.@"%String.prototype%"(),
             );
             return &string.object;
         },
 
-        // 5. If argument is a Symbol, return a new Symbol object whose [[SymbolData]] internal slot
-        //    is set to argument. See 20.4 for a description of Symbol objects.
+        // 5. If arg is a Symbol, return a new Symbol object whose [[SymbolData]] internal slot is
+        //    set to arg. See 20.4 for a description of Symbol objects.
         .symbol => {
             const symbol = try builtins.Symbol.create(agent, .{
-                .fields = .{ .symbol_data = self.asSymbol() },
+                .fields = .{ .symbol_data = arg.asSymbol() },
                 .prototype = try realm.intrinsics.@"%Symbol.prototype%"(),
             });
             return &symbol.object;
         },
 
-        // 6. If argument is a BigInt, return a new BigInt object whose [[BigIntData]] internal slot
-        //    is set to argument. See 21.2 for a description of BigInt objects.
+        // 6. If arg is a BigInt, return a new BigInt object whose [[BigIntData]] internal slot is
+        //    set to arg. See 21.2 for a description of BigInt objects.
         .big_int => {
             const big_int = try builtins.BigInt.create(agent, .{
-                .fields = .{ .big_int_data = self.asBigInt() },
+                .fields = .{ .big_int_data = arg.asBigInt() },
                 .prototype = try realm.intrinsics.@"%BigInt.prototype%"(),
             });
             return &big_int.object;
         },
 
-        // 7. Assert: argument is an Object.
-        // 8. Return argument.
+        // 7. Assert: arg is an Object.
+        // 8. Return arg.
         // NOTE: This is handled by the fast path.
         .object => unreachable,
     };
 }
 
-/// 7.1.20 ToPropertyKey ( argument )
+/// 7.1.20 ToPropertyKey ( arg )
 /// https://tc39.es/ecma262/#sec-topropertykey
-pub fn toPropertyKey(self: Value, agent: *Agent) Agent.Error!PropertyKey {
-    // 1. Let key be ? ToPrimitive(argument, string).
-    const key = try self.toPrimitive(agent, .string);
+pub fn toPropertyKey(arg: Value, agent: *Agent) Agent.Error!PropertyKey {
+    // 1. Let key be ? ToPrimitive(arg, string).
+    const key = try arg.toPrimitive(agent, .string);
 
     // 2. If key is a Symbol, then
     if (key.isSymbol()) {
@@ -1318,7 +1318,7 @@ pub fn toPropertyKey(self: Value, agent: *Agent) Agent.Error!PropertyKey {
     return PropertyKey.from(string);
 }
 
-/// 7.1.21 ToLength ( argument )
+/// 7.1.21 ToLength ( arg )
 /// https://tc39.es/ecma262/#sec-tolength
 pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1327,42 +1327,41 @@ pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
         return @max(0, self.__asI32());
     }
 
-    // 1. Let len be ? ToIntegerOrInfinity(argument).
+    // 1. Let length be ? ToIntegerOrInfinity(arg).
     const length = try self.toIntegerOrInfinity(agent);
 
-    // 2. If len ≤ 0, return +0𝔽.
+    // 2. If length ≤ 0, return +0𝔽.
     if (length <= 0) return 0;
 
-    // 3. Return 𝔽(min(len, 2**53 - 1)).
+    // 3. Return 𝔽(min(length, 2**53 - 1)).
     return @intFromFloat(@min(length, std.math.maxInt(u53)));
 }
 
-/// 7.1.23 ToIndex ( value )
+/// 7.1.23 ToIndex ( arg )
 /// https://tc39.es/ecma262/#sec-toindex
-pub fn toIndex(self: Value, agent: *Agent) Agent.Error!u53 {
+pub fn toIndex(arg: Value, agent: *Agent) Agent.Error!u53 {
     // OPTIMIZATION: Fast path for i32 values
-    if (self.__isI32() and self.__asI32() >= 0) {
+    if (arg.__isI32() and arg.__asI32() >= 0) {
         @branchHint(.likely);
-        return @intCast(self.__asI32());
+        return @intCast(arg.__asI32());
     }
 
-    // 1. Let integer be ? ToIntegerOrInfinity(value).
-    const integer = try self.toIntegerOrInfinity(agent);
+    // 1. Let int be ? ToIntegerOrInfinity(arg).
+    const int = try arg.toIntegerOrInfinity(agent);
 
-    // 2. If integer is not in the inclusive interval from 0 to 2**53 - 1, throw a RangeError
-    //    exception.
-    if (integer < 0 or integer > std.math.maxInt(u53))
+    // 2. If int is not in the inclusive interval from 0 to 2**53 - 1, throw a RangeError exception.
+    if (int < 0 or int > std.math.maxInt(u53))
         return agent.throwException(.range_error, "Value is not not a valid index", .{});
 
-    // 3. Return integer.
-    return @intFromFloat(integer);
+    // 3. Return int.
+    return @intFromFloat(int);
 }
 
-/// 7.2.1 RequireObjectCoercible ( argument )
+/// 7.2.1 RequireObjectCoercible ( arg )
 /// https://tc39.es/ecma262/#sec-requireobjectcoercible
-pub fn requireObjectCoercible(self: Value, agent: *Agent) error{ExceptionThrown}!void {
-    return switch (self.type()) {
-        // 1. If argument is either undefined or null, throw a TypeError exception.
+pub fn requireObjectCoercible(arg: Value, agent: *Agent) error{ExceptionThrown}!void {
+    return switch (arg.type()) {
+        // 1. If arg is either undefined or null, throw a TypeError exception.
         .undefined => agent.throwException(.type_error, "Cannot convert undefined to Object", .{}),
         .null => agent.throwException(.type_error, "Cannot convert null to Object", .{}),
 
@@ -1371,23 +1370,22 @@ pub fn requireObjectCoercible(self: Value, agent: *Agent) error{ExceptionThrown}
     };
 }
 
-/// 7.2.2 IsArray ( argument )
+/// 7.2.2 IsArray ( arg )
 /// https://tc39.es/ecma262/#sec-isarray
-pub fn isArray(self: Value, agent: *Agent) error{ExceptionThrown}!bool {
-    // 1. If argument is not an Object, return false.
-    if (!self.isObject()) return false;
+pub fn isArray(arg: Value, agent: *Agent) error{ExceptionThrown}!bool {
+    // 1. If arg is not an Object, return false.
+    if (!arg.isObject()) return false;
+    const obj = arg.asObject();
 
-    const object = self.asObject();
+    // 2. If arg is an Array exotic object, return true.
+    if (obj.is(builtins.Array)) return true;
 
-    // 2. If argument is an Array exotic object, return true.
-    if (object.is(builtins.Array)) return true;
-
-    // 3. If argument is a Proxy exotic object, then
-    if (object.cast(builtins.Proxy)) |proxy| {
-        // a. Perform ? ValidateNonRevokedProxy(argument).
+    // 3. If arg is a Proxy exotic object, then
+    if (obj.cast(builtins.Proxy)) |proxy| {
+        // a. Perform ? ValidateNonRevokedProxy(arg).
         try validateNonRevokedProxy(agent, proxy);
 
-        // b. Let proxyTarget be argument.[[ProxyTarget]].
+        // b. Let proxyTarget be arg.[[ProxyTarget]].
         const proxy_target = proxy.fields.proxy_target.?;
 
         // c. Return ? IsArray(proxyTarget).
@@ -1398,40 +1396,43 @@ pub fn isArray(self: Value, agent: *Agent) error{ExceptionThrown}!bool {
     return false;
 }
 
-/// 7.2.3 IsCallable ( argument )
+/// 7.2.3 IsCallable ( arg )
 /// https://tc39.es/ecma262/#sec-iscallable
-pub fn isCallable(self: Value) bool {
-    // 1. If argument is not an Object, return false.
-    if (!self.isObject()) return false;
+pub fn isCallable(arg: Value) bool {
+    // 1. If arg is not an Object, return false.
+    if (!arg.isObject()) return false;
+    const obj = arg.asObject();
 
-    // 2. If argument has a [[Call]] internal method, return true.
-    if (self.asObject().internalMethods().call != null) return true;
+    // 2. If arg has a [[Call]] internal method, return true.
+    if (obj.internalMethods().call != null) return true;
 
     // 3. Return false.
     return false;
 }
 
-/// 7.2.4 IsConstructor ( argument )
+/// 7.2.4 IsConstructor ( arg )
 /// https://tc39.es/ecma262/#sec-isconstructor
-pub fn isConstructor(self: Value) bool {
-    // 1. If argument is not an Object, return false.
-    if (!self.isObject()) return false;
+pub fn isConstructor(arg: Value) bool {
+    // 1. If arg is not an Object, return false.
+    if (!arg.isObject()) return false;
+    const obj = arg.asObject();
 
-    // 2. If argument has a [[Construct]] internal method, return true.
-    if (self.asObject().internalMethods().construct != null) return true;
+    // 2. If arg has a [[Construct]] internal method, return true.
+    if (obj.internalMethods().construct != null) return true;
 
     // 3. Return false.
     return false;
 }
 
-/// 7.2.6 IsRegExp ( argument )
+/// 7.2.6 IsRegExp ( arg )
 /// https://tc39.es/ecma262/#sec-isregexp
-pub fn isRegExp(self: Value, agent: *Agent) Agent.Error!bool {
-    // 1. If argument is not an Object, return false.
-    if (!self.isObject()) return false;
+pub fn isRegExp(arg: Value, agent: *Agent) Agent.Error!bool {
+    // 1. If arg is not an Object, return false.
+    if (!arg.isObject()) return false;
+    const obj = arg.asObject();
 
-    // 2. Let matcher be ? Get(argument, %Symbol.match%).
-    const matcher = try self.asObject().get(
+    // 2. Let matcher be ? Get(arg, %Symbol.match%).
+    const matcher = try obj.get(
         agent,
         PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
     );
@@ -1439,63 +1440,63 @@ pub fn isRegExp(self: Value, agent: *Agent) Agent.Error!bool {
     // 3. If matcher is not undefined, return ToBoolean(matcher).
     if (!matcher.isUndefined()) return matcher.toBoolean();
 
-    // 4. If argument has a [[RegExpMatcher]] internal slot, return true.
-    if (self.asObject().is(builtins.RegExp)) return true;
+    // 4. If arg has a [[RegExpMatcher]] internal slot, return true.
+    if (obj.is(builtins.RegExp)) return true;
 
     // 5. Return false.
     return false;
 }
 
-/// 7.3.3 GetV ( V, P )
+/// 7.3.3 GetV ( value, propertyKey )
 /// https://tc39.es/ecma262/#sec-getv
-pub fn get(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!Value {
-    // 1. Let O be ? ToObject(V).
-    const object = try self.toObject(agent);
+pub fn get(value: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!Value {
+    // 1. Let obj be ? ToObject(value).
+    const obj = try value.toObject(agent);
 
-    // 2. Return ? O.[[Get]](P, V).
-    return object.internalMethods().get(agent, object, property_key, self);
+    // 2. Return ? obj.[[Get]](propertyKey, value).
+    return obj.internalMethods().get(agent, obj, property_key, value);
 }
 
-/// 7.3.10 GetMethod ( V, P )
+/// 7.3.10 GetMethod ( value, propertyKey )
 /// https://tc39.es/ecma262/#sec-getmethod
-pub fn getMethod(self: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!?*Object {
-    // 1. Let func be ? GetV(V, P).
-    const function = try self.get(agent, property_key);
+pub fn getMethod(value: Value, agent: *Agent, property_key: PropertyKey) Agent.Error!?*Object {
+    // 1. Let func be ? GetV(value, propertyKey).
+    const func = try value.get(agent, property_key);
 
     // 2. If func is either undefined or null, return undefined.
-    if (function.isUndefined() or function.isNull()) return null;
+    if (func.isUndefined() or func.isNull()) return null;
 
     // 3. If IsCallable(func) is false, throw a TypeError exception.
-    if (!function.isCallable()) {
-        return agent.throwException(.type_error, "{f} is not callable", .{self});
+    if (!func.isCallable()) {
+        return agent.throwException(.type_error, "{f} is not callable", .{value});
     }
 
     // 4. Return func.
-    return function.asObject();
+    return func.asObject();
 }
 
-/// 7.3.13 Call ( F, V [ , argumentsList ] )
+/// 7.3.13 Call ( func, thisValue [ , argList ] )
 /// https://tc39.es/ecma262/#sec-call
 pub fn call(
-    self: Value,
+    value: Value,
     agent: *Agent,
     this_value: Value,
-    arguments_list: []const Value,
+    arg_list: []const Value,
 ) Agent.Error!Value {
-    // 1. If argumentsList is not present, set argumentsList to a new empty List.
+    // 1. If argList is not present, set argList to a new empty List.
 
-    // 2. If IsCallable(F) is false, throw a TypeError exception.
-    if (!self.isCallable()) {
-        return agent.throwException(.type_error, "{f} is not callable", .{self});
+    // 2. If IsCallable(func) is false, throw a TypeError exception.
+    if (!value.isCallable()) {
+        return agent.throwException(.type_error, "{f} is not callable", .{value});
     }
+    const func = value.asObject();
 
-    // 3. Return ? F.[[Call]](V, argumentsList).
-    const object = self.asObject();
-    return object.internalMethods().call.?(
+    // 3. Return ? func.[[Call]](thisValue, argList).
+    return func.internalMethods().call.?(
         agent,
-        object,
+        func,
         this_value,
-        Arguments.from(arguments_list),
+        Arguments.from(arg_list),
     );
 }
 
@@ -1503,14 +1504,14 @@ pub fn callAssumeCallable(
     self: Value,
     agent: *Agent,
     this_value: Value,
-    arguments_list: []const Value,
+    arg_list: []const Value,
 ) Agent.Error!Value {
     const object = self.asObject();
     return object.internalMethods().call.?(
         agent,
         object,
         this_value,
-        Arguments.from(arguments_list),
+        Arguments.from(arg_list),
     );
 }
 
@@ -1522,7 +1523,7 @@ const ValidElementTypes = enum {
 /// 7.3.19 CreateListFromArrayLike ( obj [ , validElementTypes ] )
 /// https://tc39.es/ecma262/#sec-createlistfromarraylike
 pub fn createListFromArrayLike(
-    self: Value,
+    value: Value,
     agent: *Agent,
     maybe_valid_element_types: ?ValidElementTypes,
 ) Agent.Error![]Value {
@@ -1530,28 +1531,29 @@ pub fn createListFromArrayLike(
     const valid_element_types = maybe_valid_element_types orelse .all;
 
     // 2. If obj is not an Object, throw a TypeError exception.
-    if (!self.isObject()) {
-        return agent.throwException(.type_error, "{f} is not an Object", .{self});
+    if (!value.isObject()) {
+        return agent.throwException(.type_error, "{f} is not an Object", .{value});
     }
+    const obj = value.asObject();
 
-    // 3. Let len be ? LengthOfArrayLike(obj).
-    const len = try self.asObject().lengthOfArrayLike(agent);
+    // 3. Let length be ? LengthOfArrayLike(obj).
+    const length = try obj.lengthOfArrayLike(agent);
 
     // 4. Let list be a new empty List.
-    if (len > std.math.maxInt(usize)) return error.OutOfMemory;
-    var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, @intCast(len));
+    if (length > std.math.maxInt(usize)) return error.OutOfMemory;
+    var list = try std.ArrayList(Value).initCapacity(agent.gc_allocator, @intCast(length));
     defer list.deinit(agent.gc_allocator);
 
     // 5. Let index be 0.
     var index: u53 = 0;
 
-    // 6. Repeat, while index < len,
-    while (index < len) : (index += 1) {
+    // 6. Repeat, while index < length,
+    while (index < length) : (index += 1) {
         // a. Let indexName be ! ToString(𝔽(index)).
         const index_name = PropertyKey.from(index);
 
         // b. Let next be ? Get(obj, indexName).
-        const next = try self.get(agent, index_name);
+        const next = try obj.get(agent, index_name);
 
         // c. If validElementTypes is property-key and next is not a property key, throw a TypeError
         //    exception.
@@ -1576,61 +1578,61 @@ pub fn createListFromArrayLike(
     return list.toOwnedSlice(agent.gc_allocator);
 }
 
-/// 7.3.20 Invoke ( V, P [ , argumentsList ] )
+/// 7.3.20 Invoke ( value, propertyKey [ , argList ] )
 /// https://tc39.es/ecma262/#sec-invoke
 pub fn invoke(
-    self: Value,
+    value: Value,
     agent: *Agent,
     property_key: PropertyKey,
-    arguments_list: []const Value,
+    arg_list: []const Value,
 ) Agent.Error!Value {
-    // 1. If argumentsList is not present, set argumentsList to a new empty List.
+    // 1. If argList is not present, set argList to a new empty List.
 
-    // 2. Let func be ? GetV(V, P).
-    const function = try self.get(agent, property_key);
+    // 2. Let func be ? GetV(value, propertyKey).
+    const func = try value.get(agent, property_key);
 
-    // 3. Return ? Call(func, V, argumentsList).
-    return function.call(agent, self, arguments_list);
+    // 3. Return ? Call(func, value, argList).
+    return func.call(agent, value, arg_list);
 }
 
-/// 7.3.21 OrdinaryHasInstance ( C, O )
+/// 7.3.21 OrdinaryHasInstance ( ctor, instance )
 /// https://tc39.es/ecma262/#sec-ordinaryhasinstance
-pub fn ordinaryHasInstance(self: Value, agent: *Agent, object_value: Value) Agent.Error!bool {
-    // 1. If IsCallable(C) is false, return false.
-    if (!self.isCallable()) return false;
+pub fn ordinaryHasInstance(value: Value, agent: *Agent, instance_value: Value) Agent.Error!bool {
+    // 1. If IsCallable(ctor) is false, return false.
+    if (!value.isCallable()) return false;
+    const ctor = value.asObject();
 
-    // 2. If C has a [[BoundTargetFunction]] internal slot, then
-    if (self.asObject().is(builtins.BoundFunction)) {
-        // a. Let BC be C.[[BoundTargetFunction]].
-        const bound_constructor = self.asObject().as(builtins.BoundFunction).fields.bound_target_function;
+    // 2. If ctor has a [[BoundTargetFunction]] internal slot, then
+    if (ctor.is(builtins.BoundFunction)) {
+        // a. Let boundCtor be ctor.[[BoundTargetFunction]].
+        const bound_ctor = ctor.as(builtins.BoundFunction).fields.bound_target_function;
 
-        // b. Return ? InstanceofOperator(O, BC).
-        return object_value.instanceofOperator(agent, from(bound_constructor));
+        // b. Return ? InstanceofOperator(instance, boundCtor).
+        return instance_value.instanceofOperator(agent, from(bound_ctor));
     }
 
-    // 3. If O is not an Object, return false.
-    if (!object_value.isObject()) return false;
+    // 3. If instance is not an Object, return false.
+    if (!instance_value.isObject()) return false;
+    var instance = instance_value.asObject();
 
-    // 4. Let P be ? Get(C, "prototype").
-    const prototype = try self.asObject().get(agent, PropertyKey.from("prototype"));
+    // 4. Let proto be ? Get(ctor, "prototype").
+    const proto = try ctor.get(agent, PropertyKey.from("prototype"));
 
-    // 5. If P is not an Object, throw a TypeError exception.
-    if (!prototype.isObject()) {
+    // 5. If proto is not an Object, throw a TypeError exception.
+    if (!proto.isObject()) {
         return agent.throwException(.type_error, "'prototype' property must be an object", .{});
     }
 
-    var object = object_value.asObject();
-
     // 6. Repeat,
     while (true) {
-        // a. Set O to ? O.[[GetPrototypeOf]]().
-        object = try object.internalMethods().getPrototypeOf(agent, object) orelse {
-            // b. If O is null, return false.
+        // a. Set instance to ? instance.[[GetPrototypeOf]]().
+        instance = try instance.internalMethods().getPrototypeOf(agent, instance) orelse {
+            // b. If instance is null, return false.
             return false;
         };
 
-        // c. If SameValue(P, O) is true, return true.
-        if (prototype.asObject() == object) return true;
+        // c. If SameValue(proto, instance) is true, return true.
+        if (proto.asObject() == instance) return true;
     }
 }
 
@@ -1642,11 +1644,11 @@ fn addValueToKeyedGroup(
     key: anytype,
     value: Value,
 ) std.mem.Allocator.Error!void {
-    // 1. For each Record { [[Key]], [[Elements]] } g of groups, do
-    //     a. If SameValue(g.[[Key]], key) is true, then
+    // 1. For each Record { [[Key]], [[Elements]] } group of groups, do
+    //     a. If SameValue(group.[[Key]], key) is true, then
     if (groups.getPtr(key)) |group| {
         // i. Assert: Exactly one element of groups meets this criterion.
-        // ii. Append value to g.[[Elements]].
+        // ii. Append value to group.[[Elements]].
         try group.append(agent.gc_allocator, value);
 
         // iii. Return unused.
@@ -1751,7 +1753,7 @@ pub fn groupBy(
     }
 }
 
-/// 7.3.37 SetterThatIgnoresPrototypeProperties ( thisValue, home, p, v )
+/// 7.3.37 SetterThatIgnoresPrototypeProperties ( thisValue, home, propertyKey, value )
 /// https://tc39.es/ecma262/#sec-SetterThatIgnoresPrototypeProperties
 pub fn setterThatIgnoresPrototypeProperties(
     self: Value,
@@ -1780,64 +1782,64 @@ pub fn setterThatIgnoresPrototypeProperties(
         );
     }
 
-    // 3. Let desc be ? thisValue.[[GetOwnProperty]](p).
-    const property_descriptor = try this_value.internalMethods().getOwnProperty(
+    // 3. Let propertyDesc be ? thisValue.[[GetOwnProperty]](propertyKey).
+    const property_desc = try this_value.internalMethods().getOwnProperty(
         agent,
         this_value,
         property_key,
     );
 
-    // 4. If desc is undefined, then
-    if (property_descriptor == null) {
-        // a. Perform ? CreateDataPropertyOrThrow(thisValue, p, v).
+    // 4. If propertyDesc is undefined, then
+    if (property_desc == null) {
+        // a. Perform ? CreateDataPropertyOrThrow(thisValue, propertyKey, value).
         try this_value.createDataPropertyOrThrow(agent, property_key, value);
     } else {
         // 5. Else,
-        // a. Perform ? Set(thisValue, p, v, true).
+        // a. Perform ? Set(thisValue, propertyKey, value, true).
         try this_value.set(agent, property_key, value, .throw);
     }
 
     // 6. Return unused.
 }
 
-/// 9.13 CanBeHeldWeakly ( v )
+/// 9.13 CanBeHeldWeakly ( arg )
 /// https://tc39.es/ecma262/#sec-canbeheldweakly
-pub fn canBeHeldWeakly(self: Value, agent: *Agent) bool {
-    // 1. If v is an Object, return true.
-    if (self.isObject()) return true;
+pub fn canBeHeldWeakly(arg: Value, agent: *Agent) bool {
+    // 1. If arg is an Object, return true.
+    if (arg.isObject()) return true;
 
-    // 2. If v is a Symbol and KeyForSymbol(v) is undefined, return true.
-    if (self.isSymbol() and keyForSymbol(agent, self.asSymbol()) == null) return true;
+    // 2. If arg is a Symbol and KeyForSymbol(arg) is undefined, return true.
+    if (arg.isSymbol() and keyForSymbol(agent, arg.asSymbol()) == null) return true;
 
     // 3. Return false.
     return false;
 }
 
-/// 10.1.15 RequireInternalSlot ( O, internalSlot )
+/// 10.1.15 RequireInternalSlot ( obj, internalSlot )
 /// https://tc39.es/ecma262/#sec-requireinternalslot
 pub fn requireInternalSlot(
-    self: Value,
+    obj: Value,
     agent: *Agent,
     comptime T: type,
 ) error{ExceptionThrown}!*T {
-    // 1. If O is not an Object, throw a TypeError exception.
-    if (!self.isObject()) {
-        return agent.throwException(.type_error, "{f} is not an Object", .{self});
+    // 1. If obj is not an Object, throw a TypeError exception.
+    if (!obj.isObject()) {
+        return agent.throwException(.type_error, "{f} is not an Object", .{obj});
     }
 
-    // 2. If O does not have an internalSlot internal slot, throw a TypeError exception.
-    if (!self.asObject().is(T)) {
-        return agent.throwException(.type_error, "{f} is not a {s} object", .{ self, T.display_name });
+    // 2. If obj does not have an internalSlot internal slot, throw a TypeError exception.
+    if (!obj.asObject().is(T)) {
+        return agent.throwException(.type_error, "{f} is not a {s} object", .{ obj, T.display_name });
     }
 
     // 3. Return unused.
     // NOTE: Returning the object here allows for direct assignment of the object at the call site.
-    return self.asObject().as(T);
+    return obj.asObject().as(T);
 }
 
-/// 13.10.2 InstanceofOperator ( V, target )
+/// 13.10.2 InstanceofOperator ( value, target )
 /// https://tc39.es/ecma262/#sec-instanceofoperator
-pub fn instanceofOperator(self: Value, agent: *Agent, target: Value) Agent.Error!bool {
+pub fn instanceofOperator(value: Value, agent: *Agent, target: Value) Agent.Error!bool {
     // 1. If target is not an Object, throw a TypeError exception.
     if (!target.isObject()) {
         return agent.throwException(
@@ -1855,8 +1857,8 @@ pub fn instanceofOperator(self: Value, agent: *Agent, target: Value) Agent.Error
 
     // 3. If instOfHandler is not undefined, then
     if (maybe_instanceof_handler) |instanceof_handler| {
-        // a. Return ToBoolean(? Call(instOfHandler, target, « V »)).
-        return (try from(instanceof_handler).call(agent, target, &.{self})).toBoolean();
+        // a. Return ToBoolean(? Call(instOfHandler, target, « value »)).
+        return (try from(instanceof_handler).call(agent, target, &.{value})).toBoolean();
     }
 
     // 4. If IsCallable(target) is false, throw a TypeError exception.
@@ -1864,28 +1866,28 @@ pub fn instanceofOperator(self: Value, agent: *Agent, target: Value) Agent.Error
         return agent.throwException(.type_error, "{f} is not callable", .{target});
     }
 
-    // 5. Return ? OrdinaryHasInstance(target, V).
-    return target.ordinaryHasInstance(agent, self);
+    // 5. Return ? OrdinaryHasInstance(target, value).
+    return target.ordinaryHasInstance(agent, value);
 }
 
 /// 24.5.1 CanonicalizeKeyedCollectionKey ( key )
 /// https://tc39.es/ecma262/#sec-canonicalizekeyedcollectionkey
-pub fn canonicalizeKeyedCollectionKey(self: Value) Value {
+pub fn canonicalizeKeyedCollectionKey(key: Value) Value {
     // 1. If key is -0𝔽, return +0𝔽.
-    if (self.isNumber() and self.asNumber().isNegativeZero()) return from(0);
+    if (key.isNumber() and key.asNumber().isNegativeZero()) return from(0);
 
     // 2. Return key.
-    return self;
+    return key;
 }
 
-/// 27.2.1.6 IsPromise ( x )
+/// 27.2.1.6 IsPromise ( arg )
 /// https://tc39.es/ecma262/#sec-ispromise
-pub fn isPromise(self: Value) bool {
-    // 1. If x is not an Object, return false.
-    if (!self.isObject()) return false;
+pub fn isPromise(arg: Value) bool {
+    // 1. If arg is not an Object, return false.
+    if (!arg.isObject()) return false;
 
-    // 2. If x does not have a [[PromiseState]] internal slot, return false.
-    if (!self.asObject().is(builtins.Promise)) return false;
+    // 2. If arg does not have a [[PromiseState]] internal slot, return false.
+    if (!arg.asObject().is(builtins.Promise)) return false;
 
     // 3. Return true.
     return true;
@@ -1912,13 +1914,13 @@ pub fn toPrivateName(self: Value) ?PrivateName {
     return .{ .symbol = self.asSymbol() };
 }
 
-/// 7.1.4.1.1 StringToNumber ( str )
+/// 7.1.4.1.1 StringToNumber ( string )
 /// https://tc39.es/ecma262/#sec-stringtonumber
 pub fn stringToNumber(
     agent: *Agent,
     string: *const String,
 ) std.mem.Allocator.Error!Number {
-    // 1. Let literal be ParseText(str, StringNumericLiteral).
+    // 1. Let literal be ParseText(string, StringNumericLiteral).
     // 2. If literal is a List of errors, return NaN.
     // 3. Return the StringNumericValue of literal.
     const gpa = agent.gpa;
@@ -1955,13 +1957,13 @@ pub fn stringToNumber(
         return Number.from(std.math.nan(f64));
 }
 
-/// 7.1.15 StringToBigInt ( str )
+/// 7.1.15 StringToBigInt ( string )
 /// https://tc39.es/ecma262/#sec-stringtobigint
 pub fn stringToBigInt(
     agent: *Agent,
     string: *const String,
 ) std.mem.Allocator.Error!?*const BigInt {
-    // 1. Let literal be ParseText(str, StringIntegerLiteral).
+    // 1. Let literal be ParseText(string, StringIntegerLiteral).
     // 2. If literal is a List of errors, return undefined.
     // 3. Let mv be the MV of literal.
     // 4. Assert: mv is an integer.
@@ -2078,7 +2080,7 @@ pub fn sameValueNonNumber(x: Value, y: Value) bool {
     };
 }
 
-/// 7.2.12 IsLessThan ( x, y, LeftFirst )
+/// 7.2.12 IsLessThan ( x, y, leftFirst )
 /// https://tc39.es/ecma262/#sec-islessthan
 pub fn isLessThan(
     agent: *Agent,
@@ -2089,7 +2091,7 @@ pub fn isLessThan(
     var px: Value = undefined;
     var py: Value = undefined;
 
-    // 1. If LeftFirst is true, then
+    // 1. If leftFirst is true, then
     if (order == .left_first) {
         // a. Let px be ? ToPrimitive(x, number).
         px = try x.toPrimitive(agent, .number);
@@ -2339,9 +2341,9 @@ pub fn createArrayFromList(
     const indexed_properties = try array.object.ensureIndexedProperties(agent.gc_allocator);
 
     // 2. Let n be 0.
-    // 3. For each element e of elements, do
+    // 3. For each element element of elements, do
     for (elements, 0..) |element, n| {
-        // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), e).
+        // a. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(n)), element).
         // NOTE: This could use createDataPropertyDirect() but since we created the array with the
         //       right length upfront directly setting indexed properties is faster.
         try indexed_properties.set(agent.gc_allocator, @intCast(n), .{

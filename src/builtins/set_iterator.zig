@@ -69,11 +69,11 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-%setiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%SetIteratorPrototype%").
-        // NOTE: In the absence of generators this implements one loop iteration of the
+        // NOTE: Instead of using generators this implements one loop iteration of the
         //       CreateSetIterator closure. State is kept track of through the SetIterator
         //       instance instead of as local variables. This should not be observable.
 
-        // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
+        // 1. Let state be ? GeneratorValidate(gen, genBrand).
         const set_iterator = try this_value.requireInternalSlot(agent, SetIterator);
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
@@ -123,7 +123,7 @@ pub const prototype = struct {
         switch (kind) {
             // 1. If kind is key+value, then
             .key_value => {
-                // a. Let result be CreateArrayFromList(« e, e »).
+                // a. Let result be CreateArrayFromList(« entry, entry »).
                 const result = try createArrayFromList(agent, &.{ value, value });
 
                 // b. Perform ? GeneratorYield(CreateIteratorResultObject(result, false)).
@@ -133,10 +133,9 @@ pub const prototype = struct {
             },
 
             // 2. Else,
+            //     a. Assert: kind is value.
             .value => {
-                // a. Assert: kind is value.
-
-                // b. Perform ? GeneratorYield(CreateIteratorResultObject(e, false)).
+                // b. Perform ? GeneratorYield(CreateIteratorResultObject(entry, false)).
                 return Value.from(try createIteratorResultObject(agent, value, false));
             },
 
@@ -145,7 +144,7 @@ pub const prototype = struct {
 
         // 3. NOTE: The number of elements in entries may have increased while execution of this
         //    abstract operation was paused by GeneratorYield.
-        // 4. Set numEntries to the number of elements in entries.
+        // 4. Set entriesCount to the number of elements in entries.
     }
 };
 

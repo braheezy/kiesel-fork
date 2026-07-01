@@ -66,15 +66,15 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         // https://tc39.es/ecma262/#sec-undefined
         .{ "undefined", .{ .property_descriptor = .{ .value = .undefined, .writable = false, .enumerable = false, .configurable = false } } },
 
-        // 19.2.1 eval ( x )
+        // 19.2.1 eval ( source )
         // https://tc39.es/ecma262/#sec-eval-x
         .{ "eval", .{ .lazy_property = LazyIntrinsicInitializer(Realm.Intrinsics.@"%eval%") } },
 
-        // 19.2.2 isFinite ( number )
+        // 19.2.2 isFinite ( value )
         // https://tc39.es/ecma262/#sec-isfinite-number
         .{ "isFinite", .{ .lazy_property = LazyIntrinsicInitializer(Realm.Intrinsics.@"%isFinite%") } },
 
-        // 19.2.3 isNaN ( number )
+        // 19.2.3 isNaN ( value )
         // https://tc39.es/ecma262/#sec-isnan-number
         .{ "isNaN", .{ .lazy_property = LazyIntrinsicInitializer(Realm.Intrinsics.@"%isNaN%") } },
 
@@ -329,39 +329,39 @@ pub const unescape_function = if (build_options.enable_annex_b)
 else
     @compileError("Annex B is not enabled");
 
-/// 19.2.1 eval ( x )
+/// 19.2.1 eval ( source )
 /// https://tc39.es/ecma262/#sec-eval-x
 fn eval(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-    const x = arguments.get(0);
+    const source = arguments.get(0);
 
-    // 1. Return ? PerformEval(x, false, false).
-    return performEval(agent, x, false, false);
+    // 1. Return ? PerformEval(source, false, false).
+    return performEval(agent, source, false, false);
 }
 
-/// 19.2.2 isFinite ( number )
+/// 19.2.2 isFinite ( value )
 /// https://tc39.es/ecma262/#sec-isfinite-number
 fn isFinite(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-    const number = arguments.get(0);
+    const value = arguments.get(0);
 
-    // 1. Let num be ? ToNumber(number).
-    const num = try number.toNumber(agent);
+    // 1. Let number be ? ToNumber(value).
+    const number = try value.toNumber(agent);
 
-    // 2. If num is finite, return true.
+    // 2. If number is finite, return true.
     // 3. Return false.
-    return Value.from(num.isFinite());
+    return Value.from(number.isFinite());
 }
 
-/// 19.2.3 isNaN ( number )
+/// 19.2.3 isNaN ( value )
 /// https://tc39.es/ecma262/#sec-isnan-number
 fn isNaN(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-    const number = arguments.get(0);
+    const value = arguments.get(0);
 
-    // 1. Let num be ? ToNumber(number).
-    const num = try number.toNumber(agent);
+    // 1. Let number be ? ToNumber(value).
+    const number = try value.toNumber(agent);
 
-    // 2. If num is NaN, return true.
+    // 2. If number is NaN, return true.
     // 3. Return false.
-    return Value.from(num.isNan());
+    return Value.from(number.isNan());
 }
 
 /// 19.2.4 parseFloat ( string )
@@ -389,11 +389,11 @@ fn parseFloat(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // Don't pass other strings starting with "inf" to `std.fmt.parseFloat()`
     if (std.ascii.startsWithIgnoreCase(trimmed_string, "inf")) return .nan;
     // Limit to characters valid for StrDecimalLiteral before brute forcing
-    var len = for (trimmed_string, 0..) |c, i| {
+    var length = for (trimmed_string, 0..) |c, i| {
         if (!std.ascii.isDigit(c) and std.mem.findScalar(u8, "+-.eE", c) == null) break i;
     } else trimmed_string.len;
-    while (len != 0) : (len -= 1) {
-        if (std.fmt.parseFloat(f64, trimmed_string[0..len])) |result|
+    while (length != 0) : (length -= 1) {
+        if (std.fmt.parseFloat(f64, trimmed_string[0..length])) |result|
             return Value.from(result)
         else |_| {}
     }
@@ -410,67 +410,71 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 1. Let inputString be ? ToString(string).
     const input_string = try string_value.toString(agent);
 
-    // 2. Let S be ! TrimString(inputString, start).
-    const string_alloc = try (try input_string.trimStart(agent)).toUtf8(gpa);
-    defer gpa.free(string_alloc);
-    var string: []const u8 = string_alloc;
+    // 2. Let trimmedString be ! TrimString(inputString, start).
+    const trimmed_string_alloc = try (try input_string.trimStart(agent)).toUtf8(gpa);
+    defer gpa.free(trimmed_string_alloc);
+    var trimmed_string: []const u8 = trimmed_string_alloc;
 
     // 3. Let sign be 1.
     var sign: f64 = 1;
 
-    // 4. If S is not empty and the first code unit of S is the code unit 0x002D (HYPHEN-MINUS), set
-    //    sign to -1.
-    if (std.mem.startsWith(u8, string, "-")) sign = -1;
+    // 4. If trimmedString is not empty and the first code unit of trimmedString is the code unit
+    //    0x002D (HYPHEN-MINUS), set sign to -1.
+    if (std.mem.startsWith(u8, trimmed_string, "-")) sign = -1;
 
-    // 5. If S is not empty and the first code unit of S is either the code unit 0x002B (PLUS SIGN)
-    //    or the code unit 0x002D (HYPHEN-MINUS), set S to the substring of S from index 1.
-    if (std.mem.startsWith(u8, string, "+") or std.mem.startsWith(u8, string, "-")) {
-        string = string[1..];
+    // 5. If trimmedString is not empty and the first code unit of trimmedString is either the code
+    //    unit 0x002B (PLUS SIGN) or the code unit 0x002D (HYPHEN-MINUS), set trimmedString to the
+    //    substring of trimmedString from index 1.
+    if (std.mem.startsWith(u8, trimmed_string, "+") or std.mem.startsWith(u8, trimmed_string, "-")) {
+        trimmed_string = trimmed_string[1..];
     }
 
-    // 6. Let R be ℝ(? ToInt32(radix)).
+    // 6. Let radixMV be ℝ(? ToInt32(radix)).
     var radix = try radix_value.toInt32(agent);
 
     // 7. Let stripPrefix be true.
     var strip_prefix = true;
 
-    // 8. If R ≠ 0, then
+    // 8. If radixMV ≠ 0, then
     if (radix != 0) {
-        // a. If R < 2 or R > 36, return NaN.
+        // a. If radixMV < 2 or radixMV > 36, return NaN.
         if (radix < 2 or radix > 36) return .nan;
 
-        // b. If R ≠ 16, set stripPrefix to false.
+        // b. If radixMV ≠ 16, set stripPrefix to false.
         if (radix != 16) strip_prefix = false;
     } else {
         // 9. Else,
-        // a. Set R to 10.
+        // a. Set radixMV to 10.
         radix = 10;
     }
 
     // 10. If stripPrefix is true, then
     if (strip_prefix) {
-        // a. If the length of S ≥ 2 and the first two code units of S are either "0x" or "0X", then
-        if (std.mem.startsWith(u8, string, "0x") or std.mem.startsWith(u8, string, "0X")) {
-            // i. Set S to the substring of S from index 2.
-            string = string[2..];
+        // a. If the length of trimmedString ≥ 2 and the first two code units of trimmedString are
+        //    either "0x" or "0X", then
+        if (std.mem.startsWith(u8, trimmed_string, "0x") or std.mem.startsWith(u8, trimmed_string, "0X")) {
+            // i. Set trimmedString to the substring of trimmedString from index 2.
+            trimmed_string = trimmed_string[2..];
 
-            // ii. Set R to 16.
+            // ii. Set radixMV to 16.
             radix = 16;
         }
     }
 
-    // 11. If S contains a code unit that is not a radix-R digit, let end be the index within S of
-    //     the first such code unit; else let end be the length of S.
-    // 12. Let Z be the substring of S from 0 to end.
-    // 13. If Z is empty, return NaN.
-    // 14. Let mathInt be the integer value that is represented by Z in radix-R notation, using the
-    //     letters A through Z and a through z for digits with values 10 through 35. (However, if
-    //     R = 10 and Z contains more than 20 significant digits, every significant digit after the
-    //     20th may be replaced by a 0 digit, at the option of the implementation; and if R is not
-    //     one of 2, 4, 8, 10, 16, or 32, then mathInt may be an implementation-approximated integer
-    //     representing the integer value denoted by Z in radix-R notation.)
+    // 11. If trimmedString contains a code unit that is not a radix-radixMV digit, let end be the
+    //     index within trimmedString of the first such code unit; else let end be the length of
+    //     trimmedString.
+    // 12. Let numberString be the substring of trimmedString from 0 to end.
+    // 13. If numberString is empty, return NaN.
+    // 14. Let mathInt be the integer value that is represented by numberString in radix-radixMV
+    //     notation, using the letters A through Z and a through z for digits with values 10
+    //     through 35. (However, if radixMV = 10 and numberString contains more than 20 significant
+    //     digits, every significant digit after the 20th may be replaced by a 0 digit, at the
+    //     option of the implementation; and if radixMV is not one of 2, 4, 8, 10, 16, or 32, then
+    //     mathInt may be an implementation-approximated integer representing the integer value
+    //     denoted by numberString in radix-radixMV notation.)
     var math_int: ?f64 = null;
-    for (string) |c| {
+    for (trimmed_string) |c| {
         const digit = std.fmt.charToDigit(c, @intCast(radix)) catch break;
         if (math_int == null) math_int = 0;
         math_int.? *= @floatFromInt(radix);
@@ -566,8 +570,8 @@ fn encode(
         defer allocating_writer.deinit();
         const writer = &allocating_writer.writer;
         std.Uri.Component.percentEncode(writer, string.asAscii(), struct {
-            fn isValidChar(c: u8) bool {
-                return std.mem.findScalar(u8, unescaped_set, c) != null;
+            fn isValidChar(code_unit: u8) bool {
+                return std.mem.findScalar(u8, unescaped_set, code_unit) != null;
             }
         }.isValidChar) catch |err| switch (err) {
             error.WriteFailed => return error.OutOfMemory,
@@ -575,54 +579,54 @@ fn encode(
         return String.fromAscii(agent, try allocating_writer.toOwnedSlice());
     }
 
-    // 1. Let len be the length of string.
-    const len = string.length;
+    // 1. Let length be the length of string.
+    const length = string.length;
 
-    // 2. Let R be the empty String.
+    // 2. Let result be the empty String.
     var result: String.Builder = .empty;
     defer result.deinit(agent.gc_allocator);
 
     // 5. Let k be 0.
     var k: u32 = 0;
 
-    // 6. Repeat, while k < len,
-    while (k < len) {
-        // a. Let C be the code unit at index k within string.
-        const c = string.codeUnitAt(k);
+    // 6. Repeat, while k < length,
+    while (k < length) {
+        // a. Let codeUnit be the code unit at index k within string.
+        const code_unit = string.codeUnitAt(k);
 
-        // b. If unescapedSet contains C, then
-        if (c <= std.math.maxInt(u8) and
-            std.mem.findScalar(u8, unescaped_set, @intCast(c)) != null)
+        // b. If unescapedSet contains codeUnit, then
+        if (code_unit <= std.math.maxInt(u8) and
+            std.mem.findScalar(u8, unescaped_set, @intCast(code_unit)) != null)
         {
             // i. Set k to k + 1.
             k += 1;
 
-            // ii. Set R to the string-concatenation of R and C.
-            try result.appendChar(agent.gc_allocator, @intCast(c));
+            // ii. Set result to the string-concatenation of result and codeUnit.
+            try result.appendChar(agent.gc_allocator, @intCast(code_unit));
         } else {
             // c. Else,
-            // i. Let cp be CodePointAt(string, k).
+            // i. Let codePoint be CodePointAt(string, k).
             const code_point = string.codePointAt(k);
 
-            // ii. If cp.[[IsUnpairedSurrogate]] is true, throw a URIError exception.
+            // ii. If codePoint.[[IsUnpairedSurrogate]] is true, throw a URIError exception.
             if (code_point.is_unpaired_surrogate) {
                 return agent.throwException(.uri_error, "URI contains unpaired surrogate", .{});
             }
 
-            // iii. Set k to k + cp.[[CodeUnitCount]].
+            // iii. Set k to k + codePoint.[[CodeUnitCount]].
             k += code_point.code_unit_count;
 
-            // iv. Let Octets be the List of octets resulting by applying the UTF-8 transformation
-            //     to cp.[[CodePoint]].
+            // iv. Let octets be the List of octets resulting by applying the UTF-8 transformation
+            //     to codePoint.[[CodePoint]].
             var buf: [4]u8 = undefined;
             const size = std.unicode.utf8Encode(code_point.code_point, &buf) catch unreachable;
 
-            // v. For each element octet of Octets, do
+            // v. For each element octet of octets, do
             for (buf[0..size]) |byte| {
                 // 1. Let hex be the String representation of octet, formatted as an uppercase
                 //    hexadecimal number.
-                // 2. Set R to the string-concatenation of R, "%", and StringPad(hex, 2, "0",
-                //    start).
+                // 2. Set result to the string-concatenation of result, "%", and StringPad(hex, 2,
+                //    "0", start).
                 try result.appendString(
                     agent.gc_allocator,
                     try String.fromAscii(agent, try std.fmt.allocPrint(
@@ -635,7 +639,7 @@ fn encode(
         }
     }
 
-    // 7. Return R.
+    // 7. Return result.
     return result.build(agent);
 }
 
@@ -653,10 +657,10 @@ fn decode(
     const input = try string.toUtf16(sfa);
     defer sfa.free(input);
 
-    // 1. Let len be the length of string.
-    const len = input.len;
+    // 1. Let length be the length of string.
+    const length = input.len;
 
-    // 2. Let R be the empty String.
+    // 2. Let result be the empty String.
     // SAFETY: This builder can use a GPA as it only stores u8/u16/u21 char/code unit/code point segments.
     var result: String.Builder = .empty;
     defer result.deinit(gpa);
@@ -664,46 +668,46 @@ fn decode(
     // 3. Let k be 0.
     var k: usize = 0;
 
-    // 4. Repeat, while k < len,
-    while (k < len) : (k += 1) {
-        // a. Let C be the code unit at index k within string.
-        const c = input[k];
+    // 4. Repeat, while k < length,
+    while (k < length) : (k += 1) {
+        // a. Let codeUnit be the code unit at index k within string.
+        const code_unit = input[k];
 
-        // b. Let S be C.
+        // b. Let segment be codeUnit.
 
-        // c. If C is the code unit 0x0025 (PERCENT SIGN), then
-        if (c == '%') {
-            // i. If k + 3 > len, throw a URIError exception.
-            if (k + 3 > len) {
+        // c. If codeUnit is the code unit 0x0025 (PERCENT SIGN), then
+        if (code_unit == '%') {
+            // i. If k + 3 > length, throw a URIError exception.
+            if (k + 3 > length) {
                 return agent.throwException(.uri_error, "Escape sequence must be of form '%XX'", .{});
             }
 
             // ii. Let escape be the substring of string from k to k + 3.
             const escape_ = input[k .. k + 3];
 
-            // iii. Let B be ParseHexOctet(string, k + 1).
-            const byte = parseHexOctet(input, k + 1) orelse {
-                // iv. If B is not an integer, throw a URIError exception.
+            // iii. Let firstOctet be ParseHexOctet(string, k + 1).
+            const first_octet = parseHexOctet(input, k + 1) orelse {
+                // iv. If firstOctet is not an integer, throw a URIError exception.
                 return agent.throwException(.uri_error, "Escape sequence must be hex digits", .{});
             };
 
             // v. Set k to k + 2.
             k += 2;
 
-            // vi. Let n be the number of leading 1 bits in B.
-            const byte_sequence_length = std.unicode.utf8ByteSequenceLength(byte) catch null;
+            // vi. Let n be the number of leading 1 bits in firstOctet.
+            const byte_sequence_length = std.unicode.utf8ByteSequenceLength(first_octet) catch null;
 
             // vii. If n = 0, then
             if (byte_sequence_length == 1) {
-                // 1. Let asciiChar be the code unit whose numeric value is B.
-                // 2. If preserveEscapeSet contains asciiChar, set S to escape; else set S to
-                //    asciiChar.
-                if (std.mem.findScalar(u8, preserve_escape_set, byte) != null) {
+                // 1. Let asciiChar be the code unit whose numeric value is firstOctet.
+                // 2. If preserveEscapeSet contains asciiChar, set segment to escape; else set
+                //    segment to asciiChar.
+                if (std.mem.findScalar(u8, preserve_escape_set, first_octet) != null) {
                     try result.appendSegment(gpa, .{ .char = '%' });
                     try result.appendSegment(gpa, .{ .char = @intCast(escape_[1]) });
                     try result.appendSegment(gpa, .{ .char = @intCast(escape_[2]) });
                 } else {
-                    try result.appendSegment(gpa, .{ .char = byte });
+                    try result.appendSegment(gpa, .{ .char = first_octet });
                 }
             } else {
                 // viii. Else,
@@ -712,8 +716,8 @@ fn decode(
                     return agent.throwException(.uri_error, "Invalid UTF-8 start byte", .{});
                 }
 
-                // 2. Let Octets be « B ».
-                var octets = [4]u8{ byte, 0, 0, 0 };
+                // 2. Let octets be « firstOctet ».
+                var octets = [4]u8{ first_octet, 0, 0, 0 };
 
                 // 3. Let j be 1.
                 var j: u3 = 1;
@@ -723,10 +727,10 @@ fn decode(
                     // a. Set k to k + 1.
                     k += 1;
 
-                    // b. If k + 3 > len, throw a URIError exception.
+                    // b. If k + 3 > length, throw a URIError exception.
                     // c. If the code unit at index k within string is not the code unit 0x0025
                     //    (PERCENT SIGN), throw a URIError exception.
-                    if (k + 3 > len or input[k] != '%') {
+                    if (k + 3 > length or input[k] != '%') {
                         return agent.throwException(.uri_error, "Escape sequence must be of form '%XX'", .{});
                     }
 
@@ -736,7 +740,7 @@ fn decode(
                         return agent.throwException(.uri_error, "Escape sequence must be hex digits", .{});
                     };
 
-                    // f. Append continuationByte to Octets.
+                    // f. Append continuationByte to octets.
                     octets[j] = continuation_byte;
 
                     // g. Set k to k + 2.
@@ -745,38 +749,38 @@ fn decode(
                     // h. Set j to j + 1.
                 }
 
-                // 5. Assert: The length of Octets is n.
-                // 6. If Octets does not contain a valid UTF-8 encoding of a Unicode code point,
+                // 5. Assert: The length of octets is n.
+                // 6. If octets does not contain a valid UTF-8 encoding of a Unicode code point,
                 //    throw a URIError exception.
                 const code_point = std.unicode.utf8Decode(octets[0..byte_sequence_length.?]) catch {
                     return agent.throwException(.uri_error, "Invalid UTF-8 byte sequence", .{});
                 };
 
-                // 7. Let V be the code point obtained by applying the UTF-8 transformation to
-                //    Octets, that is, from a List of octets into a 21-bit value.
-                // 8. Set S to UTF16EncodeCodePoint(V).
+                // 7. Let codePoint be the code point obtained by applying the UTF-8 transformation
+                //    to octets, that is, from a List of octets into a 21-bit value.
+                // 8. Set segment to UTF16EncodeCodePoint(codePoint).
                 try result.appendSegment(gpa, .{ .code_point = code_point });
             }
         } else {
-            try result.appendSegment(gpa, .{ .code_unit = c });
+            try result.appendSegment(gpa, .{ .code_unit = code_unit });
         }
 
-        // d. Set R to the string-concatenation of R and S.
+        // d. Set result to the string-concatenation of result and segment.
         // e. Set k to k + 1.
     }
 
-    // 5. Return R.
+    // 5. Return result.
     return result.build(agent);
 }
 
 /// 19.2.6.7 ParseHexOctet ( string, position )
 /// https://tc39.es/ecma262/#sec-parsehexoctet
 fn parseHexOctet(string: []const u16, position: usize) ?u8 {
-    // 1. Let len be the length of string.
-    const len = string.len;
+    // 1. Let length be the length of string.
+    const length = string.len;
 
-    // 2. Assert: position + 2 ≤ len.
-    std.debug.assert(position + 2 <= len);
+    // 2. Assert: position + 2 ≤ length.
+    std.debug.assert(position + 2 <= length);
 
     // 3. Let hexDigits be the substring of string from position to position + 2.
     const hex_digits = string[position .. position + 2];
@@ -802,7 +806,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 1. Set string to ? ToString(string).
     const string = try string_value.toString(agent);
 
-    // 3. Let R be the empty String.
+    // 3. Let result be the empty String.
     // NOTE: This allocates the exact needed capacity upfront
     var result = try String.Builder.initCapacity(agent.gc_allocator, string.length);
     defer result.deinit(agent.gc_allocator);
@@ -810,37 +814,39 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 4. Let unescapedSet be the string-concatenation of the ASCII word characters and "@*+-./".
     const unescaped_set = String.ascii_word_characters ++ "@*+-./";
 
-    // 2. Let len be the length of string.
+    // 2. Let length be the length of string.
     // 5. Let k be 0.
-    // 6. Repeat, while k < len,
-    //     a. Let C be the code unit at index k within string.
+    // 6. Repeat, while k < length,
+    //     a. Let codeUnit be the code unit at index k within string.
     var it = string.codeUnitIterator();
-    while (it.next()) |c| {
-        // b. If unescapedSet contains C, then
-        const s: String.Builder.Segment = if (c < 256 and std.mem.findScalar(u8, unescaped_set, @intCast(c)) != null) blk: {
-            // i. Let S be C.
-            break :blk .{ .char = @intCast(c) };
+    while (it.next()) |code_unit| {
+        // b. If unescapedSet contains codeUnit, then
+        const s: String.Builder.Segment = if (code_unit < 256 and std.mem.findScalar(u8, unescaped_set, @intCast(code_unit)) != null) blk: {
+            // i. Let nextPart be codeUnit.
+            break :blk .{ .char = @intCast(code_unit) };
         } else blk: {
             // c. Else,
-            // i. Let n be the numeric value of C.
-            // ii. If n < 256, then
-            if (c < 256) {
-                // 1. Let hex be the String representation of n, formatted as an uppercase
-                //    hexadecimal number.
-                // 2. Let S be the string-concatenation of "%" and StringPad(hex, 2, "0", start).
+            // i. Let codeUnitNumber be the numeric value of codeUnit.
+            // ii. If codeUnitNumber < 256, then
+            if (code_unit < 256) {
+                // 1. Let hex be the String representation of codeUnitNumber, formatted as an
+                //    uppercase hexadecimal number.
+                // 2. Let nextPart be the string-concatenation of "%" and StringPad(hex, 2, "0",
+                //    start).
                 break :blk .{
                     .string = try String.fromAscii(agent, try std.fmt.allocPrint(
                         agent.gc_allocator,
                         "%{X}",
-                        .{&.{@as(u8, @intCast(c))}},
+                        .{&.{@as(u8, @intCast(code_unit))}},
                     )),
                 };
             } else {
                 // iii. Else,
-                // 1. Let hex be the String representation of n, formatted as an uppercase
-                //    hexadecimal number.
-                // 2. Let S be the string-concatenation of "%u" and StringPad(hex, 4, "0", start).
-                var bytes = std.mem.toBytes(c);
+                // 1. Let hex be the String representation of codeUnitNumber, formatted as an
+                //    uppercase hexadecimal number.
+                // 2. Let nextPart be the string-concatenation of "%u" and StringPad(hex, 4, "0",
+                //    start).
+                var bytes = std.mem.toBytes(code_unit);
                 std.mem.reverse(u8, &bytes);
                 break :blk .{
                     .string = try String.fromAscii(agent, try std.fmt.allocPrint(
@@ -852,13 +858,13 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             }
         };
 
-        // d. Set R to the string-concatenation of R and S.
+        // d. Set result to the string-concatenation of result and nextPart.
         result.appendSegmentAssumeCapacity(s);
 
         // e. Set k to k + 1.
     }
 
-    // 7. Return R.
+    // 7. Return result.
     return Value.from(try result.build(agent));
 }
 
@@ -871,10 +877,10 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 1. Set string to ? ToString(string).
     const string = try string_value.toString(agent);
 
-    // 2. Let len be the length of string.
-    const len = string.length;
+    // 2. Let length be the length of string.
+    const length = string.length;
 
-    // 3. Let R be the empty String.
+    // 3. Let result be the empty String.
     // SAFETY: This builder can use a GPA as it only stores u16 code unit segments.
     var result: String.Builder = .empty;
     defer result.deinit(gpa);
@@ -885,30 +891,30 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 4. Let k be 0.
     var k: u32 = 0;
 
-    // 5. Repeat, while k < len,
-    while (k < len) : (k += 1) {
-        // a. Let C be the code unit at index k within string.
-        var c = code_units[k];
+    // 5. Repeat, while k < length,
+    while (k < length) : (k += 1) {
+        // a. Let codeUnit be the code unit at index k within string.
+        var code_unit = code_units[k];
 
-        // b. If C is the code unit 0x0025 (PERCENT SIGN), then
-        if (c == '%') {
+        // b. If codeUnit is the code unit 0x0025 (PERCENT SIGN), then
+        if (code_unit == '%') {
             // i. Let hexDigits be the empty String.
             var hex_digits: []const u16 = &.{};
 
             // ii. Let optionalAdvance be 0.
             var optional_advance: u32 = 0;
 
-            // iii. If k + 5 < len and the code unit at index k + 1 within string is the code unit
-            //      0x0075 (LATIN SMALL LETTER U), then
-            if (k + 5 < len and code_units[k + 1] == 'u') {
+            // iii. If k + 5 < length and the code unit at index k + 1 within string is the code
+            //      unit 0x0075 (LATIN SMALL LETTER U), then
+            if (k + 5 < length and code_units[k + 1] == 'u') {
                 // 1. Set hexDigits to the substring of string from k + 2 to k + 6.
                 hex_digits = code_units[k + 2 .. k + 6];
 
                 // 2. Set optionalAdvance to 5.
                 optional_advance = 5;
             }
-            // iv. Else if k + 3 ≤ len, then
-            else if (k + 3 <= len) {
+            // iv. Else if k + 3 ≤ length, then
+            else if (k + 3 <= length) {
                 // 1. Set hexDigits to the substring of string from k + 1 to k + 3.
                 hex_digits = code_units[k + 1 .. k + 3];
 
@@ -923,9 +929,9 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 // v. Let parseResult be ParseText(hexDigits, HexDigits[~Sep]).
                 // vi. If parseResult is a Parse Node, then
                 if (parseDigits(u16, buf[0..end], 16)) |n| {
-                    // 1. Let n be the MV of parseResult.
-                    // 2. Set C to the code unit whose numeric value is n.
-                    c = n;
+                    // 1. Let codeUnitNumber be the MV of parseResult.
+                    // 2. Set codeUnit to the code unit whose numeric value is codeUnitNumber.
+                    code_unit = n;
 
                     // 3. Set k to k + optionalAdvance.
                     k += optional_advance;
@@ -933,12 +939,12 @@ fn unescape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             }
         }
 
-        // c. Set R to the string-concatenation of R and C.
-        try result.appendCodeUnit(gpa, c);
+        // c. Set result to the string-concatenation of result and codeUnit.
+        try result.appendCodeUnit(gpa, code_unit);
 
         // d. Set k to k + 1.
     }
 
-    // 6. Return R.
+    // 6. Return result.
     return Value.from(try result.build(agent));
 }

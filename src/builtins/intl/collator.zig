@@ -34,7 +34,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Collator",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -131,11 +131,11 @@ pub const constructor = struct {
             .{},
         );
 
-        // 12. Let r be optionsResolution.[[ResolvedLocale]].
-        const r = options_resolution.resolved_locale;
-        const locale = r.locale;
+        // 12. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+        const resolved_locale = options_resolution.resolved_locale;
+        const locale = resolved_locale.locale;
 
-        // 13. Set collator.[[Locale]] to r.[[Locale]].
+        // 13. Set collator.[[Locale]] to resolvedLocale.[[Locale]].
         collator.fields.locale = locale;
 
         // TODO: 14-18.
@@ -242,16 +242,16 @@ pub const prototype = struct {
         );
 
         // 4. For each row of Table 3, except the header row, in table order, do
-        //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of collator's internal slot whose name is the Internal Slot
+        //     a. Let propertyKey be the Property value of the current row.
+        //     b. Let value be the value of collator's internal slot whose name is the Internal Slot
         //        value of the current row.
         //     c. If the current row has an Extension Key value, then
         //         i. Let extensionKey be the Extension Key value of the current row.
         //         ii. If %Intl.Collator%.[[RelevantExtensionKeys]] does not contain extensionKey,
         //             then
-        //             1. Set v to undefined.
-        //     d. If v is not undefined, then
-        //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //             1. Set value to undefined.
+        //     d. If value is not undefined, then
+        //         i. Perform ! CreateDataPropertyOrThrow(options, propertyKey, value).
         const resolved_options = collator.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,
@@ -307,8 +307,8 @@ pub const prototype = struct {
 
         // 3. If collator.[[BoundCompare]] is undefined, then
         if (collator.fields.bound_compare == null) {
-            // a. Let F be a new built-in function object as defined in 10.3.3.1.
-            // b. Set F.[[Collator]] to collator.
+            // a. Let func be a new built-in function object as defined in 10.3.3.1.
+            // b. Set func.[[Collator]] to collator.
             const Captures = struct {
                 collator: *Collator,
             };
@@ -321,25 +321,27 @@ pub const prototype = struct {
                 fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
+                    const x = arguments.get(0);
+                    const y = arguments.get(1);
 
-                    // 1. Let collator be F.[[Collator]].
+                    // 1. Let collator be func.[[Collator]].
                     // 2. Assert: collator is an Object and collator has an [[InitializedCollator]]
                     //    internal slot.
                     const collator_ = captures_.collator;
 
                     // 3. If x is not provided, let x be undefined.
                     // 4. If y is not provided, let y be undefined.
-                    // 5. Let X be ? ToString(x).
-                    // 6. Let Y be ? ToString(y).
-                    const x = try arguments.get(0).toString(agent_);
-                    const y = try arguments.get(1).toString(agent_);
+                    // 5. Let xString be ? ToString(x).
+                    // 6. Let yString be ? ToString(y).
+                    const x_string = try x.toString(agent_);
+                    const y_string = try y.toString(agent_);
 
-                    // 7. Return CompareStrings(collator, X, Y).
-                    return compareStrings(agent_.gc_allocator, collator_, x, y);
+                    // 7. Return CompareStrings(collator, xString, yString).
+                    return compareStrings(agent_.gc_allocator, collator_, x_string, y_string);
                 }
             }.func;
 
-            const bound_compare = try createBuiltinFunction(
+            const func = try createBuiltinFunction(
                 agent,
                 .{ .function = collator_compare_function },
                 2,
@@ -347,8 +349,8 @@ pub const prototype = struct {
                 .{ .additional_fields = captures },
             );
 
-            // c. Set collator.[[BoundCompare]] to F.
-            collator.fields.bound_compare = bound_compare;
+            // c. Set collator.[[BoundCompare]] to func.
+            collator.fields.bound_compare = func;
         }
 
         // 4. Return collator.[[BoundCompare]].

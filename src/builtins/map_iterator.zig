@@ -69,11 +69,11 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-%mapiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%MapIteratorPrototype%").
-        // NOTE: In the absence of generators this implements one loop iteration of the
+        // NOTE: Instead of using generators this implements one loop iteration of the
         //       CreateMapIterator closure. State is kept track of through the MapIterator
         //       instance instead of as local variables. This should not be observable.
 
-        // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
+        // 1. Let state be ? GeneratorValidate(gen, genBrand).
         const map_iterator = try this_value.requireInternalSlot(agent, MapIterator);
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
@@ -121,16 +121,16 @@ pub const prototype = struct {
 
         const result = switch (kind) {
             // 1. If kind is key, then
-            //     a. Let result be e.[[Key]].
+            //     a. Let result be entry.[[Key]].
             .key => key,
 
             // 2. Else if kind is value, then
-            //     a. Let result be e.[[Value]].
+            //     a. Let result be entry.[[Value]].
             .value => value,
 
             // 3. Else,
             //     a. Assert: kind is key+value.
-            //     b. Let result be CreateArrayFromList(« e.[[Key]], e.[[Value]] »).
+            //     b. Let result be CreateArrayFromList(« entry.[[Key]], entry.[[Value]] »).
             .key_value => blk: {
                 const array = try createArrayFromList(agent, &.{ key, value });
                 break :blk Value.from(&array.object);
@@ -142,7 +142,7 @@ pub const prototype = struct {
 
         // 5. NOTE: The number of elements in entries may have increased while execution of this
         //    abstract operation was paused by GeneratorYield.
-        // 6. Set numEntries to the number of elements in entries.
+        // 6. Set entriesCount to the number of elements in entries.
     }
 };
 

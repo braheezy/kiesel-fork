@@ -20,11 +20,11 @@ const createIteratorResultObject = types.createIteratorResultObject;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const regExpExec = builtins.regExpExec;
 
-/// 22.2.9.1 CreateRegExpStringIterator ( R, S, global, fullUnicode )
+/// 22.2.9.1 CreateRegExpStringIterator ( regexp, string, global, fullUnicode )
 /// https://tc39.es/ecma262/#sec-createregexpstringiterator
 pub fn createRegExpStringIterator(
     agent: *Agent,
-    reg_exp: *Object,
+    regexp: *Object,
     string: *const String,
     global: bool,
     full_unicode: bool,
@@ -37,10 +37,10 @@ pub fn createRegExpStringIterator(
         .prototype = try realm.intrinsics.@"%RegExpStringIteratorPrototype%"(),
         .fields = .{
             .state = .{
-                // 2. Set iterator.[[IteratingRegExp]] to R.
-                .iterating_reg_exp = reg_exp,
+                // 2. Set iterator.[[IteratingRegExp]] to regexp.
+                .iterating_regexp = regexp,
 
-                // 3. Set iterator.[[IteratedString]] to S.
+                // 3. Set iterator.[[IteratedString]] to string.
                 .iterated_string = string,
 
                 // 4. Set iterator.[[Global]] to global.
@@ -85,36 +85,36 @@ pub const prototype = struct {
     /// 22.2.9.2.1 %RegExpStringIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
-        // 3. If O does not have all of the internal slots of a RegExp String Iterator Object
-        //    Instance (see 22.2.9.3), throw a TypeError exception.
-        const reg_exp_string_iterator = try this_value.requireInternalSlot(agent, RegExpStringIterator);
+        // 1. Let iteratorObj be the this value.
+        // 2. If iteratorObj is not an Object, throw a TypeError exception.
+        // 3. If iteratorObj does not have all of the internal slots of a RegExp String Iterator
+        //    Object Instance (see 22.2.9.3), throw a TypeError exception.
+        const regexp_string_iterator = try this_value.requireInternalSlot(agent, RegExpStringIterator);
 
-        // 4. If O.[[Done]] is true, then
-        if (reg_exp_string_iterator.fields == .completed) {
+        // 4. If iteratorObj.[[Done]] is true, then
+        if (regexp_string_iterator.fields == .completed) {
             // a. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
-        // 5. Let R be O.[[IteratingRegExp]].
-        const reg_exp = reg_exp_string_iterator.fields.state.iterating_reg_exp;
+        // 5. Let regexp be iteratorObj.[[IteratingRegExp]].
+        const regexp = regexp_string_iterator.fields.state.iterating_regexp;
 
-        // 6. Let S be O.[[IteratedString]].
-        const string = reg_exp_string_iterator.fields.state.iterated_string;
+        // 6. Let string be iteratorObj.[[IteratedString]].
+        const string = regexp_string_iterator.fields.state.iterated_string;
 
-        // 7. Let global be O.[[Global]].
-        const global = reg_exp_string_iterator.fields.state.global;
+        // 7. Let global be iteratorObj.[[Global]].
+        const global = regexp_string_iterator.fields.state.global;
 
-        // 8. Let fullUnicode be O.[[Unicode]].
-        const full_unicode = reg_exp_string_iterator.fields.state.unicode;
+        // 8. Let fullUnicode be iteratorObj.[[Unicode]].
+        const full_unicode = regexp_string_iterator.fields.state.unicode;
 
-        // 9. Let match be ? RegExpExec(R, S).
-        const match = try regExpExec(agent, reg_exp, string) orelse {
+        // 9. Let match be ? RegExpExec(regexp, string).
+        const match = try regExpExec(agent, regexp, string) orelse {
             // 10. If match is null, then
 
-            // a. Set O.[[Done]] to true.
-            reg_exp_string_iterator.fields = .completed;
+            // a. Set iteratorObj.[[Done]] to true.
+            regexp_string_iterator.fields = .completed;
 
             // b. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
@@ -122,26 +122,26 @@ pub const prototype = struct {
 
         // 11. If global is false, then
         if (!global) {
-            // a. Set O.[[Done]] to true.
-            reg_exp_string_iterator.fields = .completed;
+            // a. Set iteratorObj.[[Done]] to true.
+            regexp_string_iterator.fields = .completed;
 
             // b. Return CreateIteratorResultObject(match, false).
             return Value.from(try createIteratorResultObject(agent, Value.from(match), false));
         }
 
-        // 12. Let matchStr be ? ToString(? Get(match, "0")).
-        const match_str = try (try match.get(agent, PropertyKey.from(0))).toString(agent);
+        // 12. Let matchString be ? ToString(? Get(match, "0")).
+        const match_string = try (try match.get(agent, PropertyKey.from(0))).toString(agent);
 
-        // 13. If matchStr is the empty String, then
-        if (match_str.isEmpty()) {
-            // a. Let thisIndex be ℝ(? ToLength(? Get(R, "lastIndex"))).
-            const this_index = try (try reg_exp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
+        // 13. If matchString is the empty String, then
+        if (match_string.isEmpty()) {
+            // a. Let thisIndex be ℝ(? ToLength(? Get(regexp, "lastIndex"))).
+            const this_index = try (try regexp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
 
-            // b. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
+            // b. Let nextIndex be AdvanceStringIndex(string, thisIndex, fullUnicode).
             const next_index = advanceStringIndex(string, this_index, full_unicode);
 
-            // c. Perform ? Set(R, "lastIndex", 𝔽(nextIndex), true).
-            try reg_exp.set(
+            // c. Perform ? Set(regexp, "lastIndex", 𝔽(nextIndex), true).
+            try regexp.set(
                 agent,
                 PropertyKey.from("lastIndex"),
                 Value.from(@as(f64, @floatFromInt(next_index))),
@@ -160,7 +160,7 @@ pub const RegExpStringIterator = MakeObject(.{
     .Fields = union(enum) {
         state: struct {
             /// [[IteratingRegExp]]
-            iterating_reg_exp: *Object,
+            iterating_regexp: *Object,
 
             /// [[IteratedString]]
             iterated_string: *const String,

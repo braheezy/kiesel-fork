@@ -208,131 +208,131 @@ pub const Environment = union(enum) {
     }
 };
 
-/// 9.1.2.2 NewDeclarativeEnvironment ( E )
+/// 9.1.2.2 NewDeclarativeEnvironment ( outerEnv )
 /// https://tc39.es/ecma262/#sec-newdeclarativeenvironment
 pub fn newDeclarativeEnvironment(
     allocator: std.mem.Allocator,
     outer_env: ?Environment,
 ) std.mem.Allocator.Error!*DeclarativeEnvironment {
-    // 1. Let env be a new Declarative Environment Record containing no bindings.
+    // 1. Let envRecord be a new Declarative Environment Record containing no bindings.
     const env = try allocator.create(DeclarativeEnvironment);
 
     env.* = .{
-        // 2. Set env.[[OuterEnv]] to E.
+        // 2. Set envRecord.[[OuterEnv]] to outerEnv.
         .outer_env = outer_env,
 
         .bindings = .empty,
     };
 
-    // 3. Return env.
+    // 3. Return envRecord.
     return env;
 }
 
-/// 9.1.2.3 NewObjectEnvironment ( O, W, E )
+/// 9.1.2.3 NewObjectEnvironment ( obj, isWithEnv, outerEnv )
 /// https://tc39.es/ecma262/#sec-newobjectenvironment
 pub fn newObjectEnvironment(
     allocator: std.mem.Allocator,
-    binding_object: *Object,
-    is_with_environment: bool,
+    obj: *Object,
+    is_with_env: bool,
     outer_env: ?Environment,
 ) std.mem.Allocator.Error!*ObjectEnvironment {
-    // 1. Let env be a new Object Environment Record.
+    // 1. Let envRecord be a new Object Environment Record.
     const env = try allocator.create(ObjectEnvironment);
 
     env.* = .{
-        // 2. Set env.[[BindingObject]] to O.
-        .binding_object = binding_object,
+        // 2. Set envRecord.[[BindingObject]] to obj.
+        .binding_object = obj,
 
-        // 3. Set env.[[IsWithEnvironment]] to W.
-        .is_with_environment = is_with_environment,
+        // 3. Set envRecord.[[IsWithEnvironment]] to isWithEnv.
+        .is_with_environment = is_with_env,
 
-        // 4. Set env.[[OuterEnv]] to E.
+        // 4. Set envRecord.[[OuterEnv]] to outerEnv.
         .outer_env = outer_env,
     };
 
-    // 5. Return env.
+    // 5. Return envRecord.
     return env;
 }
 
-/// 9.1.2.4 NewFunctionEnvironment ( F, newTarget )
+/// 9.1.2.4 NewFunctionEnvironment ( func, newTarget )
 /// https://tc39.es/ecma262/#sec-newfunctionenvironment
 pub fn newFunctionEnvironment(
     allocator: std.mem.Allocator,
-    function: *ECMAScriptFunction,
+    func: *ECMAScriptFunction,
     new_target: ?*Object,
 ) std.mem.Allocator.Error!*FunctionEnvironment {
-    // 1. Let env be a new Function Environment Record containing no bindings.
+    // 1. Let envRecord be a new Function Environment Record containing no bindings.
     const env = try allocator.create(FunctionEnvironment);
     env.* = .{
-        // 2. Set env.[[FunctionObject]] to F.
-        .function_object = function,
+        // 2. Set envRecord.[[FunctionObject]] to func.
+        .function_object = func,
 
-        // 3. If F.[[ThisMode]] is lexical, set env.[[ThisBindingStatus]] to lexical.
-        // 4. Else, set env.[[ThisBindingStatus]] to uninitialized.
-        .this_binding_status = if (function.fields.flags.this_mode == .lexical)
+        // 3. If func.[[ThisMode]] is lexical, set envRecord.[[ThisBindingStatus]] to lexical.
+        // 4. Else, set envRecord.[[ThisBindingStatus]] to uninitialized.
+        .this_binding_status = if (func.fields.flags.this_mode == .lexical)
             .lexical
         else
             .uninitialized,
 
-        // 5. Set env.[[NewTarget]] to newTarget.
+        // 5. Set envRecord.[[NewTarget]] to newTarget.
         .new_target = new_target,
 
-        // 6. Set env.[[OuterEnv]] to F.[[Environment]].
+        // 6. Set envRecord.[[OuterEnv]] to func.[[Environment]].
         .declarative_environment = .{
-            .outer_env = function.fields.environment,
+            .outer_env = func.fields.environment,
             .bindings = .empty,
         },
 
         .this_value = .undefined,
     };
 
-    // 7. Return env.
+    // 7. Return envRecord.
     return env;
 }
 
-/// 9.1.2.5 NewGlobalEnvironment ( G, thisValue )
+/// 9.1.2.5 NewGlobalEnvironment ( obj, thisValue )
 /// https://tc39.es/ecma262/#sec-newglobalenvironment
 pub fn newGlobalEnvironment(
     allocator: std.mem.Allocator,
-    global_object: *Object,
+    obj: *Object,
     this_value: *Object,
 ) std.mem.Allocator.Error!*GlobalEnvironment {
-    // 1. Let objRec be NewObjectEnvironment(G, false, null).
-    const object_record = try newObjectEnvironment(allocator, global_object, false, null);
+    // 1. Let objRecord be NewObjectEnvironment(obj, false, null).
+    const object_record = try newObjectEnvironment(allocator, obj, false, null);
 
-    // 2. Let dclRec be NewDeclarativeEnvironment(null).
+    // 2. Let declRecord be NewDeclarativeEnvironment(null).
     const declarative_record = try newDeclarativeEnvironment(allocator, null);
 
-    // 3. Let env be a new Global Environment Record.
+    // 3. Let envRecord be a new Global Environment Record.
     const env = try allocator.create(GlobalEnvironment);
     env.* = .{
-        // 4. Set env.[[ObjectRecord]] to objRec.
+        // 4. Set envRecord.[[ObjectRecord]] to objRecord.
         .object_record = object_record,
 
-        // 5. Set env.[[GlobalThisValue]] to thisValue.
+        // 5. Set envRecord.[[GlobalThisValue]] to thisValue.
         .global_this_value = this_value,
 
-        // 6. Set env.[[DeclarativeRecord]] to dclRec.
+        // 6. Set envRecord.[[DeclarativeRecord]] to declRecord.
         .declarative_record = declarative_record,
 
-        // 7. Set env.[[OuterEnv]] to null.
+        // 7. Set envRecord.[[OuterEnv]] to null.
         .outer_env = null,
     };
 
-    // 8. Return env.
+    // 8. Return envRecord.
     return env;
 }
 
-/// 9.1.2.6 NewModuleEnvironment ( E )
+/// 9.1.2.6 NewModuleEnvironment ( outerEnv )
 /// https://tc39.es/ecma262/#sec-newmoduleenvironment
 pub fn newModuleEnvironment(
     allocator: std.mem.Allocator,
     outer_env: *GlobalEnvironment,
 ) std.mem.Allocator.Error!*ModuleEnvironment {
-    // 1. Let env be a new Module Environment Record containing no bindings.
+    // 1. Let envRecord be a new Module Environment Record containing no bindings.
     const env = try allocator.create(ModuleEnvironment);
     env.* = .{
-        // 2. Set env.[[OuterEnv]] to E.
+        // 2. Set envRecord.[[OuterEnv]] to outerEnv.
         .declarative_environment = .{
             .outer_env = .{ .global_environment = outer_env },
             .bindings = .empty,
@@ -341,7 +341,7 @@ pub fn newModuleEnvironment(
         .indirect_bindings = .empty,
     };
 
-    // 3. Return env.
+    // 3. Return envRecord.
     return env;
 }
 

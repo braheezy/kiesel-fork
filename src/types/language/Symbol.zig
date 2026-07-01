@@ -41,15 +41,15 @@ pub fn format(self: *const Symbol, writer: *std.Io.Writer) std.Io.Writer.Error!v
     try writer.writeAll(")");
 }
 
-/// 20.4.3.3.1 SymbolDescriptiveString ( sym )
+/// 20.4.3.3.1 SymbolDescriptiveString ( symbol )
 /// https://tc39.es/ecma262/#sec-symboldescriptivestring
 pub fn descriptiveString(self: *const Symbol, agent: *Agent) std.mem.Allocator.Error!*const String {
-    // 1. Let desc be sym.[[Description]].
-    // 2. If desc is undefined, set desc to the empty String.
-    // 3. Assert: desc is a String.
+    // 1. Let description be symbol.[[Description]].
+    // 2. If description is undefined, set description to the empty String.
+    // 3. Assert: description is a String.
     const description: *const String = self.description orelse .empty;
 
-    // 4. Return the string-concatenation of "Symbol(", desc, and ")".
+    // 4. Return the string-concatenation of "Symbol(", description, and ")".
     return String.concat(agent, &.{
         String.fromLiteral("Symbol("),
         description,

@@ -30,12 +30,12 @@ pub const prototype = struct {
     /// 27.1.3.2.2.1.1 %WrapForValidIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be this value.
-        // 2. Perform ? RequireInternalSlot(O, [[Iterated]]).
-        const object = try this_value.requireInternalSlot(agent, WrapForValidIterator);
+        // 1. Let obj be this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[Iterated]]).
+        const wrap_for_valid_iterator = try this_value.requireInternalSlot(agent, WrapForValidIterator);
 
-        // 3. Let iteratorRecord be O.[[Iterated]].
-        const iterator = object.fields.iterated;
+        // 3. Let iteratorRecord be obj.[[Iterated]].
+        const iterator = wrap_for_valid_iterator.fields.iterated;
 
         // 4. Return ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
         return iterator.next_method.call(agent, Value.from(iterator.iterator), &.{});
@@ -44,13 +44,13 @@ pub const prototype = struct {
     /// 27.1.3.2.2.1.2 %WrapForValidIteratorPrototype%.return ( )
     /// https://tc39.es/ecma262/#sec-%wrapforvaliditeratorprototype%.return
     fn @"return"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be this value.
-        // 2. Perform ? RequireInternalSlot(O, [[Iterated]]).
-        const object = try this_value.requireInternalSlot(agent, WrapForValidIterator);
+        // 1. Let obj be this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[Iterated]]).
+        const wrap_for_valid_iterator = try this_value.requireInternalSlot(agent, WrapForValidIterator);
 
-        // 3. Let iterator be O.[[Iterated]].[[Iterator]].
+        // 3. Let iterator be obj.[[Iterated]].[[Iterator]].
         // 4. Assert: iterator is an Object.
-        const iterator = object.fields.iterated.iterator;
+        const iterator = wrap_for_valid_iterator.fields.iterated.iterator;
 
         // 5. Let returnMethod be ? GetMethod(iterator, "return").
         const return_method = try Value.from(iterator).getMethod(

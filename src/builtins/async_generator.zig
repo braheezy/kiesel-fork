@@ -72,8 +72,8 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 
-        // 1. Let generator be the this value.
-        const generator_value = this_value;
+        // 1. Let gen be the this value.
+        const gen_value = this_value;
 
         // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
@@ -81,16 +81,14 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // 3. Let result be Completion(AsyncGeneratorValidate(generator, empty)).
-        asyncGeneratorValidate(agent, generator_value) catch |err| {
+        // 3. Let result be Completion(AsyncGeneratorValidate(gen, empty)).
+        const gen = asyncGeneratorValidate(agent, gen_value) catch |err| {
             // 4. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        const generator = generator_value.asObject().as(AsyncGenerator);
-
-        // 5. Let state be generator.[[AsyncGeneratorState]].
-        const state = generator.fields.async_generator_state;
+        // 5. Let state be gen.[[AsyncGeneratorState]].
+        const state = gen.fields.async_generator_state;
 
         // 6. If state is completed, then
         if (state == .completed) {
@@ -111,13 +109,13 @@ pub const prototype = struct {
         // 7. Let completion be NormalCompletion(value).
         const completion: Completion = .{ .normal = value };
 
-        // 8. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
-        try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
+        // 8. Perform AsyncGeneratorEnqueue(gen, completion, promiseCapability).
+        try asyncGeneratorEnqueue(agent, gen, completion, promise_capability);
 
         // 9. If state is either suspended-start or suspended-yield, then
         if (state == .suspended_start or state == .suspended_yield) {
-            // a. Perform AsyncGeneratorResume(generator, completion).
-            try asyncGeneratorResume(agent, generator, completion);
+            // a. Perform AsyncGeneratorResume(gen, completion).
+            try asyncGeneratorResume(agent, gen, completion);
         } else {
             // 10. Else,
             // a. Assert: state is either executing or draining-queue.
@@ -134,8 +132,8 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const value = arguments.get(0);
 
-        // 1. Let generator be the this value.
-        const generator_value = this_value;
+        // 1. Let gen be the this value.
+        const gen_value = this_value;
 
         // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
@@ -143,35 +141,33 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // 3. Let result be Completion(AsyncGeneratorValidate(generator, empty)).
-        asyncGeneratorValidate(agent, generator_value) catch |err| {
+        // 3. Let result be Completion(AsyncGeneratorValidate(gen, empty)).
+        const gen = asyncGeneratorValidate(agent, gen_value) catch |err| {
             // 4. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        const generator = generator_value.asObject().as(AsyncGenerator);
-
         // 5. Let completion be ReturnCompletion(value).
         const completion: Completion = .{ .@"return" = value };
 
-        // 6. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
-        try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
+        // 6. Perform AsyncGeneratorEnqueue(gen, completion, promiseCapability).
+        try asyncGeneratorEnqueue(agent, gen, completion, promise_capability);
 
-        // 7. Let state be generator.[[AsyncGeneratorState]].
-        const state = generator.fields.async_generator_state;
+        // 7. Let state be gen.[[AsyncGeneratorState]].
+        const state = gen.fields.async_generator_state;
 
         // 8. If state is either suspended-start or completed, then
         if (state == .suspended_start or state == .completed) {
-            // a. Set generator.[[AsyncGeneratorState]] to draining-queue.
-            generator.fields.async_generator_state = .draining_queue;
+            // a. Set gen.[[AsyncGeneratorState]] to draining-queue.
+            gen.fields.async_generator_state = .draining_queue;
 
-            // b. Perform AsyncGeneratorAwaitReturn(generator).
-            try asyncGeneratorAwaitReturn(agent, generator);
+            // b. Perform AsyncGeneratorAwaitReturn(gen).
+            try asyncGeneratorAwaitReturn(agent, gen);
         }
         // 9. Else if state is suspended-yield, then
         else if (state == .suspended_yield) {
-            // a. Perform AsyncGeneratorResume(generator, completion).
-            try asyncGeneratorResume(agent, generator, completion);
+            // a. Perform AsyncGeneratorResume(gen, completion).
+            try asyncGeneratorResume(agent, gen, completion);
         } else {
             // 10. Else,
             // a. Assert: state is either executing or draining-queue.
@@ -188,8 +184,8 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const exception = arguments.get(0);
 
-        // 1. Let generator be the this value.
-        const generator_value = this_value;
+        // 1. Let gen be the this value.
+        const gen_value = this_value;
 
         // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
@@ -197,21 +193,19 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // 3. Let result be Completion(AsyncGeneratorValidate(generator, empty)).
-        asyncGeneratorValidate(agent, generator_value) catch |err| {
+        // 3. Let result be Completion(AsyncGeneratorValidate(gen, empty)).
+        const gen = asyncGeneratorValidate(agent, gen_value) catch |err| {
             // 4. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        const generator = generator_value.asObject().as(AsyncGenerator);
-
-        // 5. Let state be generator.[[AsyncGeneratorState]].
-        var state = generator.fields.async_generator_state;
+        // 5. Let state be gen.[[AsyncGeneratorState]].
+        var state = gen.fields.async_generator_state;
 
         // 6. If state is suspended-start, then
         if (state == .suspended_start) {
-            // a. Set generator.[[AsyncGeneratorState]] to completed.
-            generator.fields.async_generator_state = .completed;
+            // a. Set gen.[[AsyncGeneratorState]] to completed.
+            gen.fields.async_generator_state = .completed;
 
             // b. Set state to completed.
             state = .completed;
@@ -233,13 +227,13 @@ pub const prototype = struct {
         // 8. Let completion be ThrowCompletion(exception).
         const completion: Completion = .{ .throw = exception };
 
-        // 9. Perform AsyncGeneratorEnqueue(generator, completion, promiseCapability).
-        try asyncGeneratorEnqueue(agent, generator, completion, promise_capability);
+        // 9. Perform AsyncGeneratorEnqueue(gen, completion, promiseCapability).
+        try asyncGeneratorEnqueue(agent, gen, completion, promise_capability);
 
         // 10. If state is suspended-yield, then
         if (state == .suspended_yield) {
-            // a. Perform AsyncGeneratorResume(generator, completion).
-            try asyncGeneratorResume(agent, generator, completion);
+            // a. Perform AsyncGeneratorResume(gen, completion).
+            try asyncGeneratorResume(agent, gen, completion);
         } else {
             // 11. Else,
             // a. Assert: state is either executing or draining-queue.
@@ -275,7 +269,7 @@ pub const AsyncGenerator = MakeObject(.{
         // Non-standard
         evaluation_state: struct {
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction, Completion) std.mem.Allocator.Error!void,
-            generator_function: *builtins.ECMAScriptFunction,
+            gen_func: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
             suspension: ?interpreter.Vm.GeneratorSuspension = null,
         },
@@ -294,28 +288,28 @@ pub const AsyncGeneratorRequest = struct {
     capability: PromiseCapability,
 };
 
-/// 27.6.3.2 AsyncGeneratorStart ( generator, generatorBody )
+/// 27.6.3.2 AsyncGeneratorStart ( gen, genBody )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorstart
 pub fn asyncGeneratorStart(
     agent: *Agent,
-    generator: *AsyncGenerator,
-    generator_function: *builtins.ECMAScriptFunction,
+    gen: *AsyncGenerator,
+    gen_func: *builtins.ECMAScriptFunction,
     initial_suspension: interpreter.Vm.GeneratorSuspension,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: generator.[[AsyncGeneratorState]] is suspended-start.
-    std.debug.assert(generator.fields.async_generator_state == .suspended_start);
+    // 1. Assert: gen.[[AsyncGeneratorState]] is suspended-start.
+    std.debug.assert(gen.fields.async_generator_state == .suspended_start);
 
     // 2. Let genContext be the running execution context.
     // NOTE: The running execution context may be stack-allocated by the caller, so we replace it
     //       with a heap-allocated one here since async generators store it for later resumption.
-    const generator_context = try agent.gc_allocator.create(ExecutionContext);
-    generator_context.* = agent.runningExecutionContext().*;
-    agent.execution_context_stack.items[agent.execution_context_stack.items.len - 1] = generator_context;
+    const gen_context = try agent.gc_allocator.create(ExecutionContext);
+    gen_context.* = agent.runningExecutionContext().*;
+    agent.execution_context_stack.items[agent.execution_context_stack.items.len - 1] = gen_context;
 
-    // 3. Set the Generator component of genContext to generator.
-    generator_context.generator = .{ .async_generator = generator };
+    // 3. Set the Generator component of genContext to gen.
+    gen_context.generator = .{ .async_generator = gen };
 
-    // 4. Let closure be a new Abstract Closure with no parameters that captures generatorBody and
+    // 4. Let closure be a new Abstract Closure with no parameters that captures genBody and
     //    performs the following steps when called:
     const closure = struct {
         fn func(
@@ -324,13 +318,13 @@ pub fn asyncGeneratorStart(
             resume_completion: Completion,
         ) std.mem.Allocator.Error!void {
             // a. Let acGenContext be the running execution context.
-            const closure_generator_context = agent_.runningExecutionContext();
+            const closure_gen_context = agent_.runningExecutionContext();
 
-            // b. Let acGenerator be the Generator component of acGenContext.
-            const closure_generator = closure_generator_context.generator.async_generator;
+            // b. Let acGen be the Generator component of acGenContext.
+            const closure_gen = closure_gen_context.generator.async_generator;
 
             const vm = agent_.active_vm.?;
-            const suspension = &closure_generator.fields.evaluation_state.suspension.?;
+            const suspension = &closure_gen.fields.evaluation_state.suspension.?;
 
             // If resuming causes another yield the suspension will be overwritten, so we
             // have to capture the stack to free it regardless.
@@ -345,8 +339,8 @@ pub fn asyncGeneratorStart(
                 // TODO: Integrate throw/return completions with exception handlers in the Vm
                 .@"return", .throw => {
                     _ = agent_.execution_context_stack.pop().?;
-                    closure_generator.fields.async_generator_state = .draining_queue;
-                    closure_generator.fields.evaluation_state = undefined;
+                    closure_gen.fields.async_generator_state = .draining_queue;
+                    closure_gen.fields.evaluation_state = undefined;
 
                     const completion: Completion = switch (resume_completion) {
                         .normal => unreachable,
@@ -354,39 +348,39 @@ pub fn asyncGeneratorStart(
                         .throw => |value| .{ .throw = value },
                     };
 
-                    try asyncGeneratorCompleteStep(agent_, closure_generator, completion, true, null);
-                    try asyncGeneratorDrainQueue(agent_, closure_generator);
+                    try asyncGeneratorCompleteStep(agent_, closure_gen, completion, true, null);
+                    try asyncGeneratorDrainQueue(agent_, closure_gen);
                     return;
                 },
             }
 
-            // c. If generatorBody is a Parse Node, then
-            //     i. Let result be Completion(Evaluation of generatorBody).
+            // c. If genBody is a Parse Node, then
+            //     i. Let result be Completion(Evaluation of genBody).
             // d. Else,
-            //     i. Assert: generatorBody is an Abstract Closure with no parameters.
-            //     ii. Let result be Completion(generatorBody()).
+            //     i. Assert: genBody is an Abstract Closure with no parameters.
+            //     ii. Let result be Completion(genBody()).
             const bc = generator_function_.fields.cached_bytecode.?;
             const result = vm.@"resume"(bc, suspension.*) catch |err| {
                 // f-g.
                 _ = agent_.execution_context_stack.pop().?;
-                closure_generator.fields.async_generator_state = .draining_queue;
-                closure_generator.fields.evaluation_state = undefined;
+                closure_gen.fields.async_generator_state = .draining_queue;
+                closure_gen.fields.evaluation_state = undefined;
 
                 switch (err) {
                     error.OutOfMemory => |e| return e,
                     error.ExceptionThrown => {
                         const exception = agent_.clearException();
                         // j-k.
-                        try asyncGeneratorCompleteStep(agent_, closure_generator, .{ .throw = exception.value }, true, null);
-                        try asyncGeneratorDrainQueue(agent_, closure_generator);
+                        try asyncGeneratorCompleteStep(agent_, closure_gen, .{ .throw = exception.value }, true, null);
+                        try asyncGeneratorDrainQueue(agent_, closure_gen);
                         return;
                     },
                 }
             };
             switch (result) {
                 .yield => |new_suspension| {
-                    closure_generator.fields.evaluation_state.suspension = new_suspension;
-                    closure_generator.fields.evaluation_state.suspension_result = null;
+                    closure_gen.fields.evaluation_state.suspension = new_suspension;
+                    closure_gen.fields.evaluation_state.suspension_result = null;
                     return;
                 },
                 .@"return" => |value| {
@@ -398,10 +392,10 @@ pub fn asyncGeneratorStart(
                     //    running execution context.
                     _ = agent_.execution_context_stack.pop().?;
 
-                    // g. Set acGenerator.[[AsyncGeneratorState]] to draining-queue.
-                    closure_generator.fields.async_generator_state = .draining_queue;
+                    // g. Set acGen.[[AsyncGeneratorState]] to draining-queue.
+                    closure_gen.fields.async_generator_state = .draining_queue;
 
-                    closure_generator.fields.evaluation_state = undefined;
+                    closure_gen.fields.evaluation_state = undefined;
 
                     // h. If result is a normal completion, set result to NormalCompletion(
                     //    undefined).
@@ -409,11 +403,11 @@ pub fn asyncGeneratorStart(
                     //    result.[[Value]]).
                     const result_value: Value = value orelse .undefined;
 
-                    // j. Perform AsyncGeneratorCompleteStep(acGenerator, result, true).
-                    try asyncGeneratorCompleteStep(agent_, closure_generator, .{ .normal = result_value }, true, null);
+                    // j. Perform AsyncGeneratorCompleteStep(acGen, result, true).
+                    try asyncGeneratorCompleteStep(agent_, closure_gen, .{ .normal = result_value }, true, null);
 
-                    // k. Perform AsyncGeneratorDrainQueue(acGenerator).
-                    try asyncGeneratorDrainQueue(agent_, closure_generator);
+                    // k. Perform AsyncGeneratorDrainQueue(acGen).
+                    try asyncGeneratorDrainQueue(agent_, closure_gen);
 
                     // l. Return NormalCompletion(undefined).
                     return;
@@ -424,42 +418,44 @@ pub fn asyncGeneratorStart(
 
     // 5. Set the code evaluation state of genContext such that when evaluation is resumed for that
     //    execution context, closure will be called with no arguments.
-    generator.fields.evaluation_state = .{
+    gen.fields.evaluation_state = .{
         .closure = closure,
-        .generator_function = generator_function,
+        .gen_func = gen_func,
     };
 
-    generator.fields.evaluation_state.suspension = initial_suspension;
+    gen.fields.evaluation_state.suspension = initial_suspension;
 
-    // 6. Set generator.[[AsyncGeneratorContext]] to genContext.
-    generator.fields.async_generator_context = generator_context;
+    // 6. Set gen.[[AsyncGeneratorContext]] to genContext.
+    gen.fields.async_generator_context = gen_context;
 
-    // 7. Set generator.[[AsyncGeneratorQueue]] to a new empty List.
-    generator.fields.async_generator_queue = .empty;
+    // 7. Set gen.[[AsyncGeneratorQueue]] to a new empty List.
+    gen.fields.async_generator_queue = .empty;
 
     // 8. Return unused.
 }
 
-/// 27.6.3.3 AsyncGeneratorValidate ( generator, generatorBrand )
+/// 27.6.3.3 AsyncGeneratorValidate ( gen, genBrand )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorvalidate
-pub fn asyncGeneratorValidate(agent: *Agent, generator_value: Value) error{ExceptionThrown}!void {
-    // 1. Perform ? RequireInternalSlot(generator, [[AsyncGeneratorContext]]).
-    // 2. Perform ? RequireInternalSlot(generator, [[AsyncGeneratorState]]).
-    // 3. Perform ? RequireInternalSlot(generator, [[AsyncGeneratorQueue]]).
-    _ = try generator_value.requireInternalSlot(agent, AsyncGenerator);
+pub fn asyncGeneratorValidate(agent: *Agent, gen_value: Value) error{ExceptionThrown}!*AsyncGenerator {
+    // 1. Perform ? RequireInternalSlot(gen, [[AsyncGeneratorContext]]).
+    // 2. Perform ? RequireInternalSlot(gen, [[AsyncGeneratorState]]).
+    // 3. Perform ? RequireInternalSlot(gen, [[AsyncGeneratorQueue]]).
+    const gen = try gen_value.requireInternalSlot(agent, AsyncGenerator);
 
-    // 4. If generator.[[GeneratorBrand]] is not generatorBrand, throw a TypeError exception.
+    // 4. If gen.[[GeneratorBrand]] is not genBrand, throw a TypeError exception.
     // NOTE: All iterators using [[GeneratorBrand]] in the spec are implemented without generators
     //       so this is currently not needed.
 
     // 5. Return unused.
+    // NOTE: Returning the object here allows for direct assignment of the object at the call site.
+    return gen;
 }
 
-/// 27.6.3.4 AsyncGeneratorEnqueue ( generator, completion, promiseCapability )
+/// 27.6.3.4 AsyncGeneratorEnqueue ( gen, completion, promiseCapability )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorenqueue
 pub fn asyncGeneratorEnqueue(
     agent: *Agent,
-    generator: *AsyncGenerator,
+    gen: *AsyncGenerator,
     completion: Completion,
     promise_capability: PromiseCapability,
 ) std.mem.Allocator.Error!void {
@@ -470,27 +466,27 @@ pub fn asyncGeneratorEnqueue(
         .capability = promise_capability,
     };
 
-    // 2. Append request to generator.[[AsyncGeneratorQueue]].
-    try generator.fields.async_generator_queue.append(agent.gc_allocator, request);
+    // 2. Append request to gen.[[AsyncGeneratorQueue]].
+    try gen.fields.async_generator_queue.append(agent.gc_allocator, request);
 
     // 3. Return unused.
 }
 
-/// 27.6.3.5 AsyncGeneratorCompleteStep ( generator, completion, done [ , realm ] )
+/// 27.6.3.5 AsyncGeneratorCompleteStep ( gen, completion, done [ , realm ] )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorcompletestep
 pub fn asyncGeneratorCompleteStep(
     agent: *Agent,
-    generator: *AsyncGenerator,
+    gen: *AsyncGenerator,
     completion: Completion,
     done: bool,
     realm: ?*Realm,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: generator.[[AsyncGeneratorQueue]] is not empty.
-    std.debug.assert(generator.fields.async_generator_queue.items.len != 0);
+    // 1. Assert: gen.[[AsyncGeneratorQueue]] is not empty.
+    std.debug.assert(gen.fields.async_generator_queue.items.len != 0);
 
-    // 2. Let next be the first element of generator.[[AsyncGeneratorQueue]].
-    // 3. Remove the first element from generator.[[AsyncGeneratorQueue]].
-    const next = generator.fields.async_generator_queue.orderedRemove(0);
+    // 2. Let next be the first element of gen.[[AsyncGeneratorQueue]].
+    // 3. Remove the first element from gen.[[AsyncGeneratorQueue]].
+    const next = gen.fields.async_generator_queue.orderedRemove(0);
 
     // 4. Let promiseCapability be next.[[Capability]].
     const promise_capability = next.capability;
@@ -541,29 +537,29 @@ pub fn asyncGeneratorCompleteStep(
     // 8. Return unused.
 }
 
-/// 27.6.3.6 AsyncGeneratorResume ( generator, completion )
+/// 27.6.3.6 AsyncGeneratorResume ( gen, completion )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorresume
 pub fn asyncGeneratorResume(
     agent: *Agent,
-    generator: *AsyncGenerator,
+    gen: *AsyncGenerator,
     completion: Completion,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: generator.[[AsyncGeneratorState]] is either suspended-start or suspended-yield.
-    std.debug.assert(generator.fields.async_generator_state == .suspended_start or
-        generator.fields.async_generator_state == .suspended_yield);
+    // 1. Assert: gen.[[AsyncGeneratorState]] is either suspended-start or suspended-yield.
+    std.debug.assert(gen.fields.async_generator_state == .suspended_start or
+        gen.fields.async_generator_state == .suspended_yield);
 
-    // 2. Let genContext be generator.[[AsyncGeneratorContext]].
-    const generator_context = generator.fields.async_generator_context;
+    // 2. Let genContext be gen.[[AsyncGeneratorContext]].
+    const gen_context = gen.fields.async_generator_context;
 
-    // 3. Set generator.[[AsyncGeneratorState]] to executing.
-    generator.fields.async_generator_state = .executing;
+    // 3. Set gen.[[AsyncGeneratorState]] to executing.
+    gen.fields.async_generator_state = .executing;
 
     // 4. Perform ! RunSuspendedContext(genContext, completion).
     const caller_context = agent.runningExecutionContext();
-    try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
-    try generator.fields.evaluation_state.closure(
+    try agent.execution_context_stack.append(agent.gc_allocator, gen_context);
+    try gen.fields.evaluation_state.closure(
         agent,
-        generator.fields.evaluation_state.generator_function,
+        gen.fields.evaluation_state.gen_func,
         completion,
     );
     std.debug.assert(caller_context == agent.runningExecutionContext());
@@ -596,19 +592,19 @@ pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Comp
     return .{ .@"return" = awaited };
 }
 
-/// 27.6.3.8 AsyncGeneratorYield ( value )
+/// 27.6.3.8 AsyncGeneratorYield ( arg )
 /// https://tc39.es/ecma262/#sec-asyncgeneratoryield
-pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
+pub fn asyncGeneratorYield(agent: *Agent, arg: Value) Agent.Error!Completion {
     // 1. Let genContext be the running execution context.
-    const generator_context = agent.runningExecutionContext();
+    const gen_context = agent.runningExecutionContext();
 
     // 2. Assert: genContext is the execution context of a generator.
-    // 3. Let generator be the value of the Generator component of genContext.
+    // 3. Let gen be the value of the Generator component of genContext.
     // 4. Assert: GetGeneratorKind() is async.
-    const generator = generator_context.generator.async_generator;
+    const gen = gen_context.generator.async_generator;
 
-    // 5. Let completion be NormalCompletion(value).
-    const completion: Completion = .{ .normal = value };
+    // 5. Let completion be NormalCompletion(arg).
+    const completion: Completion = .{ .normal = arg };
 
     // 6. Assert: The execution context stack has at least two elements.
     std.debug.assert(agent.execution_context_stack.items.len >= 2);
@@ -619,11 +615,11 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
     // 8. Let previousRealm be previousContext's Realm.
     const previous_realm = previous_context.realm;
 
-    // 9. Perform AsyncGeneratorCompleteStep(generator, completion, false, previousRealm).
-    try asyncGeneratorCompleteStep(agent, generator, completion, false, previous_realm);
+    // 9. Perform AsyncGeneratorCompleteStep(gen, completion, false, previousRealm).
+    try asyncGeneratorCompleteStep(agent, gen, completion, false, previous_realm);
 
-    // 10. Let queue be generator.[[AsyncGeneratorQueue]].
-    const queue = &generator.fields.async_generator_queue;
+    // 10. Let queue be gen.[[AsyncGeneratorQueue]].
+    const queue = &gen.fields.async_generator_queue;
 
     // 11. If queue is not empty, then
     if (queue.items.len != 0) {
@@ -638,8 +634,8 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
         return asyncGeneratorUnwrapYieldResumption(agent, resumption_value);
     }
 
-    // 12. Set generator.[[AsyncGeneratorState]] to suspended-yield.
-    generator.fields.async_generator_state = .suspended_yield;
+    // 12. Set gen.[[AsyncGeneratorState]] to suspended-yield.
+    gen.fields.async_generator_state = .suspended_yield;
 
     // 13. Remove genContext from the execution context stack and restore the execution context that
     //     is at the top of the execution context stack as the running execution context.
@@ -648,7 +644,7 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
     // 14. Let callerContext be the running execution context.
     // 15. Resume callerContext passing undefined. If genContext is ever resumed again, let
     //     resumptionValue be the Completion Record with which it is resumed.
-    generator.fields.evaluation_state.suspension_result = .undefined;
+    gen.fields.evaluation_state.suspension_result = .undefined;
 
     // TODO: 16. Assert: If control reaches here, then genContext is the running execution context
     //           again.
@@ -656,17 +652,17 @@ pub fn asyncGeneratorYield(agent: *Agent, value: Value) Agent.Error!Completion {
     return .{ .normal = .undefined };
 }
 
-/// 27.6.3.10 AsyncGeneratorDrainQueue ( generator )
+/// 27.6.3.10 AsyncGeneratorDrainQueue ( gen )
 /// https://tc39.es/ecma262/#sec-asyncgeneratordrainqueue
 pub fn asyncGeneratorDrainQueue(
     agent: *Agent,
-    generator: *AsyncGenerator,
+    gen: *AsyncGenerator,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
-    std.debug.assert(generator.fields.async_generator_state == .draining_queue);
+    // 1. Assert: gen.[[AsyncGeneratorState]] is draining-queue.
+    std.debug.assert(gen.fields.async_generator_state == .draining_queue);
 
-    // 2. Let queue be generator.[[AsyncGeneratorQueue]].
-    const queue = &generator.fields.async_generator_queue;
+    // 2. Let queue be gen.[[AsyncGeneratorQueue]].
+    const queue = &gen.fields.async_generator_queue;
 
     // 3. Repeat, while queue is not empty,
     while (queue.items.len != 0) {
@@ -678,8 +674,8 @@ pub fn asyncGeneratorDrainQueue(
 
         // c. If completion is a return completion, then
         if (completion == .@"return") {
-            // i. Perform AsyncGeneratorAwaitReturn(generator).
-            try asyncGeneratorAwaitReturn(agent, generator);
+            // i. Perform AsyncGeneratorAwaitReturn(gen).
+            try asyncGeneratorAwaitReturn(agent, gen);
 
             // ii. Return unused.
             return;
@@ -691,29 +687,29 @@ pub fn asyncGeneratorDrainQueue(
             completion = .{ .normal = .undefined };
         }
 
-        // e. Perform AsyncGeneratorCompleteStep(generator, completion, true).
-        try asyncGeneratorCompleteStep(agent, generator, completion, true, null);
+        // e. Perform AsyncGeneratorCompleteStep(gen, completion, true).
+        try asyncGeneratorCompleteStep(agent, gen, completion, true, null);
     }
 
-    // 4. Set generator.[[AsyncGeneratorState]] to completed.
-    generator.fields.async_generator_state = .completed;
+    // 4. Set gen.[[AsyncGeneratorState]] to completed.
+    gen.fields.async_generator_state = .completed;
 
     // 5. Return unused.
 }
 
-/// 27.6.3.9 AsyncGeneratorAwaitReturn ( generator )
+/// 27.6.3.9 AsyncGeneratorAwaitReturn ( gen )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorawaitreturn
 pub fn asyncGeneratorAwaitReturn(
     agent: *Agent,
-    generator: *AsyncGenerator,
+    gen: *AsyncGenerator,
 ) std.mem.Allocator.Error!void {
     const realm = agent.currentRealm();
 
-    // 1. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
-    std.debug.assert(generator.fields.async_generator_state == .draining_queue);
+    // 1. Assert: gen.[[AsyncGeneratorState]] is draining-queue.
+    std.debug.assert(gen.fields.async_generator_state == .draining_queue);
 
-    // 2. Let queue be generator.[[AsyncGeneratorQueue]].
-    const queue = &generator.fields.async_generator_queue;
+    // 2. Let queue be gen.[[AsyncGeneratorQueue]].
+    const queue = &gen.fields.async_generator_queue;
 
     // 3. Assert: queue is not empty.
     std.debug.assert(queue.items.len != 0);
@@ -742,11 +738,11 @@ pub fn asyncGeneratorAwaitReturn(
             const exception = agent.clearException();
             const promise_completion: Completion = .{ .throw = exception.value };
 
-            // a. Perform AsyncGeneratorCompleteStep(generator, promiseCompletion, true).
-            try asyncGeneratorCompleteStep(agent, generator, promise_completion, true, null);
+            // a. Perform AsyncGeneratorCompleteStep(gen, promiseCompletion, true).
+            try asyncGeneratorCompleteStep(agent, gen, promise_completion, true, null);
 
-            // b. Perform AsyncGeneratorDrainQueue(generator).
-            try asyncGeneratorDrainQueue(agent, generator);
+            // b. Perform AsyncGeneratorDrainQueue(gen).
+            try asyncGeneratorDrainQueue(agent, gen);
 
             // c. Return unused.
             return;
@@ -754,33 +750,33 @@ pub fn asyncGeneratorAwaitReturn(
     };
 
     const Captures = struct {
-        generator: *AsyncGenerator,
+        gen: *AsyncGenerator,
     };
     const captures = try agent.gc_allocator.create(Captures);
     captures.* = .{
-        .generator = generator,
+        .gen = gen,
     };
 
-    // 11. Let fulfilledClosure be a new Abstract Closure with parameters (value) that captures
-    //     generator and performs the following steps when called:
+    // 11. Let fulfilledClosure be a new Abstract Closure with parameters (value) that captures gen
+    //     and performs the following steps when called:
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
             const captures_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
-            const generator_ = captures_.generator;
+            const gen_ = captures_.gen;
             const value = arguments_.get(0);
 
-            // a. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
-            std.debug.assert(generator_.fields.async_generator_state == .draining_queue);
+            // a. Assert: gen.[[AsyncGeneratorState]] is draining-queue.
+            std.debug.assert(gen_.fields.async_generator_state == .draining_queue);
 
             // b. Let result be NormalCompletion(value).
             const result: Completion = .{ .normal = value };
 
-            // c. Perform AsyncGeneratorCompleteStep(generator, result, true).
-            try asyncGeneratorCompleteStep(agent_, generator_, result, true, null);
+            // c. Perform AsyncGeneratorCompleteStep(gen, result, true).
+            try asyncGeneratorCompleteStep(agent_, gen_, result, true, null);
 
-            // d. Perform AsyncGeneratorDrainQueue(generator).
-            try asyncGeneratorDrainQueue(agent_, generator_);
+            // d. Perform AsyncGeneratorDrainQueue(gen).
+            try asyncGeneratorDrainQueue(agent_, gen_);
 
             // e. Return NormalCompletion(undefined).
             return .undefined;
@@ -796,26 +792,26 @@ pub fn asyncGeneratorAwaitReturn(
         .{ .additional_fields = captures },
     );
 
-    // 13. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures
-    //     generator and performs the following steps when called:
+    // 13. Let rejectedClosure be a new Abstract Closure with parameters (reason) that captures gen
+    //     and performs the following steps when called:
     const rejected_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
             const captures_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
-            const generator_ = captures_.generator;
+            const gen_ = captures_.gen;
             const reason = arguments_.get(0);
 
-            // a. Assert: generator.[[AsyncGeneratorState]] is draining-queue.
-            std.debug.assert(generator_.fields.async_generator_state == .draining_queue);
+            // a. Assert: gen.[[AsyncGeneratorState]] is draining-queue.
+            std.debug.assert(gen_.fields.async_generator_state == .draining_queue);
 
             // b. Let result be ThrowCompletion(reason).
             const result: Completion = .{ .throw = reason };
 
-            // c. Perform AsyncGeneratorCompleteStep(generator, result, true).
-            try asyncGeneratorCompleteStep(agent_, generator_, result, true, null);
+            // c. Perform AsyncGeneratorCompleteStep(gen, result, true).
+            try asyncGeneratorCompleteStep(agent_, gen_, result, true, null);
 
-            // d. Perform AsyncGeneratorDrainQueue(generator).
-            try asyncGeneratorDrainQueue(agent_, generator_);
+            // d. Perform AsyncGeneratorDrainQueue(gen).
+            try asyncGeneratorDrainQueue(agent_, gen_);
 
             // e. Return NormalCompletion(undefined).
             return .undefined;

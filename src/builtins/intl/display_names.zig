@@ -32,7 +32,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "DisplayNames",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -95,8 +95,8 @@ pub const constructor = struct {
         // 4. Set options to optionsResolution.[[Options]].
         const options = options_resolution.options;
 
-        // 5. Let r be optionsResolution.[[ResolvedLocale]].
-        const r = options_resolution.resolved_locale;
+        // 5. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+        const resolved_locale = options_resolution.resolved_locale;
 
         // 6. Let style be ? GetOption(options, "style", string, « "narrow", "short", "long" »,
         //    "long").
@@ -171,10 +171,10 @@ pub const constructor = struct {
         // 12. Set displayNames.[[Fallback]] to fallback.
         display_names.fields.options.fallback = fallback;
 
-        // 13. Set displayNames.[[Locale]] to r.[[Locale]].
-        display_names.fields.locale = r.locale;
+        // 13. Set displayNames.[[Locale]] to resolvedLocale.[[Locale]].
+        display_names.fields.locale = resolved_locale.locale;
 
-        // 14. Let resolvedLocaleData be r.[[LocaleData]].
+        // 14. Let resolvedLocaleData be resolvedLocale.[[LocaleData]].
         // 15. Let types be resolvedLocaleData.[[types]].
         // 16. Assert: types is a Record (see 12.2.3).
 
@@ -264,11 +264,11 @@ pub const prototype = struct {
         );
 
         // 4. For each row of Table 18, except the header row, in table order, do
-        //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of displayNames's internal slot whose name is the Internal Slot
-        //        value of the current row.
-        //     c. If v is not undefined, then
-        //         i. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //     a. Let propertyKey be the Property value of the current row.
+        //     b. Let value be the value of displayNames's internal slot whose name is the Internal
+        //        Slot value of the current row.
+        //     c. If value is not undefined, then
+        //         i. Perform ! CreateDataPropertyOrThrow(options, propertyKey, value).
         const resolved_options = display_names.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,

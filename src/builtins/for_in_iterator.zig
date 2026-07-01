@@ -17,9 +17,9 @@ const Value = types.Value;
 const createIteratorResultObject = types.createIteratorResultObject;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 14.7.5.10.1 CreateForInIterator ( object )
+/// 14.7.5.10.1 CreateForInIterator ( obj )
 /// https://tc39.es/ecma262/#sec-createforiniterator
-pub fn createForInIterator(agent: *Agent, object: *Object) std.mem.Allocator.Error!*ForInIterator {
+pub fn createForInIterator(agent: *Agent, obj: *Object) std.mem.Allocator.Error!*ForInIterator {
     const realm = agent.currentRealm();
 
     // 1. Let iterator be OrdinaryObjectCreate(%ForInIteratorPrototype%, « [[Object]],
@@ -29,8 +29,8 @@ pub fn createForInIterator(agent: *Agent, object: *Object) std.mem.Allocator.Err
         .prototype = try realm.intrinsics.@"%ForInIteratorPrototype%"(),
         .fields = .{
             .state = .{
-                // 2. Set iterator.[[Object]] to object.
-                .object = object,
+                // 2. Set iterator.[[Object]] to obj.
+                .object = obj,
 
                 // 3. Set iterator.[[ObjectWasVisited]] to false.
                 .object_was_visited = false,
@@ -59,9 +59,10 @@ pub const prototype = struct {
     /// 14.7.5.10.2.1 %ForInIteratorPrototype%.next ( )
     /// https://tc39.es/ecma262/#sec-%foriniteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. Assert: O is an Object.
-        // 3. Assert: O has all of the internal slots of a For-In Iterator instance (14.7.5.10.3).
+        // 1. Let iterator be the this value.
+        // 2. Assert: iterator is an Object.
+        // 3. Assert: iterator has all of the internal slots of a For-In Iterator instance
+        //    (14.7.5.10.3).
         std.debug.assert(this_value.isObject());
         std.debug.assert(this_value.asObject().is(ForInIterator));
         const for_in_iterator = this_value.asObject().as(ForInIterator);
@@ -70,61 +71,61 @@ pub const prototype = struct {
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
-        // 4. Let object be O.[[Object]].
-        var object = for_in_iterator.fields.state.object;
+        // 4. Let obj be iterator.[[Object]].
+        var obj = for_in_iterator.fields.state.object;
 
         // 5. Repeat,
         while (true) {
-            // a. If O.[[ObjectWasVisited]] is false, then
+            // a. If iterator.[[ObjectWasVisited]] is false, then
             if (!for_in_iterator.fields.state.object_was_visited) {
-                // i. Let keys be ? object.[[OwnPropertyKeys]]().
-                const keys = try object.internalMethods().ownPropertyKeys(agent, object);
+                // i. Let keys be ? obj.[[OwnPropertyKeys]]().
+                const keys = try obj.internalMethods().ownPropertyKeys(agent, obj);
                 defer agent.gc_allocator.free(keys);
 
                 // ii. For each element key of keys, do
                 for (keys) |key| {
                     // 1. If key is a String, then
                     if (key == .string or key == .integer_index) {
-                        // a. Append key to O.[[RemainingKeys]].
+                        // a. Append key to iterator.[[RemainingKeys]].
                         try for_in_iterator.fields.state.remaining_keys.append(agent.gc_allocator, key);
                     }
                 }
 
-                // iii. Set O.[[ObjectWasVisited]] to true.
+                // iii. Set iterator.[[ObjectWasVisited]] to true.
                 for_in_iterator.fields.state.object_was_visited = true;
             }
 
-            // b. Repeat, while O.[[RemainingKeys]] is not empty,
+            // b. Repeat, while iterator.[[RemainingKeys]] is not empty,
             while (for_in_iterator.fields.state.remaining_keys.items.len != 0) {
-                // i. Let r be the first element of O.[[RemainingKeys]].
-                // ii. Remove the first element from O.[[RemainingKeys]].
-                const remaining_key = for_in_iterator.fields.state.remaining_keys.orderedRemove(0);
+                // i. Let key be the first element of iterator.[[RemainingKeys]].
+                // ii. Remove the first element from iterator.[[RemainingKeys]].
+                const key = for_in_iterator.fields.state.remaining_keys.orderedRemove(0);
 
-                // iii. If O.[[VisitedKeys]] does not contain r, then
-                if (!for_in_iterator.fields.state.visited_keys.contains(remaining_key)) {
-                    // 1. Let desc be ? object.[[GetOwnProperty]](r).
-                    const descriptor = try object.internalMethods().getOwnProperty(
+                // iii. If iterator.[[VisitedKeys]] does not contain key, then
+                if (!for_in_iterator.fields.state.visited_keys.contains(key)) {
+                    // 1. Let propertyDesc be ? obj.[[GetOwnProperty]](key).
+                    const property_desc = try obj.internalMethods().getOwnProperty(
                         agent,
-                        object,
-                        remaining_key,
+                        obj,
+                        key,
                     );
 
-                    // 2. If desc is not undefined, then
-                    if (descriptor != null) {
-                        // a. Append r to O.[[VisitedKeys]].
+                    // 2. If propertyDesc is not undefined, then
+                    if (property_desc != null) {
+                        // a. Append key to iterator.[[VisitedKeys]].
                         try for_in_iterator.fields.state.visited_keys.putNoClobber(
                             agent.gc_allocator,
-                            remaining_key,
+                            key,
                             {},
                         );
 
-                        // b. If desc.[[Enumerable]] is true, return CreateIteratorResultObject(r,
-                        //    false).
-                        if (descriptor.?.enumerable == true) {
+                        // b. If propertyDesc.[[Enumerable]] is true, return
+                        //    CreateIteratorResultObject(key, false).
+                        if (property_desc.?.enumerable == true) {
                             return Value.from(
                                 try createIteratorResultObject(
                                     agent,
-                                    try remaining_key.toValue(agent),
+                                    try key.toValue(agent),
                                     false,
                                 ),
                             );
@@ -133,17 +134,17 @@ pub const prototype = struct {
                 }
             }
 
-            // c. Set object to ? object.[[GetPrototypeOf]]().
-            object = (try object.internalMethods().getPrototypeOf(agent, object)) orelse {
-                // f. If object is null, return CreateIteratorResultObject(undefined, true).
+            // c. Set obj to ? obj.[[GetPrototypeOf]]().
+            obj = (try obj.internalMethods().getPrototypeOf(agent, obj)) orelse {
+                // f. If obj is null, return CreateIteratorResultObject(undefined, true).
                 for_in_iterator.fields = .completed;
                 return Value.from(try createIteratorResultObject(agent, .undefined, true));
             };
 
-            // d. Set O.[[Object]] to object.
-            for_in_iterator.fields.state.object = object;
+            // d. Set iterator.[[Object]] to obj.
+            for_in_iterator.fields.state.object = obj;
 
-            // e. Set O.[[ObjectWasVisited]] to false.
+            // e. Set iterator.[[ObjectWasVisited]] to false.
             for_in_iterator.fields.state.object_was_visited = false;
         }
     }

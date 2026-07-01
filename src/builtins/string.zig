@@ -32,7 +32,7 @@ const regExpCreate = builtins.regExpCreate;
 
 pub const StringPadPlacement = enum { start, end };
 
-/// 22.1.3.17.2 StringPad ( S, maxLength, fillString, placement )
+/// 22.1.3.17.2 StringPad ( string, maxLength, fillString, placement )
 /// https://tc39.es/ecma262/#sec-stringpad
 pub fn stringPad(
     agent: *Agent,
@@ -41,41 +41,41 @@ pub fn stringPad(
     fill_string: *const types.String,
     placement: StringPadPlacement,
 ) Agent.Error!*const types.String {
-    // 1. Let stringLength be the length of S.
+    // 1. Let stringLength be the length of string.
     const string_length = string.length;
 
-    // 2. If maxLength ≤ stringLength, return S.
+    // 2. If maxLength ≤ stringLength, return string.
     if (max_length <= string_length) return string;
 
-    // 3. If fillString is the empty String, return S.
+    // 3. If fillString is the empty String, return string.
     if (fill_string.isEmpty()) return string;
 
-    // 4. Let fillLen be maxLength - stringLength.
-    const fill_len = max_length - string_length;
+    // 4. Let fillLength be maxLength - stringLength.
+    const fill_length = max_length - string_length;
 
     // 5. Let truncatedStringFiller be the String value consisting of repeated concatenations of
-    //    fillString truncated to length fillLen.
+    //    fillString truncated to length fillLength.
     const truncated_string_filler = switch (fill_string.asAsciiOrUtf16()) {
         .ascii => |ascii| blk: {
-            const repeated_code_units = try agent.gc_allocator.alloc(u8, fill_len);
+            const repeated_code_units = try agent.gc_allocator.alloc(u8, fill_length);
             var i: u32 = 0;
-            while (i < fill_len) : (i += fill_string.length) {
-                const copy_end = @min(i + fill_string.length, fill_len);
+            while (i < fill_length) : (i += fill_string.length) {
+                const copy_end = @min(i + fill_string.length, fill_length);
                 const dest = repeated_code_units[i..copy_end];
                 @memcpy(dest, ascii[0..dest.len]);
             }
             break :blk try types.String.fromAscii(agent, repeated_code_units);
         },
         .utf16 => |utf16| blk: {
-            const repeated_code_units = try agent.gc_allocator.alloc(u16, fill_len);
+            const repeated_code_units = try agent.gc_allocator.alloc(u16, fill_length);
             var i: u32 = 0;
-            while (i < fill_len) : (i += fill_string.length) {
-                const copy_end = @min(i + fill_string.length, fill_len);
+            while (i < fill_length) : (i += fill_string.length) {
+                const copy_end = @min(i + fill_string.length, fill_length);
                 const dest = repeated_code_units[i..copy_end];
                 @memcpy(dest, utf16[0..dest.len]);
             }
             // No truncation, assume resulting string must be UTF-16
-            if (fill_len >= fill_string.length) {
+            if (fill_length >= fill_string.length) {
                 break :blk try types.String.fromUtf16(agent, repeated_code_units);
             }
             // Check if fill string contains non-ASCII code units
@@ -85,7 +85,7 @@ pub fn stringPad(
                 }
             }
             // Fill string was truncated to only ASCII code units, convert
-            const repeated_code_units_ascii = try agent.gc_allocator.alloc(u8, fill_len);
+            const repeated_code_units_ascii = try agent.gc_allocator.alloc(u8, fill_length);
             for (repeated_code_units, 0..) |c, i_| {
                 repeated_code_units_ascii[i_] = @intCast(c);
             }
@@ -95,12 +95,13 @@ pub fn stringPad(
     };
 
     switch (placement) {
-        // 6. If placement is start, return the string-concatenation of truncatedStringFiller and S.
+        // 6. If placement is start, return the string-concatenation of truncatedStringFiller and
+        //    string.
         .start => return types.String.concat(agent, &.{
             truncated_string_filler,
             string,
         }),
-        // 7. Return the string-concatenation of S and truncatedStringFiller.
+        // 7. Return the string-concatenation of string and truncatedStringFiller.
         .end => return types.String.concat(agent, &.{
             string,
             truncated_string_filler,
@@ -108,19 +109,19 @@ pub fn stringPad(
     }
 }
 
-/// 22.1.3.19.1 GetSubstitution ( matched, str, position, captures, namedCaptures, replacementTemplate )
+/// 22.1.3.19.1 GetSubstitution ( matched, string, position, captures, namedCaptures, replacementTemplate )
 /// https://tc39.es/ecma262/#sec-getsubstitution
 pub fn getSubstitution(
     agent: *Agent,
     matched: *const types.String,
-    str: *const types.String,
+    string: *const types.String,
     position: u32,
     captures: []const ?*const types.String,
     named_captures: ?*Object,
     replacement_template: *const types.String,
 ) Agent.Error!*const types.String {
-    // 1. Let stringLength be the length of str.
-    const string_length = str.length;
+    // 1. Let stringLength be the length of string.
+    const string_length = string.length;
 
     // 2. Assert: position ≤ stringLength.
     std.debug.assert(position <= string_length);
@@ -150,8 +151,8 @@ pub fn getSubstitution(
             // i. Let ref be "$`".
             const ref = types.String.fromLiteral("$`");
 
-            // ii. Let refReplacement be the substring of str from 0 to position.
-            const ref_replacement = try str.substring(agent, 0, position);
+            // ii. Let refReplacement be the substring of string from 0 to position.
+            const ref_replacement = try string.substring(agent, 0, position);
 
             break :blk .{ ref, ref_replacement };
         } else if (template_reminder.startsWith(types.String.fromLiteral("$&"))) blk: {
@@ -172,16 +173,17 @@ pub fn getSubstitution(
             // ii. Let matchLength be the length of matched.
             const match_length = matched.length;
 
-            // iii. Let tailPos be position + matchLength.
-            const tail_pos = position +| match_length;
+            // iii. Let tailPosition be position + matchLength.
+            const tail_position = position +| match_length;
 
-            // iv. Let refReplacement be the substring of str from min(tailPos, stringLength).
-            // v. NOTE: tailPos can exceed stringLength only if this abstract operation was invoked
-            //    by a call to the intrinsic %Symbol.replace% method of %RegExp.prototype% on an
-            //    object whose "exec" property is not the intrinsic %RegExp.prototype.exec%.
-            const ref_replacement = try str.substring(
+            // iv. Let refReplacement be the substring of string from min(tailPosition,
+            //     stringLength).
+            // v. NOTE: tailPosition can exceed stringLength only if this abstract operation was
+            //    invoked by a call to the intrinsic %Symbol.replace% method of %RegExp.prototype%
+            //    on an object whose "exec" property is not the intrinsic %RegExp.prototype.exec%.
+            const ref_replacement = try string.substring(
                 agent,
-                @min(tail_pos, string_length),
+                @min(tail_position, string_length),
                 null,
             );
 
@@ -211,11 +213,11 @@ pub fn getSubstitution(
             // iv. Assert: 0 ≤ index ≤ 99.
             std.debug.assert(index <= 99);
 
-            // v. Let captureLen be the number of elements in captures.
-            const capture_len = captures.len;
+            // v. Let captureLength be the number of elements in captures.
+            const capture_length = captures.len;
 
-            // vi. If index > captureLen and digitCount = 2, then
-            if (index > capture_len and digit_count == 2) {
+            // vi. If index > captureLength and digitCount = 2, then
+            if (index > capture_length and digit_count == 2) {
                 // 1. NOTE: When a two-digit replacement pattern specifies an index exceeding the
                 //    count of capturing groups, it is treated as a one-digit replacement pattern
                 //    followed by a literal digit.
@@ -233,8 +235,8 @@ pub fn getSubstitution(
             // vii. Let ref be the substring of templateRemainder from 0 to 1 + digitCount.
             const ref = try template_reminder.substring(agent, 0, 1 + digit_count);
 
-            // viii. If 1 ≤ index ≤ captureLen, then
-            const ref_replacement: *const types.String = if (index >= 1 and index <= capture_len) blk_ref_replacement: {
+            // viii. If 1 ≤ index ≤ captureLength, then
+            const ref_replacement: *const types.String = if (index >= 1 and index <= capture_length) blk_ref_replacement: {
                 // 1. Let capture be captures[index - 1].
                 const capture = captures[index - 1];
 
@@ -256,11 +258,11 @@ pub fn getSubstitution(
             break :blk .{ ref, ref_replacement };
         } else if (template_reminder.startsWith(types.String.fromLiteral("$<"))) blk: {
             // g. Else if templateRemainder starts with "$<", then
-            // i. Let gtPos be StringIndexOf(templateRemainder, ">", 0).
-            const gt_pos = template_reminder.indexOf(types.String.fromLiteral(">"), 0);
+            // i. Let gtPosition be StringIndexOf(templateRemainder, ">", 0).
+            const gt_position = template_reminder.indexOf(types.String.fromLiteral(">"), 0);
 
-            // ii. If gtPos is not-found or namedCaptures is undefined, then
-            if (gt_pos == null or named_captures == null) {
+            // ii. If gtPosition is not-found or namedCaptures is undefined, then
+            if (gt_position == null or named_captures == null) {
                 // 1. Let ref be "$<".
                 const ref = types.String.fromLiteral("$<");
 
@@ -270,11 +272,11 @@ pub fn getSubstitution(
                 break :blk .{ ref, ref_replacement };
             } else {
                 // iii. Else,
-                // 1. Let ref be the substring of templateRemainder from 0 to gtPos + 1.
-                const ref = try template_reminder.substring(agent, 0, gt_pos.? + 1);
+                // 1. Let ref be the substring of templateRemainder from 0 to gtPosition + 1.
+                const ref = try template_reminder.substring(agent, 0, gt_position.? + 1);
 
-                // 2. Let groupName be the substring of templateRemainder from 2 to gtPos.
-                const group_name = try template_reminder.substring(agent, 2, gt_pos.?);
+                // 2. Let groupName be the substring of templateRemainder from 2 to gtPosition.
+                const group_name = try template_reminder.substring(agent, 2, gt_position.?);
 
                 // 3. Assert: namedCaptures is an Object.
                 std.debug.assert(named_captures != null);
@@ -318,96 +320,93 @@ pub fn getSubstitution(
     return result.build(agent);
 }
 
-/// 10.4.3.1 [[GetOwnProperty]] ( P )
+/// 10.4.3.1 [[GetOwnProperty]] ( propertyKey )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-getownproperty-p
 fn getOwnProperty(
     agent: *Agent,
-    object: *Object,
+    obj: *Object,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
-    // 1. Let desc be OrdinaryGetOwnProperty(S, P).
-    const property_descriptor = ordinaryGetOwnProperty(object, property_key) catch unreachable;
+    // 1. Let propertyDesc be OrdinaryGetOwnProperty(string, propertyKey).
+    const property_desc = ordinaryGetOwnProperty(obj, property_key) catch unreachable;
 
-    // 2. If desc is not undefined, return desc.
-    if (property_descriptor != null) return property_descriptor;
+    // 2. If propertyDesc is not undefined, return propertyDesc.
+    if (property_desc != null) return property_desc;
 
-    // 3. Return StringGetOwnProperty(S, P).
-    return stringGetOwnProperty(agent, object.as(String), property_key);
+    // 3. Return StringGetOwnProperty(string, propertyKey).
+    return stringGetOwnProperty(agent, obj.as(String), property_key);
 }
 
-/// 10.4.3.2 [[DefineOwnProperty]] ( P, Desc )
+/// 10.4.3.2 [[DefineOwnProperty]] ( propertyKey, propertyDesc )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-defineownproperty-p-desc
 fn defineOwnProperty(
     agent: *Agent,
-    object: *Object,
+    obj: *Object,
     property_key: PropertyKey,
-    property_descriptor: PropertyDescriptor,
+    property_desc: PropertyDescriptor,
 ) std.mem.Allocator.Error!bool {
-    const string = object.as(String);
+    const string = obj.as(String);
 
-    // 1. Let stringDesc be StringGetOwnProperty(S, P).
-    const maybe_string_property_descriptor = try stringGetOwnProperty(agent, string, property_key);
+    // 1. Let stringDesc be StringGetOwnProperty(string, propertyKey).
+    const maybe_string_desc = try stringGetOwnProperty(agent, string, property_key);
 
     // 2. If stringDesc is not undefined, then
-    if (maybe_string_property_descriptor) |string_property_descriptor| {
-        // a. Let extensible be S.[[Extensible]].
+    if (maybe_string_desc) |string_desc| {
+        // a. Let extensible be string.[[Extensible]].
         const extensible = string.object.extensible();
 
-        // b. Return IsCompatiblePropertyDescriptor(extensible, Desc, stringDesc).
+        // b. Return IsCompatiblePropertyDescriptor(extensible, propertyDesc, stringDesc).
         return isCompatiblePropertyDescriptor(
             extensible,
-            property_descriptor,
-            string_property_descriptor,
+            property_desc,
+            string_desc,
         );
     }
 
-    // 3. Return ! OrdinaryDefineOwnProperty(S, P, Desc).
+    // 3. Return ! OrdinaryDefineOwnProperty(string, propertyKey, propertyDesc).
     return ordinaryDefineOwnProperty(
         agent,
-        object,
+        obj,
         property_key,
-        property_descriptor,
+        property_desc,
     ) catch |err| try noexcept(err);
 }
 
 /// 10.4.3.3 [[OwnPropertyKeys]] ( )
 /// https://tc39.es/ecma262/#sec-string-exotic-objects-ownpropertykeys
-fn ownPropertyKeys(
-    agent: *Agent,
-    object: *Object,
-) std.mem.Allocator.Error![]PropertyKey {
-    const indexed_properties = object.indexedProperties();
+fn ownPropertyKeys(agent: *Agent, obj: *Object) std.mem.Allocator.Error![]PropertyKey {
+    const indexed_properties = obj.indexedProperties();
 
-    // 2. Let str be O.[[StringData]].
-    // 3. Assert: str is a String.
-    const str = object.as(String).fields.string_data;
+    // 2. Let string be obj.[[StringData]].
+    // 3. Assert: string is a String.
+    const string = obj.as(String).fields.string_data;
 
-    // 4. Let len be the length of str.
-    const len = str.length;
+    // 4. Let length be the length of string.
+    const length = string.length;
 
     // 1. Let keys be a new empty List.
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
         indexed_properties.count() +
-            object.shape.properties.count() +
-            len,
+            obj.shape.properties.count() +
+            length,
     );
 
-    // 5. For each integer i such that 0 ≤ i < len, in ascending order, do
-    for (0..len) |i| {
+    // 5. For each integer i such that 0 ≤ i < length, in ascending order, do
+    for (0..length) |i| {
         // a. Append ! ToString(𝔽(i)) to keys.
         keys.appendAssumeCapacity(PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))));
     }
 
-    // 6. For each own property key P of O such that P is an array index and ! ToIntegerOrInfinity(
-    //    P) ≥ len, in ascending numeric index order, do
-    //     a. Append P to keys.
+    // 6. For each own property key propertyKey of obj such that propertyKey is an array index and
+    //    ! ToIntegerOrInfinity(propertyKey) ≥ length, in ascending numeric index order, do
+    //     a. Append propertyKey to keys.
     switch (indexed_properties.storage) {
         .none => {},
         inline .sparse_value, .sparse_property_descriptor => |sparse| {
             var it = sparse.keyIterator();
             while (it.next()) |index| {
-                if (index.* < len) continue;
+                if (index.* < length) continue;
                 const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index.*)));
                 keys.appendAssumeCapacity(property_key);
             }
@@ -418,29 +417,30 @@ fn ownPropertyKeys(
             }.lessThanFn);
         },
         else => {
-            for (len..indexed_properties.count()) |index| {
+            for (length..indexed_properties.count()) |index| {
                 const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
                 keys.appendAssumeCapacity(property_key);
             }
         },
     }
 
-    // 7. For each own property key P of O such that P is a String and P is not an array index, in
-    //    ascending chronological order of property creation, do
-    for (object.shape.properties.keys()) |property_key| {
+    // 7. For each own property key propertyKey of obj such that propertyKey is a String and
+    //    propertyKey is not an array index, in ascending chronological order of property creation,
+    //    do
+    for (obj.shape.properties.keys()) |property_key| {
         if (property_key == .string or property_key == .integer_index) {
             std.debug.assert(!property_key.isArrayIndex());
 
-            // a. Append P to keys.
+            // a. Append propertyKey to keys.
             keys.appendAssumeCapacity(property_key);
         }
     }
 
-    // 8. For each own property key P of O such that P is a Symbol, in ascending chronological order
-    //    of property creation, do
-    for (object.shape.properties.keys()) |property_key| {
+    // 8. For each own property key propertyKey of obj such that propertyKey is a Symbol, in
+    //    ascending chronological order of property creation, do
+    for (obj.shape.properties.keys()) |property_key| {
         if (property_key == .symbol) {
-            // a. Append P to keys.
+            // a. Append propertyKey to keys.
             keys.appendAssumeCapacity(property_key);
         }
     }
@@ -449,31 +449,31 @@ fn ownPropertyKeys(
     return keys.toOwnedSlice(agent.gc_allocator);
 }
 
-/// 10.4.3.4 StringCreate ( value, prototype )
+/// 10.4.3.4 StringCreate ( value, proto )
 /// https://tc39.es/ecma262/#sec-stringcreate
 pub fn stringCreate(
     agent: *Agent,
     value: *const types.String,
-    prototype_: *Object,
+    proto: *Object,
 ) std.mem.Allocator.Error!*String {
-    // 1. Let S be MakeBasicObject(« [[Prototype]], [[Extensible]], [[StringData]] »).
-    const string = try String.create(agent, .{
-        // 2. Set S.[[Prototype]] to prototype.
-        .prototype = prototype_,
+    // 1. Let string be MakeBasicObject(« [[Prototype]], [[Extensible]], [[StringData]] »).
+    const string_obj = try String.create(agent, .{
+        // 2. Set string.[[Prototype]] to proto.
+        .prototype = proto,
 
         .fields = .{
-            // 3. Set S.[[StringData]] to value.
+            // 3. Set string.[[StringData]] to value.
             .string_data = value,
         },
 
         .internal_methods = .initComptime(.{
-            // 4. Set S.[[GetOwnProperty]] as specified in 10.4.3.1.
+            // 4. Set string.[[GetOwnProperty]] as specified in 10.4.3.1.
             .getOwnProperty = getOwnProperty,
 
-            // 5. Set S.[[DefineOwnProperty]] as specified in 10.4.3.2.
+            // 5. Set string.[[DefineOwnProperty]] as specified in 10.4.3.2.
             .defineOwnProperty = defineOwnProperty,
 
-            // 6. Set S.[[OwnPropertyKeys]] as specified in 10.4.3.3.
+            // 6. Set string.[[OwnPropertyKeys]] as specified in 10.4.3.3.
             .ownPropertyKeys = ownPropertyKeys,
         }),
     });
@@ -481,50 +481,57 @@ pub fn stringCreate(
     // 7. Let length be the length of value.
     const length = value.length;
 
-    // 8. Perform ! DefinePropertyOrThrow(S, "length", PropertyDescriptor { [[Value]]: 𝔽(length),
-    //    [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: false }).
-    try string.object.definePropertyDirect(agent, PropertyKey.from("length"), .{
+    // 8. Perform ! DefinePropertyOrThrow(string, "length", PropertyDescriptor {
+    //    [[Value]]: 𝔽(length), [[Writable]]: false, [[Enumerable]]: false,
+    //    [[Configurable]]: false }).
+    try string_obj.object.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value_or_accessor = .{
             .value = Value.from(length),
         },
         .attributes = .none,
     });
 
-    // 9. Return S.
-    return string;
+    // 9. Return string.
+    return string_obj;
 }
 
-/// 10.4.3.5 StringGetOwnProperty ( S, P )
+/// 10.4.3.5 StringGetOwnProperty ( string, propertyKey )
 /// https://tc39.es/ecma262/#sec-stringgetownproperty
 fn stringGetOwnProperty(
     agent: *Agent,
-    string: *const String,
+    string_obj: *const String,
     property_key: PropertyKey,
 ) std.mem.Allocator.Error!?PropertyDescriptor {
-    // 1. If P is not a String, return undefined.
-    // 2. Let index be CanonicalNumericIndexString(P).
-    // 3. If index is not an integral Number, return undefined.
-    // 4. If index is -0𝔽 or index < -0𝔽, return undefined.
+    // 1. If propertyKey is not a String, return undefined.
+    // 2. Let numericIndex be CanonicalNumericIndexString(propertyKey).
+    // 3. If numericIndex is not an integral Number, return undefined.
+    // 4. If numericIndex is -0𝔽 or numericIndex < -0𝔽, return undefined.
     if (property_key != .integer_index) return null;
     if (property_key.integer_index > std.math.maxInt(u32) - 1) return null;
-    const index: u32 = @intCast(property_key.integer_index);
+    const numeric_index: u32 = @intCast(property_key.integer_index);
 
-    // 5. Let str be S.[[StringData]].
-    // 6. Assert: str is a String.
-    const str = string.fields.string_data;
+    // 5. Let stringData be string.[[StringData]].
+    // 6. Assert: stringData is a String.
+    const string = string_obj.fields.string_data;
 
-    // 7. Let len be the length of str.
-    const len = str.length;
+    // 7. Let length be the length of stringData.
+    const length = string.length;
 
-    // 8. If ℝ(index) ≥ len, return undefined.
-    if (index >= len) return null;
+    // 8. If ℝ(numericIndex) ≥ length, return undefined.
+    if (numeric_index >= length) return null;
 
-    // 9. Let resultStr be the substring of str from ℝ(index) to ℝ(index) + 1.
-    const result_str = try str.substring(agent, index, index + 1);
+    // 9. Let resultString be the substring of stringData from ℝ(numericIndex) to
+    //    ℝ(numericIndex) + 1.
+    const result_string = try string.substring(agent, numeric_index, numeric_index + 1);
 
-    // 10. Return the PropertyDescriptor { [[Value]]: resultStr, [[Writable]]: false,
+    // 10. Return the PropertyDescriptor { [[Value]]: resultString, [[Writable]]: false,
     //     [[Enumerable]]: true, [[Configurable]]: false }.
-    return .{ .value = Value.from(result_str), .writable = false, .enumerable = true, .configurable = false };
+    return .{
+        .value = Value.from(result_string),
+        .writable = false,
+        .enumerable = true,
+        .configurable = false,
+    };
 }
 
 /// 22.1.2 Properties of the String Constructor
@@ -536,7 +543,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "String",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -561,10 +568,10 @@ pub const constructor = struct {
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const value = arguments.get(0);
 
-        const s: *const types.String = blk: {
+        const string: *const types.String = blk: {
             // 1. If value is not present, then
             if (arguments.count() == 0) {
-                // a. Let s be the empty String.
+                // a. Let string be the empty String.
                 break :blk .empty;
             } else {
                 // 2. Else,
@@ -574,22 +581,22 @@ pub const constructor = struct {
                     return Value.from(try value.asSymbol().descriptiveString(agent));
                 }
 
-                // b. Let s be ? ToString(value).
+                // b. Let string be ? ToString(value).
                 break :blk try value.toString(agent);
             }
         };
 
-        // 3. If NewTarget is undefined, return s.
-        if (new_target == null) return Value.from(s);
+        // 3. If NewTarget is undefined, return string.
+        if (new_target == null) return Value.from(string);
 
-        // 4. Return StringCreate(s, ? GetPrototypeFromConstructor(NewTarget,
+        // 4. Return StringCreate(string, ? GetPrototypeFromConstructor(NewTarget,
         //    "%String.prototype%")).
-        const string = try stringCreate(
+        const string_obj = try stringCreate(
             agent,
-            s,
+            string,
             try getPrototypeFromConstructor(agent, new_target.?, "%String.prototype%"),
         );
-        return Value.from(&string.object);
+        return Value.from(&string_obj.object);
     }
 
     /// 22.1.2.1 String.fromCharCode ( ...codeUnits )
@@ -687,7 +694,7 @@ pub const constructor = struct {
         // 5. If literalCount ≤ 0, return the empty String.
         if (literal_count == 0) return Value.from("");
 
-        // 6. Let R be the empty String.
+        // 6. Let result be the empty String.
         var result: types.String.Builder = .empty;
         defer result.deinit(agent.gc_allocator);
 
@@ -696,27 +703,27 @@ pub const constructor = struct {
 
         // 8. Repeat,
         while (true) : (next_index += 1) {
-            // a. Let nextLiteralVal be ? Get(literals, ! ToString(𝔽(nextIndex))).
+            // a. Let nextLiteralValue be ? Get(literals, ! ToString(𝔽(nextIndex))).
             const next_literal_value = try literals.get(agent, PropertyKey.from(next_index));
 
-            // b. Let nextLiteral be ? ToString(nextLiteralVal).
+            // b. Let nextLiteral be ? ToString(nextLiteralValue).
             const next_literal = try next_literal_value.toString(agent);
 
-            // c. Set R to the string-concatenation of R and nextLiteral.
+            // c. Set result to the string-concatenation of result and nextLiteral.
             try result.appendString(agent.gc_allocator, next_literal);
 
-            // d. If nextIndex + 1 = literalCount, return R.
+            // d. If nextIndex + 1 = literalCount, return result.
             if (next_index + 1 == literal_count) return Value.from(try result.build(agent));
 
             // e. If nextIndex < substitutionCount, then
             if (next_index < substitution_count) {
-                // i. Let nextSubVal be substitutions[nextIndex].
+                // i. Let nextSubValue be substitutions[nextIndex].
                 const next_substitution_value = substitutions[@intCast(next_index)];
 
-                // ii. Let nextSub be ? ToString(nextSubVal).
+                // ii. Let nextSub be ? ToString(nextSubValue).
                 const next_substitution = try next_substitution_value.toString(agent);
 
-                // iii. Set R to the string-concatenation of R and nextSub.
+                // iii. Set result to the string-concatenation of result and nextSub.
                 try result.appendString(agent.gc_allocator, next_substitution);
             }
 
@@ -810,17 +817,17 @@ pub const prototype = struct {
         }
     }
 
-    /// 22.1.3.35.1 ThisStringValue ( value )
+    /// 22.1.3.35.1 ThisStringValue ( arg )
     /// https://tc39.es/ecma262/#sec-thisstringvalue
-    fn thisStringValue(agent: *Agent, value: Value) error{ExceptionThrown}!*const types.String {
-        // 1. If value is a String, return value.
-        if (value.isString()) return value.asString();
+    fn thisStringValue(agent: *Agent, arg: Value) error{ExceptionThrown}!*const types.String {
+        // 1. If arg is a String, return arg.
+        if (arg.isString()) return arg.asString();
 
-        // 2. If value is an Object and value has a [[StringData]] internal slot, then
-        if (value.castObject(String)) |string| {
-            // a. Let s be value.[[StringData]].
-            // b. Assert: s is a String.
-            // c. Return s.
+        // 2. If arg is an Object and arg has a [[StringData]] internal slot, then
+        if (arg.castObject(String)) |string| {
+            // a. Let string be arg.[[StringData]].
+            // b. Assert: string is a String.
+            // c. Return string.
             return string.fields.string_data;
         }
 
@@ -837,17 +844,16 @@ pub const prototype = struct {
     fn at(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const index = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let len be the length of S.
-        const len = string.length;
+        // 4. Let length be the length of string.
+        const length = string.length;
 
         // 5. Let relativeIndex be ? ToIntegerOrInfinity(index).
         const relative_index = try index.toIntegerOrInfinity(agent);
@@ -855,66 +861,64 @@ pub const prototype = struct {
         // 6. If relativeIndex ≥ 0, then
         //     a. Let k be relativeIndex.
         // 7. Else,
-        //     a. Let k be len + relativeIndex.
+        //     a. Let k be length + relativeIndex.
         const k_f64 = if (relative_index >= 0)
             relative_index
         else
-            @as(f64, @floatFromInt(len)) + relative_index;
+            @as(f64, @floatFromInt(length)) + relative_index;
 
-        // 8. If k < 0 or k ≥ len, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(len))) return .undefined;
+        // 8. If k < 0 or k ≥ length, return undefined.
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(length))) return .undefined;
         const k = std.math.lossyCast(u32, k_f64);
 
-        // 9. Return the substring of S from k to k + 1.
+        // 9. Return the substring of string from k to k + 1.
         return Value.from(try string.substring(agent, k, k + 1));
     }
 
-    /// 22.1.3.2 String.prototype.charAt ( pos )
+    /// 22.1.3.2 String.prototype.charAt ( position )
     /// https://tc39.es/ecma262/#sec-string.prototype.charat
     fn charAt(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const pos = arguments.get(0);
+        const position_value = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let position be ? ToIntegerOrInfinity(pos).
-        const position_f64 = try pos.toIntegerOrInfinity(agent);
+        // 4. Set position to ? ToIntegerOrInfinity(position).
+        const position_f64 = try position_value.toIntegerOrInfinity(agent);
 
-        // 5. Let size be the length of S.
+        // 5. Let size be the length of string.
         const size = string.length;
 
         // 6. If position < 0 or position ≥ size, return the empty String.
         if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return Value.from("");
         const position = std.math.lossyCast(u32, position_f64);
 
-        // 7. Return the substring of S from position to position + 1.
+        // 7. Return the substring of string from position to position + 1.
         return Value.from(try string.substring(agent, position, position + 1));
     }
 
-    /// 22.1.3.3 String.prototype.charCodeAt ( pos )
+    /// 22.1.3.3 String.prototype.charCodeAt ( position )
     /// https://tc39.es/ecma262/#sec-string.prototype.charcodeat
     fn charCodeAt(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const pos = arguments.get(0);
+        const position_value = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let position be ? ToIntegerOrInfinity(pos).
-        const position_f64 = try pos.toIntegerOrInfinity(agent);
+        // 4. Set position to ? ToIntegerOrInfinity(position).
+        const position_f64 = try position_value.toIntegerOrInfinity(agent);
 
-        // 5. Let size be the length of S.
+        // 5. Let size be the length of string.
         const size = string.length;
 
         // 6. If position < 0 or position ≥ size, return NaN.
@@ -922,54 +926,52 @@ pub const prototype = struct {
         const position = std.math.lossyCast(u32, position_f64);
 
         // 7. Return the Number value for the numeric value of the code unit at index position
-        //    within the String S.
+        //    within the String string.
         return Value.from(string.codeUnitAt(position));
     }
 
-    /// 22.1.3.4 String.prototype.codePointAt ( pos )
+    /// 22.1.3.4 String.prototype.codePointAt ( position )
     /// https://tc39.es/ecma262/#sec-string.prototype.codepointat
     fn codePointAt(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const pos = arguments.get(0);
+        const position_value = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let position be ? ToIntegerOrInfinity(pos).
-        const position_f64 = try pos.toIntegerOrInfinity(agent);
+        // 4. Set position to ? ToIntegerOrInfinity(position).
+        const position_f64 = try position_value.toIntegerOrInfinity(agent);
 
-        // 5. Let size be the length of S.
+        // 5. Let size be the length of string.
         const size = string.length;
 
         // 6. If position < 0 or position ≥ size, return undefined.
         if (position_f64 < 0 or position_f64 >= @as(f64, @floatFromInt(size))) return .undefined;
         const position = std.math.lossyCast(u32, position_f64);
 
-        // 7. Let cp be CodePointAt(S, position).
+        // 7. Let codePoint be CodePointAt(string, position).
         const code_point = string.codePointAt(position);
 
-        // 8. Return 𝔽(cp.[[CodePoint]]).
+        // 8. Return 𝔽(codePoint.[[CodePoint]]).
         return Value.from(code_point.code_point);
     }
 
     /// 22.1.3.5 String.prototype.concat ( ...args )
     /// https://tc39.es/ecma262/#sec-string.prototype.concat
     fn concat(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let R be S.
+        // 4. Let result be string.
         // NOTE: This allocates the exact needed capacity upfront
         var result = try types.String.Builder.initCapacity(agent.gc_allocator, @intCast(arguments.count() + 1));
         defer result.deinit(agent.gc_allocator);
@@ -980,33 +982,32 @@ pub const prototype = struct {
             // a. Let nextString be ? ToString(next).
             const next_string = try next.toString(agent);
 
-            // b. Set R to the string-concatenation of R and nextString.
+            // b. Set result to the string-concatenation of result and nextString.
             result.appendStringAssumeCapacity(next_string);
         }
 
-        // 6. Return R.
+        // 6. Return result.
         return Value.from(try result.build(agent));
     }
 
     /// 22.1.3.7 String.prototype.endsWith ( searchString [ , endPosition ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.endswith
     fn endsWith(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const search_string = arguments.get(0);
+        const search_value = arguments.get(0);
         const end_position = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let isRegExp be ? IsRegExp(searchString).
-        const is_regexp = try search_string.isRegExp(agent);
+        // 4. Let isRegexp be ? IsRegExp(searchString).
+        const is_regexp = try search_value.isRegExp(agent);
 
-        // 5. If isRegExp is true, throw a TypeError exception.
+        // 5. If isRegexp is true, throw a TypeError exception.
         if (is_regexp) {
             return agent.throwException(
                 .type_error,
@@ -1015,24 +1016,24 @@ pub const prototype = struct {
             );
         }
 
-        // 6. Let searchStr be ? ToString(searchString).
-        const search_str = try search_string.toString(agent);
+        // 6. Set searchString to ? ToString(searchString).
+        const search_string = try search_value.toString(agent);
 
-        // 7. Let len be the length of S.
-        const len = string.length;
+        // 7. Let length be the length of string.
+        const length = string.length;
 
-        // 8. If endPosition is undefined, let pos be len; else let pos be ? ToIntegerOrInfinity(
-        //    endPosition).
-        const pos = if (end_position.isUndefined())
-            @as(f64, @floatFromInt(len))
+        // 8. If endPosition is undefined, let position be length; else let position be
+        //    ? ToIntegerOrInfinity(endPosition).
+        const position = if (end_position.isUndefined())
+            @as(f64, @floatFromInt(length))
         else
             try end_position.toIntegerOrInfinity(agent);
 
-        // 9. Let end be the result of clamping pos between 0 and len.
-        const end = std.math.clamp(std.math.lossyCast(u32, pos), 0, len);
+        // 9. Let end be the result of clamping position between 0 and length.
+        const end = std.math.clamp(std.math.lossyCast(u32, position), 0, length);
 
-        // 10. Let searchLength be the length of searchStr.
-        const search_length = search_str.length;
+        // 10. Let searchLength be the length of searchString.
+        const search_length = search_string.length;
 
         // 11. If searchLength = 0, return true.
         if (search_length == 0) return .true;
@@ -1041,11 +1042,11 @@ pub const prototype = struct {
         // 13. If start < 0, return false.
         const start = std.math.sub(u32, end, search_length) catch return .false;
 
-        // 14. Let substring be the substring of S from start to end.
+        // 14. Let substring be the substring of string from start to end.
         const substring_ = try string.substring(agent, start, end);
 
-        // 15. If substring is searchStr, return true.
-        if (substring_.eql(search_str)) return .true;
+        // 15. If substring is searchString, return true.
+        if (substring_.eql(search_string)) return .true;
 
         // 16. Return false.
         return .false;
@@ -1054,22 +1055,21 @@ pub const prototype = struct {
     /// 22.1.3.8 String.prototype.includes ( searchString [ , position ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.includes
     fn includes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const search_string = arguments.get(0);
-        const position = arguments.get(1);
+        const search_value = arguments.get(0);
+        const position_value = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let isRegExp be ? IsRegExp(searchString).
-        const is_regexp = try search_string.isRegExp(agent);
+        // 4. Let isRegexp be ? IsRegExp(searchString).
+        const is_regexp = try search_value.isRegExp(agent);
 
-        // 5. If isRegExp is true, throw a TypeError exception.
+        // 5. If isRegexp is true, throw a TypeError exception.
         if (is_regexp) {
             return agent.throwException(
                 .type_error,
@@ -1078,21 +1078,21 @@ pub const prototype = struct {
             );
         }
 
-        // 6. Let searchStr be ? ToString(searchString).
-        const search_str = try search_string.toString(agent);
+        // 6. Set searchString to ? ToString(searchString).
+        const search_string = try search_value.toString(agent);
 
-        // 7. Let pos be ? ToIntegerOrInfinity(position).
-        // 8. Assert: If position is undefined, then pos is 0.
-        const pos = try position.toIntegerOrInfinity(agent);
+        // 7. Let positionInt be ? ToIntegerOrInfinity(position).
+        // 8. Assert: If position is undefined, then positionInt is 0.
+        const position = try position_value.toIntegerOrInfinity(agent);
 
-        // 9. Let len be the length of S.
-        const len = string.length;
+        // 9. Let length be the length of string.
+        const length = string.length;
 
-        // 10. Let start be the result of clamping pos between 0 and len.
-        const start = std.math.clamp(std.math.lossyCast(u32, pos), 0, len);
+        // 10. Let start be the result of clamping positionInt between 0 and length.
+        const start = std.math.clamp(std.math.lossyCast(u32, position), 0, length);
 
-        // 11. Let index be StringIndexOf(S, searchStr, start).
-        const index = string.indexOf(search_str, start);
+        // 11. Let index be StringIndexOf(string, searchString, start).
+        const index = string.indexOf(search_string, start);
 
         // 12. If index is not-found, return false.
         // 13. Return true.
@@ -1102,35 +1102,34 @@ pub const prototype = struct {
     /// 22.1.3.9 String.prototype.indexOf ( searchString [ , position ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.indexof
     fn indexOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const search_string = arguments.get(0);
-        const position = arguments.get(1);
+        const search_value = arguments.get(0);
+        const position_value = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let searchStr be ? ToString(searchString).
-        const search_str = try search_string.toString(agent);
+        // 4. Set searchString to ? ToString(searchString).
+        const search_string = try search_value.toString(agent);
 
-        // 5. Let pos be ? ToIntegerOrInfinity(position).
-        // 6. Assert: If position is undefined, then pos is 0.
-        const pos = try position.toIntegerOrInfinity(agent);
+        // 5. Let positionInt be ? ToIntegerOrInfinity(position).
+        // 6. Assert: If position is undefined, then positionInt is 0.
+        const position = try position_value.toIntegerOrInfinity(agent);
 
-        // 7. Let len be the length of S.
-        const len = string.length;
+        // 7. Let length be the length of string.
+        const length = string.length;
 
-        // 8. Let start be the result of clamping pos between 0 and len.
-        const start = std.math.clamp(std.math.lossyCast(u32, pos), 0, len);
+        // 8. Let start be the result of clamping positionInt between 0 and length.
+        const start = std.math.clamp(std.math.lossyCast(u32, position), 0, length);
 
-        // 9. Let result be StringIndexOf(S, searchStr, start).
+        // 9. Let result be StringIndexOf(string, searchString, start).
         // 10. If result is not-found, return -1𝔽.
         // 11. Return 𝔽(result).
-        return if (string.indexOf(search_str, start)) |result|
+        return if (string.indexOf(search_string, start)) |result|
             Value.from(@as(u53, @intCast(result)))
         else
             Value.from(-1);
@@ -1139,63 +1138,62 @@ pub const prototype = struct {
     /// 22.1.3.10 String.prototype.isWellFormed ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.iswellformed
     fn isWellFormed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Return IsStringWellFormedUnicode(S).
+        // 4. Return IsStringWellFormedUnicode(string).
         return Value.from(string.isWellFormedUnicode());
     }
 
     /// 22.1.3.11 String.prototype.lastIndexOf ( searchString [ , position ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.lastindexof
     fn lastIndexOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const search_string = arguments.get(0);
-        const position = arguments.get(1);
+        const search_value = arguments.get(0);
+        const position_value = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let searchStr be ? ToString(searchString).
-        const search_str = try search_string.toString(agent);
+        // 4. Set searchString to ? ToString(searchString).
+        const search_string = try search_value.toString(agent);
 
-        // 5. Let numPos be ? ToNumber(position).
-        const num_pos = try position.toNumber(agent);
+        // 5. Let numberPosition be ? ToNumber(position).
+        const number_position = try position_value.toNumber(agent);
 
-        // 6. Assert: If position is undefined, then numPos is NaN.
-        // 7. If numPos is NaN, let pos be +∞; else let pos be ! ToIntegerOrInfinity(numPos).
-        const pos = if (num_pos.isNan())
+        // 6. Assert: If position is undefined, then numberPosition is NaN.
+        // 7. If numberPosition is NaN, set position to +∞; else set position to
+        //    ! ToIntegerOrInfinity(numberPosition).
+        const position = if (number_position.isNan())
             std.math.inf(f64)
         else
-            Value.from(num_pos).toIntegerOrInfinity(agent) catch unreachable;
+            Value.from(number_position).toIntegerOrInfinity(agent) catch unreachable;
 
-        // 8. Let len be the length of S.
-        const len = string.length;
+        // 8. Let length be the length of string.
+        const length = string.length;
 
-        // 9. Let searchLen be the length of searchStr.
-        const search_len = search_str.length;
+        // 9. Let searchLength be the length of searchString.
+        const search_length = search_string.length;
 
-        // 10. If len < searchLen, return -1𝔽.
-        if (len < search_len) return Value.from(-1);
+        // 10. If length < searchLength, return -1𝔽.
+        if (length < search_length) return Value.from(-1);
 
-        // 11. Let start be the result of clamping pos between 0 and len - searchLen.
-        const start = std.math.clamp(std.math.lossyCast(u32, pos), 0, len - search_len);
+        // 11. Let start be the result of clamping position between 0 and length - searchLength.
+        const start = std.math.clamp(std.math.lossyCast(u32, position), 0, length - search_length);
 
-        // 12. Let result be StringLastIndexOf(S, searchStr, start).
+        // 12. Let result be StringLastIndexOf(string, searchString, start).
         // 13. If result is not-found, return -1𝔽.
         // 14. Return 𝔽(result).
-        return if (string.lastIndexOf(search_str, start)) |result|
+        return if (string.lastIndexOf(search_string, start)) |result|
             Value.from(@as(u53, @intCast(result)))
         else
             Value.from(-1);
@@ -1211,14 +1209,13 @@ pub const prototype = struct {
         const gpa = agent.gpa;
         const that = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
         // 4. Let thatValue be ? ToString(that).
         const that_value = try that.toString(agent);
@@ -1250,12 +1247,11 @@ pub const prototype = struct {
         const locales = arguments.get(1);
         const options = arguments.get(2);
 
-        // 1. Let O be ? RequireObjectCoercible(this value).
-        const object = this_value;
-        try object.requireObjectCoercible(agent);
+        // 1. Let thisValue be ? RequireObjectCoercible(this value).
+        try this_value.requireObjectCoercible(agent);
 
-        // 2. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 2. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
         // 3. Let thatValue be ? ToString(that).
         const that_value = try that.toString(agent);
@@ -1270,7 +1266,7 @@ pub const prototype = struct {
             null,
         );
 
-        // 5. Return CompareStrings(collator, S, thatValue).
+        // 5. Return CompareStrings(collator, string, thatValue).
         return builtins.intl.collator.compareStrings(
             agent.gc_allocator,
             collator.as(builtins.intl.Collator),
@@ -1279,66 +1275,71 @@ pub const prototype = struct {
         );
     }
 
-    /// 22.1.3.13 String.prototype.match ( regexp )
+    /// 22.1.3.13 String.prototype.match ( regexpOrPattern )
     /// https://tc39.es/ecma262/#sec-string.prototype.match
     fn match(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const regexp = arguments.get(0);
+        const regexp_or_pattern = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. If regexp is an Object, then
-        if (regexp.isObject()) {
-            // a. Let matcher be ? GetMethod(regexp, %Symbol.match%).
-            const maybe_matcher = try regexp.getMethod(
+        // 3. If regexpOrPattern is an Object, then
+        if (regexp_or_pattern.isObject()) {
+            // a. Let matcher be ? GetMethod(regexpOrPattern, %Symbol.match%).
+            const maybe_matcher = try regexp_or_pattern.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
             );
 
             // b. If matcher is not undefined, then
             if (maybe_matcher) |matcher| {
-                // i. Return ? Call(matcher, regexp, « O »).
-                return Value.from(matcher).callAssumeCallable(agent, regexp, &.{object});
+                // i. Return ? Call(matcher, regexpOrPattern, « thisValue »).
+                return Value.from(matcher).callAssumeCallable(
+                    agent,
+                    regexp_or_pattern,
+                    &.{this_value},
+                );
             }
         }
 
-        // 4. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 4. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 5. Let rx be ? RegExpCreate(regexp, undefined).
-        const rx = try regExpCreate(agent, regexp, .undefined);
+        // 5. Let regexp be ? RegExpCreate(regexpOrPattern, undefined).
+        const regexp = try regExpCreate(agent, regexp_or_pattern, .undefined);
 
-        // 6. Return ? Invoke(rx, %Symbol.match%, « S »).
-        return Value.from(&rx.object).invoke(
+        // 6. Return ? Invoke(regexp, %Symbol.match%, « string »).
+        return Value.from(&regexp.object).invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
             &.{Value.from(string)},
         );
     }
 
-    /// 22.1.3.14 String.prototype.matchAll ( regexp )
+    /// 22.1.3.14 String.prototype.matchAll ( regexpOrPattern )
     /// https://tc39.es/ecma262/#sec-string.prototype.matchall
     fn matchAll(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const regexp = arguments.get(0);
+        const regexp_or_pattern = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. If regexp is an Object, then
-        if (regexp.isObject()) {
-            // a. Let isRegExp be ? IsRegExp(regexp).
-            const is_reg_exp = try regexp.isRegExp(agent);
+        // 3. If regexpOrPattern is an Object, then
+        if (regexp_or_pattern.isObject()) {
+            // a. Let isRegexp be ? IsRegExp(regexpOrPattern).
+            const is_regexp = try regexp_or_pattern.isRegExp(agent);
 
-            // b. If isRegExp is true, then
-            if (is_reg_exp) {
-                // i. Let flags be ? Get(regexp, "flags").
-                const flags = try regexp.asObject().get(agent, PropertyKey.from("flags"));
+            // b. If isRegexp is true, then
+            if (is_regexp) {
+                // i. Let flags be ? Get(regexpOrPattern, "flags").
+                const flags = try regexp_or_pattern.asObject().get(
+                    agent,
+                    PropertyKey.from("flags"),
+                );
 
                 // ii. Perform ? RequireObjectCoercible(flags).
                 try flags.requireObjectCoercible(agent);
@@ -1353,27 +1354,31 @@ pub const prototype = struct {
                 }
             }
 
-            // c. Let matcher be ? GetMethod(regexp, %Symbol.matchAll%).
-            const maybe_matcher = try regexp.getMethod(
+            // c. Let matcher be ? GetMethod(regexpOrPattern, %Symbol.matchAll%).
+            const maybe_matcher = try regexp_or_pattern.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             );
 
             // d. If matcher is not undefined, then
             if (maybe_matcher) |matcher| {
-                // i. Return ? Call(matcher, regexp, « O »).
-                return Value.from(matcher).callAssumeCallable(agent, regexp, &.{object});
+                // i. Return ? Call(matcher, regexpOrPattern, « thisValue »).
+                return Value.from(matcher).callAssumeCallable(
+                    agent,
+                    regexp_or_pattern,
+                    &.{this_value},
+                );
             }
         }
 
-        // 4. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 4. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 5. Let rx be ? RegExpCreate(regexp, "g").
-        const rx = try regExpCreate(agent, regexp, Value.from("g"));
+        // 5. Let regexp be ? RegExpCreate(regexpOrPattern, "g").
+        const regexp = try regExpCreate(agent, regexp_or_pattern, Value.from("g"));
 
-        // 6. Return ? Invoke(rx, %Symbol.matchAll%, « S »).
-        return Value.from(&rx.object).invoke(
+        // 6. Return ? Invoke(regexp, %Symbol.matchAll%, « string »).
+        return Value.from(&regexp.object).invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
             &.{Value.from(string)},
@@ -1391,25 +1396,25 @@ pub const prototype = struct {
         const gpa = agent.gpa;
         const form_value = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. If form is undefined, let f be "NFC".
-        // 5. Else, let f be ? ToString(form).
+        // 4. If form is undefined, set form to "NFC".
+        // 5. Else, set form to ? ToString(form).
         const form = if (form_value.isUndefined())
             types.String.fromLiteral("NFC")
         else
             try form_value.toString(agent);
 
-        // 6. If f is not one of "NFC", "NFD", "NFKC", or "NFKD", throw a RangeError exception.
-        // 7. Let ns be the String value that is the result of normalizing S into the normalization
-        //    form named by f as specified in the latest Unicode Standard, Normalization Forms.
+        // 6. If form is not one of "NFC", "NFD", "NFKC", or "NFKD", throw a RangeError exception.
+        // 7. Let normal be the String value that is the result of normalizing string into the
+        //    normalization form named by form as specified in the latest Unicode Standard,
+        //    Normalization Forms.
         // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
         //       correctly here.
         const utf8 = try string.toUtf8(gpa);
@@ -1434,7 +1439,7 @@ pub const prototype = struct {
             return agent.throwException(.range_error, "Invalid normalization form", .{});
         };
 
-        // 8. Return ns.
+        // 8. Return normal.
         return Value.from(try types.String.fromUtf8(agent, utf8_normalized));
     }
 
@@ -1444,15 +1449,14 @@ pub const prototype = struct {
         const max_length = arguments.get(0);
         const fill_string = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
+        // 2. Perform ? RequireObjectCoercible(thisValue).
         try this_value.requireObjectCoercible(agent);
 
-        // 3. Return ? StringPaddingBuiltinsImpl(O, maxLength, fillString, end).
+        // 3. Return ? StringPaddingBuiltinsImpl(thisValue, maxLength, fillString, end).
         return Value.from(
-            try stringPaddingBuiltinsImpl(agent, object, max_length, fill_string, .end),
+            try stringPaddingBuiltinsImpl(agent, this_value, max_length, fill_string, .end),
         );
     }
 
@@ -1462,38 +1466,37 @@ pub const prototype = struct {
         const max_length = arguments.get(0);
         const fill_string = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Return ? StringPaddingBuiltinsImpl(O, maxLength, fillString, start).
+        // 3. Return ? StringPaddingBuiltinsImpl(thisValue, maxLength, fillString, start).
         return Value.from(
-            try stringPaddingBuiltinsImpl(agent, object, max_length, fill_string, .start),
+            try stringPaddingBuiltinsImpl(agent, this_value, max_length, fill_string, .start),
         );
     }
 
-    /// 22.1.3.17.1 StringPaddingBuiltinsImpl ( O, maxLength, fillString, placement )
+    /// 22.1.3.17.1 StringPaddingBuiltinsImpl ( thisValue, maxLength, fillString, placement )
     /// https://tc39.es/ecma262/#sec-stringpaddingbuiltinsimpl
     fn stringPaddingBuiltinsImpl(
         agent: *Agent,
-        object: Value,
-        max_length_value: Value,
+        this_value: Value,
+        max_length: Value,
         fill_string_value: Value,
         placement: StringPadPlacement,
     ) Agent.Error!*const types.String {
-        // 1. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 1. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
         // 2. Let intMaxLength be ℝ(? ToLength(maxLength)).
-        const max_length = try max_length_value.toLength(agent);
+        const int_max_length = try max_length.toLength(agent);
 
-        // 3. Let stringLength be the length of S.
+        // 3. Let stringLength be the length of string.
         const string_length = string.length;
 
-        // 4. If intMaxLength ≤ stringLength, return S.
-        if (max_length <= string_length) return string;
+        // 4. If intMaxLength ≤ stringLength, return string.
+        if (int_max_length <= string_length) return string;
 
         // 5. If fillString is undefined, set fillString to the String value consisting solely of
         //    the code unit 0x0020 (SPACE).
@@ -1503,15 +1506,15 @@ pub const prototype = struct {
         else
             try fill_string_value.toString(agent);
 
-        if (max_length > std.math.maxInt(u32)) {
+        if (int_max_length > std.math.maxInt(u32)) {
             return agent.throwException(.range_error, "Maximum string length exceeded", .{});
         }
 
-        // 7. Return StringPad(S, intMaxLength, fillString, placement).
+        // 7. Return StringPad(string, intMaxLength, fillString, placement).
         return stringPad(
             agent,
             string,
-            @intCast(max_length),
+            @intCast(int_max_length),
             fill_string,
             placement,
         );
@@ -1522,14 +1525,13 @@ pub const prototype = struct {
     fn repeat(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const count = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
         // 4. Let n be ? ToIntegerOrInfinity(count).
         const n = try count.toIntegerOrInfinity(agent);
@@ -1548,7 +1550,7 @@ pub const prototype = struct {
 
         if (string.isEmpty()) return Value.from("");
 
-        // 7. Return the String value that is made from n copies of S appended together.
+        // 7. Return the String value that is made from n copies of string appended together.
         const n_u32 = std.math.lossyCast(u32, n);
         return Value.from(try string.repeat(agent, n_u32));
     }
@@ -1559,11 +1561,10 @@ pub const prototype = struct {
         const search_value = arguments.get(0);
         var replace_value = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
         // 3. If searchValue is an Object, then
         if (search_value.isObject()) {
@@ -1575,17 +1576,17 @@ pub const prototype = struct {
 
             // b. If replacer is not undefined, then
             if (maybe_replacer) |replacer| {
-                // i. Return ? Call(replacer, searchValue, « O, replaceValue »).
+                // i. Return ? Call(replacer, searchValue, « thisValue, replaceValue »).
                 return Value.from(replacer).callAssumeCallable(
                     agent,
                     search_value,
-                    &.{ object, replace_value },
+                    &.{ this_value, replace_value },
                 );
             }
         }
 
-        // 4. Let string be ? ToString(O).
-        const string = try object.toString(agent);
+        // 4. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
         // 5. Let searchString be ? ToString(searchValue).
         const search_string = try search_value.toString(agent);
@@ -1658,19 +1659,18 @@ pub const prototype = struct {
         const search_value = arguments.get(0);
         var replace_value = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
         // 3. If searchValue is an Object, then
         if (search_value.isObject()) {
-            // a. Let isRegExp be ? IsRegExp(searchValue).
-            const is_reg_exp = try search_value.isRegExp(agent);
+            // a. Let isRegexp be ? IsRegExp(searchValue).
+            const is_regexp = try search_value.isRegExp(agent);
 
-            // b. If isRegExp is true, then
-            if (is_reg_exp) {
+            // b. If isRegexp is true, then
+            if (is_regexp) {
                 // i. Let flags be ? Get(searchValue, "flags").
                 const flags = try search_value.get(agent, PropertyKey.from("flags"));
 
@@ -1695,17 +1695,17 @@ pub const prototype = struct {
 
             // d. If replacer is not undefined, then
             if (maybe_replacer) |replacer| {
-                // i. Return ? Call(replacer, searchValue, « O, replaceValue »).
+                // i. Return ? Call(replacer, searchValue, « thisValue, replaceValue »).
                 return Value.from(replacer).callAssumeCallable(
                     agent,
                     search_value,
-                    &.{ object, replace_value },
+                    &.{ this_value, replace_value },
                 );
             }
         }
 
-        // 4. Let string be ? ToString(O).
-        const string = try object.toString(agent);
+        // 4. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
         // 5. Let searchString be ? ToString(searchValue).
         const search_string = try search_value.toString(agent);
@@ -1747,21 +1747,21 @@ pub const prototype = struct {
         // 14. Let result be the empty String.
         var result: *const types.String = .empty;
 
-        // 15. For each element p of matchPositions, do
-        for (match_positions.items) |position| {
-            // a. Let preserved be the substring of string from endOfLastMatch to p.
-            const preserved = try string.substring(agent, end_of_last_match, position);
+        // 15. For each element matchPosition of matchPositions, do
+        for (match_positions.items) |match_position| {
+            // a. Let preserved be the substring of string from endOfLastMatch to matchPosition.
+            const preserved = try string.substring(agent, end_of_last_match, match_position);
 
             // b. If functionalReplace is true, then
             const replacement = if (functional_replace) blk: {
                 // i. Let replacement be ? ToString(? Call(replaceValue, undefined, « searchString,
-                //    𝔽(p), string »)).
+                //    𝔽(matchPosition), string »)).
                 break :blk try (try replace_value.callAssumeCallable(
                     agent,
                     .undefined,
                     &.{
                         Value.from(search_string),
-                        Value.from(position),
+                        Value.from(match_position),
                         Value.from(string),
                     },
                 )).toString(agent);
@@ -1771,13 +1771,13 @@ pub const prototype = struct {
                 std.debug.assert(replace_value.isString());
 
                 // ii. Let captures be a new empty List.
-                // iii. Let replacement be ! GetSubstitution(searchString, string, p, captures,
-                //      undefined, replaceValue).
+                // iii. Let replacement be ! GetSubstitution(searchString, string, matchPosition,
+                //      captures, undefined, replaceValue).
                 break :blk getSubstitution(
                     agent,
                     search_string,
                     string,
-                    position,
+                    match_position,
                     &.{},
                     null,
                     replace_value.asString(),
@@ -1787,8 +1787,8 @@ pub const prototype = struct {
             // d. Set result to the string-concatenation of result, preserved, and replacement.
             result = try types.String.concat(agent, &.{ result, preserved, replacement });
 
-            // e. Set endOfLastMatch to p + searchLength.
-            end_of_last_match = position + search_length;
+            // e. Set endOfLastMatch to matchPosition + searchLength.
+            end_of_last_match = match_position + search_length;
         }
 
         // 16. If endOfLastMatch < the length of string, then
@@ -1805,40 +1805,39 @@ pub const prototype = struct {
         return Value.from(result);
     }
 
-    /// 22.1.3.21 String.prototype.search ( regexp )
+    /// 22.1.3.21 String.prototype.search ( regexpOrPattern )
     /// https://tc39.es/ecma262/#sec-string.prototype.search
     fn search(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const regexp = arguments.get(0);
+        const regexp_or_pattern = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
+        // 2. Perform ? RequireObjectCoercible(thisValue).
         try this_value.requireObjectCoercible(agent);
 
-        // 3. If regexp is an Object, then
-        if (regexp.isObject()) {
-            // a. Let searcher be ? GetMethod(regexp, %Symbol.search%).
-            const maybe_searcher = try regexp.getMethod(
+        // 3. If regexpOrPattern is an Object, then
+        if (regexp_or_pattern.isObject()) {
+            // a. Let searcher be ? GetMethod(regexpOrPattern, %Symbol.search%).
+            const maybe_searcher = try regexp_or_pattern.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.@"%Symbol.search%"),
             );
 
             // b. If searcher is not undefined, then
             if (maybe_searcher) |searcher| {
-                // i. Return ? Call(searcher, regexp, « O »).
-                return Value.from(searcher).callAssumeCallable(agent, regexp, &.{object});
+                // i. Return ? Call(searcher, regexpOrPattern, « thisValue »).
+                return Value.from(searcher).callAssumeCallable(agent, regexp_or_pattern, &.{this_value});
             }
         }
 
-        // 4. Let string be ? ToString(O).
-        const string = try object.toString(agent);
+        // 4. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 5. Let rx be ? RegExpCreate(regexp, undefined).
-        const rx = try regExpCreate(agent, regexp, .undefined);
+        // 5. Let regexp be ? RegExpCreate(regexpOrPattern, undefined).
+        const regexp = try regExpCreate(agent, regexp_or_pattern, .undefined);
 
-        // 6. Return ? Invoke(rx, %Symbol.search%, « string »).
-        return Value.from(&rx.object).invoke(
+        // 6. Return ? Invoke(regexp, %Symbol.search%, « string »).
+        return Value.from(&regexp.object).invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.@"%Symbol.search%"),
             &.{Value.from(string)},
@@ -1851,18 +1850,17 @@ pub const prototype = struct {
         const start = arguments.get(0);
         const end = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let len be the length of S.
-        const len = string.length;
-        const len_f64: f64 = @floatFromInt(len);
+        // 4. Let length be the length of string.
+        const length = string.length;
+        const length_f64: f64 = @floatFromInt(length);
 
         // 5. Let intStart be ? ToIntegerOrInfinity(start).
         const int_start = try start.toIntegerOrInfinity(agent);
@@ -1871,17 +1869,18 @@ pub const prototype = struct {
         const from_f64 = if (std.math.isNegativeInf(int_start)) blk: {
             break :blk 0;
         } else if (int_start < 0) blk: {
-            // 7. Else if intStart < 0, let from be max(len + intStart, 0).
-            break :blk @max(len_f64 + int_start, 0);
+            // 7. Else if intStart < 0, let from be max(length + intStart, 0).
+            break :blk @max(length_f64 + int_start, 0);
         } else blk: {
-            // 8. Else, let from be min(intStart, len).
-            break :blk @min(int_start, len_f64);
+            // 8. Else, let from be min(intStart, length).
+            break :blk @min(int_start, length_f64);
         };
         const from = std.math.lossyCast(u32, from_f64);
 
-        // 9. If end is undefined, let intEnd be len; else let intEnd be ? ToIntegerOrInfinity(end).
+        // 9. If end is undefined, let intEnd be length; else let intEnd be ? ToIntegerOrInfinity(
+        //    end).
         const int_end = if (end.isUndefined())
-            len_f64
+            length_f64
         else
             try end.toIntegerOrInfinity(agent);
 
@@ -1889,18 +1888,18 @@ pub const prototype = struct {
         const to_f64 = if (std.math.isNegativeInf(int_end)) blk: {
             break :blk 0;
         } else if (int_end < 0) blk: {
-            // 11. Else if intEnd < 0, let to be max(len + intEnd, 0).
-            break :blk @max(len_f64 + int_end, 0);
+            // 11. Else if intEnd < 0, let to be max(length + intEnd, 0).
+            break :blk @max(length_f64 + int_end, 0);
         } else blk: {
-            // 12. Else, let to be min(intEnd, len).
-            break :blk @min(int_end, len_f64);
+            // 12. Else, let to be min(intEnd, length).
+            break :blk @min(int_end, length_f64);
         };
         const to = std.math.lossyCast(u32, to_f64);
 
         // 13. If from ≥ to, return the empty String.
         if (from >= to) return Value.from("");
 
-        // 14. Return the substring of S from from to to.
+        // 14. Return the substring of string from from to to.
         return Value.from(try string.substring(agent, from, to));
     }
 
@@ -1911,11 +1910,10 @@ pub const prototype = struct {
         const separator_value = arguments.get(0);
         const limit_value = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
         // 3. If separator is an Object, then
         if (separator_value.isObject()) {
@@ -1927,17 +1925,17 @@ pub const prototype = struct {
 
             // b. If splitter is not undefined, then
             if (maybe_splitter) |splitter| {
-                // i. Return ? Call(splitter, separator, « O, limit »).
+                // i. Return ? Call(splitter, separator, « thisValue, limit »).
                 return Value.from(splitter).callAssumeCallable(
                     agent,
                     separator_value,
-                    &.{ object, limit_value },
+                    &.{ this_value, limit_value },
                 );
             }
         }
 
-        // 4. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 4. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
         // 5. If limit is undefined, let lim be 2**32 - 1; else let lim be ℝ(? ToUint32(limit)).
         const limit = if (limit_value.isUndefined())
@@ -1945,8 +1943,8 @@ pub const prototype = struct {
         else
             try limit_value.toUint32(agent);
 
-        // 6. Let R be ? ToString(separator).
-        const separator = try separator_value.toString(agent);
+        // 6. Let separatorString be ? ToString(separator).
+        const separator_string = try separator_value.toString(agent);
 
         // 7. If lim = 0, then
         if (limit == 0) {
@@ -1957,24 +1955,24 @@ pub const prototype = struct {
 
         // 8. If separator is undefined, then
         if (separator_value.isUndefined()) {
-            // a. Return CreateArrayFromList(« S »).
+            // a. Return CreateArrayFromList(« string »).
             const array = try createArrayFromList(agent, &.{Value.from(string)});
             return Value.from(&array.object);
         }
 
-        // 9. Let separatorLength be the length of R.
-        const separator_length = separator.length;
+        // 9. Let separatorLength be the length of separatorString.
+        const separator_length = separator_string.length;
 
         // 10. If separatorLength = 0, then
         if (separator_length == 0) {
-            // a. Let strLen be the length of S.
-            const str_len = string.length;
+            // a. Let stringLength be the length of string.
+            const string_length = string.length;
 
-            // b. Let outLen be the result of clamping lim between 0 and strLen.
-            const out_len = std.math.clamp(limit, 0, str_len);
+            // b. Let outLength be the result of clamping lim between 0 and stringLength.
+            const out_length = std.math.clamp(limit, 0, string_length);
 
-            // c. Let head be the substring of S from 0 to outLen.
-            const head = try string.substring(agent, 0, out_len);
+            // c. Let head be the substring of string from 0 to outLength.
+            const head = try string.substring(agent, 0, out_length);
 
             // d. Let codeUnits be a List consisting of the sequence of code units that are the
             //    elements of head.
@@ -1999,7 +1997,7 @@ pub const prototype = struct {
             return Value.from(&array.object);
         }
 
-        // 11. If S is the empty String, return CreateArrayFromList(« S »).
+        // 11. If string is the empty String, return CreateArrayFromList(« string »).
         if (string.isEmpty()) {
             const array = try createArrayFromList(agent, &.{Value.from(string)});
             return Value.from(&array.object);
@@ -2009,19 +2007,19 @@ pub const prototype = struct {
         var substrings: std.ArrayList(*const types.String) = .empty;
         defer substrings.deinit(agent.gc_allocator);
 
-        // 13. Let i be 0.
-        var i: u32 = 0;
+        // 13. Let searchStart be 0.
+        var search_start: u32 = 0;
 
-        // 14. Let j be StringIndexOf(S, R, 0).
-        var j = string.indexOf(separator, 0);
+        // 14. Let matchIndex be StringIndexOf(string, separatorString, 0).
+        var match_index = string.indexOf(separator_string, 0);
 
-        // 15. Repeat, while j is not not-found,
-        while (j != null) {
-            // a. Let T be the substring of S from i to j.
-            const tail = try string.substring(agent, i, j.?);
+        // 15. Repeat, while matchIndex is not not-found,
+        while (match_index != null) {
+            // a. Let substring be the substring of string from searchStart to matchIndex.
+            const substring_ = try string.substring(agent, search_start, match_index.?);
 
-            // b. Append T to substrings.
-            try substrings.append(agent.gc_allocator, tail);
+            // b. Append substring to substrings.
+            try substrings.append(agent.gc_allocator, substring_);
 
             // c. If the number of elements in substrings is lim, return CreateArrayFromList(
             //    substrings).
@@ -2034,18 +2032,18 @@ pub const prototype = struct {
                 return Value.from(&array.object);
             }
 
-            // d. Set i to j + separatorLength.
-            i = j.? + separator_length;
+            // d. Set searchStart to matchIndex + separatorLength.
+            search_start = match_index.? + separator_length;
 
-            // e. Set j to StringIndexOf(S, R, i).
-            j = string.indexOf(separator, i);
+            // e. Set matchIndex to StringIndexOf(string, separatorString, searchStart).
+            match_index = string.indexOf(separator_string, search_start);
         }
 
-        // 16. Let T be the substring of S from i.
-        const tail = try string.substring(agent, i, null);
+        // 16. Let substring be the substring of string from searchStart.
+        const substring_ = try string.substring(agent, search_start, null);
 
-        // 17. Append T to substrings.
-        try substrings.append(agent.gc_allocator, tail);
+        // 17. Append substring to substrings.
+        try substrings.append(agent.gc_allocator, substring_);
 
         // 18. Return CreateArrayFromList(substrings).
         const array = try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
@@ -2059,22 +2057,21 @@ pub const prototype = struct {
     /// 22.1.3.24 String.prototype.startsWith ( searchString [ , position ] )
     /// https://tc39.es/ecma262/#sec-string.prototype.startswith
     fn startsWith(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const search_string = arguments.get(0);
-        const position = arguments.get(1);
+        const search_value = arguments.get(0);
+        const position_value = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let isRegExp be ? IsRegExp(searchString).
-        const is_regexp = try search_string.isRegExp(agent);
+        // 4. Let isRegexp be ? IsRegExp(searchString).
+        const is_regexp = try search_value.isRegExp(agent);
 
-        // 5. If isRegExp is true, throw a TypeError exception.
+        // 5. If isRegexp is true, throw a TypeError exception.
         if (is_regexp) {
             return agent.throwException(
                 .type_error,
@@ -2083,21 +2080,21 @@ pub const prototype = struct {
             );
         }
 
-        // 6. Let searchStr be ? ToString(searchString).
-        const search_str = try search_string.toString(agent);
+        // 6. Set searchString to ? ToString(searchString).
+        const search_string = try search_value.toString(agent);
 
-        // 7. Let len be the length of S.
-        const len = string.length;
+        // 7. Let length be the length of string.
+        const length = string.length;
 
-        // 8. If position is undefined, let pos be 0; else let pos be ? ToIntegerOrInfinity(
-        //    position).
-        const pos = if (position.isUndefined()) 0 else try position.toIntegerOrInfinity(agent);
+        // 8. If position is undefined, set position to 0; else set position to
+        //    ? ToIntegerOrInfinity(position).
+        const position = if (position_value.isUndefined()) 0 else try position_value.toIntegerOrInfinity(agent);
 
-        // 9. Let start be the result of clamping pos between 0 and len.
-        const start = std.math.clamp(std.math.lossyCast(u32, pos), 0, len);
+        // 9. Let start be the result of clamping position between 0 and length.
+        const start = std.math.clamp(std.math.lossyCast(u32, position), 0, length);
 
-        // 10. Let searchLength be the length of searchStr.
-        const search_length = search_str.length;
+        // 10. Let searchLength be the length of searchString.
+        const search_length = search_string.length;
 
         // 11. If searchLength = 0, return true.
         if (search_length == 0) return .true;
@@ -2105,14 +2102,14 @@ pub const prototype = struct {
         // 12. Let end be start + searchLength.
         const end = start +| search_length;
 
-        // 13. If end > len, return false.
-        if (end > len) return .false;
+        // 13. If end > length, return false.
+        if (end > length) return .false;
 
-        // 14. Let substring be the substring of S from start to end.
+        // 14. Let substring be the substring of string from start to end.
         const substring_ = try string.substring(agent, start, end);
 
-        // 15. If substring is searchStr, return true.
-        if (substring_.eql(search_str)) return .true;
+        // 15. If substring is searchString, return true.
+        if (substring_.eql(search_string)) return .true;
 
         // 16. Return false.
         return .false;
@@ -2124,32 +2121,32 @@ pub const prototype = struct {
         const start = arguments.get(0);
         const end = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let len be the length of S.
-        const len = string.length;
+        // 4. Let length be the length of string.
+        const length = string.length;
 
         // 5. Let intStart be ? ToIntegerOrInfinity(start).
         const int_start = try start.toIntegerOrInfinity(agent);
 
-        // 6. If end is undefined, let intEnd be len; else let intEnd be ? ToIntegerOrInfinity(end).
+        // 6. If end is undefined, let intEnd be length; else let intEnd be ? ToIntegerOrInfinity(
+        //    end).
         const int_end = if (end.isUndefined())
-            @as(f64, @floatFromInt(len))
+            @as(f64, @floatFromInt(length))
         else
             try end.toIntegerOrInfinity(agent);
 
-        // 7. Let finalStart be the result of clamping intStart between 0 and len.
-        const final_start = std.math.clamp(std.math.lossyCast(u32, int_start), 0, len);
+        // 7. Let finalStart be the result of clamping intStart between 0 and length.
+        const final_start = std.math.clamp(std.math.lossyCast(u32, int_start), 0, length);
 
-        // 8. Let finalEnd be the result of clamping intEnd between 0 and len.
-        const final_end = std.math.clamp(std.math.lossyCast(u32, int_end), 0, len);
+        // 8. Let finalEnd be the result of clamping intEnd between 0 and length.
+        const final_end = std.math.clamp(std.math.lossyCast(u32, int_end), 0, length);
 
         // 9. Let from be min(finalStart, finalEnd).
         const from = @min(final_start, final_end);
@@ -2157,7 +2154,7 @@ pub const prototype = struct {
         // 10. Let to be max(finalStart, finalEnd).
         const to = @max(final_start, final_end);
 
-        // 11. Return the substring of S from from to to.
+        // 11. Return the substring of string from from to to.
         return Value.from(try string.substring(agent, from, to));
     }
 
@@ -2175,18 +2172,17 @@ pub const prototype = struct {
     fn toLocaleLowerCaseIntl(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const locales = arguments.get(0);
 
-        // 1. Let O be ? RequireObjectCoercible(this value).
-        const object = this_value;
-        try object.requireObjectCoercible(agent);
+        // 1. Let thisValue be ? RequireObjectCoercible(this value).
+        try this_value.requireObjectCoercible(agent);
 
-        // 2. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 2. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 3. Return ? TransformCase(S, locales, lower).
+        // 3. Return ? TransformCase(string, locales, lower).
         return Value.from(try transformCase(agent, string, locales, .lower));
     }
 
-    /// 20.1.2.1 TransformCase ( S, locales, targetCase )
+    /// 20.1.2.1 TransformCase ( string, locales, targetCase )
     /// https://tc39.es/ecma402/#sec-transform-case
     fn transformCase(
         agent: *Agent,
@@ -2214,7 +2210,7 @@ pub const prototype = struct {
         //    should also include their corresponding language tags.
         // 5. Let match be LookupMatchingLocaleByPrefix(availableLocales, « requestedLocale »).
         // 6. If match is not undefined, let locale be match.[[locale]]; else let locale be "und".
-        // 7. Let codePoints be StringToCodePoints(S).
+        // 7. Let codePoints be StringToCodePoints(string).
         // 8. If targetCase is lower, then
         //     a. Let newCodePoints be a List whose elements are the result of a lowercase
         //        transformation of codePoints according to an implementation-derived algorithm
@@ -2252,14 +2248,13 @@ pub const prototype = struct {
     fn toLocaleUpperCaseIntl(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const locales = arguments.get(0);
 
-        // 1. Let O be ? RequireObjectCoercible(this value).
-        const object = this_value;
-        try object.requireObjectCoercible(agent);
+        // 1. Let thisValue be ? RequireObjectCoercible(this value).
+        try this_value.requireObjectCoercible(agent);
 
-        // 2. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 2. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 3. Return ? TransformCase(S, locales, upper).
+        // 3. Return ? TransformCase(string, locales, upper).
         return Value.from(try transformCase(agent, string, locales, .upper));
     }
 
@@ -2268,20 +2263,19 @@ pub const prototype = struct {
     fn toLowerCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const gpa = agent.gpa;
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let sText be StringToCodePoints(S).
+        // 4. Let sText be StringToCodePoints(string).
         // 5. Let lowerText be toLowercase(sText), according to the Unicode Default Case Conversion
         //    algorithm.
-        // 6. Let L be CodePointsToString(lowerText).
-        const lower = if (build_options.enable_intl) blk: {
+        // 6. Let lowercaseString be CodePointsToString(lowerText).
+        const lowercase_string = if (build_options.enable_intl) blk: {
             // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
             //       correctly here.
             const utf8 = try string.toUtf8(gpa);
@@ -2297,8 +2291,8 @@ pub const prototype = struct {
             break :blk try string.toLowerCaseAscii(agent);
         };
 
-        // 7. Return L.
-        return Value.from(lower);
+        // 7. Return lowercaseString.
+        return Value.from(lowercase_string);
     }
 
     /// 22.1.3.29 String.prototype.toString ( )
@@ -2314,20 +2308,19 @@ pub const prototype = struct {
         // NOTE: The spec simply references toLowerCase() for this, so the steps below are inferred.
         const gpa = agent.gpa;
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let sText be StringToCodePoints(S).
+        // 4. Let sText be StringToCodePoints(string).
         // 5. Let upperText be toUppercase(sText), according to the Unicode Default Case Conversion
         //    algorithm.
-        // 6. Let U be CodePointsToString(upperText).
-        const upper = if (build_options.enable_intl) blk: {
+        // 6. Let uppercaseString be CodePointsToString(upperText).
+        const uppercase_string = if (build_options.enable_intl) blk: {
             // NOTE: ICU4X only supports UTF-8 for this, so unpaired surrogates are not handled
             //       correctly here.
             const utf8 = try string.toUtf8(gpa);
@@ -2343,8 +2336,8 @@ pub const prototype = struct {
             break :blk try string.toUpperCaseAscii(agent);
         };
 
-        // 7. Return U.
-        return Value.from(upper);
+        // 7. Return uppercaseString.
+        return Value.from(uppercase_string);
     }
 
     /// 22.1.3.31 String.prototype.toWellFormed ( )
@@ -2352,20 +2345,19 @@ pub const prototype = struct {
     fn toWellFormed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const gpa = agent.gpa;
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(thisValue).
+        const string = try this_value.toString(agent);
 
-        // 4. Let strLen be the length of S.
-        const str_len = string.length;
+        // 4. Let stringLength be the length of string.
+        const string_length = string.length;
 
         // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (str_len == 0) return Value.from(types.String.empty);
+        if (string_length == 0) return Value.from(types.String.empty);
 
         // 5. Let k be 0.
         var k: u32 = 0;
@@ -2373,15 +2365,15 @@ pub const prototype = struct {
         // 6. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
         // SAFETY: This builder can use a GPA as it only stores u21 code point segments.
-        var result = try types.String.Builder.initCapacity(gpa, str_len);
+        var result = try types.String.Builder.initCapacity(gpa, string_length);
         defer result.deinit(gpa);
 
-        // 7. Repeat, while k < strLen,
-        while (k < str_len) {
-            // a. Let cp be CodePointAt(S, k).
+        // 7. Repeat, while k < stringLength,
+        while (k < string_length) {
+            // a. Let codePoint be CodePointAt(string, k).
             const code_point = string.codePointAt(k);
 
-            // b. If cp.[[IsUnpairedSurrogate]] is true, then
+            // b. If codePoint.[[IsUnpairedSurrogate]] is true, then
             if (code_point.is_unpaired_surrogate) {
                 // i. Set result to the string-concatenation of result and 0xFFFD (REPLACEMENT
                 //    CHARACTER).
@@ -2389,11 +2381,11 @@ pub const prototype = struct {
             } else {
                 // c. Else,
                 // i. Set result to the string-concatenation of result and UTF16EncodeCodePoint(
-                //    cp.[[CodePoint]]).
+                //    codePoint.[[CodePoint]]).
                 result.appendCodePointAssumeCapacity(code_point.code_point);
             }
 
-            // d. Set k to k + cp.[[CodeUnitCount]].
+            // d. Set k to k + codePoint.[[CodeUnitCount]].
             k += code_point.code_unit_count;
         }
 
@@ -2404,65 +2396,65 @@ pub const prototype = struct {
     /// 22.1.3.32 String.prototype.trim ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.trim
     fn trim(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? TrimString(S, start+end).
+        // 1. Let thisValue be the this value.
+        // 2. Return ? TrimString(thisValue, start+end).
         return Value.from(try trimString(agent, this_value, .@"start+end"));
     }
 
-    /// 22.1.3.32.1 TrimString ( string, where )
+    /// 22.1.3.32.1 TrimString ( arg, where )
     /// https://tc39.es/ecma262/#sec-trimstring
     fn trimString(
         agent: *Agent,
-        string_value: Value,
+        arg: Value,
         where: enum { start, end, @"start+end" },
     ) Agent.Error!*const types.String {
-        // 1. Perform ? RequireObjectCoercible(string).
-        try string_value.requireObjectCoercible(agent);
+        // 1. Perform ? RequireObjectCoercible(arg).
+        try arg.requireObjectCoercible(agent);
 
-        // 2. Let S be ? ToString(string).
-        const string = try string_value.toString(agent);
+        // 2. Let string be ? ToString(arg).
+        const string = try arg.toString(agent);
 
-        const trimmed = switch (where) {
+        const trimmed_string = switch (where) {
             // 3. If where is start, then
             .start => blk: {
-                // a. Let T be the String value that is a copy of S with leading white space
-                //    removed.
+                // a. Let trimmedString be the String value that is a copy of string with leading
+                //    white space removed.
                 break :blk try string.trimStart(agent);
             },
 
             // 4. Else if where is end, then
             .end => blk: {
-                // a. Let T be the String value that is a copy of S with trailing white space
-                //    removed.
+                // a. Let trimmedString be the String value that is a copy of string with trailing
+                //    white space removed.
                 break :blk try string.trimEnd(agent);
             },
 
             // 5. Else,
             //     a. Assert: where is start+end.
             .@"start+end" => blk: {
-                // b. Let T be the String value that is a copy of S with both leading and trailing
-                //    white space removed.
+                // b. Let trimmedString be the String value that is a copy of string with both
+                //    leading and trailing white space removed.
                 break :blk try string.trim(agent);
             },
         };
 
-        // 6. Return T.
-        return trimmed;
+        // 6. Return trimmedString.
+        return trimmed_string;
     }
 
     /// 22.1.3.33 String.prototype.trimEnd ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.trimend
     fn trimEnd(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? TrimString(S, end).
+        // 1. Let string be the this value.
+        // 2. Return ? TrimString(string, end).
         return Value.from(try trimString(agent, this_value, .end));
     }
 
     /// 22.1.3.34 String.prototype.trimStart ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.trimstart
     fn trimStart(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? TrimString(S, start).
+        // 1. Let string be the this value.
+        // 2. Return ? TrimString(string, start).
         return Value.from(try trimString(agent, this_value, .start));
     }
 
@@ -2478,14 +2470,12 @@ pub const prototype = struct {
     fn @"%Symbol.iterator%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let string be the this value.
+        // 2. Perform ? RequireObjectCoercible(string).
+        try this_value.requireObjectCoercible(agent);
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
-
-        // 3. Let s be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Set string to ? ToString(string).
+        const string = try this_value.toString(agent);
 
         // 4. Let closure be a new Abstract Closure with no parameters that captures s and performs
         //    the following steps when called:
@@ -2507,16 +2497,16 @@ pub const prototype = struct {
         const start = arguments.get(0);
         const length = arguments.get(1);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let obj be the this value.
+        const obj = this_value;
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(obj).
+        try obj.requireObjectCoercible(agent);
 
-        // 3. Let S be ? ToString(O).
-        const string = try object.toString(agent);
+        // 3. Let string be ? ToString(obj).
+        const string = try obj.toString(agent);
 
-        // 4. Let size be the length of S.
+        // 4. Let size be the length of string.
         const size: f64 = @floatFromInt(string.length);
 
         // 5. Let intStart be ? ToIntegerOrInfinity(start).
@@ -2548,7 +2538,7 @@ pub const prototype = struct {
         // 11. Let intEnd be min(intStart + intLength, size).
         const int_end = @min(int_start + int_length, size);
 
-        // 12. Return the substring of S from intStart to intEnd.
+        // 12. Return the substring of string from intStart to intEnd.
         return Value.from(
             try string.substring(
                 agent,
@@ -2558,55 +2548,55 @@ pub const prototype = struct {
         );
     }
 
-    /// B.2.2.2.1 CreateHTML ( string, tag, attribute, value )
+    /// B.2.2.2.1 CreateHTML ( contents, tag, attr, attrValue )
     /// https://tc39.es/ecma262/#sec-createhtml
     fn createHTML(
         agent: *Agent,
-        string_value: Value,
+        contents: Value,
         tag: []const u8,
-        attribute: ?struct { name: []const u8, value: Value },
+        maybe_attr: ?struct { name: []const u8, value: Value },
     ) Agent.Error!*const types.String {
-        // 1. Perform ? RequireObjectCoercible(string).
-        try string_value.requireObjectCoercible(agent);
+        // 1. Perform ? RequireObjectCoercible(contents).
+        try contents.requireObjectCoercible(agent);
 
-        // 2. Let S be ? ToString(string).
-        const string = try string_value.toString(agent);
+        // 2. Let contentsString be ? ToString(contents).
+        const contents_string = try contents.toString(agent);
 
-        // 3. Let p1 be the string-concatenation of "<" and tag.
-        // 5. Let p2 be the string-concatenation of p1 and ">".
-        // 6. Let p3 be the string-concatenation of p2 and S.
-        // 7. Let p4 be the string-concatenation of p3, "</", tag, and ">".
-        // 8. Return p4.
+        // 3. Let part1 be the string-concatenation of "<" and tag.
+        // 5. Let part2 be the string-concatenation of part1 and ">".
+        // 6. Let part3 be the string-concatenation of part2 and contentsString.
+        // 7. Let part4 be the string-concatenation of part3, "</", tag, and ">".
+        // 8. Return part4.
 
-        // 4. If attribute is not the empty String, then
-        if (attribute) |attr| {
-            // a. Let V be ? ToString(value).
-            const value_string = try attr.value.toString(agent);
+        // 4. If attr is not the empty String, then
+        if (maybe_attr) |attr| {
+            // a. Let attrValueString be ? ToString(attrValue).
+            const attr_value_string = try attr.value.toString(agent);
 
-            // b. Let escapedV be the String value that is the same as V except that each occurrence
-            //    of the code unit 0x0022 (QUOTATION MARK) in V has been replaced with the six code
-            //    unit sequence "&quot;".
-            const value_string_escaped = try value_string.replace(
+            // b. Let escapedAttrValue be the String value that is the same as attrValueString
+            //    except that each occurrence of the code unit 0x0022 (QUOTATION MARK) in
+            //    attrValueString has been replaced with the six code unit sequence "&quot;".
+            const escaped_attr_value = try attr_value_string.replace(
                 agent,
                 "\"",
                 "&quot;",
             );
 
-            // c. Set p1 to the string-concatenation of:- p1
+            // c. Set part1 to the string-concatenation of:- part1
             //    - the code unit 0x0020 (SPACE)
-            //    - attribute
+            //    - attr
             //    - the code unit 0x003D (EQUALS SIGN)
             //    - the code unit 0x0022 (QUOTATION MARK)
-            //    - escapedV
+            //    - escapedAttrValue
             //    - the code unit 0x0022 (QUOTATION MARK)
             return types.String.fromUtf8(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "<{[tag]s} {[attribute]s}=\"{[value]f}\">{[string]f}</{[tag]s}>",
                 .{
-                    .string = string.fmtRaw(),
+                    .string = contents_string.fmtRaw(),
                     .tag = tag,
                     .attribute = attr.name,
-                    .value = value_string_escaped.fmtRaw(),
+                    .value = escaped_attr_value.fmtRaw(),
                 },
             ));
         }
@@ -2614,7 +2604,7 @@ pub const prototype = struct {
         return types.String.fromUtf8(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "<{[tag]s}>{[string]f}</{[tag]s}>",
-            .{ .string = string.fmtRaw(), .tag = tag },
+            .{ .string = contents_string.fmtRaw(), .tag = tag },
         ));
     }
 
@@ -2623,8 +2613,8 @@ pub const prototype = struct {
     fn anchor(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const name = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "a", "name", name).
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "a", "name", name).
         return Value.from(
             try createHTML(agent, this_value, "a", .{ .name = "name", .value = name }),
         );
@@ -2633,32 +2623,32 @@ pub const prototype = struct {
     /// B.2.2.3 String.prototype.big ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.big
     fn big(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "big", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "big", "", "").
         return Value.from(try createHTML(agent, this_value, "big", null));
     }
 
     /// B.2.2.4 String.prototype.blink ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.blink
     fn blink(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "blink", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "blink", "", "").
         return Value.from(try createHTML(agent, this_value, "blink", null));
     }
 
     /// B.2.2.5 String.prototype.bold ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.bold
     fn bold(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "b", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "b", "", "").
         return Value.from(try createHTML(agent, this_value, "b", null));
     }
 
     /// B.2.2.6 String.prototype.fixed ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.fixed
     fn fixed(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "tt", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "tt", "", "").
         return Value.from(try createHTML(agent, this_value, "tt", null));
     }
 
@@ -2667,8 +2657,8 @@ pub const prototype = struct {
     fn fontcolor(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const colour = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "font", "color", colour).
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "font", "color", colour).
         return Value.from(
             try createHTML(agent, this_value, "font", .{ .name = "color", .value = colour }),
         );
@@ -2679,8 +2669,8 @@ pub const prototype = struct {
     fn fontsize(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const size = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "font", "size", size).
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "font", "size", size).
         return Value.from(
             try createHTML(agent, this_value, "font", .{ .name = "size", .value = size }),
         );
@@ -2689,8 +2679,8 @@ pub const prototype = struct {
     /// B.2.2.9 String.prototype.italics ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.italics
     fn italics(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "i", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "i", "", "").
         return Value.from(try createHTML(agent, this_value, "i", null));
     }
 
@@ -2699,8 +2689,8 @@ pub const prototype = struct {
     fn link(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const url = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "a", "href", url).
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "a", "href", url).
         return Value.from(
             try createHTML(agent, this_value, "a", .{ .name = "href", .value = url }),
         );
@@ -2709,32 +2699,32 @@ pub const prototype = struct {
     /// B.2.2.11 String.prototype.small ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.small
     fn small(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "small", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "small", "", "").
         return Value.from(try createHTML(agent, this_value, "small", null));
     }
 
     /// B.2.2.12 String.prototype.strike ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.strike
     fn strike(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "strike", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "strike", "", "").
         return Value.from(try createHTML(agent, this_value, "strike", null));
     }
 
     /// B.2.2.13 String.prototype.sub ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.sub
     fn sub(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "sub", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "sub", "", "").
         return Value.from(try createHTML(agent, this_value, "sub", null));
     }
 
     /// B.2.2.14 String.prototype.sup ( )
     /// https://tc39.es/ecma262/#sec-string.prototype.sup
     fn sup(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Return ? CreateHTML(S, "sup", "", "").
+        // 1. Let string be the this value.
+        // 2. Return ? CreateHTML(string, "sup", "", "").
         return Value.from(try createHTML(agent, this_value, "sup", null));
     }
 };

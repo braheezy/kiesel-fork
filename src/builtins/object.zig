@@ -35,7 +35,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Object",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -84,14 +84,14 @@ pub const constructor = struct {
         // 1. If NewTarget is neither undefined nor the active function object, then
         if (new_target != null and new_target.? != agent.activeFunctionObject()) {
             // a. Return ? OrdinaryCreateFromConstructor(NewTarget, "%Object.prototype%").
-            const object = try ordinaryCreateFromConstructor(
+            const obj = try ordinaryCreateFromConstructor(
                 Object,
                 agent,
                 new_target.?,
                 "%Object.prototype%",
                 {},
             );
-            return Value.from(&object.object);
+            return Value.from(&obj.object);
         }
 
         // 2. If value is either undefined or null, return OrdinaryObjectCreate(%Object.prototype%).
@@ -112,11 +112,11 @@ pub const constructor = struct {
         const target = arguments.get(0);
         const sources = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
-        // 1. Let to be ? ToObject(target).
-        const to = try target.toObject(agent);
+        // 1. Let targetObj be ? ToObject(target).
+        const target_obj = try target.toObject(agent);
 
-        // 2. If only one argument was passed, return to.
-        if (arguments.count() == 1) return Value.from(to);
+        // 2. If only one argument was passed, return targetObj.
+        if (arguments.count() == 1) return Value.from(target_obj);
 
         // 3. For each element nextSource of sources, do
         for (sources) |next_source| {
@@ -131,49 +131,50 @@ pub const constructor = struct {
 
                 // iii. For each element nextKey of keys, do
                 for (keys_) |next_key| {
-                    // 1. Let desc be ? from.[[GetOwnProperty]](nextKey).
-                    const descriptor = try from.internalMethods().getOwnProperty(
+                    // 1. Let propertyDesc be ? from.[[GetOwnProperty]](nextKey).
+                    const property_desc = try from.internalMethods().getOwnProperty(
                         agent,
                         from,
                         next_key,
                     );
 
-                    // 2. If desc is not undefined and desc.[[Enumerable]] is true, then
-                    if (descriptor != null and descriptor.?.enumerable == true) {
-                        // a. Let propValue be ? Get(from, nextKey).
+                    // 2. If propertyDesc is not undefined and propertyDesc.[[Enumerable]] is true,
+                    //    then
+                    if (property_desc != null and property_desc.?.enumerable == true) {
+                        // a. Let propertyValue be ? Get(from, nextKey).
                         const property_value = try from.get(agent, next_key);
 
-                        // b. Perform ? Set(to, nextKey, propValue, true).
-                        try to.set(agent, next_key, property_value, .throw);
+                        // b. Perform ? Set(targetObj, nextKey, propertyValue, true).
+                        try target_obj.set(agent, next_key, property_value, .throw);
                     }
                 }
             }
         }
 
-        // 4. Return to.
-        return Value.from(to);
+        // 4. Return targetObj.
+        return Value.from(target_obj);
     }
 
-    /// 20.1.2.2 Object.create ( O, Properties )
+    /// 20.1.2.2 Object.create ( proto, properties )
     /// https://tc39.es/ecma262/#sec-object.create
     fn create_(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const proto = arguments.get(0);
         const properties = arguments.get(1);
 
-        // 1. If O is not an Object and O is not null, throw a TypeError exception.
-        if (!object.isObject() and !object.isNull()) {
-            return agent.throwException(.type_error, "{f} is not an Object or null", .{object});
+        // 1. If proto is not an Object and proto is not null, throw a TypeError exception.
+        if (!proto.isObject() and !proto.isNull()) {
+            return agent.throwException(.type_error, "{f} is not an Object or null", .{proto});
         }
 
-        // 2. Let obj be OrdinaryObjectCreate(O).
+        // 2. Let obj be OrdinaryObjectCreate(proto).
         const obj = try ordinaryObjectCreate(
             agent,
-            if (object.isObject()) object.asObject() else null,
+            if (proto.isObject()) proto.asObject() else null,
         );
 
-        // 3. If Properties is not undefined, then
+        // 3. If properties is not undefined, then
         if (!properties.isUndefined()) {
-            // a. Return ? ObjectDefineProperties(obj, Properties).
+            // a. Return ? ObjectDefineProperties(obj, properties).
             return Value.from(try objectDefineProperties(agent, obj, properties));
         }
 
@@ -181,114 +182,118 @@ pub const constructor = struct {
         return Value.from(obj);
     }
 
-    /// 20.1.2.3 Object.defineProperties ( O, Properties )
+    /// 20.1.2.3 Object.defineProperties ( obj, properties )
     /// https://tc39.es/ecma262/#sec-object.defineproperties
     fn defineProperties(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
         const properties = arguments.get(1);
 
-        // 1. If O is not an Object, throw a TypeError exception.
-        if (!object.isObject()) {
-            return agent.throwException(.type_error, "{f} is not an Object", .{object});
+        // 1. If obj is not an Object, throw a TypeError exception.
+        if (!obj.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{obj});
         }
 
-        // 2. Return ? ObjectDefineProperties(O, Properties).
-        return Value.from(try objectDefineProperties(agent, object.asObject(), properties));
+        // 2. Return ? ObjectDefineProperties(obj, properties).
+        return Value.from(try objectDefineProperties(agent, obj.asObject(), properties));
     }
 
-    /// 20.1.2.3.1 ObjectDefineProperties ( O, Properties )
+    /// 20.1.2.3.1 ObjectDefineProperties ( obj, properties )
     /// https://tc39.es/ecma262/#sec-objectdefineproperties
     fn objectDefineProperties(
         agent: *Agent,
-        object: *types.Object,
-        properties: Value,
+        obj: *types.Object,
+        properties_value: Value,
     ) Agent.Error!*types.Object {
-        // 1. Let props be ? ToObject(Properties).
-        const props = try properties.toObject(agent);
+        // 1. Set properties to ? ToObject(properties).
+        const properties = try properties_value.toObject(agent);
 
-        // 2. Let keys be ? props.[[OwnPropertyKeys]]().
-        const keys_ = try props.internalMethods().ownPropertyKeys(agent, props);
+        // 2. Let keys be ? properties.[[OwnPropertyKeys]]().
+        const keys_ = try properties.internalMethods().ownPropertyKeys(agent, properties);
         defer agent.gc_allocator.free(keys_);
 
         const Property = struct {
+            /// [[Key]]
             key: PropertyKey,
+            /// [[Descriptor]]
             descriptor: PropertyDescriptor,
         };
 
-        // 3. Let descriptors be a new empty List.
-        var descriptors: std.ArrayList(Property) = .empty;
-        defer descriptors.deinit(agent.gc_allocator);
+        // 3. Let propertyDescs be a new empty List.
+        var property_descs: std.ArrayList(Property) = .empty;
+        defer property_descs.deinit(agent.gc_allocator);
 
         // 4. For each element nextKey of keys, do
         for (keys_) |next_key| {
-            // a. Let propDesc be ? props.[[GetOwnProperty]](nextKey).
-            const maybe_property_descriptor = try props.internalMethods().getOwnProperty(
+            // a. Let currentPropertyDesc be ? properties.[[GetOwnProperty]](nextKey).
+            const current_property_desc = try properties.internalMethods().getOwnProperty(
                 agent,
-                props,
+                properties,
                 next_key,
             );
 
-            // b. If propDesc is not undefined and propDesc.[[Enumerable]] is true, then
-            if (maybe_property_descriptor) |property_descriptor| if (property_descriptor.enumerable == true) {
-                // i. Let descObj be ? Get(props, nextKey).
-                const descriptor_object = try props.get(agent, next_key);
+            // b. If currentPropertyDesc is not undefined and currentPropertyDesc.[[Enumerable]] is
+            //    true, then
+            if (current_property_desc != null and current_property_desc.?.enumerable == true) {
+                // i. Let propertyDescObj be ? Get(properties, nextKey).
+                const property_desc_obj = try properties.get(agent, next_key);
 
-                // ii. Let desc be ? ToPropertyDescriptor(descObj).
-                const descriptor = try descriptor_object.toPropertyDescriptor(agent);
+                // ii. Let propertyDesc be ? ToPropertyDescriptor(propertyDescObj).
+                const property_desc = try property_desc_obj.toPropertyDescriptor(agent);
 
-                // iii. Append the Record { [[Key]]: nextKey, [[Descriptor]]: desc } to descriptors.
-                try descriptors.append(
-                    agent.gc_allocator,
-                    .{ .key = next_key, .descriptor = descriptor },
-                );
-            };
+                // iii. Append the Record { [[Key]]: nextKey, [[Descriptor]]: propertyDesc } to
+                //      propertyDescs.
+                try property_descs.append(agent.gc_allocator, .{
+                    .key = next_key,
+                    .descriptor = property_desc,
+                });
+            }
         }
 
-        // 5. For each element property of descriptors, do
-        for (descriptors.items) |property| {
-            // a. Perform ? DefinePropertyOrThrow(O, property.[[Key]], property.[[Descriptor]]).
-            try object.definePropertyOrThrow(agent, property.key, property.descriptor);
+        // 5. For each element property of propertyDescs, do
+        for (property_descs.items) |property| {
+            // a. Perform ? DefinePropertyOrThrow(obj, property.[[Key]], property.[[Descriptor]]).
+            try obj.definePropertyOrThrow(agent, property.key, property.descriptor);
         }
 
-        // 6. Return O.
-        return object;
+        // 6. Return obj.
+        return obj;
     }
 
-    /// 20.1.2.4 Object.defineProperty ( O, P, Attributes )
+    /// 20.1.2.4 Object.defineProperty ( obj, key, attrs )
     /// https://tc39.es/ecma262/#sec-object.defineproperty
     fn defineProperty(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
-        const property = arguments.get(1);
-        const attributes = arguments.get(2);
+        const obj = arguments.get(0);
+        const key = arguments.get(1);
+        const attrs = arguments.get(2);
 
-        // 1. If O is not an Object, throw a TypeError exception.
-        if (!object.isObject()) {
-            return agent.throwException(.type_error, "{f} is not an Object", .{object});
+        // 1. If obj is not an Object, throw a TypeError exception.
+        if (!obj.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{obj});
         }
 
-        // 2. Let key be ? ToPropertyKey(P).
-        const property_key = try property.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 3. Let desc be ? ToPropertyDescriptor(Attributes).
-        const property_descriptor = try attributes.toPropertyDescriptor(agent);
+        // 3. Let propertyDesc be ? ToPropertyDescriptor(attrs).
+        const property_desc = try attrs.toPropertyDescriptor(agent);
 
-        // 4. Perform ? DefinePropertyOrThrow(O, key, desc).
-        try object.asObject().definePropertyOrThrow(agent, property_key, property_descriptor);
+        // 4. Perform ? DefinePropertyOrThrow(obj, propertyKey, propertyDesc).
+        try obj.asObject().definePropertyOrThrow(agent, property_key, property_desc);
 
-        // 5. Return O.
-        return object;
+        // 5. Return obj.
+        return obj;
     }
 
-    /// 20.1.2.5 Object.entries ( O )
+    /// 20.1.2.5 Object.entries ( obj )
     /// https://tc39.es/ecma262/#sec-object.entries
     fn entries(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. Let obj be ? ToObject(O).
-        const obj = try object.toObject(agent);
+        // 1. Let coerced be ? ToObject(obj).
+        const coerced = try obj.toObject(agent);
 
-        // 2. Let entryList be ? EnumerableOwnProperties(obj, key+value).
-        var entry_list = try obj.enumerableOwnProperties(agent, .key_value);
+        // 2. Let entryList be ? EnumerableOwnProperties(coerced, key+value).
+        var entry_list = try coerced.enumerableOwnProperties(agent, .key_value);
         defer entry_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(entryList).
@@ -296,22 +301,22 @@ pub const constructor = struct {
         return Value.from(&array.object);
     }
 
-    /// 20.1.2.6 Object.freeze ( O )
+    /// 20.1.2.6 Object.freeze ( obj )
     /// https://tc39.es/ecma262/#sec-object.freeze
     fn freeze(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. If O is not an Object, return O.
-        if (!object.isObject()) return object;
+        // 1. If obj is not an Object, return obj.
+        if (!obj.isObject()) return obj;
 
-        // 2. Let status be ? SetIntegrityLevel(O, frozen).
-        const status = try object.asObject().setIntegrityLevel(agent, .frozen);
+        // 2. Let status be ? SetIntegrityLevel(obj, frozen).
+        const status = try obj.asObject().setIntegrityLevel(agent, .frozen);
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not freeze object", .{});
 
-        // 4. Return O.
-        return object;
+        // 4. Return obj.
+        return obj;
     }
 
     /// 20.1.2.7 Object.fromEntries ( iterable )
@@ -325,7 +330,7 @@ pub const constructor = struct {
 
         // 2. Let obj be OrdinaryObjectCreate(%Object.prototype%).
         // 3. Assert: obj is an extensible ordinary object with no own properties.
-        const object = try ordinaryObjectCreate(
+        const obj = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%Object.prototype%"(),
         );
@@ -334,7 +339,7 @@ pub const constructor = struct {
             object: *types.Object,
         };
         const captures = try agent.gc_allocator.create(Captures);
-        captures.* = .{ .object = object };
+        captures.* = .{ .object = obj };
 
         // 4. Let closure be a new Abstract Closure with parameters (key, value) that captures obj
         //    and performs the following steps when called:
@@ -367,74 +372,74 @@ pub const constructor = struct {
         );
 
         // 6. Return ? AddEntriesFromIterable(obj, iterable, adder).
-        return Value.from(try addEntriesFromIterable(agent, object, iterable, &adder.object));
+        return Value.from(try addEntriesFromIterable(agent, obj, iterable, &adder.object));
     }
 
-    /// 20.1.2.8 Object.getOwnPropertyDescriptor ( O, P )
+    /// 20.1.2.8 Object.getOwnPropertyDescriptor ( obj, key )
     /// https://tc39.es/ecma262/#sec-object.getownpropertydescriptor
     fn getOwnPropertyDescriptor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
-        const property = arguments.get(1);
+        const obj = arguments.get(0);
+        const key = arguments.get(1);
 
-        // 1. Let obj be ? ToObject(O).
-        const obj = try object.toObject(agent);
+        // 1. Let coerced be ? ToObject(obj).
+        const coerced = try obj.toObject(agent);
 
-        // 2. Let key be ? ToPropertyKey(P).
-        const property_key = try property.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 3. Let desc be ? obj.[[GetOwnProperty]](key).
-        const maybe_descriptor = try obj.internalMethods().getOwnProperty(agent, obj, property_key);
+        // 3. Let propertyDesc be ? coerced.[[GetOwnProperty]](propertyKey).
+        const property_desc = try coerced.internalMethods().getOwnProperty(agent, coerced, property_key);
 
-        // 4. Return FromPropertyDescriptor(desc).
-        if (maybe_descriptor) |descriptor|
+        // 4. Return FromPropertyDescriptor(propertyDesc).
+        if (property_desc) |descriptor|
             return Value.from(try descriptor.fromPropertyDescriptor(agent))
         else
             return .undefined;
     }
 
-    /// 20.1.2.9 Object.getOwnPropertyDescriptors ( O )
+    /// 20.1.2.9 Object.getOwnPropertyDescriptors ( obj )
     /// https://tc39.es/ecma262/#sec-object.getownpropertydescriptors
     fn getOwnPropertyDescriptors(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. Let obj be ? ToObject(O).
-        const obj = try object.toObject(agent);
+        // 1. Let coerced be ? ToObject(obj).
+        const coerced = try obj.toObject(agent);
 
-        // 2. Let ownKeys be ? obj.[[OwnPropertyKeys]]().
-        const own_keys = try obj.internalMethods().ownPropertyKeys(agent, obj);
+        // 2. Let ownKeys be ? coerced.[[OwnPropertyKeys]]().
+        const own_keys = try coerced.internalMethods().ownPropertyKeys(agent, coerced);
         defer agent.gc_allocator.free(own_keys);
 
-        // 3. Let descriptors be OrdinaryObjectCreate(%Object.prototype%).
-        const descriptors = try ordinaryObjectCreate(
+        // 3. Let descs be OrdinaryObjectCreate(%Object.prototype%).
+        const descs = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%Object.prototype%"(),
         );
 
         // 4. For each element key of ownKeys, do
         for (own_keys) |key| {
-            // a. Let desc be ? obj.[[GetOwnProperty]](key).
-            if (try obj.internalMethods().getOwnProperty(agent, obj, key)) |property_descriptor| {
-                // b. Let descriptor be FromPropertyDescriptor(desc).
-                const descriptor = try property_descriptor.fromPropertyDescriptor(agent);
+            // a. Let propertyDesc be ? coerced.[[GetOwnProperty]](key).
+            if (try coerced.internalMethods().getOwnProperty(agent, coerced, key)) |property_desc| {
+                // b. Let propertyDescObj be FromPropertyDescriptor(propertyDesc).
+                const property_desc_obj = try property_desc.fromPropertyDescriptor(agent);
 
-                // c. If descriptor is not undefined, perform ! CreateDataPropertyOrThrow(
-                //    descriptors, key, descriptor).
-                try descriptors.createDataPropertyDirect(agent, key, Value.from(descriptor));
+                // c. If propertyDescObj is not undefined, perform ! CreateDataPropertyOrThrow(
+                //    descs, key, propertyDescObj).
+                try descs.createDataPropertyDirect(agent, key, Value.from(property_desc_obj));
             }
         }
 
-        // 5. Return descriptors.
-        return Value.from(descriptors);
+        // 5. Return descs.
+        return Value.from(descs);
     }
 
-    /// 20.1.2.10 Object.getOwnPropertyNames ( O )
+    /// 20.1.2.10 Object.getOwnPropertyNames ( obj )
     /// https://tc39.es/ecma262/#sec-object.getownpropertynames
     fn getOwnPropertyNames(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, string)).
-        const property_keys = try getOwnPropertyKeys(agent, object, .string);
+        // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(obj, string)).
+        const property_keys = try getOwnPropertyKeys(agent, obj, .string);
         defer agent.gc_allocator.free(property_keys);
         const array = try createArrayFromListMapToValue(agent, PropertyKey, property_keys, struct {
             fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
@@ -444,13 +449,13 @@ pub const constructor = struct {
         return Value.from(&array.object);
     }
 
-    /// 20.1.2.11 Object.getOwnPropertySymbols ( O )
+    /// 20.1.2.11 Object.getOwnPropertySymbols ( obj )
     /// https://tc39.es/ecma262/#sec-object.getownpropertysymbols
     fn getOwnPropertySymbols(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(O, symbol)).
-        const property_keys = try getOwnPropertyKeys(agent, object, .symbol);
+        // 1. Return CreateArrayFromList(? GetOwnPropertyKeys(obj, symbol)).
+        const property_keys = try getOwnPropertyKeys(agent, obj, .symbol);
         defer agent.gc_allocator.free(property_keys);
         const array = try createArrayFromListMapToValue(agent, PropertyKey, property_keys, struct {
             fn mapFn(agent_: *Agent, property_key: PropertyKey) std.mem.Allocator.Error!Value {
@@ -460,15 +465,15 @@ pub const constructor = struct {
         return Value.from(&array.object);
     }
 
-    /// 20.1.2.11.1 GetOwnPropertyKeys ( O, type )
+    /// 20.1.2.11.1 GetOwnPropertyKeys ( value, type )
     /// https://tc39.es/ecma262/#sec-getownpropertykeys
     fn getOwnPropertyKeys(
         agent: *Agent,
-        object: Value,
+        value: Value,
         comptime @"type": enum { string, symbol },
     ) Agent.Error![]PropertyKey {
-        // 1. Let obj be ? ToObject(O).
-        const obj = try object.toObject(agent);
+        // 1. Let obj be ? ToObject(value).
+        const obj = try value.toObject(agent);
 
         // 2. Let keys be ? obj.[[OwnPropertyKeys]]().
         const keys_ = try obj.internalMethods().ownPropertyKeys(agent, obj);
@@ -493,16 +498,19 @@ pub const constructor = struct {
         return name_list.toOwnedSlice(agent.gc_allocator);
     }
 
-    /// 20.1.2.12 Object.getPrototypeOf ( O )
+    /// 20.1.2.12 Object.getPrototypeOf ( obj )
     /// https://tc39.es/ecma262/#sec-object.getprototypeof
     fn getPrototypeOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. Let obj be ? ToObject(O).
-        const obj = try object.toObject(agent);
+        // 1. Let coerced be ? ToObject(obj).
+        const coerced = try obj.toObject(agent);
 
-        // 2. Return ? obj.[[GetPrototypeOf]]().
-        return Value.from(try obj.internalMethods().getPrototypeOf(agent, obj) orelse return .null);
+        // 2. Return ? coerced.[[GetPrototypeOf]]().
+        return if (try coerced.internalMethods().getPrototypeOf(agent, coerced)) |proto|
+            Value.from(proto)
+        else
+            .null;
     }
 
     /// 20.1.2.13 Object.groupBy ( items, callback )
@@ -515,16 +523,16 @@ pub const constructor = struct {
         const groups = try items.groupBy(agent, callback, .property);
 
         // 2. Let obj be OrdinaryObjectCreate(null).
-        const object = try ordinaryObjectCreate(agent, null);
+        const obj = try ordinaryObjectCreate(agent, null);
 
-        // 3. For each Record { [[Key]], [[Elements]] } g of groups, do
+        // 3. For each Record { [[Key]], [[Elements]] } group of groups, do
         var it = groups.iterator();
         while (it.next()) |entry| {
-            // a. Let elements be CreateArrayFromList(g.[[Elements]]).
+            // a. Let elements be CreateArrayFromList(group.[[Elements]]).
             const elements = try createArrayFromList(agent, entry.value_ptr.items);
 
-            // b. Perform ! CreateDataPropertyOrThrow(obj, g.[[Key]], elements).
-            try object.createDataPropertyDirect(
+            // b. Perform ! CreateDataPropertyOrThrow(obj, group.[[Key]], elements).
+            try obj.createDataPropertyDirect(
                 agent,
                 entry.key_ptr.*,
                 Value.from(&elements.object),
@@ -532,23 +540,23 @@ pub const constructor = struct {
         }
 
         // 4. Return obj.
-        return Value.from(object);
+        return Value.from(obj);
     }
 
-    /// 20.1.2.14 Object.hasOwn ( O, P )
+    /// 20.1.2.14 Object.hasOwn ( obj, key )
     /// https://tc39.es/ecma262/#sec-object.hasown
     fn hasOwn(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
-        const property = arguments.get(1);
+        const obj = arguments.get(0);
+        const key = arguments.get(1);
 
-        // 1. Let obj be ? ToObject(O).
-        const obj = try object.toObject(agent);
+        // 1. Let coerced be ? ToObject(obj).
+        const coerced = try obj.toObject(agent);
 
-        // 2. Let key be ? ToPropertyKey(P).
-        const property_key = try property.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 3. Return ? HasOwnProperty(obj, key).
-        return Value.from(try obj.hasOwnProperty(agent, property_key));
+        // 3. Return ? HasOwnProperty(coerced, propertyKey).
+        return Value.from(try coerced.hasOwnProperty(agent, property_key));
     }
 
     /// 20.1.2.15 Object.is ( value1, value2 )
@@ -561,52 +569,52 @@ pub const constructor = struct {
         return Value.from(sameValue(value1, value2));
     }
 
-    /// 20.1.2.16 Object.isExtensible ( O )
+    /// 20.1.2.16 Object.isExtensible ( obj )
     /// https://tc39.es/ecma262/#sec-object.isextensible
     fn isExtensible(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. If O is not an Object, return false.
-        if (!object.isObject()) return .false;
+        // 1. If obj is not an Object, return false.
+        if (!obj.isObject()) return .false;
 
-        // 2. Return ? IsExtensible(O).
-        return Value.from(try object.asObject().isExtensible(agent));
+        // 2. Return ? IsExtensible(obj).
+        return Value.from(try obj.asObject().isExtensible(agent));
     }
 
-    /// 20.1.2.17 Object.isFrozen ( O )
+    /// 20.1.2.17 Object.isFrozen ( obj )
     /// https://tc39.es/ecma262/#sec-object.isfrozen
     fn isFrozen(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. If O is not an Object, return true.
-        if (!object.isObject()) return .true;
+        // 1. If obj is not an Object, return true.
+        if (!obj.isObject()) return .true;
 
-        // 2. Return ? TestIntegrityLevel(O, frozen).
-        return Value.from(try object.asObject().testIntegrityLevel(agent, .frozen));
+        // 2. Return ? TestIntegrityLevel(obj, frozen).
+        return Value.from(try obj.asObject().testIntegrityLevel(agent, .frozen));
     }
 
-    /// 20.1.2.18 Object.isSealed ( O )
+    /// 20.1.2.18 Object.isSealed ( obj )
     /// https://tc39.es/ecma262/#sec-object.issealed
     fn isSealed(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. If O is not an Object, return true.
-        if (!object.isObject()) return .true;
+        // 1. If obj is not an Object, return true.
+        if (!obj.isObject()) return .true;
 
-        // 2. Return ? TestIntegrityLevel(O, sealed).
-        return Value.from(try object.asObject().testIntegrityLevel(agent, .sealed));
+        // 2. Return ? TestIntegrityLevel(obj, sealed).
+        return Value.from(try obj.asObject().testIntegrityLevel(agent, .sealed));
     }
 
-    /// 20.1.2.19 Object.keys ( O )
+    /// 20.1.2.19 Object.keys ( obj )
     /// https://tc39.es/ecma262/#sec-object.keys
     fn keys(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. Let obj be ? ToObject(O).
-        const obj = try object.toObject(agent);
+        // 1. Let coerced be ? ToObject(obj).
+        const coerced = try obj.toObject(agent);
 
-        // 2. Let keyList be ? EnumerableOwnProperties(obj, key).
-        var key_list = try obj.enumerableOwnProperties(agent, .key);
+        // 2. Let keyList be ? EnumerableOwnProperties(coerced, key).
+        var key_list = try coerced.enumerableOwnProperties(agent, .key);
         defer key_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(keyList).
@@ -614,83 +622,83 @@ pub const constructor = struct {
         return Value.from(&array.object);
     }
 
-    /// 20.1.2.20 Object.preventExtensions ( O )
+    /// 20.1.2.20 Object.preventExtensions ( obj )
     /// https://tc39.es/ecma262/#sec-object.preventextensions
     fn preventExtensions(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. If O is not an Object, return O.
-        if (!object.isObject()) return object;
+        // 1. If obj is not an Object, return obj.
+        if (!obj.isObject()) return obj;
 
-        // 2. Let status be ? O.[[PreventExtensions]]().
-        const status = try object.asObject().internalMethods().preventExtensions(agent, object.asObject());
+        // 2. Let status be ? obj.[[PreventExtensions]]().
+        const status = try obj.asObject().internalMethods().preventExtensions(agent, obj.asObject());
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not prevent extensions", .{});
 
-        // 4. Return O.
-        return object;
+        // 4. Return obj.
+        return obj;
     }
 
-    /// 20.1.2.22 Object.seal ( O )
+    /// 20.1.2.22 Object.seal ( obj )
     /// https://tc39.es/ecma262/#sec-object.seal
     fn seal(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. If O is not an Object, return O.
-        if (!object.isObject()) return object;
+        // 1. If obj is not an Object, return obj.
+        if (!obj.isObject()) return obj;
 
-        // 2. Let status be ? SetIntegrityLevel(O, sealed).
-        const status = try object.asObject().setIntegrityLevel(agent, .sealed);
+        // 2. Let status be ? SetIntegrityLevel(obj, sealed).
+        const status = try obj.asObject().setIntegrityLevel(agent, .sealed);
 
         // 3. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not seal object", .{});
 
-        // 4. Return O.
-        return object;
+        // 4. Return obj.
+        return obj;
     }
 
-    /// 20.1.2.23 Object.setPrototypeOf ( O, proto )
+    /// 20.1.2.23 Object.setPrototypeOf ( obj, proto )
     /// https://tc39.es/ecma262/#sec-object.setprototypeof
     fn setPrototypeOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
-        const prototype_ = arguments.get(1);
+        const obj = arguments.get(0);
+        const proto = arguments.get(1);
 
-        // 1. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 1. Perform ? RequireObjectCoercible(obj).
+        try obj.requireObjectCoercible(agent);
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
-        if (!prototype_.isObject() and !prototype_.isNull()) {
-            return agent.throwException(.type_error, "{f} is not an Object or null", .{prototype_});
+        if (!proto.isObject() and !proto.isNull()) {
+            return agent.throwException(.type_error, "{f} is not an Object or null", .{proto});
         }
 
-        // 3. If O is not an Object, return O.
-        if (!object.isObject()) return object;
+        // 3. If obj is not an Object, return obj.
+        if (!obj.isObject()) return obj;
 
-        // 4. Let status be ? O.[[SetPrototypeOf]](proto).
-        const status = try object.asObject().internalMethods().setPrototypeOf(
+        // 4. Let status be ? obj.[[SetPrototypeOf]](proto).
+        const status = try obj.asObject().internalMethods().setPrototypeOf(
             agent,
-            object.asObject(),
-            if (prototype_.isObject()) prototype_.asObject() else null,
+            obj.asObject(),
+            if (proto.isObject()) proto.asObject() else null,
         );
 
         // 5. If status is false, throw a TypeError exception.
         if (!status) return agent.throwException(.type_error, "Could not set prototype", .{});
 
-        // 6. Return O.
-        return object;
+        // 6. Return obj.
+        return obj;
     }
 
-    /// 20.1.2.24 Object.values ( O )
+    /// 20.1.2.24 Object.values ( obj )
     /// https://tc39.es/ecma262/#sec-object.values
     fn values(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. Let obj be ? ToObject(O).
-        const obj = try object.toObject(agent);
+        // 1. Let coerced be ? ToObject(obj).
+        const coerced = try obj.toObject(agent);
 
-        // 2. Let valueList be ? EnumerableOwnProperties(obj, value).
-        var value_list = try obj.enumerableOwnProperties(agent, .value);
+        // 2. Let valueList be ? EnumerableOwnProperties(coerced, value).
+        var value_list = try coerced.enumerableOwnProperties(agent, .value);
         defer value_list.deinit(agent.gc_allocator);
 
         // 3. Return CreateArrayFromList(valueList).
@@ -740,48 +748,48 @@ pub const prototype = struct {
         _ = try realm.intrinsics.@"%Object.prototype.toString%"();
     }
 
-    /// 20.1.3.2 Object.prototype.hasOwnProperty ( V )
+    /// 20.1.3.2 Object.prototype.hasOwnProperty ( value )
     /// https://tc39.es/ecma262/#sec-object.prototype.hasownproperty
     fn hasOwnProperty(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. Let P be ? ToPropertyKey(V).
+        // 1. Let propertyKey be ? ToPropertyKey(value).
         const property_key = try value.toPropertyKey(agent);
 
-        // 2. Let O be ? ToObject(this value).
-        const object = try this_value.toObject(agent);
+        // 2. Let obj be ? ToObject(this value).
+        const obj = try this_value.toObject(agent);
 
-        // 3. Return ? HasOwnProperty(O, P).
-        return Value.from(try object.hasOwnProperty(agent, property_key));
+        // 3. Return ? HasOwnProperty(obj, propertyKey).
+        return Value.from(try obj.hasOwnProperty(agent, property_key));
     }
 
-    /// 20.1.3.3 Object.prototype.isPrototypeOf ( V )
+    /// 20.1.3.3 Object.prototype.isPrototypeOf ( value )
     /// https://tc39.es/ecma262/#sec-object.prototype.isprototypeof
     fn isPrototypeOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. If V is not an Object, return false.
+        // 1. If value is not an Object, return false.
         if (!value.isObject()) return .false;
 
-        // 2. Let O be ? ToObject(this value).
-        const object = try this_value.toObject(agent);
+        // 2. Let obj be ? ToObject(this value).
+        const obj = try this_value.toObject(agent);
 
-        var prototype_ = value.asObject();
+        var proto = value.asObject();
 
         // 3. Repeat,
         while (true) {
-            // a. Set V to ? V.[[GetPrototypeOf]]().
-            prototype_ = try prototype_.internalMethods().getPrototypeOf(agent, prototype_) orelse {
-                // b. If V is null, return false.
+            // a. Set value to ? value.[[GetPrototypeOf]]().
+            proto = try proto.internalMethods().getPrototypeOf(agent, proto) orelse {
+                // b. If value is null, return false.
                 return .false;
             };
 
-            // c. If SameValue(O, V) is true, return true.
-            if (object == prototype_) return .true;
+            // c. If SameValue(obj, value) is true, return true.
+            if (obj == proto) return .true;
         }
     }
 
-    /// 20.1.3.4 Object.prototype.propertyIsEnumerable ( V )
+    /// 20.1.3.4 Object.prototype.propertyIsEnumerable ( value )
     /// https://tc39.es/ecma262/#sec-object.prototype.propertyisenumerable
     fn propertyIsEnumerable(
         agent: *Agent,
@@ -790,31 +798,31 @@ pub const prototype = struct {
     ) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. Let P be ? ToPropertyKey(V).
+        // 1. Let propertyKey be ? ToPropertyKey(value).
         const property_key = try value.toPropertyKey(agent);
 
-        // 2. Let O be ? ToObject(this value).
-        const object = try this_value.toObject(agent);
+        // 2. Let obj be ? ToObject(this value).
+        const obj = try this_value.toObject(agent);
 
-        // 3. Let desc be ? O.[[GetOwnProperty]](P).
-        const property_descriptor = try object.internalMethods().getOwnProperty(
+        // 3. Let propertyDesc be ? obj.[[GetOwnProperty]](propertyKey).
+        const property_desc = try obj.internalMethods().getOwnProperty(
             agent,
-            object,
+            obj,
             property_key,
         ) orelse {
-            // 4. If desc is undefined, return false.
+            // 4. If propertyDesc is undefined, return false.
             return .false;
         };
 
-        // 5. Return desc.[[Enumerable]].
-        return Value.from(property_descriptor.enumerable.?);
+        // 5. Return propertyDesc.[[Enumerable]].
+        return Value.from(property_desc.enumerable.?);
     }
 
     /// 20.1.3.5 Object.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-object.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. Return ? Invoke(O, "toString").
+        // 1. Let thisValue be the this value.
+        // 2. Return ? Invoke(thisValue, "toString").
         return this_value.invoke(agent, PropertyKey.from("toString"), &.{});
     }
 
@@ -827,47 +835,47 @@ pub const prototype = struct {
         // 2. If the this value is null, return "[object Null]".
         if (this_value.isNull()) return Value.from("[object Null]");
 
-        // 3. Let O be ! ToObject(this value).
-        const object = this_value.toObject(agent) catch |err| try noexcept(err);
+        // 3. Let obj be ! ToObject(this value).
+        const obj = this_value.toObject(agent) catch |err| try noexcept(err);
 
-        // 4. Let isArray be ? IsArray(O).
+        // 4. Let isArray be ? IsArray(obj).
         const is_array = try this_value.isArray(agent);
 
         // zig fmt: off
         // 5. If isArray is true, let builtinTag be "Array".
         const builtin_tag = if (is_array)
             String.fromLiteral("Array")
-        // 6. Else if O has a [[ParameterMap]] internal slot, let builtinTag be "Arguments".
-        else if (object.is(builtins.Arguments))
+        // 6. Else if obj has a [[ParameterMap]] internal slot, let builtinTag be "Arguments".
+        else if (obj.is(builtins.Arguments))
             String.fromLiteral("Arguments")
-        // 7. Else if O has a [[Call]] internal method, let builtinTag be "Function".
-        else if (object.internalMethods().call) |_|
+        // 7. Else if obj has a [[Call]] internal method, let builtinTag be "Function".
+        else if (obj.internalMethods().call) |_|
             String.fromLiteral("Function")
-        // 8. Else if O has an [[ErrorData]] internal slot, let builtinTag be "Error".
-        else if (object.is(builtins.Error))
+        // 8. Else if obj has an [[ErrorData]] internal slot, let builtinTag be "Error".
+        else if (obj.is(builtins.Error))
             String.fromLiteral("Error")
-        // 9. Else if O has a [[BooleanData]] internal slot, let builtinTag be "Boolean".
-        else if (object.is(builtins.Boolean))
+        // 9. Else if obj has a [[BooleanData]] internal slot, let builtinTag be "Boolean".
+        else if (obj.is(builtins.Boolean))
             String.fromLiteral("Boolean")
-        // 10. Else if O has a [[NumberData]] internal slot, let builtinTag be "Number".
-        else if (object.is(builtins.Number))
+        // 10. Else if obj has a [[NumberData]] internal slot, let builtinTag be "Number".
+        else if (obj.is(builtins.Number))
             String.fromLiteral("Number")
-        // 11. Else if O has a [[StringData]] internal slot, let builtinTag be "String".
-        else if (object.is(builtins.String))
+        // 11. Else if obj has a [[StringData]] internal slot, let builtinTag be "String".
+        else if (obj.is(builtins.String))
             String.fromLiteral("String")
-        // 12. Else if O has a [[DateValue]] internal slot, let builtinTag be "Date".
-        else if (object.is(builtins.Date))
+        // 12. Else if obj has a [[DateValue]] internal slot, let builtinTag be "Date".
+        else if (obj.is(builtins.Date))
             String.fromLiteral("Date")
-        // 13. Else if O has a [[RegExpMatcher]] internal slot, let builtinTag be "RegExp".
-        else if (object.is(builtins.RegExp))
+        // 13. Else if obj has a [[RegExpMatcher]] internal slot, let builtinTag be "RegExp".
+        else if (obj.is(builtins.RegExp))
             String.fromLiteral("RegExp")
         // 14. Else, let builtinTag be "Object".
         else
             String.fromLiteral("Object");
         // zig fmt: on
 
-        // 15. Let tag be ? Get(O, %Symbol.toStringTag%).
-        const tag_value = try object.get(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.toStringTag%"));
+        // 15. Let tag be ? Get(obj, %Symbol.toStringTag%).
+        const tag_value = try obj.get(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.toStringTag%"));
 
         // 16. If tag is not a String, set tag to builtinTag.
         const tag = if (tag_value.isString()) tag_value.asString() else builtin_tag;
@@ -892,37 +900,37 @@ pub const prototype = struct {
     /// 20.1.3.8.1 get Object.prototype.__proto__
     /// https://tc39.es/ecma262/#sec-get-object.prototype.__proto__
     fn @"get __proto__"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be ? ToObject(this value).
-        const object = try this_value.toObject(agent);
+        // 1. Let obj be ? ToObject(this value).
+        const obj = try this_value.toObject(agent);
 
-        // 2. Return ? O.[[GetPrototypeOf]]().
-        return Value.from(
-            try object.internalMethods().getPrototypeOf(agent, object) orelse return .null,
-        );
+        // 2. Return ? obj.[[GetPrototypeOf]]().
+        return if (try obj.internalMethods().getPrototypeOf(agent, obj)) |proto|
+            Value.from(proto)
+        else
+            .null;
     }
 
     /// 20.1.3.8.2 set Object.prototype.__proto__
     /// https://tc39.es/ecma262/#sec-set-object.prototype.__proto__
     fn @"set __proto__"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const prototype_ = arguments.get(0);
+        const proto = arguments.get(0);
 
-        // 1. Let O be the this value.
-        const object = this_value;
+        // 1. Let thisValue be the this value.
 
-        // 2. Perform ? RequireObjectCoercible(O).
-        try object.requireObjectCoercible(agent);
+        // 2. Perform ? RequireObjectCoercible(thisValue).
+        try this_value.requireObjectCoercible(agent);
 
         // 3. If proto is not an Object and proto is not null, return undefined.
-        if (!prototype_.isObject() and !prototype_.isNull()) return .undefined;
+        if (!proto.isObject() and !proto.isNull()) return .undefined;
 
-        // 4. If O is not an Object, return undefined.
-        if (!object.isObject()) return .undefined;
+        // 4. If thisValue is not an Object, return undefined.
+        if (!this_value.isObject()) return .undefined;
 
-        // 5. Let status be ? O.[[SetPrototypeOf]](proto).
-        const status = try object.asObject().internalMethods().setPrototypeOf(
+        // 5. Let status be ? thisValue.[[SetPrototypeOf]](proto).
+        const status = try this_value.asObject().internalMethods().setPrototypeOf(
             agent,
-            object.asObject(),
-            if (prototype_.isObject()) prototype_.asObject() else null,
+            this_value.asObject(),
+            if (proto.isObject()) proto.asObject() else null,
         );
 
         // 6. If status is false, throw a TypeError exception.
@@ -934,139 +942,139 @@ pub const prototype = struct {
         return .undefined;
     }
 
-    /// 20.1.3.9.1 Object.prototype.__defineGetter__ ( P, getter )
+    /// 20.1.3.9.1 Object.prototype.__defineGetter__ ( key, getter )
     /// https://tc39.es/ecma262/#sec-object.prototype.__defineGetter__
     fn __defineGetter__(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const property = arguments.get(0);
+        const key = arguments.get(0);
         const getter = arguments.get(1);
 
-        // 1. Let O be ? ToObject(this value).
-        const object = try this_value.toObject(agent);
+        // 1. Let obj be ? ToObject(this value).
+        const obj = try this_value.toObject(agent);
 
         // 2. If IsCallable(getter) is false, throw a TypeError exception.
         if (!getter.isCallable()) {
             return agent.throwException(.type_error, "{f} is not callable", .{getter});
         }
 
-        // 3. Let desc be PropertyDescriptor { [[Get]]: getter, [[Enumerable]]: true,
+        // 3. Let propertyDesc be PropertyDescriptor { [[Get]]: getter, [[Enumerable]]: true,
         //    [[Configurable]]: true }.
-        const property_descriptor: PropertyDescriptor = .{
+        const property_desc: PropertyDescriptor = .{
             .get = getter.asObject(),
             .enumerable = true,
             .configurable = true,
         };
 
-        // 4. Let key be ? ToPropertyKey(P).
-        const property_key = try property.toPropertyKey(agent);
+        // 4. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 5. Perform ? DefinePropertyOrThrow(O, key, desc).
-        try object.definePropertyOrThrow(agent, property_key, property_descriptor);
+        // 5. Perform ? DefinePropertyOrThrow(obj, propertyKey, propertyDesc).
+        try obj.definePropertyOrThrow(agent, property_key, property_desc);
 
         // 6. Return undefined.
         return .undefined;
     }
 
-    /// 20.1.3.9.2 Object.prototype.__defineSetter__ ( P, setter )
+    /// 20.1.3.9.2 Object.prototype.__defineSetter__ ( key, setter )
     /// https://tc39.es/ecma262/#sec-object.prototype.__defineSetter__
     fn __defineSetter__(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const property = arguments.get(0);
+        const key = arguments.get(0);
         const setter = arguments.get(1);
 
-        // 1. Let O be ? ToObject(this value).
-        const object = try this_value.toObject(agent);
+        // 1. Let obj be ? ToObject(this value).
+        const obj = try this_value.toObject(agent);
 
         // 2. If IsCallable(setter) is false, throw a TypeError exception.
         if (!setter.isCallable()) {
             return agent.throwException(.type_error, "{f} is not callable", .{setter});
         }
 
-        // 3. Let desc be PropertyDescriptor { [[Set]]: setter, [[Enumerable]]: true,
+        // 3. Let propertyDesc be PropertyDescriptor { [[Set]]: setter, [[Enumerable]]: true,
         //    [[Configurable]]: true }.
-        const property_descriptor: PropertyDescriptor = .{
+        const property_desc: PropertyDescriptor = .{
             .set = setter.asObject(),
             .enumerable = true,
             .configurable = true,
         };
 
-        // 4. Let key be ? ToPropertyKey(P).
-        const property_key = try property.toPropertyKey(agent);
+        // 4. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 5. Perform ? DefinePropertyOrThrow(O, key, desc).
-        try object.definePropertyOrThrow(agent, property_key, property_descriptor);
+        // 5. Perform ? DefinePropertyOrThrow(obj, propertyKey, propertyDesc).
+        try obj.definePropertyOrThrow(agent, property_key, property_desc);
 
         // 6. Return undefined.
         return .undefined;
     }
 
-    /// 20.1.3.9.3 Object.prototype.__lookupGetter__ ( P )
+    /// 20.1.3.9.3 Object.prototype.__lookupGetter__ ( key )
     /// https://tc39.es/ecma262/#sec-object.prototype.__lookupGetter__
     fn __lookupGetter__(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const property = arguments.get(0);
+        const key = arguments.get(0);
 
-        // 1. Let O be ? ToObject(this value).
-        var object = try this_value.toObject(agent);
+        // 1. Let obj be ? ToObject(this value).
+        var obj = try this_value.toObject(agent);
 
-        // 2. Let key be ? ToPropertyKey(P).
-        const property_key = try property.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
         // 3. Repeat,
         while (true) {
-            // a. Let desc be ? O.[[GetOwnProperty]](key).
-            // b. If desc is not undefined, then
-            if (try object.internalMethods().getOwnProperty(
+            // a. Let propertyDesc be ? obj.[[GetOwnProperty]](propertyKey).
+            // b. If propertyDesc is not undefined, then
+            if (try obj.internalMethods().getOwnProperty(
                 agent,
-                object,
+                obj,
                 property_key,
-            )) |property_descriptor| {
-                // i. If IsAccessorDescriptor(desc) is true, return desc.[[Get]].
-                if (property_descriptor.isAccessorDescriptor()) {
-                    return Value.from(property_descriptor.get.? orelse return .undefined);
+            )) |property_desc| {
+                // i. If IsAccessorDescriptor(propertyDesc) is true, return propertyDesc.[[Get]].
+                if (property_desc.isAccessorDescriptor()) {
+                    return Value.from(property_desc.get.? orelse return .undefined);
                 }
 
                 // ii. Return undefined.
                 return .undefined;
             }
 
-            // c. Set O to ? O.[[GetPrototypeOf]]().
-            object = try object.internalMethods().getPrototypeOf(agent, object) orelse {
-                // d. If O is null, return undefined.
+            // c. Set obj to ? obj.[[GetPrototypeOf]]().
+            obj = try obj.internalMethods().getPrototypeOf(agent, obj) orelse {
+                // d. If obj is null, return undefined.
                 return .undefined;
             };
         }
     }
 
-    /// 20.1.3.9.4 Object.prototype.__lookupSetter__ ( P )
+    /// 20.1.3.9.4 Object.prototype.__lookupSetter__ ( key )
     /// https://tc39.es/ecma262/#sec-object.prototype.__lookupSetter__
     fn __lookupSetter__(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const property = arguments.get(0);
+        const key = arguments.get(0);
 
-        // 1. Let O be ? ToObject(this value).
-        var object = try this_value.toObject(agent);
+        // 1. Let obj be ? ToObject(this value).
+        var obj = try this_value.toObject(agent);
 
-        // 2. Let key be ? ToPropertyKey(P).
-        const property_key = try property.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
         // 3. Repeat,
         while (true) {
-            // a. Let desc be ? O.[[GetOwnProperty]](key).
-            // b. If desc is not undefined, then
-            if (try object.internalMethods().getOwnProperty(
+            // a. Let propertyDesc be ? obj.[[GetOwnProperty]](propertyKey).
+            // b. If propertyDesc is not undefined, then
+            if (try obj.internalMethods().getOwnProperty(
                 agent,
-                object,
+                obj,
                 property_key,
-            )) |property_descriptor| {
-                // i. If IsAccessorDescriptor(desc) is true, return desc.[[Set]].
-                if (property_descriptor.isAccessorDescriptor()) {
-                    return Value.from(property_descriptor.set.? orelse return .undefined);
+            )) |property_desc| {
+                // i. If IsAccessorDescriptor(propertyDesc) is true, return propertyDesc.[[Set]].
+                if (property_desc.isAccessorDescriptor()) {
+                    return Value.from(property_desc.set.? orelse return .undefined);
                 }
 
                 // ii. Return undefined.
                 return .undefined;
             }
 
-            // c. Set O to ? O.[[GetPrototypeOf]]().
-            object = try object.internalMethods().getPrototypeOf(agent, object) orelse {
-                // d. If O is null, return undefined.
+            // c. Set obj to ? obj.[[GetPrototypeOf]]().
+            obj = try obj.internalMethods().getPrototypeOf(agent, obj) orelse {
+                // d. If obj is null, return undefined.
                 return .undefined;
             };
         }

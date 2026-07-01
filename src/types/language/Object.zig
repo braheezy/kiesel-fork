@@ -323,14 +323,14 @@ pub fn setProperty(
     self: *Object,
     allocator: std.mem.Allocator,
     property_key: PropertyKey,
-    property_descriptor: CompletePropertyDescriptor,
+    property_desc: CompletePropertyDescriptor,
 ) std.mem.Allocator.Error!void {
     if (property_key.isArrayIndex()) {
         const indexed_properties = try self.ensureIndexedProperties(allocator);
-        return indexed_properties.set(allocator, @intCast(property_key.integer_index), property_descriptor);
+        return indexed_properties.set(allocator, @intCast(property_key.integer_index), property_desc);
     }
-    const value_or_accessor = property_descriptor.value_or_accessor;
-    const attributes = property_descriptor.attributes;
+    const value_or_accessor = property_desc.value_or_accessor;
+    const attributes = property_desc.attributes;
     const property_type: Shape.Property.Type = switch (value_or_accessor) {
         .value => .value,
         .accessor => .accessor,
@@ -553,7 +553,7 @@ pub fn definePropertyDirect(
     self: *Object,
     agent: *Agent,
     property_key: PropertyKey,
-    property_descriptor: CompletePropertyDescriptor,
+    property_desc: CompletePropertyDescriptor,
 ) std.mem.Allocator.Error!void {
     const has_ordinary_internal_methods = self.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_define_own_property,
@@ -568,13 +568,13 @@ pub fn definePropertyDirect(
         !property_key.isLength();
 
     if (has_ordinary_internal_methods or use_fast_path_for_array) {
-        try self.setProperty(agent.gc_allocator, property_key, property_descriptor);
+        try self.setProperty(agent.gc_allocator, property_key, property_desc);
     } else {
         const result = self.internalMethods().defineOwnProperty(
             agent,
             self,
             property_key,
-            property_descriptor.toPropertyDescriptor(),
+            property_desc.toPropertyDescriptor(),
         ) catch |err| try noexcept(err);
         std.debug.assert(result);
     }
@@ -857,9 +857,9 @@ pub fn defineBuiltinPropertyLazy(
     );
 }
 
-/// 7.1.1.1 OrdinaryToPrimitive ( O, hint )
+/// 7.1.1.1 OrdinaryToPrimitive ( obj, hint )
 /// https://tc39.es/ecma262/#sec-ordinarytoprimitive
-pub fn ordinaryToPrimitive(self: *Object, agent: *Agent, hint: PreferredType) Agent.Error!Value {
+pub fn ordinaryToPrimitive(obj: *Object, agent: *Agent, hint: PreferredType) Agent.Error!Value {
     const method_names = switch (hint) {
         // 1. If hint is string, then
         //     a. Let methodNames be « "toString", "valueOf" ».
@@ -871,13 +871,13 @@ pub fn ordinaryToPrimitive(self: *Object, agent: *Agent, hint: PreferredType) Ag
 
     // 3. For each element name of methodNames, do
     for (method_names) |name| {
-        // a. Let method be ? Get(O, name).
-        const method = try self.get(agent, name);
+        // a. Let method be ? Get(obj, name).
+        const method = try obj.get(agent, name);
 
         // b. If IsCallable(method) is true, then
         if (method.isCallable()) {
-            // i. Let result be ? Call(method, O).
-            const result = try method.callAssumeCallable(agent, Value.from(self), &.{});
+            // i. Let result be ? Call(method, obj).
+            const result = try method.callAssumeCallable(agent, Value.from(obj), &.{});
 
             // ii. If result is not an Object, return result.
             if (!result.isObject()) return result;
@@ -888,49 +888,49 @@ pub fn ordinaryToPrimitive(self: *Object, agent: *Agent, hint: PreferredType) Ag
     return agent.throwException(.type_error, "Could not convert object to {t}", .{hint});
 }
 
-/// 7.2.5 IsExtensible ( O )
+/// 7.2.5 IsExtensible ( obj )
 /// https://tc39.es/ecma262/#sec-isextensible-o
-pub fn isExtensible(self: *Object, agent: *Agent) Agent.Error!bool {
-    // 1. Return ? O.[[IsExtensible]]().
-    return self.internalMethods().isExtensible(agent, self);
+pub fn isExtensible(obj: *Object, agent: *Agent) Agent.Error!bool {
+    // 1. Return ? obj.[[IsExtensible]]().
+    return obj.internalMethods().isExtensible(agent, obj);
 }
 
-/// 7.3.2 Get ( O, P )
+/// 7.3.2 Get ( obj, propertyKey )
 /// https://tc39.es/ecma262/#sec-get-o-p
-pub fn get(self: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!Value {
-    // 1. Return ? O.[[Get]](P, O).
-    return self.internalMethods().get(agent, self, property_key, Value.from(self));
+pub fn get(obj: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!Value {
+    // 1. Return ? obj.[[Get]](propertyKey, obj).
+    return obj.internalMethods().get(agent, obj, property_key, Value.from(obj));
 }
 
-/// 7.3.4 Set ( O, P, V, Throw )
+/// 7.3.4 Set ( obj, propertyKey, value, throw )
 /// https://tc39.es/ecma262/#sec-set-o-p-v-throw
 pub fn set(
-    self: *Object,
+    obj: *Object,
     agent: *Agent,
     property_key: PropertyKey,
     value: Value,
     throw: enum { throw, ignore },
 ) Agent.Error!void {
-    // 1. Let success be ? O.[[Set]](P, V, O).
-    const success = try self.internalMethods().set(
+    // 1. Let success be ? obj.[[Set]](propertyKey, value, obj).
+    const success = try obj.internalMethods().set(
         agent,
-        self,
+        obj,
         property_key,
         value,
-        Value.from(self),
+        Value.from(obj),
     );
 
-    // 2. If success is false and Throw is true, throw a TypeError exception.
+    // 2. If success is false and throw is true, throw a TypeError exception.
     if (!success and throw == .throw)
         return agent.throwException(.type_error, "Could not set property", .{});
 
     // 3. Return unused.
 }
 
-/// 7.3.5 CreateDataProperty ( O, P, V )
+/// 7.3.5 CreateDataProperty ( obj, propertyKey, value )
 /// https://tc39.es/ecma262/#sec-createdataproperty
-pub fn createDataProperty(self: *Object, agent: *Agent, property_key: PropertyKey, value: Value) Agent.Error!bool {
-    // 1. Let newDesc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true,
+pub fn createDataProperty(obj: *Object, agent: *Agent, property_key: PropertyKey, value: Value) Agent.Error!bool {
+    // 1. Let newDesc be the PropertyDescriptor { [[Value]]: value, [[Writable]]: true,
     //    [[Enumerable]]: true, [[Configurable]]: true }.
     const new_descriptor: PropertyDescriptor = .{
         .value = value,
@@ -939,20 +939,20 @@ pub fn createDataProperty(self: *Object, agent: *Agent, property_key: PropertyKe
         .configurable = true,
     };
 
-    // 2. Return ? O.[[DefineOwnProperty]](P, newDesc).
-    return self.internalMethods().defineOwnProperty(agent, self, property_key, new_descriptor);
+    // 2. Return ? obj.[[DefineOwnProperty]](propertyKey, newDesc).
+    return obj.internalMethods().defineOwnProperty(agent, obj, property_key, new_descriptor);
 }
 
-/// 7.3.6 CreateDataPropertyOrThrow ( O, P, V )
+/// 7.3.6 CreateDataPropertyOrThrow ( obj, propertyKey, value )
 /// https://tc39.es/ecma262/#sec-createdatapropertyorthrow
 pub fn createDataPropertyOrThrow(
-    self: *Object,
+    obj: *Object,
     agent: *Agent,
     property_key: PropertyKey,
     value: Value,
 ) Agent.Error!void {
-    // 1. Let success be ? CreateDataProperty(O, P, V).
-    const success = try self.createDataProperty(agent, property_key, value);
+    // 1. Let success be ? CreateDataProperty(obj, propertyKey, value).
+    const success = try obj.createDataProperty(agent, property_key, value);
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
@@ -961,19 +961,19 @@ pub fn createDataPropertyOrThrow(
     // 3. Return unused.
 }
 
-/// 7.3.7 CreateNonEnumerableDataPropertyOrThrow ( O, P, V )
+/// 7.3.7 CreateNonEnumerableDataPropertyOrThrow ( obj, propertyKey, value )
 /// https://tc39.es/ecma262/#sec-createnonenumerabledatapropertyorthrow
 pub fn createNonEnumerableDataPropertyOrThrow(
-    self: *Object,
+    obj: *Object,
     agent: *Agent,
     property_key: PropertyKey,
     value: Value,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: O is an ordinary, extensible object with no non-configurable properties.
+    // 1. Assert: obj is an ordinary, extensible object with no non-configurable properties.
     std.debug.assert(
-        self.extensible() and for (self.shape.properties.values()) |entry| {
+        obj.extensible() and for (obj.shape.properties.values()) |entry| {
             if (!entry.attributes.configurable) break false;
-        } else true and switch (self.indexedProperties().storage) {
+        } else true and switch (obj.indexedProperties().storage) {
             .sparse_property_descriptor => |sparse_property_descriptor| blk: {
                 var it = sparse_property_descriptor.valueIterator();
                 break :blk while (it.next()) |entry| {
@@ -984,35 +984,35 @@ pub fn createNonEnumerableDataPropertyOrThrow(
         },
     );
 
-    // 2. Let newDesc be the PropertyDescriptor { [[Value]]: V, [[Writable]]: true,
+    // 2. Let newDesc be the PropertyDescriptor { [[Value]]: value, [[Writable]]: true,
     //    [[Enumerable]]: false, [[Configurable]]: true }.
-    const new_descriptor: CompletePropertyDescriptor = .{
+    const new_desc: CompletePropertyDescriptor = .{
         .value_or_accessor = .{
             .value = value,
         },
         .attributes = .builtin_default,
     };
 
-    // 3. Perform ! DefinePropertyOrThrow(O, P, newDesc).
-    self.definePropertyDirect(agent, property_key, new_descriptor) catch |err| try noexcept(err);
+    // 3. Perform ! DefinePropertyOrThrow(obj, propertyKey, newDesc).
+    obj.definePropertyDirect(agent, property_key, new_desc) catch |err| try noexcept(err);
 
     // 4. Return unused.
 }
 
-/// 7.3.8 DefinePropertyOrThrow ( O, P, desc )
+/// 7.3.8 DefinePropertyOrThrow ( obj, propertyKey, propertyDesc )
 /// https://tc39.es/ecma262/#sec-definepropertyorthrow
 pub fn definePropertyOrThrow(
-    self: *Object,
+    obj: *Object,
     agent: *Agent,
     property_key: PropertyKey,
-    property_descriptor: PropertyDescriptor,
+    property_desc: PropertyDescriptor,
 ) Agent.Error!void {
-    // 1. Let success be ? O.[[DefineOwnProperty]](P, desc).
-    const success = try self.internalMethods().defineOwnProperty(
+    // 1. Let success be ? obj.[[DefineOwnProperty]](propertyKey, propertyDesc).
+    const success = try obj.internalMethods().defineOwnProperty(
         agent,
-        self,
+        obj,
         property_key,
-        property_descriptor,
+        property_desc,
     );
 
     // 2. If success is false, throw a TypeError exception.
@@ -1022,11 +1022,11 @@ pub fn definePropertyOrThrow(
     // 3. Return unused.
 }
 
-/// 7.3.9 DeletePropertyOrThrow ( O, P )
+/// 7.3.9 DeletePropertyOrThrow ( obj, propertyKey )
 /// https://tc39.es/ecma262/#sec-deletepropertyorthrow
-pub fn deletePropertyOrThrow(self: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!void {
-    // 1. Let success be ? O.[[Delete]](P).
-    const success = try self.internalMethods().delete(agent, self, property_key);
+pub fn deletePropertyOrThrow(obj: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!void {
+    // 1. Let success be ? obj.[[Delete]](propertyKey).
+    const success = try obj.internalMethods().delete(agent, obj, property_key);
 
     // 2. If success is false, throw a TypeError exception.
     if (!success)
@@ -1035,62 +1035,62 @@ pub fn deletePropertyOrThrow(self: *Object, agent: *Agent, property_key: Propert
     // 3. Return unused.
 }
 
-/// 7.3.11 HasProperty ( O, P )
+/// 7.3.11 HasProperty ( obj, propertyKey )
 /// https://tc39.es/ecma262/#sec-hasproperty
-pub fn hasProperty(self: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!bool {
-    // 1. Return ? O.[[HasProperty]](P).
-    return self.internalMethods().hasProperty(agent, self, property_key);
+pub fn hasProperty(obj: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!bool {
+    // 1. Return ? obj.[[HasProperty]](propertyKey).
+    return obj.internalMethods().hasProperty(agent, obj, property_key);
 }
 
-/// 7.3.12 HasOwnProperty ( O, P )
+/// 7.3.12 HasOwnProperty ( obj, propertyKey )
 /// https://tc39.es/ecma262/#sec-hasownproperty
-pub fn hasOwnProperty(self: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!bool {
-    // 1. Let desc be ? O.[[GetOwnProperty]](P).
-    const descriptor = try self.internalMethods().getOwnProperty(agent, self, property_key);
+pub fn hasOwnProperty(obj: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!bool {
+    // 1. Let propertyDesc be ? obj.[[GetOwnProperty]](propertyKey).
+    const property_desc = try obj.internalMethods().getOwnProperty(agent, obj, property_key);
 
-    // 2. If desc is undefined, return false.
+    // 2. If propertyDesc is undefined, return false.
     // 3. Return true.
-    return descriptor != null;
+    return property_desc != null;
 }
 
-/// 7.3.14 Construct ( F [ , argumentsList [ , newTarget ] ] )
+/// 7.3.14 Construct ( ctor [ , argList [ , newTarget ] ] )
 /// https://tc39.es/ecma262/#sec-construct
 pub fn construct(
-    self: *Object,
+    ctor: *Object,
     agent: *Agent,
-    arguments_list: []const Value,
+    arg_list: []const Value,
     maybe_new_target: ?*Object,
 ) Agent.Error!*Object {
-    // 1. If newTarget is not present, set newTarget to F.
-    const new_target = maybe_new_target orelse self;
+    // 1. If newTarget is not present, set newTarget to ctor.
+    const new_target = maybe_new_target orelse ctor;
 
-    // 2. If argumentsList is not present, set argumentsList to a new empty List.
+    // 2. If argList is not present, set argList to a new empty List.
 
-    // 3. Return ? F.[[Construct]](argumentsList, newTarget).
-    return self.internalMethods().construct.?(agent, self, Arguments.from(arguments_list), new_target);
+    // 3. Return ? ctor.[[Construct]](argList, newTarget).
+    return ctor.internalMethods().construct.?(agent, ctor, Arguments.from(arg_list), new_target);
 }
 
-/// 7.3.15 SetIntegrityLevel ( O, level )
+/// 7.3.15 SetIntegrityLevel ( obj, level )
 /// https://tc39.es/ecma262/#sec-setintegritylevel
-pub fn setIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Agent.Error!bool {
-    // 1. Let status be ? O.[[PreventExtensions]]().
-    const status = try self.internalMethods().preventExtensions(agent, self);
+pub fn setIntegrityLevel(obj: *Object, agent: *Agent, level: IntegrityLevel) Agent.Error!bool {
+    // 1. Let status be ? obj.[[PreventExtensions]]().
+    const status = try obj.internalMethods().preventExtensions(agent, obj);
 
     // 2. If status is false, return false.
     if (!status) return false;
 
-    // 3. Let keys be ? O.[[OwnPropertyKeys]]().
-    const keys = try self.internalMethods().ownPropertyKeys(agent, self);
+    // 3. Let keys be ? obj.[[OwnPropertyKeys]]().
+    const keys = try obj.internalMethods().ownPropertyKeys(agent, obj);
     defer agent.gc_allocator.free(keys);
 
     switch (level) {
         // 4. If level is sealed, then
         .sealed => {
-            // a. For each element k of keys, do
+            // a. For each element key of keys, do
             for (keys) |property_key| {
-                // i. Perform ? DefinePropertyOrThrow(O, k, PropertyDescriptor {
+                // i. Perform ? DefinePropertyOrThrow(obj, key, PropertyDescriptor {
                 //    [[Configurable]]: false }).
-                try self.definePropertyOrThrow(agent, property_key, .{ .configurable = false });
+                try obj.definePropertyOrThrow(agent, property_key, .{ .configurable = false });
             }
         },
 
@@ -1098,32 +1098,31 @@ pub fn setIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Ag
         .frozen => {
             // a. Assert: level is frozen.
 
-            // b. For each element k of keys, do
+            // b. For each element key of keys, do
             for (keys) |property_key| {
-                // i. Let currentDesc be ? O.[[GetOwnProperty]](k).
-                const maybe_current_descriptor = try self.internalMethods().getOwnProperty(
+                // i. Let currentDesc be ? obj.[[GetOwnProperty]](key).
+                const maybe_current_desc = try obj.internalMethods().getOwnProperty(
                     agent,
-                    self,
+                    obj,
                     property_key,
                 );
 
                 // ii. If currentDesc is not undefined, then
-                if (maybe_current_descriptor) |current_descriptor| {
-                    var descriptor: PropertyDescriptor = undefined;
-
+                if (maybe_current_desc) |current_desc| {
                     // 1. If IsAccessorDescriptor(currentDesc) is true, then
-                    if (current_descriptor.isAccessorDescriptor()) {
-                        // a. Let desc be the PropertyDescriptor { [[Configurable]]: false }.
-                        descriptor = .{ .configurable = false };
-                    } else {
+                    const property_desc: PropertyDescriptor = if (current_desc.isAccessorDescriptor()) blk: {
+                        // a. Let propertyDesc be the PropertyDescriptor {
+                        //    [[Configurable]]: false }.
+                        break :blk .{ .configurable = false };
+                    } else blk: {
                         // 2. Else,
-                        // a. Let desc be the PropertyDescriptor { [[Configurable]]: false,
+                        // a. Let propertyDesc be the PropertyDescriptor { [[Configurable]]: false,
                         //    [[Writable]]: false }.
-                        descriptor = .{ .configurable = false, .writable = false };
-                    }
+                        break :blk .{ .configurable = false, .writable = false };
+                    };
 
-                    // 3. Perform ? DefinePropertyOrThrow(O, k, desc).
-                    try self.definePropertyOrThrow(agent, property_key, descriptor);
+                    // 3. Perform ? DefinePropertyOrThrow(obj, key, propertyDesc).
+                    try obj.definePropertyOrThrow(agent, property_key, property_desc);
                 }
             }
         },
@@ -1133,38 +1132,38 @@ pub fn setIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Ag
     return true;
 }
 
-/// 7.3.16 TestIntegrityLevel ( O, level )
+/// 7.3.16 TestIntegrityLevel ( obj, level )
 /// https://tc39.es/ecma262/#sec-testintegritylevel
-pub fn testIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) Agent.Error!bool {
-    // 1. Let extensible be ? IsExtensible(O).
-    const extensible_ = try self.isExtensible(agent);
+pub fn testIntegrityLevel(obj: *Object, agent: *Agent, level: IntegrityLevel) Agent.Error!bool {
+    // 1. Let extensible be ? IsExtensible(obj).
+    const extensible_ = try obj.isExtensible(agent);
 
     // 2. If extensible is true, return false.
     // 3. NOTE: If the object is extensible, none of its properties are examined.
     if (extensible_) return false;
 
-    // 4. Let keys be ? O.[[OwnPropertyKeys]]().
-    const keys = try self.internalMethods().ownPropertyKeys(agent, self);
+    // 4. Let keys be ? obj.[[OwnPropertyKeys]]().
+    const keys = try obj.internalMethods().ownPropertyKeys(agent, obj);
     defer agent.gc_allocator.free(keys);
 
-    // 5. For each element k of keys, do
+    // 5. For each element key of keys, do
     for (keys) |property_key| {
-        // a. Let currentDesc be ? O.[[GetOwnProperty]](k).
-        const maybe_current_descriptor = try self.internalMethods().getOwnProperty(
+        // a. Let currentDesc be ? obj.[[GetOwnProperty]](key).
+        const maybe_current_desc = try obj.internalMethods().getOwnProperty(
             agent,
-            self,
+            obj,
             property_key,
         );
 
         // b. If currentDesc is not undefined, then
-        if (maybe_current_descriptor) |current_descriptor| {
+        if (maybe_current_desc) |current_desc| {
             // i. If currentDesc.[[Configurable]] is true, return false.
-            if (current_descriptor.configurable.?) return false;
+            if (current_desc.configurable.?) return false;
 
             // ii. If level is frozen and IsDataDescriptor(currentDesc) is true, then
-            if (level == .frozen and current_descriptor.isDataDescriptor()) {
+            if (level == .frozen and current_desc.isDataDescriptor()) {
                 // 1. If currentDesc.[[Writable]] is true, return false.
-                if (current_descriptor.writable.?) return false;
+                if (current_desc.writable.?) return false;
             }
         }
     }
@@ -1175,35 +1174,35 @@ pub fn testIntegrityLevel(self: *Object, agent: *Agent, level: IntegrityLevel) A
 
 /// 7.3.18 LengthOfArrayLike ( obj )
 /// https://tc39.es/ecma262/#sec-lengthofarraylike
-pub fn lengthOfArrayLike(self: *Object, agent: *Agent) Agent.Error!u53 {
+pub fn lengthOfArrayLike(obj: *Object, agent: *Agent) Agent.Error!u53 {
     // 1. Return ℝ(? ToLength(? Get(obj, "length"))).
-    return (try self.get(agent, PropertyKey.from("length"))).toLength(agent);
+    return (try obj.get(agent, PropertyKey.from("length"))).toLength(agent);
 }
 
-/// 7.3.22 SpeciesConstructor ( O, defaultConstructor )
+/// 7.3.22 SpeciesConstructor ( obj, defaultCtor )
 /// https://tc39.es/ecma262/#sec-speciesconstructor
-pub fn speciesConstructor(self: *Object, agent: *Agent, default_constructor: *Object) Agent.Error!*Object {
-    // 1. Let C be ? Get(O, "constructor").
-    const constructor = try self.get(agent, PropertyKey.from("constructor"));
+pub fn speciesConstructor(obj: *Object, agent: *Agent, default_ctor: *Object) Agent.Error!*Object {
+    // 1. Let ctor be ? Get(obj, "constructor").
+    const ctor = try obj.get(agent, PropertyKey.from("constructor"));
 
-    // 2. If C is undefined, return defaultConstructor.
-    if (constructor.isUndefined()) return default_constructor;
+    // 2. If ctor is undefined, return defaultCtor.
+    if (ctor.isUndefined()) return default_ctor;
 
-    // 3. If C is not an Object, throw a TypeError exception.
-    if (!constructor.isObject()) {
-        return agent.throwException(.type_error, "{f} is not an Object", .{constructor});
+    // 3. If ctor is not an Object, throw a TypeError exception.
+    if (!ctor.isObject()) {
+        return agent.throwException(.type_error, "{f} is not an Object", .{ctor});
     }
 
-    // 4. Let S be ? Get(C, %Symbol.species%).
-    const species = try constructor.asObject().get(
+    // 4. Let species be ? Get(ctor, %Symbol.species%).
+    const species = try ctor.asObject().get(
         agent,
         PropertyKey.from(agent.well_known_symbols.@"%Symbol.species%"),
     );
 
-    // 5. If S is either undefined or null, return defaultConstructor.
-    if (species.isUndefined() or species.isNull()) return default_constructor;
+    // 5. If species is either undefined or null, return defaultCtor.
+    if (species.isUndefined() or species.isNull()) return default_ctor;
 
-    // 6. If IsConstructor(S) is true, return S.
+    // 6. If IsConstructor(species) is true, return species.
     if (species.isConstructor()) return species.asObject();
 
     // 7. Throw a TypeError exception.
@@ -1214,15 +1213,15 @@ pub fn speciesConstructor(self: *Object, agent: *Agent, default_constructor: *Ob
     );
 }
 
-/// 7.3.23 EnumerableOwnProperties ( O, kind )
+/// 7.3.23 EnumerableOwnProperties ( obj, kind )
 /// https://tc39.es/ecma262/#sec-enumerableownproperties
 pub fn enumerableOwnProperties(
-    self: *Object,
+    obj: *Object,
     agent: *Agent,
     comptime kind: EnumerationKind,
 ) Agent.Error!std.ArrayList(Value) {
-    // 1. Let ownKeys be ? O.[[OwnPropertyKeys]]().
-    const own_keys = try self.internalMethods().ownPropertyKeys(agent, self);
+    // 1. Let ownKeys be ? obj.[[OwnPropertyKeys]]().
+    const own_keys = try obj.internalMethods().ownPropertyKeys(agent, obj);
     defer agent.gc_allocator.free(own_keys);
 
     // 2. Let results be a new empty List.
@@ -1232,19 +1231,19 @@ pub fn enumerableOwnProperties(
     for (own_keys) |key| {
         // a. If key is a String, then
         if (key == .string or key == .integer_index) {
-            // i. Let desc be ? O.[[GetOwnProperty]](key).
-            const descriptor = try self.internalMethods().getOwnProperty(agent, self, key);
+            // i. Let propertyDesc be ? obj.[[GetOwnProperty]](key).
+            const property_desc = try obj.internalMethods().getOwnProperty(agent, obj, key);
 
-            // ii. If desc is not undefined and desc.[[Enumerable]] is true, then
-            if (descriptor != null and descriptor.?.enumerable == true) {
+            // ii. If propertyDesc is not undefined and propertyDesc.[[Enumerable]] is true, then
+            if (property_desc != null and property_desc.?.enumerable == true) {
                 // 1. If kind is key, then
                 if (kind == .key) {
                     // a. Append key to results.
                     try results.append(agent.gc_allocator, try key.toValue(agent));
                 } else {
                     // 2. Else,
-                    // a. Let value be ? Get(O, key).
-                    const value = try self.get(agent, key);
+                    // a. Let value be ? Get(obj, key).
+                    const value = try obj.get(agent, key);
 
                     // b. If kind is value, then
                     if (kind == .value) {
@@ -1273,36 +1272,36 @@ pub fn enumerableOwnProperties(
     return results;
 }
 
-/// 7.3.24 GetFunctionRealm ( obj )
+/// 7.3.24 GetFunctionRealm ( func )
 /// https://tc39.es/ecma262/#sec-getfunctionrealm
-pub fn getFunctionRealm(self: *const Object, agent: *Agent) error{ExceptionThrown}!*Realm {
-    // 1. If obj has a [[Realm]] internal slot, then
-    if (self.internalMethods().call != null) {
-        // a. Return obj.[[Realm]].
-        if (self.cast(builtins.BuiltinFunction)) |builtin_function| {
+pub fn getFunctionRealm(func: *const Object, agent: *Agent) error{ExceptionThrown}!*Realm {
+    // 1. If func has a [[Realm]] internal slot, then
+    if (func.internalMethods().call != null) {
+        // a. Return func.[[Realm]].
+        if (func.cast(builtins.BuiltinFunction)) |builtin_function| {
             return builtin_function.fields.realm;
-        } else if (self.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
+        } else if (func.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
             return ecmascript_function.fields.realm;
-        } else if (!(self.is(builtins.BoundFunction) or self.is(builtins.Proxy))) {
+        } else if (!(func.is(builtins.BoundFunction) or func.is(builtins.Proxy))) {
             @panic("Unhandled function type in getFunctionRealm()");
         }
     }
 
-    // 2. If obj is a bound function exotic object, then
-    if (self.cast(builtins.BoundFunction)) |bound_function| {
-        // a. Let boundTargetFunction be obj.[[BoundTargetFunction]].
-        const bound_target_function = bound_function.fields.bound_target_function;
+    // 2. If func is a bound function exotic object, then
+    if (func.cast(builtins.BoundFunction)) |bound_function| {
+        // a. Let boundTargetFunc be func.[[BoundTargetFunction]].
+        const bound_target_func = bound_function.fields.bound_target_function;
 
-        // b. Return ? GetFunctionRealm(boundTargetFunction).
-        return bound_target_function.getFunctionRealm(agent);
+        // b. Return ? GetFunctionRealm(boundTargetFunc).
+        return bound_target_func.getFunctionRealm(agent);
     }
 
-    // 3. If obj is a Proxy exotic object, then
-    if (self.cast(builtins.Proxy)) |proxy| {
-        // a. Perform ? ValidateNonRevokedProxy(obj).
+    // 3. If func is a Proxy exotic object, then
+    if (func.cast(builtins.Proxy)) |proxy| {
+        // a. Perform ? ValidateNonRevokedProxy(func).
         try validateNonRevokedProxy(agent, proxy);
 
-        // b. Let proxyTarget be obj.[[ProxyTarget]].
+        // b. Let proxyTarget be func.[[ProxyTarget]].
         const proxy_target = proxy.fields.proxy_target.?;
 
         // c. Assert: proxyTarget is a function object.
@@ -1319,7 +1318,7 @@ pub fn getFunctionRealm(self: *const Object, agent: *Agent) error{ExceptionThrow
 /// 7.3.25 CopyDataProperties ( target, source, excludedItems )
 /// https://tc39.es/ecma262/#sec-copydataproperties
 pub fn copyDataProperties(
-    self: *Object,
+    target: *Object,
     agent: *Agent,
     source: Value,
     excluded_items: []const PropertyKey,
@@ -1337,10 +1336,10 @@ pub fn copyDataProperties(
     // 4. For each element nextKey of keys, do
     for (keys) |next_key| {
         // a. Let excluded be false.
-        // b. For each element e of excludedItems, do
-        const excluded = for (excluded_items) |e| {
-            // i. If SameValue(e, nextKey) is true, then
-            if (e.eql(next_key)) {
+        // b. For each element element of excludedItems, do
+        const excluded = for (excluded_items) |element| {
+            // i. If SameValue(element, nextKey) is true, then
+            if (element.eql(next_key)) {
                 // 1. Set excluded to true.
                 break true;
             }
@@ -1348,20 +1347,20 @@ pub fn copyDataProperties(
 
         // c. If excluded is false, then
         if (!excluded) {
-            // i. Let desc be ? from.[[GetOwnProperty]](nextKey).
-            const descriptor = try from.internalMethods().getOwnProperty(
+            // i. Let propertyDesc be ? from.[[GetOwnProperty]](nextKey).
+            const property_desc = try from.internalMethods().getOwnProperty(
                 agent,
                 from,
                 next_key,
             );
 
-            // ii. If desc is not undefined and desc.[[Enumerable]] is true, then
-            if (descriptor != null and descriptor.?.enumerable == true) {
-                // 1. Let propValue be ? Get(from, nextKey).
+            // ii. If propertyDesc is not undefined and propertyDesc.[[Enumerable]] is true, then
+            if (property_desc != null and property_desc.?.enumerable == true) {
+                // 1. Let propertyValue be ? Get(from, nextKey).
                 const property_value = try from.get(agent, next_key);
 
-                // 2. Perform ! CreateDataPropertyOrThrow(target, nextKey, propValue).
-                try self.createDataPropertyDirect(agent, next_key, property_value);
+                // 2. Perform ! CreateDataPropertyOrThrow(target, nextKey, propertyValue).
+                try target.createDataPropertyDirect(agent, next_key, property_value);
             }
         }
     }
@@ -1369,25 +1368,26 @@ pub fn copyDataProperties(
     // 5. Return unused.
 }
 
-/// 7.3.26 PrivateElementFind ( O, P )
+/// 7.3.26 PrivateElementFind ( obj, privateName )
 /// https://tc39.es/ecma262/#sec-privateelementfind
-pub fn privateElementFind(self: *const Object, private_name: PrivateName) ?*PrivateElement {
-    // 1. If O.[[PrivateElements]] contains a PrivateElement pe such that pe.[[Key]] is P, then
-    //     a. Return pe.
+pub fn privateElementFind(obj: *const Object, private_name: PrivateName) ?*PrivateElement {
+    // 1. If obj.[[PrivateElements]] contains a PrivateElement entry such that entry.[[Key]] is
+    //    privateName, then
+    //     a. Return entry.
     // 2. Return empty.
-    const extra_data = self.extra_data orelse return null;
+    const extra_data = obj.extra_data orelse return null;
     return extra_data.private_elements.getPtr(private_name);
 }
 
-/// 7.3.27 PrivateFieldAdd ( O, P, value )
+/// 7.3.27 PrivateFieldAdd ( obj, privateName, value )
 /// https://tc39.es/ecma262/#sec-privatefieldadd
-pub fn privateFieldAdd(self: *Object, agent: *Agent, private_name: PrivateName, value: Value) Agent.Error!void {
+pub fn privateFieldAdd(obj: *Object, agent: *Agent, private_name: PrivateName, value: Value) Agent.Error!void {
     // 1. If the host is a web browser, then
-    //     a. Perform ? HostEnsureCanAddPrivateElement(O).
-    try agent.host_hooks.hostEnsureCanAddPrivateElement(agent, self);
+    //     a. Perform ? HostEnsureCanAddPrivateElement(obj).
+    try agent.host_hooks.hostEnsureCanAddPrivateElement(agent, obj);
 
-    // 2. Let entry be PrivateElementFind(O, P).
-    const entry = self.privateElementFind(private_name);
+    // 2. Let entry be PrivateElementFind(obj, privateName).
+    const entry = obj.privateElementFind(private_name);
 
     // 3. If entry is not empty, throw a TypeError exception.
     if (entry != null) {
@@ -1398,18 +1398,18 @@ pub fn privateFieldAdd(self: *Object, agent: *Agent, private_name: PrivateName, 
         );
     }
 
-    // 4. Append PrivateElement { [[Key]]: P, [[Kind]]: field, [[Value]]: value } to
-    //    O.[[PrivateElements]].
-    const extra_data = try self.ensureExtraData(agent.gc_allocator);
+    // 4. Append PrivateElement { [[Key]]: privateName, [[Kind]]: field, [[Value]]: value } to
+    //    obj.[[PrivateElements]].
+    const extra_data = try obj.ensureExtraData(agent.gc_allocator);
     try extra_data.private_elements.putNoClobber(agent.gc_allocator, private_name, .{ .field = value });
 
     // 5. Return unused.
 }
 
-/// 7.3.28 PrivateMethodOrAccessorAdd ( O, method )
+/// 7.3.28 PrivateMethodOrAccessorAdd ( obj, method )
 /// https://tc39.es/ecma262/#sec-privatemethodoraccessoradd
 pub fn privateMethodOrAccessorAdd(
-    self: *Object,
+    obj: *Object,
     agent: *Agent,
     private_name: PrivateName,
     method: PrivateElement,
@@ -1418,11 +1418,11 @@ pub fn privateMethodOrAccessorAdd(
     std.debug.assert(method == .method or method == .accessor);
 
     // 2. If the host is a web browser, then
-    //     a. Perform ? HostEnsureCanAddPrivateElement(O).
-    try agent.host_hooks.hostEnsureCanAddPrivateElement(agent, self);
+    //     a. Perform ? HostEnsureCanAddPrivateElement(obj).
+    try agent.host_hooks.hostEnsureCanAddPrivateElement(agent, obj);
 
-    // 3. Let entry be PrivateElementFind(O, method.[[Key]]).
-    const entry = self.privateElementFind(private_name);
+    // 3. Let entry be PrivateElementFind(obj, method.[[Key]]).
+    const entry = obj.privateElementFind(private_name);
 
     // 4. If entry is not empty, throw a TypeError exception.
     if (entry != null) {
@@ -1433,18 +1433,18 @@ pub fn privateMethodOrAccessorAdd(
         );
     }
 
-    // 5. Append method to O.[[PrivateElements]].
-    const extra_data = try self.ensureExtraData(agent.gc_allocator);
+    // 5. Append method to obj.[[PrivateElements]].
+    const extra_data = try obj.ensureExtraData(agent.gc_allocator);
     try extra_data.private_elements.putNoClobber(agent.gc_allocator, private_name, method);
 
     // 6. Return unused.
 }
 
-/// 7.3.30 PrivateGet ( O, P )
+/// 7.3.30 PrivateGet ( obj, privateName )
 /// https://tc39.es/ecma262/#sec-privateget
-pub fn privateGet(self: *Object, agent: *Agent, private_name: PrivateName) Agent.Error!Value {
-    // 1. Let entry be PrivateElementFind(O, P).
-    const entry = self.privateElementFind(private_name) orelse {
+pub fn privateGet(obj: *Object, agent: *Agent, private_name: PrivateName) Agent.Error!Value {
+    // 1. Let entry be PrivateElementFind(obj, privateName).
+    const entry = obj.privateElementFind(private_name) orelse {
         // 2. If entry is empty, throw a TypeError exception.
         return agent.throwException(
             .type_error,
@@ -1471,17 +1471,17 @@ pub fn privateGet(self: *Object, agent: *Agent, private_name: PrivateName) Agent
                 );
             };
 
-            // 7. Return ? Call(getter, O).
-            return Value.from(getter).callAssumeCallable(agent, Value.from(self), &.{});
+            // 7. Return ? Call(getter, obj).
+            return Value.from(getter).callAssumeCallable(agent, Value.from(obj), &.{});
         },
     }
 }
 
-/// 7.3.31 PrivateSet ( O, P, value )
+/// 7.3.31 PrivateSet ( obj, privateName, value )
 /// https://tc39.es/ecma262/#sec-privateset
-pub fn privateSet(self: *Object, agent: *Agent, private_name: PrivateName, value: Value) Agent.Error!void {
-    // 1. Let entry be PrivateElementFind(O, P).
-    const entry = self.privateElementFind(private_name) orelse {
+pub fn privateSet(obj: *Object, agent: *Agent, private_name: PrivateName, value: Value) Agent.Error!void {
+    // 1. Let entry be PrivateElementFind(obj, privateName).
+    const entry = obj.privateElementFind(private_name) orelse {
         // 2. If entry is empty, throw a TypeError exception.
         return agent.throwException(
             .type_error,
@@ -1519,10 +1519,10 @@ pub fn privateSet(self: *Object, agent: *Agent, private_name: PrivateName, value
                 );
             };
 
-            // d. Perform ? Call(setter, O, « value »).
+            // d. Perform ? Call(setter, obj, « value »).
             _ = try Value.from(setter).callAssumeCallable(
                 agent,
-                Value.from(self),
+                Value.from(obj),
                 &.{value},
             );
         },
@@ -1533,7 +1533,7 @@ pub fn privateSet(self: *Object, agent: *Agent, private_name: PrivateName, value
 
 /// 7.3.32 DefineField ( receiver, fieldRecord )
 /// https://tc39.es/ecma262/#sec-definefield
-pub fn defineField(self: *Object, agent: *Agent, field: ClassFieldDefinition) Agent.Error!void {
+pub fn defineField(receiver: *Object, agent: *Agent, field: ClassFieldDefinition) Agent.Error!void {
     // 1. Let fieldName be fieldRecord.[[Name]].
 
     // 2. Let initializer be fieldRecord.[[Initializer]].
@@ -1542,7 +1542,7 @@ pub fn defineField(self: *Object, agent: *Agent, field: ClassFieldDefinition) Ag
         // a. Let initValue be ? Call(initializer, receiver).
         break :blk try Value.from(&initializer.object).callAssumeCallable(
             agent,
-            Value.from(self),
+            Value.from(receiver),
             &.{},
         );
     } else blk: {
@@ -1555,58 +1555,58 @@ pub fn defineField(self: *Object, agent: *Agent, field: ClassFieldDefinition) Ag
         // 5. If fieldName is a Private Name, then
         .private_name => |private_name| {
             // a. Perform ? PrivateFieldAdd(receiver, fieldName, initValue).
-            try self.privateFieldAdd(agent, private_name, init_value);
+            try receiver.privateFieldAdd(agent, private_name, init_value);
         },
         // 6. Else,
         .property_key => |property_key| {
             // a. Assert: fieldName is a property key.
             // b. Perform ? CreateDataPropertyOrThrow(receiver, fieldName, initValue).
-            try self.createDataPropertyOrThrow(agent, property_key, init_value);
+            try receiver.createDataPropertyOrThrow(agent, property_key, init_value);
         },
     }
 
     // 7. Return unused.
 }
 
-/// 7.3.33 InitializeInstanceElements ( O, constructor )
+/// 7.3.33 InitializeInstanceElements ( obj, ctor )
 /// https://tc39.es/ecma262/#sec-initializeinstanceelements
 pub fn initializeInstanceElements(
-    self: *Object,
+    obj: *Object,
     agent: *Agent,
-    constructor: *Object,
+    ctor: *Object,
 ) Agent.Error!void {
-    // 1. Let methods be constructor.[[PrivateMethods]].
-    const methods = if (constructor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
+    // 1. Let methods be ctor.[[PrivateMethods]].
+    const methods = if (ctor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
         break :blk if (ecmascript_function.fields.class_data) |class_data|
             class_data.private_methods
         else
             &.{};
-    } else if (constructor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
+    } else if (ctor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
         const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
         break :blk class_constructor_fields.private_methods;
     } else unreachable;
 
     // 2. For each PrivateElement method of methods, do
     for (methods) |method| {
-        // a. Perform ? PrivateMethodOrAccessorAdd(O, method).
-        try self.privateMethodOrAccessorAdd(agent, method.private_name, method.private_element);
+        // a. Perform ? PrivateMethodOrAccessorAdd(obj, method).
+        try obj.privateMethodOrAccessorAdd(agent, method.private_name, method.private_element);
     }
 
-    // 3. Let fields be constructor.[[Fields]].
-    const fields = if (constructor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
+    // 3. Let fields be ctor.[[Fields]].
+    const fields = if (ctor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
         break :blk if (ecmascript_function.fields.class_data) |class_data|
             class_data.fields
         else
             &.{};
-    } else if (constructor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
+    } else if (ctor.cast(builtins.BuiltinFunction)) |builtin_function| blk: {
         const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
         break :blk class_constructor_fields.fields;
     } else unreachable;
 
     // 4. For each element fieldRecord of fields, do
     for (fields) |field| {
-        // a. Perform ? DefineField(O, fieldRecord).
-        try self.defineField(agent, field);
+        // a. Perform ? DefineField(obj, fieldRecord).
+        try obj.defineField(agent, field);
     }
 
     // 5. Return unused.
@@ -1624,22 +1624,22 @@ pub const OptionType = enum {
     }
 };
 
-/// 9.2.11 GetOption ( options, property, type, values, default )
+/// 9.2.11 GetOption ( options, propertyKey, type, values, default )
 /// https://tc39.es/ecma402/#sec-getoption
 pub fn getOption(
     self: *Object,
     agent: *Agent,
-    comptime property: []const u8,
-    comptime type_: OptionType,
-    values: ?[]const type_.T(),
+    comptime property_key: []const u8,
+    comptime @"type": OptionType,
+    values: ?[]const @"type".T(),
     default: anytype,
-) Agent.Error!if (@TypeOf(default) == @TypeOf(null)) ?type_.T() else type_.T() {
-    if (@TypeOf(default) != @TypeOf(null) and @TypeOf(default) != type_.T() and default != .required) {
+) Agent.Error!if (@TypeOf(default) == @TypeOf(null)) ?@"type".T() else @"type".T() {
+    if (@TypeOf(default) != @TypeOf(null) and @TypeOf(default) != @"type".T() and default != .required) {
         @compileError("Invalid value for default parameter");
     }
 
-    // 1. Let value be ? Get(options, property).
-    const value = try self.get(agent, PropertyKey.from(property));
+    // 1. Let value be ? Get(options, propertyKey).
+    const value = try self.get(agent, PropertyKey.from(property_key));
 
     // 2. If value is undefined, then
     if (value.isUndefined()) {
@@ -1648,7 +1648,7 @@ pub fn getOption(
             return agent.throwException(
                 .range_error,
                 "Required option '{s}' must not be undefined",
-                .{property},
+                .{property_key},
             );
         }
 
@@ -1656,7 +1656,7 @@ pub fn getOption(
         return default;
     }
 
-    const coerced_value = switch (type_) {
+    const coerced_value = switch (@"type") {
         // 3. If type is boolean, then
         .boolean => blk: {
             // a. Set value to ToBoolean(value).
@@ -1679,7 +1679,7 @@ pub fn getOption(
             return agent.throwException(
                 .range_error,
                 "Invalid value for option '{s}'",
-                .{property},
+                .{property_key},
             );
         }
     }

@@ -193,30 +193,30 @@ pub const Number = union(enum) {
         return utils.float16.__truncdfhf2(self.asFloat());
     }
 
-    /// 6.1.6.1.1 Number::unaryMinus ( x )
+    /// 6.1.6.1.1 Number::unaryMinus ( number )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-unaryMinus
-    pub fn unaryMinus(self: Number) Number {
-        // 1. If x is NaN, return NaN.
-        if (self.isNan()) return self;
+    pub fn unaryMinus(number: Number) Number {
+        // 1. If number is NaN, return NaN.
+        if (number.isNan()) return number;
 
-        // 2. Return the negation of x; that is, compute a Number with the same magnitude but
+        // 2. Return the negation of number; that is, compute a Number with the same magnitude but
         //    opposite sign.
-        return if (self.isZero())
-            .{ .f64 = -self.asFloat() }
-        else switch (self) {
+        return if (number.isZero())
+            .{ .f64 = -number.asFloat() }
+        else switch (number) {
             .f64 => |x| .{ .f64 = -x },
             .i32 => |x| if (-%x != x)
                 .{ .i32 = -x }
             else
-                .{ .f64 = -self.asFloat() },
+                .{ .f64 = -number.asFloat() },
         };
     }
 
-    /// 6.1.6.1.2 Number::bitwiseNOT ( x )
+    /// 6.1.6.1.2 Number::bitwiseNOT ( number )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-bitwiseNOT
-    pub fn bitwiseNOT(self: Number) Number {
-        // 1. Let oldValue be ! ToInt32(x).
-        const old_value = self.toInt32();
+    pub fn bitwiseNOT(number: Number) Number {
+        // 1. Let oldValue be ! ToInt32(number).
+        const old_value = number.toInt32();
 
         // 2. Return the bitwise complement of oldValue. The mathematical value of the result is
         //    exactly representable as a 32-bit two's complement bit string.
@@ -353,42 +353,42 @@ pub const Number = union(enum) {
         return from(x.asFloat() / y.asFloat());
     }
 
-    /// 6.1.6.1.6 Number::remainder ( n, d )
+    /// 6.1.6.1.6 Number::remainder ( numerator, denominator )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-remainder
-    pub fn remainder(n: Number, d: Number) Number {
-        // 1. If n is NaN or d is NaN, return NaN.
-        if (n.isNan() or d.isNan()) return .{ .f64 = std.math.nan(f64) };
+    pub fn remainder(numerator: Number, denominator: Number) Number {
+        // 1. If numerator is NaN or denominator is NaN, return NaN.
+        if (numerator.isNan() or denominator.isNan()) return .{ .f64 = std.math.nan(f64) };
 
-        // 2. If n is either +∞𝔽 or -∞𝔽, return NaN.
-        if (n.isPositiveInf() or n.isNegativeInf()) return .{ .f64 = std.math.nan(f64) };
+        // 2. If numerator is either +∞𝔽 or -∞𝔽, return NaN.
+        if (numerator.isPositiveInf() or numerator.isNegativeInf()) return .{ .f64 = std.math.nan(f64) };
 
-        // 3. If d is either +∞𝔽 or -∞𝔽, return n.
-        if (d.isPositiveInf() or d.isNegativeInf()) return n;
+        // 3. If denominator is either +∞𝔽 or -∞𝔽, return numerator.
+        if (denominator.isPositiveInf() or denominator.isNegativeInf()) return numerator;
 
-        // 4. If d is either +0𝔽 or -0𝔽, return NaN.
-        if (d.isZero()) return .{ .f64 = std.math.nan(f64) };
+        // 4. If denominator is either +0𝔽 or -0𝔽, return NaN.
+        if (denominator.isZero()) return .{ .f64 = std.math.nan(f64) };
 
-        // 5. If n is either +0𝔽 or -0𝔽, return n.
-        if (n.isZero()) return n;
+        // 5. If numerator is either +0𝔽 or -0𝔽, return numerator.
+        if (numerator.isZero()) return numerator;
 
-        // 6. Assert: n and d are finite and non-zero.
-        std.debug.assert(n.isFinite() and n.asFloat() != 0);
-        std.debug.assert(d.isFinite() and d.asFloat() != 0);
+        // 6. Assert: numerator and denominator are finite and non-zero.
+        std.debug.assert(numerator.isFinite() and numerator.asFloat() != 0);
+        std.debug.assert(denominator.isFinite() and denominator.asFloat() != 0);
 
-        // 7. Let quotient be ℝ(n) / ℝ(d).
-        const quotient = n.asFloat() / d.asFloat();
+        // 7. Let quotient be ℝ(numerator) / ℝ(denominator).
+        const quotient = numerator.asFloat() / denominator.asFloat();
 
-        // 8. Let q be truncate(quotient).
-        const q = @trunc(quotient);
+        // 8. Let truncatedQuotient be truncate(quotient).
+        const truncated_quotient = @trunc(quotient);
 
-        // 9. Let r be ℝ(n) - (ℝ(d) × q).
-        const r = n.asFloat() - (d.asFloat() * q);
+        // 9. Let remainder be ℝ(numerator) - (ℝ(denominator) × truncatedQuotient).
+        const remainder_ = numerator.asFloat() - (denominator.asFloat() * truncated_quotient);
 
-        // 10. If r = 0 and n < -0𝔽, return -0𝔽.
-        if (r == 0 and n.asFloat() < 0) return .{ .f64 = -0.0 };
+        // 10. If remainder = 0 and numerator < -0𝔽, return -0𝔽.
+        if (remainder_ == 0 and numerator.asFloat() < 0) return .{ .f64 = -0.0 };
 
-        // 11. Return 𝔽(r).
-        return from(r);
+        // 11. Return 𝔽(remainder).
+        return from(remainder_);
     }
 
     /// 6.1.6.1.7 Number::add ( x, y )
@@ -414,54 +414,54 @@ pub const Number = union(enum) {
     /// 6.1.6.1.9 Number::leftShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-leftShift
     pub fn leftShift(x: Number, y: Number) Number {
-        // 1. Let lNum be ! ToInt32(x).
-        const l_num = x.toInt32();
+        // 1. Let leftNumber be ! ToInt32(x).
+        const left_number = x.toInt32();
 
-        // 2. Let rNum be ! ToUint32(y).
-        const r_num = y.toUint32();
+        // 2. Let rightNumber be ! ToUint32(y).
+        const right_number = y.toUint32();
 
-        // 3. Let shiftCount be ℝ(rNum) modulo 32.
-        const shift_count: u5 = @intCast(@mod(r_num, 32));
+        // 3. Let shiftCount be ℝ(rightNumber) modulo 32.
+        const shift_count: u5 = @intCast(@mod(right_number, 32));
 
-        // 4. Return the result of left shifting lNum by shiftCount bits. The mathematical value of
-        //    the result is exactly representable as a 32-bit two's complement bit string.
-        return .{ .i32 = l_num << shift_count };
+        // 4. Return the result of left shifting leftNumber by shiftCount bits. The mathematical
+        //    value of the result is exactly representable as a 32-bit two's complement bit string.
+        return .{ .i32 = left_number << shift_count };
     }
 
     /// 6.1.6.1.10 Number::signedRightShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-signedRightShift
     pub fn signedRightShift(x: Number, y: Number) Number {
-        // 1. Let lNum be ! ToInt32(x).
-        const l_num = x.toInt32();
+        // 1. Let leftNumber be ! ToInt32(x).
+        const left_number = x.toInt32();
 
-        // 2. Let rNum be ! ToUint32(y).
-        const r_num = y.toUint32();
+        // 2. Let rightNumber be ! ToUint32(y).
+        const right_number = y.toUint32();
 
-        // 3. Let shiftCount be ℝ(rNum) modulo 32.
-        const shift_count: u5 = @intCast(@mod(r_num, 32));
+        // 3. Let shiftCount be ℝ(rightNumber) modulo 32.
+        const shift_count: u5 = @intCast(@mod(right_number, 32));
 
-        // 4. Return the result of performing a sign-extending right shift of lNum by shiftCount
-        //    bits. The most significant bit is propagated. The mathematical value of the result is
-        //    exactly representable as a 32-bit two's complement bit string.
-        return .{ .i32 = l_num >> shift_count };
+        // 4. Return the result of performing a sign-extending right shift of leftNumber by
+        //    shiftCount bits. The most significant bit is propagated. The mathematical value of the
+        //    result is exactly representable as a 32-bit two's complement bit string.
+        return .{ .i32 = left_number >> shift_count };
     }
 
     /// 6.1.6.1.11 Number::unsignedRightShift ( x, y )
     /// https://tc39.es/ecma262/#sec-numeric-types-number-unsignedRightShift
     pub fn unsignedRightShift(x: Number, y: Number) Number {
-        // 1. Let lNum be ! ToUint32(x).
-        const l_num = x.toUint32();
+        // 1. Let leftNumber be ! ToUint32(x).
+        const left_number = x.toUint32();
 
-        // 2. Let rNum be ! ToUint32(y).
-        const r_num = y.toUint32();
+        // 2. Let rightNumber be ! ToUint32(y).
+        const right_number = y.toUint32();
 
-        // 3. Let shiftCount be ℝ(rNum) modulo 32.
-        const shift_count: u5 = @intCast(@mod(r_num, 32));
+        // 3. Let shiftCount be ℝ(rightNumber) modulo 32.
+        const shift_count: u5 = @intCast(@mod(right_number, 32));
 
-        // 4. Return the result of performing a zero-filling right shift of lNum by shiftCount bits.
-        //    Vacated bits are filled with zero. The mathematical value of the result is exactly
-        //    representable as a 32-bit unsigned bit string.
-        return from(l_num >> shift_count);
+        // 4. Return the result of performing a zero-filling right shift of leftNumber by shiftCount
+        //    bits. Vacated bits are filled with zero. The mathematical value of the result is
+        //    exactly representable as a 32-bit unsigned bit string.
+        return from(left_number >> shift_count);
     }
 
     /// 6.1.6.1.12 Number::lessThan ( x, y )
@@ -551,30 +551,31 @@ pub const Number = union(enum) {
     /// 6.1.6.1.16 NumberBitwiseOp ( op, x, y )
     /// https://tc39.es/ecma262/#sec-numberbitwiseop
     fn numberBitwiseOp(comptime op: enum { @"&", @"^", @"|" }, x: Number, y: Number) i32 {
-        // 1. Let lNum be ! ToInt32(x).
-        const l_num = x.toInt32();
+        // 1. Let leftNumber be ! ToInt32(x).
+        const left_number = x.toInt32();
 
-        // 2. Let rNum be ! ToInt32(y).
-        const r_num = y.toInt32();
+        // 2. Let rightNumber be ! ToInt32(y).
+        const right_number = y.toInt32();
 
-        // 3. Let lBits be the 32-bit two's complement bit string representing ℝ(lNum).
-        // 4. Let rBits be the 32-bit two's complement bit string representing ℝ(rNum).
+        // 3. Let leftBits be the 32-bit two's complement bit string representing ℝ(leftNumber).
+        // 4. Let rightBits be the 32-bit two's complement bit string representing ℝ(rightNumber).
 
         const result = switch (op) {
             // 5. If op is `&`, then
-            // a. Let result be the result of applying the bitwise AND operation to lBits and rBits.
-            .@"&" => l_num & r_num,
+            // a. Let result be the result of applying the bitwise AND operation to leftBits and
+            //    rightBits.
+            .@"&" => left_number & right_number,
 
             // 6. Else if op is `^`, then
             // a. Let result be the result of applying the bitwise exclusive OR (XOR) operation to
-            //    lBits and rBits.
-            .@"^" => l_num ^ r_num,
+            //    leftBits and rightBits.
+            .@"^" => left_number ^ right_number,
 
             // 7. Else,
             // a. Assert: op is `|`.
-            // b. Let result be the result of applying the bitwise inclusive OR operation to lBits
-            //    and rBits.
-            .@"|" => l_num | r_num,
+            // b. Let result be the result of applying the bitwise inclusive OR operation to
+            //    leftBits and rightBits.
+            .@"|" => left_number | right_number,
         };
 
         // 8. Return the Number value for the integer represented by the 32-bit two's complement bit

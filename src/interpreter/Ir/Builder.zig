@@ -541,7 +541,7 @@ fn lowerFunction(b: *Builder, formal_parameters: *const ast.FormalParameters, fu
     return .none;
 }
 
-/// 10.2.11 FunctionDeclarationInstantiation ( func, argumentsList )
+/// 10.2.11 FunctionDeclarationInstantiation ( func, argList )
 /// https://tc39.es/ecma262/#sec-functiondeclarationinstantiation
 fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const ast.FormalParameters, function_body: *const ast.FunctionBody) Error!void {
     // 1. Let calleeContext be the running execution context.
@@ -556,111 +556,112 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // 4. Let formals be func.[[FormalParameters]].
     // NOTE: This is `formal_parameters`.
 
-    // 5. Let parameterNames be the BoundNames of formals.
-    var parameter_names: std.ArrayList(ast.Identifier) = .empty;
-    defer parameter_names.deinit(b.gpa);
-    try formal_parameters.collectBoundNames(b.gpa, &parameter_names);
+    // 5. Let paramNames be the BoundNames of formals.
+    var param_names: std.ArrayList(ast.Identifier) = .empty;
+    defer param_names.deinit(b.gpa);
+    try formal_parameters.collectBoundNames(b.gpa, &param_names);
 
-    // 6. If parameterNames has any duplicate entries, let hasDuplicates be true; else let
-    //    hasDuplicates be false.
+    // 6. If paramNames has any duplicate entries, let hasDuplicates be true; else let hasDuplicates
+    //    be false.
     const has_duplicates = blk: {
         var seen: std.array_hash_map.String(void) = .empty;
         defer seen.deinit(b.gpa);
-        for (parameter_names.items) |name| {
+        for (param_names.items) |name| {
             const gop = try seen.getOrPut(b.gpa, name);
             if (gop.found_existing) break :blk true;
         }
         break :blk false;
     };
 
-    // 7. Let simpleParameterList be IsSimpleParameterList of formals.
-    const simple_parameter_list = formal_parameters.isSimpleParameterList();
+    // 7. Let simpleParamList be IsSimpleParameterList of formals.
+    const simple_param_list = formal_parameters.isSimpleParameterList();
 
-    // 8. Let hasParameterExpressions be ContainsExpression of formals.
-    const has_parameter_expressions = formal_parameters.containsExpression();
+    // 8. Let hasParamExprs be ContainsExpression of formals.
+    const has_param_exprs = formal_parameters.containsExpression();
 
-    // 9. Let varNames be the VarDeclaredNames of code.
-    var var_names: std.ArrayList(ast.Identifier) = .empty;
-    defer var_names.deinit(b.gpa);
-    try function_body.collectVarDeclaredNames(b.gpa, &var_names);
+    // 9. Let variableNames be the VarDeclaredNames of code.
+    var variable_names: std.ArrayList(ast.Identifier) = .empty;
+    defer variable_names.deinit(b.gpa);
+    try function_body.collectVarDeclaredNames(b.gpa, &variable_names);
 
-    // 10. Let varDeclarations be the VarScopedDeclarations of code.
-    var var_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
-    defer var_declarations.deinit(b.gpa);
-    try function_body.collectVarScopedDeclarations(b.gpa, &var_declarations);
+    // 10. Let variableDecls be the VarScopedDeclarations of code.
+    var variable_decls: std.ArrayList(ast.VarScopedDeclaration) = .empty;
+    defer variable_decls.deinit(b.gpa);
+    try function_body.collectVarScopedDeclarations(b.gpa, &variable_decls);
 
     // 11. Let lexicalNames be the LexicallyDeclaredNames of code.
     var lexical_names: std.ArrayList(ast.Identifier) = .empty;
     defer lexical_names.deinit(b.gpa);
     try function_body.collectLexicallyDeclaredNames(b.gpa, &lexical_names);
 
-    // 12. Let functionNames be a new empty List.
-    var function_names: std.array_hash_map.String(void) = .empty;
-    defer function_names.deinit(b.gpa);
+    // 12. Let funcNames be a new empty List.
+    var func_names: std.array_hash_map.String(void) = .empty;
+    defer func_names.deinit(b.gpa);
 
-    // 13. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
-    defer functions_to_initialize.deinit(b.gpa);
+    // 13. Let funcsToInitialize be a new empty List.
+    var funcs_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
+    defer funcs_to_initialize.deinit(b.gpa);
 
-    // 14. For each element d of varDeclarations, in reverse List order, do
-    var it = std.mem.reverseIterator(var_declarations.items);
-    while (it.next()) |var_declaration| {
-        // a. If d is neither a VariableDeclaration nor a ForBinding nor a BindingIdentifier, then
-        if (var_declaration == .hoistable_declaration) {
-            // i. Assert: d is either a FunctionDeclaration, a GeneratorDeclaration, an
+    // 14. For each element variableDecl of variableDecls, in reverse List order, do
+    var it = std.mem.reverseIterator(variable_decls.items);
+    while (it.next()) |variable_decl| {
+        // a. If variableDecl is neither a VariableDeclaration nor a ForBinding nor a
+        //    BindingIdentifier, then
+        if (variable_decl == .hoistable_declaration) {
+            // i. Assert: variableDecl is either a FunctionDeclaration, a GeneratorDeclaration, an
             //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration.
-            const hoistable_declaration = var_declaration.hoistable_declaration;
+            const hoistable_decl = variable_decl.hoistable_declaration;
 
-            // ii. Let fn be the sole element of the BoundNames of d.
-            const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| function_declaration.identifier.?,
+            // ii. Let funcName be the sole element of the BoundNames of variableDecl.
+            const func_name = switch (hoistable_decl) {
+                inline else => |func_decl| func_decl.identifier.?,
             };
 
-            // iii. If functionNames does not contain fn, then
-            const gop = try function_names.getOrPut(b.gpa, function_name);
+            // iii. If funcNames does not contain funcName, then
+            const gop = try func_names.getOrPut(b.gpa, func_name);
             if (!gop.found_existing) {
-                // 1. Insert fn as the first element of functionNames.
+                // 1. Insert funcName as the first element of funcNames.
                 // 2. NOTE: If there are multiple function declarations for the same name, the last
                 //    declaration is used.
-                // 3. Insert d as the first element of functionsToInitialize.
+                // 3. Insert variableDecl as the first element of funcsToInitialize.
                 // NOTE: AFAICT the order isn't observable, so we can append.
-                try functions_to_initialize.append(b.gpa, hoistable_declaration);
+                try funcs_to_initialize.append(b.gpa, hoistable_decl);
             }
         }
     }
 
-    // 15. Let argumentsObjectNeeded be true.
+    // 15. Let argumentsObjNeeded be true.
     // OPTIMIZATION: If nothing accesses the arguments object we don't need to create one.
     //               This is determined during parsing, with a deopt when using eval.
-    var arguments_object_needed = formal_parameters.arguments_object_needed or function_body.arguments_object_needed;
+    var arguments_obj_needed = formal_parameters.arguments_object_needed or function_body.arguments_object_needed;
 
     // 16. If func.[[ThisMode]] is lexical, then
     //     a. NOTE: Arrow functions never have an arguments object.
-    //     b. Set argumentsObjectNeeded to false.
+    //     b. Set argumentsObjNeeded to false.
     // NOTE: This is done by setting arguments_object_needed to false during parsing.
 
-    // 17. Else if parameterNames contains "arguments", then
-    if (containsSlice(parameter_names.items, "arguments")) {
-        // a. Set argumentsObjectNeeded to false.
-        arguments_object_needed = false;
+    // 17. Else if paramNames contains "arguments", then
+    if (containsSlice(param_names.items, "arguments")) {
+        // a. Set argumentsObjNeeded to false.
+        arguments_obj_needed = false;
     }
 
-    // 18. Else if hasParameterExpressions is false, then
-    else if (!has_parameter_expressions) {
-        // a. If functionNames contains "arguments" or lexicalNames contains "arguments", then
-        if (function_names.contains("arguments") or containsSlice(lexical_names.items, "arguments")) {
-            // i. Set argumentsObjectNeeded to false.
-            arguments_object_needed = false;
+    // 18. Else if hasParamExprs is false, then
+    else if (!has_param_exprs) {
+        // a. If funcNames contains "arguments" or lexicalNames contains "arguments", then
+        if (func_names.contains("arguments") or containsSlice(lexical_names.items, "arguments")) {
+            // i. Set argumentsObjNeeded to false.
+            arguments_obj_needed = false;
         }
     }
 
-    // 19. If strict is true or hasParameterExpressions is false, then
-    if (strict or !has_parameter_expressions) {
+    // 19. If strict is true or hasParamExprs is false, then
+    if (strict or !has_param_exprs) {
         // a. NOTE: Only a single Environment Record is needed for the parameters, since calls to
         //    `eval` in strict mode code cannot create new bindings which are visible outside of the
         //    `eval`.
 
-        // b. Let env be the LexicalEnvironment of calleeContext.
+        // b. Let envRecord be the LexicalEnvironment of calleeContext.
         // NOTE: The function environment created by `prepareForOrdinaryCall()` is used directly.
     } else {
         // 20. Else,
@@ -670,7 +671,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         //    parameters are declared.
 
         // b. Let calleeEnv be the LexicalEnvironment of calleeContext.
-        // c. Let env be NewDeclarativeEnvironment(calleeEnv).
+        // c. Let envRecord be NewDeclarativeEnvironment(calleeEnv).
         _ = try b.addInst(.{
             .tag = .push_scope,
             .data = .{ .none = {} },
@@ -680,16 +681,16 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         // d. Assert: The VariableEnvironment of calleeContext and calleeEnv are the same
         //    Environment Record.
 
-        // e. Set the LexicalEnvironment of calleeContext to env.
+        // e. Set the LexicalEnvironment of calleeContext to envRecord.
         // NOTE: This is handled by `push_scope`.
     }
 
     var already_declared: std.array_hash_map.String(void) = .empty;
     defer already_declared.deinit(b.gpa);
 
-    // 21. For each String paramName of parameterNames, do
-    for (parameter_names.items) |param_name| {
-        // a. Let alreadyDeclared be ! env.HasBinding(paramName).
+    // 21. For each String paramName of paramNames, do
+    for (param_names.items) |param_name| {
+        // a. Let alreadyDeclared be ! envRecord.HasBinding(paramName).
         const gop = try already_declared.getOrPut(b.gpa, param_name);
 
         // b. NOTE: Early errors ensure that duplicate parameter names can only occur in non-strict
@@ -697,7 +698,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
 
         // c. If alreadyDeclared is false, then
         if (!gop.found_existing) {
-            // i. Perform ! env.CreateMutableBinding(paramName, false).
+            // i. Perform ! envRecord.CreateMutableBinding(paramName, false).
             const string_index = try b.internString(param_name, .literal);
             _ = try b.addInst(.{
                 .tag = .create_mutable_binding,
@@ -706,7 +707,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
 
             // ii. If hasDuplicates is true, then
             if (has_duplicates) {
-                // 1. Perform ! env.InitializeBinding(paramName, undefined).
+                // 1. Perform ! envRecord.InitializeBinding(paramName, undefined).
                 const undefined_ref = try b.addInst(.{
                     .tag = .undefined,
                     .data = .{ .none = {} },
@@ -722,11 +723,11 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         }
     }
 
-    // 22. If argumentsObjectNeeded is true, then
-    const parameter_bindings_has_arguments = if (arguments_object_needed) blk: {
-        // a. If strict is true or simpleParameterList is false, then
-        const ao = if (strict or !simple_parameter_list) ao_blk: {
-            // i. Let ao be CreateUnmappedArgumentsObject(argumentsList).
+    // 22. If argumentsObjNeeded is true, then
+    const param_bindings_has_arguments = if (arguments_obj_needed) blk: {
+        // a. If strict is true or simpleParamList is false, then
+        const ao = if (strict or !simple_param_list) ao_blk: {
+            // i. Let argumentsObj be CreateUnmappedArgumentsObject(argList).
             break :ao_blk try b.addInst(.{
                 .tag = .create_unmapped_arguments_object,
                 .data = .{ .none = {} },
@@ -737,7 +738,8 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
             //    don't have a rest parameter, any parameter default value initializers, or any
             //    destructured parameters.
 
-            // ii. Let ao be CreateMappedArgumentsObject(func, formals, argumentsList, env).
+            // ii. Let argumentsObj be CreateMappedArgumentsObject(func, formals, argList,
+            //     envRecord).
             break :ao_blk try b.addInst(.{
                 .tag = .create_mapped_arguments_object,
                 .data = .{ .none = {} },
@@ -747,7 +749,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         // c. If strict is true, then
         const arguments_string = try b.internString("arguments", .literal);
         if (strict) {
-            // i. Perform ! env.CreateImmutableBinding("arguments", false).
+            // i. Perform ! envRecord.CreateImmutableBinding("arguments", false).
             _ = try b.addInst(.{
                 .tag = .create_immutable_binding,
                 .data = .{ .string = arguments_string },
@@ -757,14 +759,14 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
             //     binding, so its mutability is not observable.
         } else {
             // d. Else,
-            // i. Perform ! env.CreateMutableBinding("arguments", false).
+            // i. Perform ! envRecord.CreateMutableBinding("arguments", false).
             _ = try b.addInst(.{
                 .tag = .create_mutable_binding,
                 .data = .{ .string = arguments_string },
             });
         }
 
-        // e. Perform ! env.InitializeBinding("arguments", ao).
+        // e. Perform ! envRecord.InitializeBinding("arguments", argumentsObj).
         _ = try b.addInst(.{
             .tag = .initialize_binding,
             .data = .{ .set_binding = .{
@@ -773,21 +775,21 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
             } },
         });
 
-        // f. Let parameterBindings be the list-concatenation of parameterNames and « "arguments" ».
+        // f. Let paramBindings be the list-concatenation of paramNames and « "arguments" ».
         break :blk true;
     } else blk: {
         // 23. Else,
-        // a. Let parameterBindings be parameterNames.
+        // a. Let paramBindings be paramNames.
         break :blk false;
     };
 
-    // 24. Let iteratorRecord be CreateListIteratorRecord(argumentsList).
+    // 24. Let iteratorRecord be CreateListIteratorRecord(argList).
     // NOTE: This is done with a manual loop below.
 
     // 25. If hasDuplicates is true, then
     //     a. Let usedEnv be undefined.
     // 26. Else,
-    //     a. Let usedEnv be env.
+    //     a. Let usedEnv be envRecord.
     // NOTE: The binding tag (`set_binding` vs `initialize_binding`) controls whether we use
     //       the environment or not.
     const binding_tag: Ir.Inst.Tag = if (has_duplicates) .set_binding else .initialize_binding;
@@ -854,30 +856,30 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         },
     };
 
-    // 29. If hasParameterExpressions is false, then
-    if (!has_parameter_expressions) {
+    // 29. If hasParamExprs is false, then
+    if (!has_param_exprs) {
         // a. NOTE: Only a single Environment Record is needed for the parameters and top-level
         //    vars.
 
-        // b. Let instantiatedVarNames be a copy of the List parameterBindings.
-        var instantiated_var_names: std.array_hash_map.String(void) = .empty;
-        defer instantiated_var_names.deinit(b.gpa);
-        for (parameter_names.items) |name| {
-            try instantiated_var_names.put(b.gpa, name, {});
+        // b. Let instantiatedVariableNames be a copy of the List paramBindings.
+        var instantiated_variable_names: std.array_hash_map.String(void) = .empty;
+        defer instantiated_variable_names.deinit(b.gpa);
+        for (param_names.items) |name| {
+            try instantiated_variable_names.put(b.gpa, name, {});
         }
-        if (parameter_bindings_has_arguments) {
-            try instantiated_var_names.put(b.gpa, "arguments", {});
+        if (param_bindings_has_arguments) {
+            try instantiated_variable_names.put(b.gpa, "arguments", {});
         }
 
-        // c. For each element n of varNames, do
-        for (var_names.items) |var_name| {
-            // i. If instantiatedVarNames does not contain n, then
-            const gop = try instantiated_var_names.getOrPut(b.gpa, var_name);
+        // c. For each element name of variableNames, do
+        for (variable_names.items) |name| {
+            // i. If instantiatedVariableNames does not contain name, then
+            const gop = try instantiated_variable_names.getOrPut(b.gpa, name);
             if (!gop.found_existing) {
-                // 1. Append n to instantiatedVarNames.
-                // 2. Perform ! env.CreateMutableBinding(n, false).
-                // 3. Perform ! env.InitializeBinding(n, undefined).
-                const string_index = try b.internString(var_name, .literal);
+                // 1. Append name to instantiatedVariableNames.
+                // 2. Perform ! envRecord.CreateMutableBinding(name, false).
+                // 3. Perform ! envRecord.InitializeBinding(name, undefined).
+                const string_index = try b.internString(name, .literal);
                 _ = try b.addInst(.{
                     .tag = .create_var_binding,
                     .data = .{ .string = string_index },
@@ -885,7 +887,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
             }
         }
 
-        // d. Let varEnv be env.
+        // d. Let variableEnv be envRecord.
         // NOTE: No separate environment needed.
     } else {
         // 30. Else,
@@ -893,57 +895,57 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         //    expressions in the formal parameter list do not have visibility of declarations in the
         //    function body.
 
-        // b. Let varEnv be NewDeclarativeEnvironment(env).
-        // c. Set the VariableEnvironment of calleeContext to varEnv.
+        // b. Let variableEnv be NewDeclarativeEnvironment(envRecord).
+        // c. Set the VariableEnvironment of calleeContext to variableEnv.
         _ = try b.addInst(.{
             .tag = .push_var_scope,
             .data = .{ .none = {} },
         });
         b.scope_depth += 1;
 
-        // d. Let instantiatedVarNames be a new empty List.
-        var instantiated_var_names: std.array_hash_map.String(void) = .empty;
-        defer instantiated_var_names.deinit(b.gpa);
+        // d. Let instantiatedVariableNames be a new empty List.
+        var instantiated_variable_names: std.array_hash_map.String(void) = .empty;
+        defer instantiated_variable_names.deinit(b.gpa);
 
-        // e. For each element n of varNames, do
-        for (var_names.items) |var_name| {
-            // i. If instantiatedVarNames does not contain n, then
-            const gop = try instantiated_var_names.getOrPut(b.gpa, var_name);
+        // e. For each element name of variableNames, do
+        for (variable_names.items) |name| {
+            // i. If instantiatedVariableNames does not contain name, then
+            const gop = try instantiated_variable_names.getOrPut(b.gpa, name);
             if (!gop.found_existing) {
-                // 1. Append n to instantiatedVarNames.
+                // 1. Append name to instantiatedVariableNames.
 
-                // 3. If parameterBindings does not contain n or functionNames contains n, then
-                const is_in_parameter_bindings = containsSlice(parameter_names.items, var_name) or
-                    (parameter_bindings_has_arguments and std.mem.eql(u8, var_name, "arguments"));
-                if (!is_in_parameter_bindings or function_names.contains(var_name)) {
+                // 3. If paramBindings does not contain name or funcNames contains name, then
+                const is_in_parameter_bindings = containsSlice(param_names.items, name) or
+                    (param_bindings_has_arguments and std.mem.eql(u8, name, "arguments"));
+                if (!is_in_parameter_bindings or func_names.contains(name)) {
                     // a. Let initialValue be undefined.
-                    // 2. Perform ! varEnv.CreateMutableBinding(n, false).
-                    // 5. Perform ! varEnv.InitializeBinding(n, initialValue).
-                    const string_index = try b.internString(var_name, .literal);
+                    // 2. Perform ! variableEnv.CreateMutableBinding(name, false).
+                    // 5. Perform ! variableEnv.InitializeBinding(name, initialValue).
+                    const string_index = try b.internString(name, .literal);
                     _ = try b.addInst(.{
                         .tag = .create_var_binding,
                         .data = .{ .string = string_index },
                     });
                 } else {
                     // 4. Else,
-                    //     a. Let initialValue be ! env.GetBindingValue(n, false).
+                    //     a. Let initialValue be ! envRecord.GetBindingValue(name, false).
                     // NOTE: We must read the value *before* creating the binding in varEnv, because
                     //       get_binding walks the environment chain and would find the uninitialized
                     //       binding in varEnv instead of the initialized one in env. This reorder is
                     //       equivalent because env.GetBindingValue has no side effects on varEnv.
-                    const string_index = try b.internString(var_name, .literal);
+                    const string_index = try b.internString(name, .literal);
                     const initial_value = try b.addInst(.{
                         .tag = .get_binding,
                         .data = .{ .string = string_index },
                     });
 
-                    // 2. Perform ! varEnv.CreateMutableBinding(n, false).
+                    // 2. Perform ! variableEnv.CreateMutableBinding(name, false).
                     _ = try b.addInst(.{
                         .tag = .create_mutable_binding,
                         .data = .{ .string = string_index },
                     });
 
-                    // 5. Perform ! varEnv.InitializeBinding(n, initialValue).
+                    // 5. Perform ! variableEnv.InitializeBinding(name, initialValue).
                     _ = try b.addInst(.{
                         .tag = .initialize_binding,
                         .data = .{ .set_binding = .{
@@ -961,7 +963,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
 
     // 31. If strict is true, then
     if (strict) {
-        // a. Let lexEnv be varEnv.
+        // a. Let lexicalEnv be variableEnv.
         // NOTE: No separate environment needed.
     } else {
         // 32. Else,
@@ -969,7 +971,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         //    Web Legacy Compatibility Semantics, then
         //    [...]
 
-        // b. Let lexEnv be NewDeclarativeEnvironment(varEnv).
+        // b. Let lexicalEnv be NewDeclarativeEnvironment(variableEnv).
         _ = try b.addInst(.{
             .tag = .push_scope,
             .data = .{ .none = {} },
@@ -983,40 +985,40 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         //    always places all declarations into a new Environment Record.
     }
 
-    // 33. Set the LexicalEnvironment of calleeContext to lexEnv.
+    // 33. Set the LexicalEnvironment of calleeContext to lexicalEnv.
     // NOTE: This is handled by `push_scope` above.
 
-    // 34. Let lexDeclarations be the LexicallyScopedDeclarations of code.
-    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
-    defer lex_declarations.deinit(b.gpa);
-    try function_body.collectLexicallyScopedDeclarations(b.gpa, &lex_declarations);
+    // 34. Let lexicalDecls be the LexicallyScopedDeclarations of code.
+    var lexical_decls: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
+    defer lexical_decls.deinit(b.gpa);
+    try function_body.collectLexicallyScopedDeclarations(b.gpa, &lexical_decls);
 
     var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(b.gpa);
 
-    // 35. For each element d of lexDeclarations, do
-    for (lex_declarations.items) |declaration| {
+    // 35. For each element lexicalDecl of lexicalDecls, do
+    for (lexical_decls.items) |lexical_decl| {
         // a. NOTE: A lexically declared name cannot be the same as a function/generator
         //    declaration, formal parameter, or a var name. Lexically declared names are only
         //    instantiated here but not initialized.
 
-        // b. For each element dn of the BoundNames of d, do
+        // b. For each element name of the BoundNames of lexicalDecl, do
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(b.gpa, &bound_names);
+        try lexical_decl.collectBoundNames(b.gpa, &bound_names);
 
         for (bound_names.items) |name| {
             const string_index = try b.internString(name, .literal);
 
-            // i. If IsConstantDeclaration of d is true, then
-            if (declaration.isConstantDeclaration()) {
-                // 1. Perform ! lexEnv.CreateImmutableBinding(dn, true).
+            // i. If IsConstantDeclaration of lexicalDecl is true, then
+            if (lexical_decl.isConstantDeclaration()) {
+                // 1. Perform ! lexicalEnv.CreateImmutableBinding(name, true).
                 _ = try b.addInst(.{
                     .tag = .create_immutable_binding,
                     .data = .{ .string = string_index },
                 });
             } else {
                 // ii. Else,
-                // 1. Perform ! lexEnv.CreateMutableBinding(dn, false).
+                // 1. Perform ! lexicalEnv.CreateMutableBinding(name, false).
                 _ = try b.addInst(.{
                     .tag = .create_mutable_binding,
                     .data = .{ .string = string_index },
@@ -1029,18 +1031,19 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // NOTE: When `create_function` executes at runtime, the VM captures the current execution
     //       context's private environment in the new function object.
 
-    // 37. For each Parse Node f of functionsToInitialize, do
-    for (functions_to_initialize.items) |hoistable_declaration| {
-        // a. Let fn be the sole element of the BoundNames of f.
-        // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
-        const string_index, const func_ref = switch (hoistable_declaration) {
-            inline else => |function_declaration, tag| blk: {
-                const string_index = try b.internString(function_declaration.identifier.?, .literal);
+    // 37. For each Parse Node funcDecl of funcsToInitialize, do
+    for (funcs_to_initialize.items) |hoistable_decl| {
+        // a. Let funcName be the sole element of the BoundNames of funcDecl.
+        // b. Let funcObj be InstantiateFunctionObject of funcDecl with arguments lexicalEnv and
+        //    privateEnv.
+        const string_index, const func_ref = switch (hoistable_decl) {
+            inline else => |func_decl, tag| blk: {
+                const string_index = try b.internString(func_decl.identifier.?, .literal);
                 const function_index = try b.addFunction(.{
-                    .source_range = function_declaration.source_range,
+                    .source_range = func_decl.source_range,
                     .name = .{ .identifier = string_index },
-                    .parameters = function_declaration.formal_parameters,
-                    .body = function_declaration.function_body,
+                    .parameters = func_decl.formal_parameters,
+                    .body = func_decl.function_body,
                     .kind = switch (tag) {
                         .function_declaration => .normal,
                         .generator_declaration => .generator,
@@ -1056,7 +1059,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
             },
         };
 
-        // c. Perform ! varEnv.SetMutableBinding(fn, fo, false).
+        // c. Perform ! variableEnv.SetMutableBinding(funcName, funcObj, false).
         _ = try b.addInst(.{
             .tag = .set_binding,
             .data = .{ .set_binding = .{
@@ -1069,7 +1072,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // 38. Return unused.
 }
 
-/// 14.2.3 BlockDeclarationInstantiation ( code, env )
+/// 14.2.3 BlockDeclarationInstantiation ( code, envRecord )
 /// https://tc39.es/ecma262/#sec-blockdeclarationinstantiation
 fn lowerBlockDeclarationInstantiation(
     b: *Builder,
@@ -1078,12 +1081,12 @@ fn lowerBlockDeclarationInstantiation(
         case_block: *const ast.CaseBlock,
     },
 ) Error!void {
-    // 1. Let declarations be the LexicallyScopedDeclarations of code.
-    var declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
-    defer declarations.deinit(b.gpa);
+    // 1. Let decls be the LexicallyScopedDeclarations of code.
+    var decls: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
+    defer decls.deinit(b.gpa);
     switch (ast_node) {
-        .block => |block| try block.statement_list.collectLexicallyScopedDeclarations(b.gpa, &declarations),
-        .case_block => |case_block| try case_block.collectLexicallyScopedDeclarations(b.gpa, &declarations),
+        .block => |block| try block.statement_list.collectLexicallyScopedDeclarations(b.gpa, &decls),
+        .case_block => |case_block| try case_block.collectLexicallyScopedDeclarations(b.gpa, &decls),
     }
 
     // 2. Let privateEnv be the running execution context's PrivateEnvironment.
@@ -1091,21 +1094,21 @@ fn lowerBlockDeclarationInstantiation(
     var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(b.gpa);
 
-    // 3. For each element d of declarations, do
-    for (declarations.items) |declaration| {
-        // a. For each element dn of the BoundNames of d, do
+    // 3. For each element decl of decls, do
+    for (decls.items) |decl| {
+        // a. For each element name of the BoundNames of decl, do
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(b.gpa, &bound_names);
+        try decl.collectBoundNames(b.gpa, &bound_names);
         for (bound_names.items) |name| {
-            // i. If IsConstantDeclaration of d is true, then
-            //     1. Perform ! env.CreateImmutableBinding(dn, true).
+            // i. If IsConstantDeclaration of decl is true, then
+            //     1. Perform ! envRecord.CreateImmutableBinding(name, true).
             // ii. Else,
             //     1. If the host is a web browser or otherwise supports Block-Level Function
             //        Declarations Web Legacy Compatibility Semantics, then
             //        [...]
             //     2. Else,
-            //         a. Perform ! env.CreateMutableBinding(dn, false).
-            const tag: Ir.Inst.Tag = if (declaration.isConstantDeclaration())
+            //         a. Perform ! envRecord.CreateMutableBinding(name, false).
+            const tag: Ir.Inst.Tag = if (decl.isConstantDeclaration())
                 .create_immutable_binding
             else
                 .create_mutable_binding;
@@ -1116,26 +1119,27 @@ fn lowerBlockDeclarationInstantiation(
             });
         }
 
-        // b. If d is either a FunctionDeclaration, a GeneratorDeclaration, an
+        // b. If decl is either a FunctionDeclaration, a GeneratorDeclaration, an
         //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration, then
-        if (declaration == .hoistable_declaration) {
-            const hoistable_declaration = declaration.hoistable_declaration;
+        if (decl == .hoistable_declaration) {
+            const hoistable_decl = decl.hoistable_declaration;
 
-            // i. Let fn be the sole element of the BoundNames of d.
-            // ii. Let fo be InstantiateFunctionObject of d with arguments env and privateEnv.
+            // i. Let funcName be the sole element of the BoundNames of decl.
+            // ii. Let funcObj be InstantiateFunctionObject of decl with arguments envRecord and
+            //     privateEnv.
             // iii. If the host is a web browser or otherwise supports Block-Level Function
             //      Declarations Web Legacy Compatibility Semantics, then
             //      [...]
             // iv. Else,
-            //     1. Perform ! env.InitializeBinding(fn, fo).
-            const string_index, const function_ref = switch (hoistable_declaration) {
-                inline else => |function_declaration, tag| blk: {
-                    const string_index = try b.internString(function_declaration.identifier.?, .literal);
+            //     1. Perform ! envRecord.InitializeBinding(funcName, funcObj).
+            const string_index, const function_ref = switch (hoistable_decl) {
+                inline else => |func_decl, tag| blk: {
+                    const string_index = try b.internString(func_decl.identifier.?, .literal);
                     const function_index = try b.addFunction(.{
-                        .source_range = function_declaration.source_range,
+                        .source_range = func_decl.source_range,
                         .name = .{ .identifier = string_index },
-                        .parameters = function_declaration.formal_parameters,
-                        .body = function_declaration.function_body,
+                        .parameters = func_decl.formal_parameters,
+                        .body = func_decl.function_body,
                         .kind = switch (tag) {
                             .function_declaration => .normal,
                             .generator_declaration => .generator,
@@ -1957,11 +1961,11 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
 fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
     const discriminant = try b.lowerExpression(&switch_stmt.expression);
 
-    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
-    defer lex_declarations.deinit(b.gpa);
-    try switch_stmt.case_block.collectLexicallyScopedDeclarations(b.gpa, &lex_declarations);
+    var lexical_decls: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
+    defer lexical_decls.deinit(b.gpa);
+    try switch_stmt.case_block.collectLexicallyScopedDeclarations(b.gpa, &lexical_decls);
 
-    const has_scope = lex_declarations.items.len > 0;
+    const has_scope = lexical_decls.items.len > 0;
 
     if (has_scope) {
         _ = try b.addInst(.{

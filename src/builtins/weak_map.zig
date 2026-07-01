@@ -30,7 +30,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "WeakMap",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -137,22 +137,22 @@ pub const prototype = struct {
     fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
-        const map = try this_value.requireInternalSlot(agent, WeakMap);
+        // 1. Let weakMap be the this value.
+        // 2. Perform ? RequireInternalSlot(weakMap, [[WeakMapData]]).
+        const weak_map = try this_value.requireInternalSlot(agent, WeakMap);
 
         // 3. If CanBeHeldWeakly(key) is false, return false.
         if (!key.canBeHeldWeakly(agent)) {
             return .false;
         }
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        //    a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
-        //       i. Set p.[[Key]] to empty.
-        //       ii. Set p.[[Value]] to empty.
+        // 4. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
+        //    a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, then
+        //       i. Set entry.[[Key]] to empty.
+        //       ii. Set entry.[[Value]] to empty.
         //       iii. Return true.
         // 5. Return false.
-        const is_removed = map.fields.weak_map_data.remove(Value.Weak.init(key));
+        const is_removed = weak_map.fields.weak_map_data.remove(Value.Weak.init(key));
         return Value.from(is_removed);
     }
 
@@ -161,19 +161,20 @@ pub const prototype = struct {
     fn get(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
-        const map = try this_value.requireInternalSlot(agent, WeakMap);
+        // 1. Let weakMap be the this value.
+        // 2. Perform ? RequireInternalSlot(weakMap, [[WeakMapData]]).
+        const weak_map = try this_value.requireInternalSlot(agent, WeakMap);
 
         // 3. If CanBeHeldWeakly(key) is false, return undefined.
         if (!key.canBeHeldWeakly(agent)) {
             return .undefined;
         }
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        // a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return p.[[Value]].
+        // 4. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
+        // a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return
+        //    entry.[[Value]].
         // 5. Return undefined.
-        const maybe_value = map.fields.weak_map_data.get(Value.Weak.init(key));
+        const maybe_value = weak_map.fields.weak_map_data.get(Value.Weak.init(key));
         return maybe_value orelse .undefined;
     }
 
@@ -183,25 +184,25 @@ pub const prototype = struct {
         const key = arguments.get(0);
         const value = arguments.get(1);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
-        const map = try this_value.requireInternalSlot(agent, WeakMap);
+        // 1. Let weakMap be the this value.
+        // 2. Perform ? RequireInternalSlot(weakMap, [[WeakMapData]]).
+        const weak_map = try this_value.requireInternalSlot(agent, WeakMap);
 
         // 3. If CanBeHeldWeakly(key) is false, throw a TypeError exception.
         if (!key.canBeHeldWeakly(agent)) {
             return agent.throwException(.type_error, "Value {f} cannot be held weakly", .{key});
         }
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
-        //        p.[[Value]].
-        const weak_map_data = &map.fields.weak_map_data;
+        // 4. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return
+        //        entry.[[Value]].
+        const weak_map_data = &weak_map.fields.weak_map_data;
         const weak_key = Value.Weak.init(key);
         const gop = try weak_map_data.getOrPut(agent.gc_allocator, weak_key);
         if (gop.found_existing) return gop.value_ptr.*;
 
-        // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
-        // 6. Append p to M.[[WeakMapData]].
+        // 5. Let entry be the Record { [[Key]]: key, [[Value]]: value }.
+        // 6. Append entry to weakMap.[[WeakMapData]].
         gop.value_ptr.* = value;
         try registerFinalizer(agent, weak_key, weak_map_data);
 
@@ -215,9 +216,9 @@ pub const prototype = struct {
         var key = arguments.get(0);
         const callback = arguments.get(1);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
-        const map = try this_value.requireInternalSlot(agent, WeakMap);
+        // 1. Let weakMap be the this value.
+        // 2. Perform ? RequireInternalSlot(weakMap, [[WeakMapData]]).
+        const weak_map = try this_value.requireInternalSlot(agent, WeakMap);
 
         // 3. If CanBeHeldWeakly(key) is false, throw a TypeError exception.
         if (!key.canBeHeldWeakly(agent)) {
@@ -229,10 +230,10 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
-        // 5. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return
-        //        p.[[Value]].
-        const weak_map_data = &map.fields.weak_map_data;
+        // 5. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return
+        //        entry.[[Value]].
+        const weak_map_data = &weak_map.fields.weak_map_data;
         const weak_key = Value.Weak.init(key);
         if (weak_map_data.get(weak_key)) |value| return value;
 
@@ -240,12 +241,12 @@ pub const prototype = struct {
         const value = try callback.callAssumeCallable(agent, .undefined, &.{key});
 
         // 7. NOTE: The WeakMap may have been modified during execution of callback.
-        // 8. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        //     a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
-        //         i. Set p.[[Value]] to value.
+        // 8. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
+        //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, then
+        //         i. Set entry.[[Value]] to value.
         //         ii. Return value.
-        // 9. Let p be the Record { [[Key]]: key, [[Value]]: value }.
-        // 10. Append p to M.[[WeakMapData]].
+        // 9. Let entry be the Record { [[Key]]: key, [[Value]]: value }.
+        // 10. Append entry to weakMap.[[WeakMapData]].
         const gop = try weak_map_data.getOrPut(agent.gc_allocator, weak_key);
         gop.value_ptr.* = value;
         if (!gop.found_existing) {
@@ -261,19 +262,19 @@ pub const prototype = struct {
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
-        const map = try this_value.requireInternalSlot(agent, WeakMap);
+        // 1. Let weakMap be the this value.
+        // 2. Perform ? RequireInternalSlot(weakMap, [[WeakMapData]]).
+        const weak_map = try this_value.requireInternalSlot(agent, WeakMap);
 
         // 3. If CanBeHeldWeakly(key) is false, return false.
         if (!key.canBeHeldWeakly(agent)) {
             return .false;
         }
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        // a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, return true.
+        // 4. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
+        // a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return true.
         // 5. Return false.
-        const is_present = map.fields.weak_map_data.contains(Value.Weak.init(key));
+        const is_present = weak_map.fields.weak_map_data.contains(Value.Weak.init(key));
         return Value.from(is_present);
     }
 
@@ -283,9 +284,9 @@ pub const prototype = struct {
         const key = arguments.get(0);
         const value = arguments.get(1);
 
-        // 1. Let M be the this value.
-        // 2. Perform ? RequireInternalSlot(M, [[WeakMapData]]).
-        const map = try this_value.requireInternalSlot(agent, WeakMap);
+        // 1. Let weakMap be the this value.
+        // 2. Perform ? RequireInternalSlot(weakMap, [[WeakMapData]]).
+        const weak_map = try this_value.requireInternalSlot(agent, WeakMap);
 
         // 3. If CanBeHeldWeakly(key) is false, throw a TypeError exception.
         if (!key.canBeHeldWeakly(agent)) {
@@ -296,13 +297,13 @@ pub const prototype = struct {
             );
         }
 
-        // 4. For each Record { [[Key]], [[Value]] } p of M.[[WeakMapData]], do
-        //    a. If p.[[Key]] is not empty and SameValue(p.[[Key]], key) is true, then
-        //       i. Set p.[[Value]] to value.
-        //       ii. Return M.
-        // 5. Let p be the Record { [[Key]]: key, [[Value]]: value }.
-        // 6. Append p to M.[[WeakMapData]].
-        const weak_map_data = &map.fields.weak_map_data;
+        // 4. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
+        //    a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, then
+        //       i. Set entry.[[Value]] to value.
+        //       ii. Return weakMap.
+        // 5. Let entry be the Record { [[Key]]: key, [[Value]]: value }.
+        // 6. Append entry to weakMap.[[WeakMapData]].
+        const weak_map_data = &weak_map.fields.weak_map_data;
         const weak_key = Value.Weak.init(key);
         const gop = try weak_map_data.getOrPut(agent.gc_allocator, weak_key);
         gop.value_ptr.* = value;
@@ -310,7 +311,7 @@ pub const prototype = struct {
             try registerFinalizer(agent, weak_key, weak_map_data);
         }
 
-        // 7. Return M.
+        // 7. Return weakMap.
         return this_value;
     }
 
@@ -334,8 +335,8 @@ pub const prototype = struct {
         } };
         gc.registerFinalizer(weak_key.getPtr(), finalizer_data, struct {
             pub fn finalizer(_: *anyopaque, data: *CleanupEntryData) void {
-                // i. Set r.[[Key]] to empty.
-                // ii. Set r.[[Value]] to empty.
+                // i. Set entry.[[Key]] to empty.
+                // ii. Set entry.[[Value]] to empty.
                 _ = data.weak_map_data.*.remove(data.key);
             }
         }.finalizer);

@@ -179,15 +179,15 @@ pub const Iterator = struct {
         return completion;
     }
 
-    /// 7.4.12 IteratorCloseAll ( iters, completion )
+    /// 7.4.12 IteratorCloseAll ( iterators, completion )
     /// https://tc39.es/ecma262/#sec-iteratorcloseall
     pub fn closeAll(agent: *Agent, iterators: []const Iterator, completion: anytype) @TypeOf(completion) {
         var new_completion = completion;
 
-        // 1. For each element iter of iters, in reverse List order, do
+        // 1. For each element iterator of iterators, in reverse List order, do
         var it = std.mem.reverseIterator(iterators);
         while (it.nextPtr()) |iterator| {
-            // a. Set completion to Completion(IteratorClose(iter, completion)).
+            // a. Set completion to Completion(IteratorClose(iterator, completion)).
             new_completion = iterator.close(agent, new_completion);
         }
 
@@ -268,14 +268,14 @@ pub const Iterator = struct {
 
 /// 7.4.2 GetIteratorDirect ( obj )
 /// https://tc39.es/ecma262/#sec-getiteratordirect
-pub fn getIteratorDirect(agent: *Agent, object: *Object) Agent.Error!Iterator {
+pub fn getIteratorDirect(agent: *Agent, obj: *Object) Agent.Error!Iterator {
     // 1. Let nextMethod be ? Get(obj, "next").
-    const next_method = try object.get(agent, PropertyKey.from("next"));
+    const next_method = try obj.get(agent, PropertyKey.from("next"));
 
     // 2. Let iteratorRecord be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: nextMethod,
     //    [[Done]]: false }.
     const iterator: Iterator = .{
-        .iterator = object,
+        .iterator = obj,
         .next_method = next_method,
         .done = false,
     };
@@ -418,14 +418,14 @@ pub fn createIteratorResultObject(
     const realm = agent.currentRealm();
 
     // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).
-    const object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+    const obj = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
     // 2. Perform ! CreateDataPropertyOrThrow(obj, "value", value).
-    try object.createDataPropertyDirect(agent, PropertyKey.from("value"), value);
+    try obj.createDataPropertyDirect(agent, PropertyKey.from("value"), value);
 
     // 3. Perform ! CreateDataPropertyOrThrow(obj, "done", done).
-    try object.createDataPropertyDirect(agent, PropertyKey.from("done"), Value.from(done));
+    try obj.createDataPropertyDirect(agent, PropertyKey.from("done"), Value.from(done));
 
     // 4. Return obj.
-    return object;
+    return obj;
 }

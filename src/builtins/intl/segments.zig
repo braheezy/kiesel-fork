@@ -75,14 +75,14 @@ pub const prototype = struct {
         // 4. Let string be segments.[[SegmentsString]].
         const string = segments.fields.segments_string;
 
-        // 5. Let len be the length of string.
-        const len = string.length;
+        // 5. Let length be the length of string.
+        const length = string.length;
 
         // 6. Let n be ? ToIntegerOrInfinity(index).
         const n = try index.toIntegerOrInfinity(agent);
 
-        // 7. If n < 0 or n ≥ len, return undefined.
-        if (n < 0 or n >= @as(f64, @floatFromInt(len))) return .undefined;
+        // 7. If n < 0 or n ≥ length, return undefined.
+        if (n < 0 or n >= @as(f64, @floatFromInt(length))) return .undefined;
 
         // 8. Let startIndex be FindBoundary(segmenter, string, n, before).
         const boundary_before = findBoundary(segmenter, string, @intFromFloat(n), .before);

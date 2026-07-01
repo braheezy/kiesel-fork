@@ -47,7 +47,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Function",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -63,36 +63,36 @@ pub const constructor = struct {
         );
     }
 
-    /// 20.2.1.1 Function ( ...parameterArgs, bodyArg )
+    /// 20.2.1.1 Function ( ...paramArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-function-p1-p2-pn-body
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
-        const parameter_args = arguments.values[0..arguments.count() -| 1];
+        const param_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
-        // 1. Let C be the active function object.
-        const constructor_ = agent.activeFunctionObject();
+        // 1. Let ctor be the active function object.
+        const ctor = agent.activeFunctionObject();
 
         // 2. If bodyArg is not present, set bodyArg to the empty String.
         const body_arg = maybe_body_arg orelse Value.from("");
 
-        // 3. Return ? CreateDynamicFunction(C, NewTarget, normal, parameterArgs, bodyArg).
+        // 3. Return ? CreateDynamicFunction(ctor, NewTarget, normal, paramArgs, bodyArg).
         const ecmascript_function = try createDynamicFunction(
             agent,
-            constructor_,
+            ctor,
             new_target,
             .normal,
-            parameter_args,
+            param_args,
             body_arg,
         );
         return Value.from(&ecmascript_function.object);
     }
 };
 
-/// 20.2.1.1.1 CreateDynamicFunction ( constructor, newTarget, kind, parameterArgs, bodyArg )
+/// 20.2.1.1.1 CreateDynamicFunction ( ctor, newTarget, kind, paramArgs, bodyArg )
 /// https://tc39.es/ecma262/#sec-createdynamicfunction
 pub fn createDynamicFunction(
     agent: *Agent,
-    constructor_: *Object,
+    ctor: *Object,
     maybe_new_target: ?*Object,
     comptime kind: enum {
         normal,
@@ -100,25 +100,25 @@ pub fn createDynamicFunction(
         async,
         async_generator,
     },
-    parameter_args: []const Value,
+    param_args: []const Value,
     body_arg: Value,
 ) Agent.Error!*ECMAScriptFunction {
     const gpa = agent.gpa;
     const realm = agent.currentRealm();
 
-    // 1. If newTarget is undefined, set newTarget to constructor.
-    const new_target = maybe_new_target orelse constructor_;
+    // 1. If newTarget is undefined, set newTarget to ctor.
+    const new_target = maybe_new_target orelse ctor;
 
     comptime var prefix: []const u8 = undefined;
     comptime var fallback_prototype: []const u8 = undefined;
-    comptime var expr_sym: GrammarSymbol(switch (kind) {
+    comptime var expr_grammar: GrammarSymbol(switch (kind) {
         .normal => ast.FunctionExpression,
         .generator => ast.GeneratorExpression,
         .async => ast.AsyncFunctionExpression,
         .async_generator => ast.AsyncGeneratorExpression,
     }) = .{};
-    comptime var body_sym: GrammarSymbol(ast.FunctionBody) = .{};
-    comptime var parameter_sym: GrammarSymbol(ast.FormalParameters) = .{};
+    comptime var body_grammar: GrammarSymbol(ast.FunctionBody) = .{};
+    comptime var param_grammar: GrammarSymbol(ast.FormalParameters) = .{};
 
     switch (kind) {
         // 2. If kind is normal, then
@@ -126,22 +126,22 @@ pub fn createDynamicFunction(
             // a. Let prefix be "function".
             prefix = "function";
 
-            // b. Let exprSym be the grammar symbol FunctionExpression.
-            expr_sym.acceptFn = struct {
+            // b. Let exprGrammar be the grammar symbol FunctionExpression.
+            expr_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionExpression {
                     return parser.acceptFunctionExpression();
                 }
             }.accept;
 
-            // c. Let bodySym be the grammar symbol FunctionBody[~Yield, ~Await].
-            body_sym.acceptFn = struct {
+            // c. Let bodyGrammar be the grammar symbol FunctionBody[~Yield, ~Await].
+            body_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
                     return parser.acceptFunctionBody(.normal);
                 }
             }.accept;
 
-            // d. Let parameterSym be the grammar symbol FormalParameters[~Yield, ~Await].
-            parameter_sym.acceptFn = struct {
+            // d. Let paramGrammar be the grammar symbol FormalParameters[~Yield, ~Await].
+            param_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FormalParameters {
                     return parser.acceptFormalParameters();
                 }
@@ -156,22 +156,22 @@ pub fn createDynamicFunction(
             // a. Let prefix be "function*".
             prefix = "function*";
 
-            // b. Let exprSym be the grammar symbol GeneratorExpression.
-            expr_sym.acceptFn = struct {
+            // b. Let exprGrammar be the grammar symbol GeneratorExpression.
+            expr_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.GeneratorExpression {
                     return parser.acceptGeneratorExpression();
                 }
             }.accept;
 
-            // c. Let bodySym be the grammar symbol GeneratorBody.
-            body_sym.acceptFn = struct {
+            // c. Let bodyGrammar be the grammar symbol GeneratorBody.
+            body_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
                     return parser.acceptFunctionBody(.generator);
                 }
             }.accept;
 
-            // d. Let parameterSym be the grammar symbol FormalParameters[+Yield, ~Await].
-            parameter_sym.acceptFn = struct {
+            // d. Let paramGrammar be the grammar symbol FormalParameters[+Yield, ~Await].
+            param_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FormalParameters {
                     return parser.acceptFormalParameters();
                 }
@@ -186,22 +186,22 @@ pub fn createDynamicFunction(
             // a. Let prefix be "async function".
             prefix = "async function";
 
-            // b. Let exprSym be the grammar symbol AsyncFunctionExpression.
-            expr_sym.acceptFn = struct {
+            // b. Let exprGrammar be the grammar symbol AsyncFunctionExpression.
+            expr_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.AsyncFunctionExpression {
                     return parser.acceptAsyncFunctionExpression();
                 }
             }.accept;
 
-            // c. Let bodySym be the grammar symbol AsyncFunctionBody.
-            body_sym.acceptFn = struct {
+            // c. Let bodyGrammar be the grammar symbol AsyncFunctionBody.
+            body_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
                     return parser.acceptFunctionBody(.async);
                 }
             }.accept;
 
-            // d. Let parameterSym be the grammar symbol FormalParameters[~Yield, +Await].
-            parameter_sym.acceptFn = struct {
+            // d. Let paramGrammar be the grammar symbol FormalParameters[~Yield, +Await].
+            param_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FormalParameters {
                     return parser.acceptFormalParameters();
                 }
@@ -218,22 +218,22 @@ pub fn createDynamicFunction(
             // b. Let prefix be "async function*".
             prefix = "async function*";
 
-            // c. Let exprSym be the grammar symbol AsyncGeneratorExpression.
-            expr_sym.acceptFn = struct {
+            // c. Let exprGrammar be the grammar symbol AsyncGeneratorExpression.
+            expr_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.AsyncGeneratorExpression {
                     return parser.acceptAsyncGeneratorExpression();
                 }
             }.accept;
 
-            // d. Let bodySym be the grammar symbol AsyncGeneratorBody.
-            body_sym.acceptFn = struct {
+            // d. Let bodyGrammar be the grammar symbol AsyncGeneratorBody.
+            body_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FunctionBody {
                     return parser.acceptFunctionBody(.async_generator);
                 }
             }.accept;
 
-            // e. Let parameterSym be the grammar symbol FormalParameters[+Yield, +Await].
-            parameter_sym.acceptFn = struct {
+            // e. Let paramGrammar be the grammar symbol FormalParameters[+Yield, +Await].
+            param_grammar.acceptFn = struct {
                 fn accept(parser: *Parser) Parser.AcceptError!ast.FormalParameters {
                     return parser.acceptFormalParameters();
                 }
@@ -244,20 +244,20 @@ pub fn createDynamicFunction(
         },
     }
 
-    // 6. Let argCount be the number of elements in parameterArgs.
-    const arg_count = parameter_args.len;
+    // 6. Let argCount be the number of elements in paramArgs.
+    const arg_count = param_args.len;
 
-    // 7. Let parameterStrings be a new empty List.
-    var parameter_strings = try std.ArrayList(*const String).initCapacity(
+    // 7. Let paramStrings be a new empty List.
+    var param_strings = try std.ArrayList(*const String).initCapacity(
         agent.gc_allocator,
-        parameter_args.len,
+        param_args.len,
     );
-    defer parameter_strings.deinit(agent.gc_allocator);
+    defer param_strings.deinit(agent.gc_allocator);
 
-    // 8. For each element arg of parameterArgs, do
-    for (parameter_args) |arg| {
-        // a. Append ? ToString(arg) to parameterStrings.
-        parameter_strings.appendAssumeCapacity(try arg.toString(agent));
+    // 8. For each element arg of paramArgs, do
+    for (param_args) |arg| {
+        // a. Append ? ToString(arg) to paramStrings.
+        param_strings.appendAssumeCapacity(try arg.toString(agent));
     }
 
     // 9. Let bodyString be ? ToString(bodyArg).
@@ -266,22 +266,23 @@ pub fn createDynamicFunction(
     // 10. Let currentRealm be the current Realm Record.
     const current_realm = realm;
 
-    // 11. Perform ? HostEnsureCanCompileStrings(currentRealm, parameterStrings, bodyString, false).
-    try agent.host_hooks.hostEnsureCanCompileStrings(current_realm, parameter_strings.items, body_string, false);
+    // 11. Perform ? HostEnsureCanCompileStrings(currentRealm, paramStrings, bodyString, false).
+    try agent.host_hooks.hostEnsureCanCompileStrings(current_realm, param_strings.items, body_string, false);
 
-    // 12. Let P be the empty String.
+    // 12. Let paramString be the empty String.
     var result: String.Builder = .empty;
     defer result.deinit(agent.gc_allocator);
 
     // 13. If argCount > 0, then
     if (arg_count > 0) {
-        // a. Set P to parameterStrings[0].
+        // a. Set paramString to paramStrings[0].
         // b. Let k be 1.
         // c. Repeat, while k < argCount,
-        //     i. Let nextArgString be parameterStrings[k].
-        //     ii. Set P to the string-concatenation of P, "," (a comma), and nextArgString.
+        //     i. Let nextArgString be paramStrings[k].
+        //     ii. Set paramString to the string-concatenation of paramString, "," (a comma), and
+        //         nextArgString.
         //     iii. Set k to k + 1.
-        for (parameter_strings.items, 0..) |next_arg_string, k| {
+        for (param_strings.items, 0..) |next_arg_string, k| {
             if (k > 0) try result.appendChar(agent.gc_allocator, ',');
             try result.appendString(agent.gc_allocator, next_arg_string);
         }
@@ -299,8 +300,8 @@ pub fn createDynamicFunction(
     );
     defer gpa.free(body_parse_string);
 
-    // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", P, 0x000A (LINE
-    //     FEED), ") {", bodyParseString, and "}".
+    // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", paramString,
+    //     0x000A (LINE FEED), ") {", bodyParseString, and "}".
     // 16. Let sourceText be StringToCodePoints(sourceString).
     const source_text = try std.fmt.allocPrint(
         agent.gc_allocator,
@@ -318,22 +319,22 @@ pub fn createDynamicFunction(
         .async_generator => .{ .in_async_function = true, .in_generator_function = true },
     };
 
-    // 17. Let parameters be ParseText(P, parameterSym).
-    const parameters = Parser.parseNode(parameter_sym.type, parameter_sym.acceptFn, agent.gc_allocator, parameters_string, .{
+    // 17. Let params be ParseText(paramString, paramGrammar).
+    const params = Parser.parseNode(param_grammar.type, param_grammar.acceptFn, agent.gc_allocator, parameters_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
         .state = state,
     }) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
         error.ParseError => {
-            // 18. If parameters is a List of errors, throw a SyntaxError exception.
+            // 18. If params is a List of errors, throw a SyntaxError exception.
             const parse_error = diagnostics.errors.items[0];
             return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
         },
     };
 
-    // 19. Let body be ParseText(bodyParseString, bodySym).
-    const body = Parser.parseNode(body_sym.type, body_sym.acceptFn, agent.gc_allocator, body_parse_string, .{
+    // 19. Let body be ParseText(bodyParseString, bodyGrammar).
+    const body = Parser.parseNode(body_grammar.type, body_grammar.acceptFn, agent.gc_allocator, body_parse_string, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
         .state = state,
@@ -349,12 +350,12 @@ pub fn createDynamicFunction(
     // 21. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
     //     For example, `new Function("/*", "*/ ) {")` does not evaluate to a function.
 
-    // 22. NOTE: If this step is reached, sourceText must have the syntax of exprSym (although the
-    //     reverse implication does not hold). The purpose of the next two steps is to enforce any
-    //     Early Error rules which apply to exprSym directly.
+    // 22. NOTE: If this step is reached, sourceText must have the syntax of exprGrammar (although
+    //     the reverse implication does not hold). The purpose of the next two steps is to enforce
+    //     any Early Error rules which apply to exprGrammar directly.
 
-    // 23. Let expr be ParseText(sourceText, exprSym).
-    _ = Parser.parseNode(expr_sym.type, expr_sym.acceptFn, agent.gc_allocator, source_text, .{
+    // 23. Let expr be ParseText(sourceText, exprGrammar).
+    _ = Parser.parseNode(expr_grammar.type, expr_grammar.acceptFn, agent.gc_allocator, source_text, .{
         .diagnostics = &diagnostics,
         .file_name = "Function",
     }) catch |err| switch (err) {
@@ -366,47 +367,47 @@ pub fn createDynamicFunction(
         },
     };
 
-    // 25. Let proto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
-    const proto = try getPrototypeFromConstructor(agent, new_target, fallback_prototype);
+    // 25. Let funcProto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
+    const func_proto = try getPrototypeFromConstructor(agent, new_target, fallback_prototype);
 
-    // 26. Let env be currentRealm.[[GlobalEnv]].
+    // 26. Let envRecord be currentRealm.[[GlobalEnv]].
     const env = current_realm.global_env;
 
     // 27. Let privateEnv be null.
     const private_env = null;
 
-    // 28. Let F be OrdinaryFunctionCreate(proto, sourceText, parameters, body, non-lexical-this,
-    //     env, privateEnv).
+    // 28. Let func be OrdinaryFunctionCreate(funcProto, sourceText, params, body, non-lexical-this,
+    //     envRecord, privateEnv).
     const source = try String.fromUtf8(agent, source_text);
-    const function = try ordinaryFunctionCreate(
+    const func = try ordinaryFunctionCreate(
         agent,
-        proto,
+        func_proto,
         .{ .string = source },
-        parameters,
+        params,
         body,
         .non_lexical_this,
         .{ .global_environment = env },
         private_env,
     );
 
-    // 29. Perform SetFunctionName(F, "anonymous").
-    try setFunctionName(agent, &function.object, PropertyKey.from("anonymous"), null);
+    // 29. Perform SetFunctionName(func, "anonymous").
+    try setFunctionName(agent, &func.object, PropertyKey.from("anonymous"), null);
 
     switch (kind) {
         // 30. If kind is generator, then
         .generator => {
-            // a. Let prototype be OrdinaryObjectCreate(%GeneratorPrototype%).
-            const prototype_ = try ordinaryObjectCreate(
+            // a. Let protoProto be OrdinaryObjectCreate(%GeneratorPrototype%).
+            const proto_proto = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%GeneratorPrototype%"(),
             );
 
-            // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-            //    [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false,
+            // b. Perform ! DefinePropertyOrThrow(func, "prototype", PropertyDescriptor {
+            //    [[Value]]: protoProto, [[Writable]]: true, [[Enumerable]]: false,
             //    [[Configurable]]: false }).
-            try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+            try func.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value_or_accessor = .{
-                    .value = Value.from(prototype_),
+                    .value = Value.from(proto_proto),
                 },
                 .attributes = .{
                     .writable = true,
@@ -418,18 +419,18 @@ pub fn createDynamicFunction(
 
         // 31. Else if kind is async-generator, then
         .async_generator => {
-            // a. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
-            const prototype_ = try ordinaryObjectCreate(
+            // a. Let protoProto be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
+            const proto_proto = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
             );
 
-            // b. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor {
-            //    [[Value]]: prototype, [[Writable]]: true, [[Enumerable]]: false,
+            // b. Perform ! DefinePropertyOrThrow(func, "prototype", PropertyDescriptor {
+            //    [[Value]]: protoProto, [[Writable]]: true, [[Enumerable]]: false,
             //    [[Configurable]]: false }).
-            try function.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+            try func.object.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
                 .value_or_accessor = .{
-                    .value = Value.from(prototype_),
+                    .value = Value.from(proto_proto),
                 },
                 .attributes = .{
                     .writable = true,
@@ -441,8 +442,8 @@ pub fn createDynamicFunction(
 
         // 32. Else if kind is normal, then
         .normal => {
-            // a. Perform MakeConstructor(F).
-            try makeConstructor(agent, &function.object, .{});
+            // a. Perform MakeConstructor(func).
+            try makeConstructor(agent, &func.object, .{});
         },
 
         // 33. NOTE: Functions whose kind is async are not constructable and do not have a
@@ -450,8 +451,8 @@ pub fn createDynamicFunction(
         .async => {},
     }
 
-    // 34. Return F.
-    return function;
+    // 34. Return func.
+    return func;
 }
 
 /// 20.2.3 Properties of the Function Prototype Object
@@ -463,7 +464,7 @@ pub const prototype = struct {
             .{ .function = function },
             0,
             "",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Object.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Object.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -530,70 +531,70 @@ pub const prototype = struct {
         const this_arg = arguments.get(0);
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
-        // 1. Let Target be the this value.
+        // 1. Let target be the this value.
         const target = this_value;
 
-        // 2. If IsCallable(Target) is false, throw a TypeError exception.
+        // 2. If IsCallable(target) is false, throw a TypeError exception.
         if (!target.isCallable()) {
             return agent.throwException(.type_error, "{f} is not a function", .{target});
         }
 
-        // 3. Let F be ? BoundFunctionCreate(Target, thisArg, args).
-        const function_ = try boundFunctionCreate(agent, target.asObject(), this_arg, args);
+        // 3. Let boundFunc be ? BoundFunctionCreate(target, thisArg, args).
+        const bound_func = try boundFunctionCreate(agent, target.asObject(), this_arg, args);
 
-        // 4. Let L be 0.
+        // 4. Let length be 0.
         var length: f64 = 0;
 
-        // 5. Let targetHasLength be ? HasOwnProperty(Target, "length").
+        // 5. Let targetHasLength be ? HasOwnProperty(target, "length").
         const target_has_length = try target.asObject().hasOwnProperty(agent, PropertyKey.from("length"));
 
         // 6. If targetHasLength is true, then
         if (target_has_length) {
-            // a. Let targetLen be ? Get(Target, "length").
+            // a. Let targetLength be ? Get(target, "length").
             const target_length = try target.asObject().get(agent, PropertyKey.from("length"));
 
-            // b. If targetLen is a Number, then
+            // b. If targetLength is a Number, then
             if (target_length.isNumber()) {
-                // i. If targetLen is +∞𝔽, then
+                // i. If targetLength is +∞𝔽, then
                 if (target_length.asNumber().isPositiveInf()) {
-                    // 1. Set L to +∞.
+                    // 1. Set length to +∞.
                     length = std.math.inf(f64);
                 }
-                // ii. Else if targetLen is -∞𝔽, then
+                // ii. Else if targetLength is -∞𝔽, then
                 else if (target_length.asNumber().isNegativeInf()) {
-                    // 1. Set L to 0.
+                    // 1. Set length to 0.
                     length = 0;
                 } else {
                     // iii. Else,
-                    // 1. Let targetLenAsInt be ! ToIntegerOrInfinity(targetLen).
+                    // 1. Let targetLengthAsInt be ! ToIntegerOrInfinity(targetLength).
                     const target_length_as_int = target_length.toIntegerOrInfinity(agent) catch unreachable;
 
-                    // 2. Assert: targetLenAsInt is finite.
+                    // 2. Assert: targetLengthAsInt is finite.
                     std.debug.assert(std.math.isFinite(target_length_as_int));
 
                     // 3. Let argCount be the number of elements in args.
                     const arg_count = args.len;
 
-                    // 4. Set L to max(targetLenAsInt - argCount, 0).
+                    // 4. Set length to max(targetLengthAsInt - argCount, 0).
                     length = @max(target_length_as_int - @as(f64, @floatFromInt(arg_count)), 0);
                 }
             }
         }
 
-        // 7. Perform SetFunctionLength(F, L).
-        try setFunctionLength(agent, &function_.object, length);
+        // 7. Perform SetFunctionLength(boundFunc, length).
+        try setFunctionLength(agent, &bound_func.object, length);
 
-        // 8. Let targetName be ? Get(Target, "name").
+        // 8. Let targetName be ? Get(target, "name").
         var target_name = try target.asObject().get(agent, PropertyKey.from("name"));
 
         // 9. If targetName is not a String, set targetName to the empty String.
         if (!target_name.isString()) target_name = Value.from("");
 
-        // 10. Perform SetFunctionName(F, targetName, "bound").
-        try setFunctionName(agent, &function_.object, PropertyKey.from(target_name.asString()), "bound");
+        // 10. Perform SetFunctionName(boundFunc, targetName, "bound").
+        try setFunctionName(agent, &bound_func.object, PropertyKey.from(target_name.asString()), "bound");
 
-        // 11. Return F.
-        return Value.from(&function_.object);
+        // 11. Return boundFunc.
+        return Value.from(&bound_func.object);
     }
 
     /// 20.2.3.3 Function.prototype.call ( thisArg, ...args )
@@ -619,15 +620,13 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-function.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let func be the this value.
-        const func = this_value;
-
         // 2. If func is an Object, func has a [[SourceText]] internal slot, func.[[SourceText]] is
         //    a sequence of Unicode code points, and HostHasSourceTextAvailable(func) is true, then
         //     a. Return CodePointsToString(func.[[SourceText]]).
-        if (func.castObject(ECMAScriptFunction)) |ecmascript_function| {
+        if (this_value.castObject(ECMAScriptFunction)) |ecmascript_function| {
             const source_text = try ecmascript_function.fields.source_text.resolve(agent);
             return Value.from(source_text);
-        } else if (func.castObject(BuiltinFunction)) |builtin_function| {
+        } else if (this_value.castObject(BuiltinFunction)) |builtin_function| {
             if (builtin_function.fields.flags.is_class_constructor) {
                 const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
                 const source_text = try class_constructor_fields.source_text.resolve(agent);
@@ -640,7 +639,7 @@ pub const prototype = struct {
         //    NativeFunction. Additionally, if func has an [[InitialName]] internal slot and
         //    func.[[InitialName]] is a String, the portion of the returned String that would be
         //    matched by NativeFunctionAccessor[opt] PropertyName must be func.[[InitialName]].
-        if (func.castObject(BuiltinFunction)) |builtin_function| {
+        if (this_value.castObject(BuiltinFunction)) |builtin_function| {
             const name: *const String = builtin_function.fields.initial_name orelse .empty;
             const source_text = try std.fmt.allocPrint(
                 agent.gc_allocator,
@@ -653,21 +652,19 @@ pub const prototype = struct {
         // 4. If func is an Object and IsCallable(func) is true, return an implementation-defined
         //    String source code representation of func. The representation must have the syntax of
         //    a NativeFunction.
-        if (func.isCallable()) return Value.from("function () { [native code] }");
+        if (this_value.isCallable()) return Value.from("function () { [native code] }");
 
         // 5. Throw a TypeError exception.
-        return agent.throwException(.type_error, "{f} is not a function", .{func});
+        return agent.throwException(.type_error, "{f} is not a function", .{this_value});
     }
 
-    /// 20.2.3.6 Function.prototype [ %Symbol.hasInstance% ] ( V )
+    /// 20.2.3.6 Function.prototype [ %Symbol.hasInstance% ] ( value )
     /// https://tc39.es/ecma262/#sec-function.prototype-%symbol.hasinstance%
     fn @"%Symbol.hasInstance%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. Let F be the this value.
-        const func = this_value;
-
-        // 2. Return ? OrdinaryHasInstance(F, V).
-        return Value.from(try func.ordinaryHasInstance(agent, value));
+        // 1. Let thisValue be the this value.
+        // 2. Return ? OrdinaryHasInstance(thisValue, value).
+        return Value.from(try this_value.ordinaryHasInstance(agent, value));
     }
 };

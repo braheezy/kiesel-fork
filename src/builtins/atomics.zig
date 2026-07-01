@@ -34,23 +34,23 @@ const typedArrayElementSize = builtins.typedArrayElementSize;
 const typedArrayLength = builtins.typedArrayLength;
 const validateTypedArray = builtins.validateTypedArray;
 
-/// 25.4.3.1 ValidateIntegerTypedArray ( typedArray, waitable )
+/// 25.4.3.1 ValidateIntegerTypedArray ( ta, waitable )
 /// https://tc39.es/ecma262/#sec-validateintegertypedarray
 fn validateIntegerTypedArray(
     agent: *Agent,
     typed_array_value: Value,
     waitable: bool,
 ) Agent.Error!TypedArrayWithBufferWitness {
-    // 1. Let taRecord be ? ValidateTypedArray(typedArray, unordered).
-    // 2. NOTE: Bounds checking is not a synchronizing operation when typedArray's backing buffer is
-    //    a growable SharedArrayBuffer.
+    // 1. Let taRecord be ? ValidateTypedArray(ta, unordered).
+    // 2. NOTE: Bounds checking is not a synchronizing operation when ta's backing buffer is a
+    //    growable SharedArrayBuffer.
     const ta = try validateTypedArray(agent, typed_array_value, .unordered);
     const typed_array = ta.object;
     const @"type" = typed_array.fields.element_type;
 
     // 3. If waitable is true, then
     if (waitable) {
-        // a. If typedArray.[[TypedArrayName]] is neither "Int32Array" nor "BigInt64Array", throw a
+        // a. If ta.[[TypedArrayName]] is neither "Int32Array" nor "BigInt64Array", throw a
         //    TypeError exception.
         if (@"type" != .int32 and @"type" != .bigint64) {
             return agent.throwException(
@@ -61,7 +61,7 @@ fn validateIntegerTypedArray(
         }
     } else {
         // 4. Else,
-        // a. Let type be TypedArrayElementType(typedArray).
+        // a. Let type be TypedArrayElementType(ta).
         // b. If IsUnclampedIntegerElementType(type) is false and IsBigIntElementType(type) is
         //    false, throw a TypeError exception.
         if (!@"type".isUnclampedIntegerElementType() and !@"type".isBigIntElementType()) {
@@ -100,43 +100,43 @@ fn validateAtomicAccess(
         );
     }
 
-    // 5. Let typedArray be taRecord.[[Object]].
+    // 5. Let ta be taRecord.[[Object]].
     const typed_array = ta.object;
 
-    // 6. Let elementSize be TypedArrayElementSize(typedArray).
+    // 6. Let elementSize be TypedArrayElementSize(ta).
     const element_size = typedArrayElementSize(typed_array);
 
-    // 7. Let offset be typedArray.[[ByteOffset]].
+    // 7. Let offset be ta.[[ByteOffset]].
     const offset = typed_array.fields.byte_offset;
 
     // 8. Return (accessIndex × elementSize) + offset.
     return (access_index * element_size) + @intFromEnum(offset);
 }
 
-/// 25.4.3.3 ValidateAtomicAccessOnIntegerTypedArray ( typedArray, requestIndex )
+/// 25.4.3.3 ValidateAtomicAccessOnIntegerTypedArray ( ta, requestIndex )
 /// https://tc39.es/ecma262/#sec-validateatomicaccessonintegertypedarray
 fn validateAtomicAccessOnIntegerTypedArray(
     agent: *Agent,
     typed_array: Value,
     request_index: Value,
 ) Agent.Error!u53 {
-    // 1. Let taRecord be ? ValidateIntegerTypedArray(typedArray, false).
+    // 1. Let taRecord be ? ValidateIntegerTypedArray(ta, false).
     const ta = try validateIntegerTypedArray(agent, typed_array, false);
 
     // 2. Return ? ValidateAtomicAccess(taRecord, requestIndex).
     return validateAtomicAccess(agent, ta, request_index);
 }
 
-/// 25.4.3.4 RevalidateAtomicAccess ( typedArray, byteIndexInBuffer )
+/// 25.4.3.4 RevalidateAtomicAccess ( ta, byteIndexInBuffer )
 /// https://tc39.es/ecma262/#sec-revalidateatomicaccess
 fn revalidateAtomicAccess(
     agent: *Agent,
     typed_array: *const builtins.TypedArray,
     byte_index_in_buffer: u53,
 ) Agent.Error!void {
-    // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(typedArray, unordered).
-    // 2. NOTE: Bounds checking is not a synchronizing operation when typedArray's backing buffer is
-    //    a growable SharedArrayBuffer.
+    // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(ta, unordered).
+    // 2. NOTE: Bounds checking is not a synchronizing operation when ta's backing buffer is a
+    //    growable SharedArrayBuffer.
     const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .unordered);
 
     // 3. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
@@ -144,7 +144,7 @@ fn revalidateAtomicAccess(
         return agent.throwException(.type_error, "Typed array is out of bounds", .{});
     }
 
-    // 4. Assert: byteIndexInBuffer ≥ typedArray.[[ByteOffset]].
+    // 4. Assert: byteIndexInBuffer ≥ ta.[[ByteOffset]].
     std.debug.assert(byte_index_in_buffer >= @intFromEnum(typed_array.fields.byte_offset));
 
     // 5. If byteIndexInBuffer ≥ taRecord.[[CachedBufferByteLength]], throw a RangeError exception.
@@ -159,7 +159,7 @@ fn revalidateAtomicAccess(
     // 6. Return unused.
 }
 
-/// 25.4.3.14 DoWait ( mode, typedArray, index, value, timeout )
+/// 25.4.3.14 DoWait ( mode, ta, index, value, timeout )
 /// https://tc39.es/ecma262/#sec-dowait
 fn doWait(
     agent: *Agent,
@@ -171,7 +171,7 @@ fn doWait(
 ) Agent.Error!Value {
     const realm = agent.currentRealm();
 
-    // 1. Let taRecord be ? ValidateIntegerTypedArray(typedArray, true).
+    // 1. Let taRecord be ? ValidateIntegerTypedArray(ta, true).
     const ta = try validateIntegerTypedArray(agent, typed_array_value, true);
 
     // 2. Let buffer be taRecord.[[Object]].[[ViewedArrayBuffer]].
@@ -191,42 +191,42 @@ fn doWait(
 
     const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
-    // 5. Let arrayTypeName be typedArray.[[TypedArrayName]].
-    // 6. If arrayTypeName is "BigInt64Array", let v be ? ToBigInt64(value).
-    // 7. Else, let v be ? ToInt32(value).
-    const v = if (typed_array.fields.element_type == .bigint64)
+    // 5. Let arrayTypeName be ta.[[TypedArrayName]].
+    // 6. If arrayTypeName is "BigInt64Array", let expected be ? ToBigInt64(value).
+    // 7. Else, let expected be ? ToInt32(value).
+    const expected = if (typed_array.fields.element_type == .bigint64)
         Value.from(try BigInt.fromValue(agent, try value.toBigInt64(agent)))
     else
         Value.from(try value.toInt32(agent));
 
-    // 8. Let q be ? ToNumber(timeout).
-    const q = try timeout.toNumber(agent);
+    // 8. Let timeoutNumber be ? ToNumber(timeout).
+    const timeout_number = try timeout.toNumber(agent);
 
-    // 9. If q is either NaN or +∞𝔽, let t be +∞.
-    // 10. Else if q is -∞𝔽, let t be 0.
-    // 11. Else, let t be max(ℝ(q), 0).
-    const t = if (q.isNan() or q.isPositiveInf())
+    // 9. If timeoutNumber is either NaN or +∞𝔽, let realTimeout be +∞.
+    // 10. Else if timeoutNumber is -∞𝔽, let realTimeout be 0.
+    // 11. Else, let realTimeout be max(ℝ(timeoutNumber), 0).
+    const real_timeout = if (timeout_number.isNan() or timeout_number.isPositiveInf())
         std.math.inf(f64)
-    else if (q.isNegativeInf())
+    else if (timeout_number.isNegativeInf())
         0
     else
-        @max(q.asFloat(), 0);
+        @max(timeout_number.asFloat(), 0);
 
     // 12. If mode is sync and AgentCanSuspend() is false, throw a TypeError exception.
 
     // 13. Let block be buffer.[[ArrayBufferData]].
     const block = buffer.fields.data_block;
 
-    // TODO: 14. Let WL be GetWaiterList(block, byteIndexInBuffer).
+    // TODO: 14. Let waiterList be GetWaiterList(block, byteIndexInBuffer).
     _ = block;
 
     var promise_capability: PromiseCapability = undefined;
-    var result_object: *Object = undefined;
+    var result_obj: *Object = undefined;
 
     // 15. If mode is sync, then
     if (mode == .sync) {
         // a. Let promiseCapability be blocking.
-        // b. Let resultObject be undefined.
+        // b. Let resultObj be undefined.
     } else {
         // 16. Else,
         // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
@@ -235,22 +235,22 @@ fn doWait(
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // b. Let resultObject be OrdinaryObjectCreate(%Object.prototype%).
-        result_object = try ordinaryObjectCreate(
+        // b. Let resultObj be OrdinaryObjectCreate(%Object.prototype%).
+        result_obj = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%Object.prototype%"(),
         );
     }
 
-    // TODO: 17. Perform EnterCriticalSection(WL).
+    // TODO: 17. Perform EnterCriticalSection(waiterList).
 
-    // 18. Let elementType be TypedArrayElementType(typedArray).
-    const w = switch (typed_array.fields.element_type) {
+    // 18. Let elementType be TypedArrayElementType(ta).
+    const witness = switch (typed_array.fields.element_type) {
         .uint8_clamped, .float16, .float32, .float64 => unreachable,
         inline else => |@"type"| blk: {
-            // 19. Let w be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true,
+            // 19. Let witness be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true,
             //     seq-cst).
-            const w = getValueFromBuffer(
+            const witness = getValueFromBuffer(
                 agent,
                 buffer,
                 byte_index_in_buffer,
@@ -260,61 +260,61 @@ fn doWait(
                 null,
             );
             break :blk if (@"type".isBigIntElementType())
-                Value.from(try BigInt.fromValue(agent, w))
+                Value.from(try BigInt.fromValue(agent, witness))
             else
-                Value.from(w);
+                Value.from(witness);
         },
     };
 
-    // 20. If v ≠ w, then
-    if (!sameValue(v, w)) {
-        // TODO: a. Perform LeaveCriticalSection(WL).
+    // 20. If expected ≠ witness, then
+    if (!sameValue(expected, witness)) {
+        // TODO: a. Perform LeaveCriticalSection(waiterList).
 
         // b. If mode is sync, return "not-equal".
         if (mode == .sync) return Value.from("not-equal");
 
-        // c. Perform ! CreateDataPropertyOrThrow(resultObject, "async", false).
-        try result_object.createDataPropertyDirect(
+        // c. Perform ! CreateDataPropertyOrThrow(resultObj, "async", false).
+        try result_obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("async"),
             .false,
         );
 
-        // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "not-equal").
-        try result_object.createDataPropertyDirect(
+        // d. Perform ! CreateDataPropertyOrThrow(resultObj, "value", "not-equal").
+        try result_obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("value"),
             Value.from("not-equal"),
         );
 
-        // e. Return resultObject.
-        return Value.from(result_object);
+        // e. Return resultObj.
+        return Value.from(result_obj);
     }
 
-    // 21. If t = 0 and mode is async, then
-    if (t == 0 and mode == .async) {
+    // 21. If realTimeout = 0 and mode is async, then
+    if (real_timeout == 0 and mode == .async) {
         // a. NOTE: There is no special handling of synchronous immediate timeouts. Asynchronous
         //    immediate timeouts have special handling in order to fail fast and avoid unnecessary
         //    Promise jobs.
 
-        // TODO: b. Perform LeaveCriticalSection(WL).
+        // TODO: b. Perform LeaveCriticalSection(waiterList).
 
-        // c. Perform ! CreateDataPropertyOrThrow(resultObject, "async", false).
-        try result_object.createDataPropertyDirect(
+        // c. Perform ! CreateDataPropertyOrThrow(resultObj, "async", false).
+        try result_obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("async"),
             .false,
         );
 
-        // d. Perform ! CreateDataPropertyOrThrow(resultObject, "value", "timed-out").
-        try result_object.createDataPropertyDirect(
+        // d. Perform ! CreateDataPropertyOrThrow(resultObj, "value", "timed-out").
+        try result_obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("value"),
             Value.from("timed-out"),
         );
 
-        // e. Return resultObject.
-        return Value.from(result_object);
+        // e. Return resultObj.
+        return Value.from(result_obj);
     }
 
     // TODO: 22-31.
@@ -323,26 +323,25 @@ fn doWait(
     // 32. If mode is sync, return waiterRecord.[[Result]].
     if (mode == .sync) return Value.from(waiter.result);
 
-    // 33. Perform ! CreateDataPropertyOrThrow(resultObject, "async", true).
-    try result_object.createDataPropertyDirect(
+    // 33. Perform ! CreateDataPropertyOrThrow(resultObj, "async", true).
+    try result_obj.createDataPropertyDirect(
         agent,
         PropertyKey.from("async"),
         .true,
     );
 
-    // 34. Perform ! CreateDataPropertyOrThrow(resultObject, "value",
-    //     promiseCapability.[[Promise]]).
-    try result_object.createDataPropertyDirect(
+    // 34. Perform ! CreateDataPropertyOrThrow(resultObj, "value", promiseCapability.[[Promise]]).
+    try result_obj.createDataPropertyDirect(
         agent,
         PropertyKey.from("value"),
         Value.from(promise_capability.promise),
     );
 
-    // 35. Return resultObject.
-    return Value.from(result_object);
+    // 35. Return resultObj.
+    return Value.from(result_obj);
 }
 
-/// 25.4.3.17 AtomicReadModifyWrite ( typedArray, index, value, op )
+/// 25.4.3.17 AtomicReadModifyWrite ( ta, index, value, op )
 /// https://tc39.es/ecma262/#sec-atomicreadmodifywrite
 fn atomicReadModifyWrite(
     agent: *Agent,
@@ -351,7 +350,7 @@ fn atomicReadModifyWrite(
     value: Value,
     comptime op: std.builtin.AtomicRmwOp,
 ) Agent.Error!Value {
-    // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index).
+    // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(ta, index).
     const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
         agent,
         typed_array_value,
@@ -359,20 +358,20 @@ fn atomicReadModifyWrite(
     );
     const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
-    // 2. If typedArray.[[ContentType]] is bigint, let v be ? ToBigInt(value).
-    // 3. Else, let v be 𝔽(? ToIntegerOrInfinity(value)).
-    const numeric_value = if (typed_array.fields.content_type == .bigint)
+    // 2. If ta.[[ContentType]] is bigint, let coerced be ? ToBigInt(value).
+    // 3. Else, let coerced be 𝔽(? ToIntegerOrInfinity(value)).
+    const coerced = if (typed_array.fields.content_type == .bigint)
         Value.from(try value.toBigInt(agent))
     else
         Value.from(try value.toIntegerOrInfinity(agent));
 
-    // 4. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
+    // 4. Perform ? RevalidateAtomicAccess(ta, byteIndexInBuffer).
     try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
 
-    // 5. Let buffer be typedArray.[[ViewedArrayBuffer]].
+    // 5. Let buffer be ta.[[ViewedArrayBuffer]].
     const buffer = typed_array.fields.viewed_array_buffer;
 
-    // 6. Let elementType be TypedArrayElementType(typedArray).
+    // 6. Let elementType be TypedArrayElementType(ta).
     switch (typed_array.fields.element_type) {
         .uint8_clamped, .float16, .float32, .float64 => unreachable,
         inline else => |@"type"| {
@@ -384,13 +383,14 @@ fn atomicReadModifyWrite(
                     .{@"type".typedArrayName()},
                 );
             }
-            // 7. Return GetModifySetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, op).
+            // 7. Return GetModifySetValueInBuffer(buffer, byteIndexInBuffer, elementType, coerced,
+            //    op).
             const modified_value = try getModifySetValueInBuffer(
                 agent,
                 buffer,
                 byte_index_in_buffer,
                 @"type",
-                numeric_value,
+                coerced,
                 op,
             );
             return if (@"type".isBigIntElementType())
@@ -436,7 +436,7 @@ pub const namespace = struct {
         );
     }
 
-    /// 25.4.4 Atomics.add ( typedArray, index, value )
+    /// 25.4.4 Atomics.add ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.add
     fn add(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -444,14 +444,13 @@ pub const namespace = struct {
         const value = arguments.get(2);
 
         // 1. Let add be a new read-modify-write modification function with parameters (xBytes,
-        //    yBytes) that captures typedArray and performs the following steps atomically when
-        //    called:
+        //    yBytes) that captures ta and performs the following steps atomically when called:
         //     a-j.
-        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, add).
+        // 2. Return ? AtomicReadModifyWrite(ta, index, value, add).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Add);
     }
 
-    /// 25.4.5 Atomics.and ( typedArray, index, value )
+    /// 25.4.5 Atomics.and ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.and
     fn @"and"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -461,11 +460,11 @@ pub const namespace = struct {
         // 1. Let and be a new read-modify-write modification function with parameters (xBytes,
         //    yBytes) that captures nothing and performs the following steps atomically when called:
         //     a. Return ByteListBitwiseOp(`&`, xBytes, yBytes).
-        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, and).
+        // 2. Return ? AtomicReadModifyWrite(ta, index, value, and).
         return atomicReadModifyWrite(agent, typed_array, index, value, .And);
     }
 
-    /// 25.4.6 Atomics.compareExchange ( typedArray, index, expectedValue, replacementValue )
+    /// 25.4.6 Atomics.compareExchange ( ta, index, expectedValue, replacementValue )
     /// https://tc39.es/ecma262/#sec-atomics.compareexchange
     fn compareExchange(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array_value = arguments.get(0);
@@ -473,7 +472,7 @@ pub const namespace = struct {
         const expected_value = arguments.get(2);
         const replacement_value = arguments.get(3);
 
-        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index).
+        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(ta, index).
         const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
             agent,
             typed_array_value,
@@ -481,13 +480,13 @@ pub const namespace = struct {
         );
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
-        // 2. Let buffer be typedArray.[[ViewedArrayBuffer]].
+        // 2. Let buffer be ta.[[ViewedArrayBuffer]].
         const buffer = typed_array.fields.viewed_array_buffer;
 
         // 3. Let block be buffer.[[ArrayBufferData]].
         // NOTE: This is only safe to access after step 6.
 
-        // 4. If typedArray.[[ContentType]] is bigint, then
+        // 4. If ta.[[ContentType]] is bigint, then
         const expected, const replacement = if (typed_array.fields.content_type == .bigint) .{
             // a. Let expected be ? ToBigInt(expectedValue).
             Value.from(try expected_value.toBigInt(agent)),
@@ -503,16 +502,16 @@ pub const namespace = struct {
             Value.from(try replacement_value.toIntegerOrInfinity(agent)),
         };
 
-        // 6. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
+        // 6. Perform ? RevalidateAtomicAccess(ta, byteIndexInBuffer).
         try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
 
         const block = buffer.fields.data_block.?;
 
-        // 7. Let elementType be TypedArrayElementType(typedArray).
-        // 8. Let elementSize be TypedArrayElementSize(typedArray).
+        // 7. Let elementType be TypedArrayElementType(ta).
+        // 8. Let elementSize be TypedArrayElementSize(ta).
 
-        // 9. Let AR be the Agent Record of the surrounding agent.
-        // 10. Let isLittleEndian be AR.[[LittleEndian]].
+        // 9. Let agentRecord be the Agent Record of the surrounding agent.
+        // 10. Let isLittleEndian be agentRecord.[[LittleEndian]].
         const is_little_endian = agent.little_endian;
 
         switch (typed_array.fields.element_type) {
@@ -586,7 +585,7 @@ pub const namespace = struct {
         }
     }
 
-    /// 25.4.7 Atomics.exchange ( typedArray, index, value )
+    /// 25.4.7 Atomics.exchange ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.exchange
     fn exchange(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -597,7 +596,7 @@ pub const namespace = struct {
         //    newBytes) that captures nothing and performs the following steps atomically when
         //    called:
         //     a. Return newBytes.
-        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, second).
+        // 2. Return ? AtomicReadModifyWrite(ta, index, value, second).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Xchg);
     }
 
@@ -610,24 +609,24 @@ pub const namespace = struct {
         const n = try size.toIntegerOrInfinity(agent);
 
         // NOTE: Everyone but LibJS hardcodes these, so we might as well :^)
-        // 2. Let AR be the Agent Record of the surrounding agent.
-        // 3. If n = 1, return AR.[[IsLockFree1]].
-        // 4. If n = 2, return AR.[[IsLockFree2]].
+        // 2. Let agentRecord be the Agent Record of the surrounding agent.
+        // 3. If n = 1, return agentRecord.[[IsLockFree1]].
+        // 4. If n = 2, return agentRecord.[[IsLockFree2]].
         // 5. If n = 4, return true.
-        // 6. If n = 8, return AR.[[IsLockFree8]].
+        // 6. If n = 8, return agentRecord.[[IsLockFree8]].
         if (n == 1 or n == 2 or n == 4 or n == 8) return .true;
 
         // 7. Return false.
         return .false;
     }
 
-    /// 25.4.9 Atomics.load ( typedArray, index )
+    /// 25.4.9 Atomics.load ( ta, index )
     /// https://tc39.es/ecma262/#sec-atomics.load
     fn load(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array_value = arguments.get(0);
         const index = arguments.get(1);
 
-        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index).
+        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(ta, index).
         const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
             agent,
             typed_array_value,
@@ -635,13 +634,13 @@ pub const namespace = struct {
         );
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
-        // 2. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
+        // 2. Perform ? RevalidateAtomicAccess(ta, byteIndexInBuffer).
         try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
 
-        // 3. Let buffer be typedArray.[[ViewedArrayBuffer]].
+        // 3. Let buffer be ta.[[ViewedArrayBuffer]].
         const buffer = typed_array.fields.viewed_array_buffer;
 
-        // 4. Let elementType be TypedArrayElementType(typedArray).
+        // 4. Let elementType be TypedArrayElementType(ta).
         switch (typed_array.fields.element_type) {
             .uint8_clamped, .float16, .float32, .float64 => unreachable,
             inline else => |@"type"| {
@@ -664,14 +663,14 @@ pub const namespace = struct {
         }
     }
 
-    /// 25.4.15 Atomics.notify ( typedArray, index, count )
+    /// 25.4.15 Atomics.notify ( ta, index, count )
     /// https://tc39.es/ecma262/#sec-atomics.notify
     fn notify(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array_value = arguments.get(0);
         const index = arguments.get(1);
         const count_value = arguments.get(2);
 
-        // 1. Let taRecord be ? ValidateIntegerTypedArray(typedArray, true).
+        // 1. Let taRecord be ? ValidateIntegerTypedArray(ta, true).
         const ta = try validateIntegerTypedArray(agent, typed_array_value, true);
 
         // 2. Let byteIndexInBuffer be ? ValidateAtomicAccess(taRecord, index).
@@ -680,18 +679,18 @@ pub const namespace = struct {
 
         // 3. If count is undefined, then
         const count = if (count_value.isUndefined()) blk: {
-            // a. Let c be +∞.
+            // a. Set count to +∞.
             break :blk std.math.inf(f64);
         } else blk: {
             // 4. Else,
             // a. Let intCount be ? ToIntegerOrInfinity(count).
             const int_count = try count_value.toIntegerOrInfinity(agent);
 
-            // b. Let c be max(intCount, 0).
+            // b. Set count to max(intCount, 0).
             break :blk @max(int_count, 0);
         };
 
-        // 5. Let buffer be typedArray.[[ViewedArrayBuffer]].
+        // 5. Let buffer be ta.[[ViewedArrayBuffer]].
         const buffer = typed_array.fields.viewed_array_buffer;
 
         // 6. Let block be buffer.[[ArrayBufferData]].
@@ -699,19 +698,19 @@ pub const namespace = struct {
         if (!isSharedArrayBuffer(buffer)) return Value.from(0);
         const block = buffer.fields.data_block.?;
 
-        // TODO: 8. Let WL be GetWaiterList(block, byteIndexInBuffer).
+        // TODO: 8. Let waiterList be GetWaiterList(block, byteIndexInBuffer).
         _ = block;
         _ = byte_index_in_buffer;
 
         // TODO: 9-13.
         _ = count;
-        const n = 0;
+        const waiters_count = 0;
 
-        // 14. Return 𝔽(n).
-        return Value.from(n);
+        // 14. Return 𝔽(waitersCount).
+        return Value.from(waiters_count);
     }
 
-    /// 25.4.10 Atomics.or ( typedArray, index, value )
+    /// 25.4.10 Atomics.or ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.or
     fn @"or"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -721,7 +720,7 @@ pub const namespace = struct {
         // 1. Let or be a new read-modify-write modification function with parameters (xBytes,
         //    yBytes) that captures nothing and performs the following steps atomically when called:
         //     a. Return ByteListBitwiseOp(`|`, xBytes, yBytes).
-        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, or).
+        // 2. Return ? AtomicReadModifyWrite(ta, index, value, or).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Or);
     }
 
@@ -754,14 +753,14 @@ pub const namespace = struct {
         return .undefined;
     }
 
-    /// 25.4.11 Atomics.store ( typedArray, index, value )
+    /// 25.4.11 Atomics.store ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.store
     fn store(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array_value = arguments.get(0);
         const index = arguments.get(1);
         const value = arguments.get(2);
 
-        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(typedArray, index).
+        // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(ta, index).
         const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(
             agent,
             typed_array_value,
@@ -769,31 +768,31 @@ pub const namespace = struct {
         );
         const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
-        // 2. If typedArray.[[ContentType]] is bigint, let v be ? ToBigInt(value).
-        // 3. Else, let v be 𝔽(? ToIntegerOrInfinity(value)).
-        const numeric_value = if (typed_array.fields.content_type == .bigint)
+        // 2. If ta.[[ContentType]] is bigint, let coerced be ? ToBigInt(value).
+        // 3. Else, let coerced be 𝔽(? ToIntegerOrInfinity(value)).
+        const coerced = if (typed_array.fields.content_type == .bigint)
             Value.from(try value.toBigInt(agent))
         else
             Value.from(try value.toIntegerOrInfinity(agent));
 
-        // 4. Perform ? RevalidateAtomicAccess(typedArray, byteIndexInBuffer).
+        // 4. Perform ? RevalidateAtomicAccess(ta, byteIndexInBuffer).
         try revalidateAtomicAccess(agent, typed_array, byte_index_in_buffer);
 
-        // 5. Let buffer be typedArray.[[ViewedArrayBuffer]].
+        // 5. Let buffer be ta.[[ViewedArrayBuffer]].
         const buffer = typed_array.fields.viewed_array_buffer;
 
-        // 6. Let elementType be TypedArrayElementType(typedArray).
+        // 6. Let elementType be TypedArrayElementType(ta).
         switch (typed_array.fields.element_type) {
             .uint8_clamped, .float16, .float32, .float64 => unreachable,
             inline else => |@"type"| {
-                // 7. Perform SetValueInBuffer(buffer, byteIndexInBuffer, elementType, v, true,
-                //    seq-cst).
+                // 7. Perform SetValueInBuffer(buffer, byteIndexInBuffer, elementType, coerced,
+                //    true, seq-cst).
                 try setValueInBuffer(
                     agent,
                     buffer,
                     byte_index_in_buffer,
                     @"type",
-                    numeric_value,
+                    coerced,
                     true,
                     .seq_cst,
                     null,
@@ -801,11 +800,11 @@ pub const namespace = struct {
             },
         }
 
-        // 8. Return v.
-        return numeric_value;
+        // 8. Return coerced.
+        return coerced;
     }
 
-    /// 25.4.12 Atomics.sub ( typedArray, index, value )
+    /// 25.4.12 Atomics.sub ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.sub
     fn sub(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -813,14 +812,13 @@ pub const namespace = struct {
         const value = arguments.get(2);
 
         // 1. Let subtract be a new read-modify-write modification function with parameters (xBytes,
-        //    yBytes) that captures typedArray and performs the following steps atomically when
-        //    called:
+        //    yBytes) that captures ta and performs the following steps atomically when called:
         //     a-j.
-        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, subtract).
+        // 2. Return ? AtomicReadModifyWrite(ta, index, value, subtract).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Sub);
     }
 
-    /// 25.4.13 Atomics.wait ( typedArray, index, value, timeout )
+    /// 25.4.13 Atomics.wait ( ta, index, value, timeout )
     /// https://tc39.es/ecma262/#sec-atomics.wait
     fn wait(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -828,11 +826,11 @@ pub const namespace = struct {
         const value = arguments.get(2);
         const timeout = arguments.get(3);
 
-        // 1. Return ? DoWait(sync, typedArray, index, value, timeout).
+        // 1. Return ? DoWait(sync, ta, index, value, timeout).
         return doWait(agent, .sync, typed_array, index, value, timeout);
     }
 
-    /// 25.4.14 Atomics.waitAsync ( typedArray, index, value, timeout )
+    /// 25.4.14 Atomics.waitAsync ( ta, index, value, timeout )
     /// https://tc39.es/ecma262/#sec-atomics.waitasync
     fn waitAsync(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -840,11 +838,11 @@ pub const namespace = struct {
         const value = arguments.get(2);
         const timeout = arguments.get(3);
 
-        // 1. Return ? DoWait(async, typedArray, index, value, timeout).
+        // 1. Return ? DoWait(async, ta, index, value, timeout).
         return doWait(agent, .async, typed_array, index, value, timeout);
     }
 
-    /// 25.4.16 Atomics.xor ( typedArray, index, value )
+    /// 25.4.16 Atomics.xor ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.xor
     fn xor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -854,7 +852,7 @@ pub const namespace = struct {
         // 1. Let xor be a new read-modify-write modification function with parameters (xBytes,
         //    yBytes) that captures nothing and performs the following steps atomically when called:
         //     a. Return ByteListBitwiseOp(`^`, xBytes, yBytes).
-        // 2. Return ? AtomicReadModifyWrite(typedArray, index, value, xor).
+        // 2. Return ? AtomicReadModifyWrite(ta, index, value, xor).
         return atomicReadModifyWrite(agent, typed_array, index, value, .Xor);
     }
 };

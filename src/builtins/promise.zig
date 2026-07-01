@@ -266,47 +266,47 @@ pub fn fulfillPromise(
     // 8. Return unused.
 }
 
-/// 27.2.1.5 NewPromiseCapability ( C )
+/// 27.2.1.5 NewPromiseCapability ( ctor )
 /// https://tc39.es/ecma262/#sec-newpromisecapability
-pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!PromiseCapability {
-    // 1. If IsConstructor(C) is false, throw a TypeError exception.
-    if (!constructor_.isConstructor()) {
-        return agent.throwException(.type_error, "{f} is not a constructor", .{constructor_});
+pub fn newPromiseCapability(agent: *Agent, ctor: Value) Agent.Error!PromiseCapability {
+    // 1. If IsConstructor(ctor) is false, throw a TypeError exception.
+    if (!ctor.isConstructor()) {
+        return agent.throwException(.type_error, "{f} is not a constructor", .{ctor});
     }
 
-    // 2. NOTE: C is assumed to be a constructor function that supports the parameter conventions of
-    //    the Promise constructor (see 27.2.3.1).
+    // 2. NOTE: ctor is assumed to be a constructor function that supports the parameter conventions
+    //    of the Promise constructor (see 27.2.3.1).
 
-    // 3. Let resolvingFunctions be the Record { [[Resolve]]: undefined, [[Reject]]: undefined }.
+    // 3. Let resolvingFuncs be the Record { [[Resolve]]: undefined, [[Reject]]: undefined }.
     // NOTE: This is created later.
 
     const AdditionalFields = struct {
-        resolving_functions: struct {
+        resolving_funcs: struct {
             resolve: Value,
             reject: Value,
         },
     };
 
     // 4. Let executorClosure be a new Abstract Closure with parameters (resolve, reject) that
-    //    captures resolvingFunctions and performs the following steps when called:
+    //    captures resolvingFuncs and performs the following steps when called:
     const executor_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
             const resolve = arguments.get(0);
             const reject = arguments.get(1);
             const function = agent_.activeFunctionObject();
             const additional_fields = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
-            const resolving_functions_ = &additional_fields.resolving_functions;
+            const resolving_funcs_ = &additional_fields.resolving_funcs;
 
-            // a. If resolvingFunctions.[[Resolve]] is not undefined, throw a TypeError exception.
-            if (!resolving_functions_.resolve.isUndefined()) {
+            // a. If resolvingFuncs.[[Resolve]] is not undefined, throw a TypeError exception.
+            if (!resolving_funcs_.resolve.isUndefined()) {
                 return agent_.throwException(
                     .type_error,
                     "Resolve function has already been set",
                     .{},
                 );
             }
-            // b. If resolvingFunctions.[[Reject]] is not undefined, throw a TypeError exception.
-            if (!resolving_functions_.reject.isUndefined()) {
+            // b. If resolvingFuncs.[[Reject]] is not undefined, throw a TypeError exception.
+            if (!resolving_funcs_.reject.isUndefined()) {
                 return agent_.throwException(
                     .type_error,
                     "Reject function has already been set",
@@ -314,11 +314,11 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
                 );
             }
 
-            // c. Set resolvingFunctions.[[Resolve]] to resolve.
-            resolving_functions_.resolve = resolve;
+            // c. Set resolvingFuncs.[[Resolve]] to resolve.
+            resolving_funcs_.resolve = resolve;
 
-            // d. Set resolvingFunctions.[[Reject]] to reject.
-            resolving_functions_.reject = reject;
+            // d. Set resolvingFuncs.[[Reject]] to reject.
+            resolving_funcs_.reject = reject;
 
             // e. Return NormalCompletion(undefined).
             return .undefined;
@@ -337,37 +337,37 @@ pub fn newPromiseCapability(agent: *Agent, constructor_: Value) Agent.Error!Prom
 
     // NOTE: This struct can outlive the function scope if anything holds on to the callback above.
     additional_fields.* = .{
-        .resolving_functions = .{ .resolve = .undefined, .reject = .undefined },
+        .resolving_funcs = .{ .resolve = .undefined, .reject = .undefined },
     };
-    const resolving_functions = &additional_fields.resolving_functions;
+    const resolving_funcs = &additional_fields.resolving_funcs;
 
-    // 6. Let promise be ? Construct(C, « executor »).
-    const promise = try constructor_.asObject().construct(
+    // 6. Let promise be ? Construct(ctor, « executor »).
+    const promise = try ctor.asObject().construct(
         agent,
         &.{Value.from(&executor.object)},
         null,
     );
 
-    // 7. If IsCallable(resolvingFunctions.[[Resolve]]) is false, throw a TypeError exception.
-    if (!resolving_functions.resolve.isCallable()) {
-        return agent.throwException(.type_error, "{f} is not callable", .{resolving_functions.resolve});
+    // 7. If IsCallable(resolvingFuncs.[[Resolve]]) is false, throw a TypeError exception.
+    if (!resolving_funcs.resolve.isCallable()) {
+        return agent.throwException(.type_error, "{f} is not callable", .{resolving_funcs.resolve});
     }
 
-    // 8. If IsCallable(resolvingFunctions.[[Reject]]) is false, throw a TypeError exception.
-    if (!resolving_functions.reject.isCallable()) {
+    // 8. If IsCallable(resolvingFuncs.[[Reject]]) is false, throw a TypeError exception.
+    if (!resolving_funcs.reject.isCallable()) {
         return agent.throwException(
             .type_error,
             "{f} is not callable",
-            .{resolving_functions.reject},
+            .{resolving_funcs.reject},
         );
     }
 
     // 9. Return the PromiseCapability Record { [[Promise]]: promise,
-    //    [[Resolve]]: resolvingFunctions.[[Resolve]], [[Reject]]: resolvingFunctions.[[Reject]] }.
+    //    [[Resolve]]: resolvingFuncs.[[Resolve]], [[Reject]]: resolvingFuncs.[[Reject]] }.
     return .{
         .promise = promise,
-        .resolve = resolving_functions.resolve.asObject(),
-        .reject = resolving_functions.reject.asObject(),
+        .resolve = resolving_funcs.resolve.asObject(),
+        .reject = resolving_funcs.reject.asObject(),
     };
 }
 
@@ -408,17 +408,17 @@ pub fn rejectPromise(
     // 9. Return unused.
 }
 
-/// 27.2.1.8 TriggerPromiseReactions ( reactions, argument )
+/// 27.2.1.8 TriggerPromiseReactions ( reactions, arg )
 /// https://tc39.es/ecma262/#sec-triggerpromisereactions
 pub fn triggerPromiseReactions(
     agent: *Agent,
     reactions: []const PromiseReaction,
-    argument: Value,
+    arg: Value,
 ) std.mem.Allocator.Error!void {
     // 1. For each element reaction of reactions, do
     for (reactions) |reaction| {
-        // a. Let job be NewPromiseReactionJob(reaction, argument).
-        const job = try newPromiseReactionJob(agent, reaction, argument);
+        // a. Let job be NewPromiseReactionJob(reaction, arg).
+        const job = try newPromiseReactionJob(agent, reaction, arg);
 
         // b. Perform HostEnqueuePromiseJob(job.[[Job]], job.[[Realm]]).
         try agent.host_hooks.hostEnqueuePromiseJob(agent, job.job, job.realm);
@@ -427,51 +427,51 @@ pub fn triggerPromiseReactions(
     // 2. Return unused.
 }
 
-/// 27.2.4.7.1 PromiseResolve ( C, x )
+/// 27.2.4.7.1 PromiseResolve ( ctor, resolution )
 /// https://tc39.es/ecma262/#sec-promise-resolve
-pub fn promiseResolve(agent: *Agent, constructor_: *Object, x: Value) Agent.Error!*Object {
-    // 1. If IsPromise(x) is true, then
-    if (x.isPromise()) {
-        // a. Let xConstructor be ? Get(x, "constructor").
-        const x_constructor = try x.asObject().get(agent, PropertyKey.from("constructor"));
+pub fn promiseResolve(agent: *Agent, ctor: *Object, resolution: Value) Agent.Error!*Object {
+    // 1. If IsPromise(resolution) is true, then
+    if (resolution.isPromise()) {
+        // a. Let resolutionCtor be ? Get(resolution, "constructor").
+        const resolution_ctor = try resolution.asObject().get(agent, PropertyKey.from("constructor"));
 
-        // b. If SameValue(xConstructor, C) is true, return x.
-        if (sameValue(x_constructor, Value.from(constructor_))) return x.asObject();
+        // b. If SameValue(resolutionCtor, ctor) is true, return resolution.
+        if (sameValue(resolution_ctor, Value.from(ctor))) return resolution.asObject();
     }
 
-    // 2. Let promiseCapability be ? NewPromiseCapability(C).
-    const promise_capability = try newPromiseCapability(agent, Value.from(constructor_));
+    // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+    const promise_capability = try newPromiseCapability(agent, Value.from(ctor));
 
-    // 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « x »).
-    _ = try Value.from(promise_capability.resolve).callAssumeCallable(agent, .undefined, &.{x});
+    // 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « resolution »).
+    _ = try Value.from(promise_capability.resolve).callAssumeCallable(agent, .undefined, &.{resolution});
 
     // 4. Return promiseCapability.[[Promise]].
     return promise_capability.promise;
 }
 
-/// 27.2.2.1 NewPromiseReactionJob ( reaction, argument )
+/// 27.2.2.1 NewPromiseReactionJob ( reaction, arg )
 /// https://tc39.es/ecma262/#sec-newpromisereactionjob
 pub fn newPromiseReactionJob(
     agent: *Agent,
     reaction: PromiseReaction,
-    argument: Value,
+    arg: Value,
 ) std.mem.Allocator.Error!struct { job: Job, realm: ?*Realm } {
     const Captures = struct {
         agent: *Agent,
         reaction: PromiseReaction,
-        argument: Value,
+        arg: Value,
     };
     const captures = try agent.gc_allocator.create(Captures);
-    captures.* = .{ .agent = agent, .reaction = reaction, .argument = argument };
+    captures.* = .{ .agent = agent, .reaction = reaction, .arg = arg };
 
-    // 1. Let job be a new Job Abstract Closure with no parameters that captures reaction and
-    //    argument and performs the following steps when called:
+    // 1. Let job be a new Job Abstract Closure with no parameters that captures reaction and arg
+    //    and performs the following steps when called:
     const func = struct {
         fn func(captures_ptr: *anyopaque) Agent.Error!Value {
             const captures_: *Captures = @ptrCast(@alignCast(captures_ptr));
             const agent_ = captures_.agent;
             const reaction_ = captures_.reaction;
-            const argument_ = captures_.argument;
+            const arg_ = captures_.arg;
 
             // a. Let promiseCapability be reaction.[[Capability]].
             const maybe_promise_capability = reaction_.capability;
@@ -492,25 +492,25 @@ pub fn newPromiseReactionJob(
                 switch (@"type") {
                     // i. If type is fulfill, then
                     .fulfill => {
-                        // 1. Let handlerResult be NormalCompletion(argument).
-                        break :blk .{ .resolve = argument_ };
+                        // 1. Let handlerResult be NormalCompletion(arg).
+                        break :blk .{ .resolve = arg_ };
                     },
                     // ii. Else,
                     //    1. Assert: type is reject.
                     .reject => {
-                        // 2. Let handlerResult be ThrowCompletion(argument).
-                        break :blk .{ .reject = argument_ };
+                        // 2. Let handlerResult be ThrowCompletion(arg).
+                        break :blk .{ .reject = arg_ };
                     },
                 }
             } else blk: {
                 // e. Else,
                 // i. Let handlerResult be Completion(HostCallJobCallback(handler, undefined,
-                //    « argument »)).
+                //    « arg »)).
                 if (agent_.host_hooks.hostCallJobCallback(
                     agent_,
                     handler.?,
                     .undefined,
-                    &.{argument_},
+                    &.{arg_},
                 )) |value|
                     break :blk .{ .resolve = value }
                 else |err| switch (err) {
@@ -618,18 +618,18 @@ pub fn newPromiseResolveThenableJob(
             const thenable_ = captures_.thenable;
             const then_ = captures_.then;
 
-            // a. Let resolvingFunctions be CreateResolvingFunctions(promiseToResolve).
-            const resolving_functions = try createResolvingFunctions(agent_, promise_to_resolve_);
+            // a. Let resolvingFuncs be CreateResolvingFunctions(promiseToResolve).
+            const resolving_funcs = try createResolvingFunctions(agent_, promise_to_resolve_);
 
             // b. Let thenCallResult be Completion(HostCallJobCallback(then, thenable,
-            //    « resolvingFunctions.[[Resolve]], resolvingFunctions.[[Reject]] »)).
+            //    « resolvingFuncs.[[Resolve]], resolvingFuncs.[[Reject]] »)).
             const then_call_result = agent_.host_hooks.hostCallJobCallback(
                 agent_,
                 then_,
                 Value.from(thenable_),
                 &.{
-                    Value.from(&resolving_functions.resolve.object),
-                    Value.from(&resolving_functions.reject.object),
+                    Value.from(&resolving_funcs.resolve.object),
+                    Value.from(&resolving_funcs.reject.object),
                 },
             ) catch |err| switch (err) {
                 error.OutOfMemory => |e| return e,
@@ -638,9 +638,9 @@ pub fn newPromiseResolveThenableJob(
                 error.ExceptionThrown => {
                     const exception = agent_.clearException();
 
-                    // i. Return ? Call(resolvingFunctions.[[Reject]], undefined,
+                    // i. Return ? Call(resolvingFuncs.[[Reject]], undefined,
                     //    « thenCallResult.[[Value]] »).
-                    return Value.from(&resolving_functions.reject.object).callAssumeCallable(
+                    return Value.from(&resolving_funcs.reject.object).callAssumeCallable(
                         agent_,
                         .undefined,
                         &.{exception.value},
@@ -691,12 +691,12 @@ const RemainingElements = struct {
     value: usize,
 };
 
-/// 27.2.4.1.2 PerformPromiseAll ( iteratorRecord, constructor, resultCapability, promiseResolve )
+/// 27.2.4.1.2 PerformPromiseAll ( iteratorRecord, ctor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiseall
 fn performPromiseAll(
     agent: *Agent,
     iterator: *Iterator,
-    constructor_: *Object,
+    ctor: *Object,
     result_capability: PromiseCapability,
     promise_resolve: *Object,
 ) Agent.Error!*Object {
@@ -742,10 +742,10 @@ fn performPromiseAll(
         // c. Append undefined to values.
         try values.append(agent.gc_allocator, .undefined);
 
-        // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
+        // d. Let nextPromise be ? Call(promiseResolve, ctor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             agent,
-            Value.from(constructor_),
+            Value.from(ctor),
             &.{next},
         );
 
@@ -769,21 +769,21 @@ fn performPromiseAll(
             fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 const value = arguments.get(0);
 
-                // i. Let F be the active function object.
-                const function = agent_.activeFunctionObject();
+                // i. Let activeFunc be the active function object.
+                const active_func = agent_.activeFunctionObject();
 
-                const additional_fields = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
+                const additional_fields = active_func.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const values_ = additional_fields.values;
                 const result_capability_ = additional_fields.result_capability;
                 const remaining_elements_count_ = additional_fields.remaining_elements_count;
 
-                // ii. If F.[[AlreadyCalled]] is true, return undefined.
+                // ii. If activeFunc.[[AlreadyCalled]] is true, return undefined.
                 if (additional_fields.already_called) return .undefined;
 
-                // iii. Set F.[[AlreadyCalled]] to true.
+                // iii. Set activeFunc.[[AlreadyCalled]] to true.
                 additional_fields.already_called = true;
 
-                // iv. Let thisIndex be F.[[Index]].
+                // iv. Let thisIndex be activeFunc.[[Index]].
                 const this_index = additional_fields.index;
 
                 // v. Set values[thisIndex] to value.
@@ -849,12 +849,12 @@ fn performPromiseAll(
     }
 }
 
-/// 27.2.4.2.1 PerformPromiseAllSettled ( iteratorRecord, constructor, resultCapability, promiseResolve )
+/// 27.2.4.2.1 PerformPromiseAllSettled ( iteratorRecord, ctor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiseallsettled
 fn performPromiseAllSettled(
     agent: *Agent,
     iterator: *Iterator,
-    constructor_: *Object,
+    ctor: *Object,
     result_capability: PromiseCapability,
     promise_resolve: *Object,
 ) Agent.Error!*Object {
@@ -900,10 +900,10 @@ fn performPromiseAllSettled(
         // c. Append undefined to values.
         try values.append(agent.gc_allocator, .undefined);
 
-        // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
+        // d. Let nextPromise be ? Call(promiseResolve, ctor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             agent,
-            Value.from(constructor_),
+            Value.from(ctor),
             &.{next},
         );
 
@@ -934,41 +934,41 @@ fn performPromiseAllSettled(
                 const realm = agent_.currentRealm();
                 const value = arguments_.get(0);
 
-                // i. Let F be the active function object.
-                const function = agent_.activeFunctionObject();
+                // i. Let activeFunc be the active function object.
+                const active_func = agent_.activeFunctionObject();
 
-                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
+                const additional_fields_ = active_func.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const values_ = additional_fields_.values;
                 const result_capability_ = additional_fields_.result_capability;
                 const remaining_elements_count_ = additional_fields_.remaining_elements_count;
 
-                // ii. If F.[[AlreadyCalled]].[[Value]] is true, return undefined.
+                // ii. If activeFunc.[[AlreadyCalled]].[[Value]] is true, return undefined.
                 if (additional_fields_.already_called.value) return .undefined;
 
-                // iii. Set F.[[AlreadyCalled]].[[Value]] to true.
+                // iii. Set activeFunc.[[AlreadyCalled]].[[Value]] to true.
                 additional_fields_.already_called.value = true;
 
                 // iv. Let obj be OrdinaryObjectCreate(%Object.prototype%).
-                const object = try ordinaryObjectCreate(
+                const obj = try ordinaryObjectCreate(
                     agent_,
                     try realm.intrinsics.@"%Object.prototype%"(),
                 );
 
                 // v. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
-                try object.createDataPropertyDirect(
+                try obj.createDataPropertyDirect(
                     agent_,
                     PropertyKey.from("status"),
                     Value.from("fulfilled"),
                 );
 
                 // vi. Perform ! CreateDataPropertyOrThrow(obj, "value", value).
-                try object.createDataPropertyDirect(agent_, PropertyKey.from("value"), value);
+                try obj.createDataPropertyDirect(agent_, PropertyKey.from("value"), value);
 
-                // vii. Let thisIndex be F.[[Index]].
+                // vii. Let thisIndex be activeFunc.[[Index]].
                 const this_index = additional_fields_.index;
 
                 // viii. Set values[thisIndex] to obj.
-                values_.items[this_index] = Value.from(object);
+                values_.items[this_index] = Value.from(obj);
 
                 // ix. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
                 remaining_elements_count_.value -= 1;
@@ -1023,41 +1023,41 @@ fn performPromiseAllSettled(
                 const realm = agent_.currentRealm();
                 const @"error" = arguments_.get(0);
 
-                // i. Let F be the active function object.
-                const function = agent_.activeFunctionObject();
+                // i. Let activeFunc be the active function object.
+                const active_func = agent_.activeFunctionObject();
 
-                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
+                const additional_fields_ = active_func.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const values_ = additional_fields_.values;
                 const result_capability_ = additional_fields_.result_capability;
                 const remaining_elements_count_ = additional_fields_.remaining_elements_count;
 
-                // ii. If F.[[AlreadyCalled]].[[Value]] is true, return undefined.
+                // ii. If activeFunc.[[AlreadyCalled]].[[Value]] is true, return undefined.
                 if (additional_fields_.already_called.value) return .undefined;
 
-                // iii. Set F.[[AlreadyCalled]].[[Value]] to true.
+                // iii. Set activeFunc.[[AlreadyCalled]].[[Value]] to true.
                 additional_fields_.already_called.value = true;
 
                 // iv. Let obj be OrdinaryObjectCreate(%Object.prototype%).
-                const object = try ordinaryObjectCreate(
+                const obj = try ordinaryObjectCreate(
                     agent_,
                     try realm.intrinsics.@"%Object.prototype%"(),
                 );
 
                 // v. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
-                try object.createDataPropertyDirect(
+                try obj.createDataPropertyDirect(
                     agent_,
                     PropertyKey.from("status"),
                     Value.from("rejected"),
                 );
 
                 // vi. Perform ! CreateDataPropertyOrThrow(obj, "reason", error).
-                try object.createDataPropertyDirect(agent_, PropertyKey.from("reason"), @"error");
+                try obj.createDataPropertyDirect(agent_, PropertyKey.from("reason"), @"error");
 
-                // vii. Let thisIndex be F.[[Index]].
+                // vii. Let thisIndex be activeFunc.[[Index]].
                 const this_index = additional_fields_.index;
 
                 // viii. Set values[thisIndex] to obj.
-                values_.items[this_index] = Value.from(object);
+                values_.items[this_index] = Value.from(obj);
 
                 // ix. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
                 remaining_elements_count_.value -= 1;
@@ -1119,12 +1119,12 @@ fn performPromiseAllSettled(
     }
 }
 
-/// 27.2.4.3.1 PerformPromiseAny ( iteratorRecord, constructor, resultCapability, promiseResolve )
+/// 27.2.4.3.1 PerformPromiseAny ( iteratorRecord, ctor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiseany
 fn performPromiseAny(
     agent: *Agent,
     iterator: *Iterator,
-    constructor_: *Object,
+    ctor: *Object,
     result_capability: PromiseCapability,
     promise_resolve: *Object,
 ) Agent.Error!*Object {
@@ -1185,10 +1185,10 @@ fn performPromiseAny(
         // c. Append undefined to errors.
         try errors.append(agent.gc_allocator, .undefined);
 
-        // d. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
+        // d. Let nextPromise be ? Call(promiseResolve, ctor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             agent,
-            Value.from(constructor_),
+            Value.from(ctor),
             &.{next},
         );
 
@@ -1212,21 +1212,21 @@ fn performPromiseAny(
             fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                 const @"error" = arguments_.get(0);
 
-                // i. Let F be the active function object.
-                const function = agent_.activeFunctionObject();
+                // i. Let activeFunc be the active function object.
+                const active_func = agent_.activeFunctionObject();
 
-                const additional_fields_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
+                const additional_fields_ = active_func.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
                 const errors_ = additional_fields_.errors;
                 const promise_capability = additional_fields_.result_capability;
                 const remaining_elements_count_ = additional_fields_.remaining_elements_count;
 
-                // ii. If F.[[AlreadyCalled]] is true, return undefined.
+                // ii. If activeFunc.[[AlreadyCalled]] is true, return undefined.
                 if (additional_fields_.already_called) return .undefined;
 
-                // iii. Set F.[[AlreadyCalled]] to true.
+                // iii. Set activeFunc.[[AlreadyCalled]] to true.
                 additional_fields_.already_called = true;
 
-                // iv. Let thisIndex be F.[[Index]].
+                // iv. Let thisIndex be activeFunc.[[Index]].
                 const this_index = additional_fields_.index;
 
                 // v. Set errors[thisIndex] to error.
@@ -1307,12 +1307,12 @@ fn performPromiseAny(
     }
 }
 
-/// 27.2.4.5.1 PerformPromiseRace ( iteratorRecord, constructor, resultCapability, promiseResolve )
+/// 27.2.4.5.1 PerformPromiseRace ( iteratorRecord, ctor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiserace
 fn performPromiseRace(
     agent: *Agent,
     iterator: *Iterator,
-    constructor_: *Object,
+    ctor: *Object,
     result_capability: PromiseCapability,
     promise_resolve: *Object,
 ) Agent.Error!*Object {
@@ -1325,10 +1325,10 @@ fn performPromiseRace(
             return result_capability.promise;
         };
 
-        // c. Let nextPromise be ? Call(promiseResolve, constructor, « next »).
+        // c. Let nextPromise be ? Call(promiseResolve, ctor, « next »).
         const next_promise = try Value.from(promise_resolve).callAssumeCallable(
             agent,
-            Value.from(constructor_),
+            Value.from(ctor),
             &.{next},
         );
 
@@ -1457,7 +1457,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Promise",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -1528,17 +1528,17 @@ pub const constructor = struct {
             },
         );
 
-        // 9. Let resolvingFunctions be CreateResolvingFunctions(promise).
-        const resolving_functions = try createResolvingFunctions(agent, promise);
+        // 9. Let resolvingFuncs be CreateResolvingFunctions(promise).
+        const resolving_funcs = try createResolvingFunctions(agent, promise);
 
-        // 10. Let completion be Completion(Call(executor, undefined,
-        //     « resolvingFunctions.[[Resolve]], resolvingFunctions.[[Reject]] »)).
+        // 10. Let completion be Completion(Call(executor, undefined, « resolvingFuncs.[[Resolve]],
+        //     resolvingFuncs.[[Reject]] »)).
         _ = executor.callAssumeCallable(
             agent,
             .undefined,
             &.{
-                Value.from(&resolving_functions.resolve.object),
-                Value.from(&resolving_functions.reject.object),
+                Value.from(&resolving_funcs.resolve.object),
+                Value.from(&resolving_funcs.reject.object),
             },
         ) catch |err| switch (err) {
             error.OutOfMemory => |e| return e,
@@ -1547,9 +1547,9 @@ pub const constructor = struct {
             error.ExceptionThrown => {
                 const exception = agent.clearException();
 
-                // a. Perform ? Call(resolvingFunctions.[[Reject]], undefined,
+                // a. Perform ? Call(resolvingFuncs.[[Reject]], undefined,
                 //    « completion.[[Value]] »).
-                _ = try Value.from(&resolving_functions.reject.object).callAssumeCallable(
+                _ = try Value.from(&resolving_funcs.reject.object).callAssumeCallable(
                     agent,
                     .undefined,
                     &.{exception.value},
@@ -1566,14 +1566,14 @@ pub const constructor = struct {
     fn all(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
 
-        // 1. Let C be the this value.
-        const constructor_ = this_value;
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
 
-        // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor_);
+        // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
 
-        // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
-        const promise_resolve = getPromiseResolve(agent, constructor_.asObject()) catch |err| {
+        // 3. Let promiseResolve be Completion(GetPromiseResolve(ctor)).
+        const promise_resolve = getPromiseResolve(agent, ctor.asObject()) catch |err| {
             // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -1584,12 +1584,12 @@ pub const constructor = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 7. Let result be Completion(PerformPromiseAll(iteratorRecord, C, promiseCapability,
+        // 7. Let result be Completion(PerformPromiseAll(iteratorRecord, ctor, promiseCapability,
         //    promiseResolve)).
         var result = performPromiseAll(
             agent,
             &iterator,
-            constructor_.asObject(),
+            ctor.asObject(),
             promise_capability,
             promise_resolve,
         );
@@ -1615,14 +1615,14 @@ pub const constructor = struct {
     fn allSettled(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
 
-        // 1. Let C be the this value.
-        const constructor_ = this_value;
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
 
-        // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor_);
+        // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
 
-        // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
-        const promise_resolve = getPromiseResolve(agent, constructor_.asObject()) catch |err| {
+        // 3. Let promiseResolve be Completion(GetPromiseResolve(ctor)).
+        const promise_resolve = getPromiseResolve(agent, ctor.asObject()) catch |err| {
             // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -1633,12 +1633,12 @@ pub const constructor = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 7. Let result be Completion(PerformPromiseAllSettled(iteratorRecord, C,
+        // 7. Let result be Completion(PerformPromiseAllSettled(iteratorRecord, ctor,
         //    promiseCapability, promiseResolve)).
         var result = performPromiseAllSettled(
             agent,
             &iterator,
-            constructor_.asObject(),
+            ctor.asObject(),
             promise_capability,
             promise_resolve,
         );
@@ -1664,14 +1664,14 @@ pub const constructor = struct {
     fn any(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
 
-        // 1. Let C be the this value.
-        const constructor_ = this_value;
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
 
-        // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor_);
+        // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
 
-        // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
-        const promise_resolve = getPromiseResolve(agent, constructor_.asObject()) catch |err| {
+        // 3. Let promiseResolve be Completion(GetPromiseResolve(ctor)).
+        const promise_resolve = getPromiseResolve(agent, ctor.asObject()) catch |err| {
             // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -1682,12 +1682,12 @@ pub const constructor = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 7. Let result be Completion(PerformPromiseAny(iteratorRecord, C, promiseCapability,
+        // 7. Let result be Completion(PerformPromiseAny(iteratorRecord, ctor, promiseCapability,
         //    promiseResolve)).
         var result = performPromiseAny(
             agent,
             &iterator,
-            constructor_.asObject(),
+            ctor.asObject(),
             promise_capability,
             promise_resolve,
         );
@@ -1713,14 +1713,14 @@ pub const constructor = struct {
     fn race(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
 
-        // 1. Let C be the this value.
-        const constructor_ = this_value;
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
 
-        // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor_);
+        // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
 
-        // 3. Let promiseResolve be Completion(GetPromiseResolve(C)).
-        const promise_resolve = getPromiseResolve(agent, constructor_.asObject()) catch |err| {
+        // 3. Let promiseResolve be Completion(GetPromiseResolve(ctor)).
+        const promise_resolve = getPromiseResolve(agent, ctor.asObject()) catch |err| {
             // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
@@ -1731,12 +1731,12 @@ pub const constructor = struct {
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };
 
-        // 7. Let result be Completion(PerformPromiseRace(iteratorRecord, C, promiseCapability,
+        // 7. Let result be Completion(PerformPromiseRace(iteratorRecord, ctor, promiseCapability,
         //    promiseResolve)).
         var result = performPromiseRace(
             agent,
             &iterator,
-            constructor_.asObject(),
+            ctor.asObject(),
             promise_capability,
             promise_resolve,
         );
@@ -1757,39 +1757,39 @@ pub const constructor = struct {
         return Value.from(result catch unreachable);
     }
 
-    /// 27.2.4.6 Promise.reject ( r )
+    /// 27.2.4.6 Promise.reject ( reason )
     /// https://tc39.es/ecma262/#sec-promise.reject
     fn reject(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const reason = arguments.get(0);
 
-        // 1. Let C be the this value.
-        const constructor_ = this_value;
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
 
-        // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor_);
+        // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
 
-        // 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « r »).
+        // 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « reason »).
         _ = try Value.from(promise_capability.reject).call(agent, .undefined, &.{reason});
 
         // 4. Return promiseCapability.[[Promise]].
         return Value.from(promise_capability.promise);
     }
 
-    /// 27.2.4.7 Promise.resolve ( x )
+    /// 27.2.4.7 Promise.resolve ( resolution )
     /// https://tc39.es/ecma262/#sec-promise.resolve
     fn resolve(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const resolution = arguments.get(0);
 
-        // 1. Let C be the this value.
-        const constructor_ = this_value;
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
 
-        // 2. If C is not an Object, throw a TypeError exception.
-        if (!constructor_.isObject()) {
-            return agent.throwException(.type_error, "{f} is not an Object", .{constructor_});
+        // 2. If ctor is not an Object, throw a TypeError exception.
+        if (!ctor.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{ctor});
         }
 
-        // 3. Return ? PromiseResolve(C, x).
-        return Value.from(try promiseResolve(agent, constructor_.asObject(), resolution));
+        // 3. Return ? PromiseResolve(ctor, resolution).
+        return Value.from(try promiseResolve(agent, ctor.asObject(), resolution));
     }
 
     /// 27.2.4.8 Promise.try ( callback, ...args )
@@ -1798,16 +1798,16 @@ pub const constructor = struct {
         const callback = arguments.get(0);
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
-        // 1. Let C be the this value.
-        const constructor_ = this_value;
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
 
-        // 2. If C is not an Object, throw a TypeError exception.
-        if (!constructor_.isObject()) {
-            return agent.throwException(.type_error, "{f} is not an Object", .{constructor_});
+        // 2. If ctor is not an Object, throw a TypeError exception.
+        if (!ctor.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{ctor});
         }
 
-        // 3. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor_);
+        // 3. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
 
         // 4. Let status be Completion(Call(callback, undefined, args)).
         const status = callback.call(agent, .undefined, args);
@@ -1843,41 +1843,41 @@ pub const constructor = struct {
     fn withResolvers(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
-        // 1. Let C be the this value.
-        const constructor_ = this_value;
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
 
-        // 2. Let promiseCapability be ? NewPromiseCapability(C).
-        const promise_capability = try newPromiseCapability(agent, constructor_);
+        // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
 
         // 3. Let obj be OrdinaryObjectCreate(%Object.prototype%).
-        const object = try ordinaryObjectCreate(
+        const obj = try ordinaryObjectCreate(
             agent,
             try realm.intrinsics.@"%Object.prototype%"(),
         );
 
         // 4. Perform ! CreateDataPropertyOrThrow(obj, "promise", promiseCapability.[[Promise]]).
-        try object.createDataPropertyDirect(
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("promise"),
             Value.from(promise_capability.promise),
         );
 
         // 5. Perform ! CreateDataPropertyOrThrow(obj, "resolve", promiseCapability.[[Resolve]]).
-        try object.createDataPropertyDirect(
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("resolve"),
             Value.from(promise_capability.resolve),
         );
 
         // 6. Perform ! CreateDataPropertyOrThrow(obj, "reject", promiseCapability.[[Reject]]).
-        try object.createDataPropertyDirect(
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("reject"),
             Value.from(promise_capability.reject),
         );
 
         // 7. Return obj.
-        return Value.from(object);
+        return Value.from(obj);
     }
 
     /// 27.2.4.10 get Promise [ %Symbol.species% ]
@@ -1948,14 +1948,14 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not an Object", .{promise});
         }
 
-        // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
-        const constructor_ = try promise.asObject().speciesConstructor(
+        // 3. Let ctor be ? SpeciesConstructor(promise, %Promise%).
+        const ctor = try promise.asObject().speciesConstructor(
             agent,
             try realm.intrinsics.@"%Promise%"(),
         );
 
-        // 4. Assert: IsConstructor(C) is true.
-        std.debug.assert(Value.from(constructor_).isConstructor());
+        // 4. Assert: IsConstructor(ctor) is true.
+        std.debug.assert(Value.from(ctor).isConstructor());
 
         var then_finally: Value = undefined;
         var catch_finally: Value = undefined;
@@ -1971,26 +1971,26 @@ pub const prototype = struct {
             // 6. Else,
             const Captures = struct {
                 on_finally: Value,
-                constructor: *Object,
+                ctor: *Object,
             };
             const captures = try agent.gc_allocator.create(Captures);
-            captures.* = .{ .on_finally = on_finally, .constructor = constructor_ };
+            captures.* = .{ .on_finally = on_finally, .ctor = ctor };
 
             // a. Let thenFinallyClosure be a new Abstract Closure with parameters (value) that
-            //    captures onFinally and C and performs the following steps when called:
+            //    captures onFinally and ctor and performs the following steps when called:
             const then_finally_closure = struct {
                 fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
                     const on_finally_ = captures_.on_finally;
-                    const constructor__ = captures_.constructor;
+                    const ctor_ = captures_.ctor;
                     const value = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
                     const result = try on_finally_.callAssumeCallable(agent_, .undefined, &.{});
 
-                    // ii. Let p be ? PromiseResolve(C, result).
-                    const new_promise = try promiseResolve(agent_, constructor__, result);
+                    // ii. Let p be ? PromiseResolve(ctor, result).
+                    const new_promise = try promiseResolve(agent_, ctor_, result);
 
                     const value_capture = try agent_.gc_allocator.create(Value);
                     value_capture.* = value;
@@ -2036,20 +2036,20 @@ pub const prototype = struct {
             then_finally = Value.from(&then_finally_function.object);
 
             // c. Let catchFinallyClosure be a new Abstract Closure with parameters (reason) that
-            //    captures onFinally and C and performs the following steps when called:
+            //    captures onFinally and ctor and performs the following steps when called:
             const catch_finally_closure = struct {
                 fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
                     const on_finally_ = captures_.on_finally;
-                    const constructor__ = captures_.constructor;
+                    const ctor_ = captures_.ctor;
                     const reason = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
                     const result = try on_finally_.callAssumeCallable(agent_, .undefined, &.{});
 
-                    // ii. Let p be ? PromiseResolve(C, result).
-                    const new_promise = try promiseResolve(agent_, constructor__, result);
+                    // ii. Let p be ? PromiseResolve(ctor, result).
+                    const new_promise = try promiseResolve(agent_, ctor_, result);
 
                     const reason_capture = try agent_.gc_allocator.create(Value);
                     reason_capture.* = reason;
@@ -2118,14 +2118,14 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not a Promise", .{promise});
         }
 
-        // 3. Let C be ? SpeciesConstructor(promise, %Promise%).
-        const constructor_ = try promise.asObject().speciesConstructor(
+        // 3. Let ctor be ? SpeciesConstructor(promise, %Promise%).
+        const ctor = try promise.asObject().speciesConstructor(
             agent,
             try realm.intrinsics.@"%Promise%"(),
         );
 
-        // 4. Let resultCapability be ? NewPromiseCapability(C).
-        const result_capability = try newPromiseCapability(agent, Value.from(constructor_));
+        // 4. Let resultCapability be ? NewPromiseCapability(ctor).
+        const result_capability = try newPromiseCapability(agent, Value.from(ctor));
 
         // 5. Return PerformPromiseThen(promise, onFulfilled, onRejected, resultCapability).
         return Value.from(

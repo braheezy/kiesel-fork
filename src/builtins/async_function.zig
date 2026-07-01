@@ -33,7 +33,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "AsyncFunction",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function%"() },
         );
         return &builtin_function.object;
     }
@@ -49,25 +49,25 @@ pub const constructor = struct {
         );
     }
 
-    /// 27.7.1.1 AsyncFunction ( ...parameterArgs, bodyArg )
+    /// 27.7.1.1 AsyncFunction ( ...paramArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-async-function-constructor-arguments
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
-        const parameter_args = arguments.values[0..arguments.count() -| 1];
+        const param_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
-        // 1. Let C be the active function object.
-        const constructor_ = agent.activeFunctionObject();
+        // 1. Let activeFunc be the active function object.
+        const active_func = agent.activeFunctionObject();
 
         // 2. If bodyArg is not present, set bodyArg to the empty String.
         const body_arg = maybe_body_arg orelse Value.from("");
 
-        // 3. Return ? CreateDynamicFunction(C, NewTarget, async, parameterArgs, bodyArg).
+        // 3. Return ? CreateDynamicFunction(activeFunc, NewTarget, async, paramArgs, bodyArg).
         const ecmascript_function = try createDynamicFunction(
             agent,
-            constructor_,
+            active_func,
             new_target,
             .async,
-            parameter_args,
+            param_args,
             body_arg,
         );
         return Value.from(&ecmascript_function.object);
@@ -110,7 +110,7 @@ pub const prototype = struct {
     }
 };
 
-/// 27.7.5.1 AsyncFunctionStart ( promiseCapability, asyncFunctionBody )
+/// 27.7.5.1 AsyncFunctionStart ( promiseCapability, asyncFuncBody )
 /// https://tc39.es/ecma262/#sec-async-functions-abstract-operations-async-function-start
 pub fn asyncFunctionStart(
     agent: *Agent,
@@ -126,7 +126,7 @@ pub fn asyncFunctionStart(
     const async_context = try agent.gc_allocator.create(ExecutionContext);
     async_context.* = running_context.*;
 
-    // 4. Perform AsyncBlockStart(promiseCapability, asyncFunctionBody, asyncContext).
+    // 4. Perform AsyncBlockStart(promiseCapability, asyncFuncBody, asyncContext).
     try asyncBlockStart(
         agent,
         promise_capability,
@@ -262,15 +262,15 @@ pub fn asyncBlockStart(
     // 6. Return unused.
 }
 
-/// 27.7.5.3 Await ( value )
+/// 27.7.5.3 Await ( arg )
 /// https://tc39.es/ecma262/#await
-pub fn await(agent: *Agent, value: Value) Agent.Error!Value {
+pub fn await(agent: *Agent, arg: Value) Agent.Error!Value {
     const realm = agent.currentRealm();
     // 1. Let asyncContext be the running execution context.
     const async_context = agent.runningExecutionContext();
 
-    // 2. Let promise be ? PromiseResolve(%Promise%, value).
-    const promise_object = try promiseResolve(agent, try realm.intrinsics.@"%Promise%"(), value);
+    // 2. Let promise be ? PromiseResolve(%Promise%, arg).
+    const promise_object = try promiseResolve(agent, try realm.intrinsics.@"%Promise%"(), arg);
     const promise = promise_object.as(builtins.Promise);
 
     const Captures = struct {

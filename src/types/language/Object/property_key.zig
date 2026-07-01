@@ -74,7 +74,7 @@ pub const PropertyKey = union(enum) {
         return self == .string and self.string.eql(String.fromLiteral("length"));
     }
 
-    /// 7.1.22 CanonicalNumericIndexString ( argument )
+    /// 7.1.22 CanonicalNumericIndexString ( arg )
     /// https://tc39.es/ecma262/#sec-canonicalnumericindexstring
     pub fn canonicalNumericIndex(
         self: PropertyKey,
@@ -86,9 +86,9 @@ pub const PropertyKey = union(enum) {
             .symbol => return null,
             .integer_index => |integer_index| return .{ .integer_index = integer_index },
             .string => |string| {
-                // 1. If argument is "-0", return -0𝔽.
-                // 2. Let n be ! ToNumber(argument).
-                // 3. If ! ToString(n) is argument, return n.
+                // 1. If arg is "-0", return -0𝔽.
+                // 2. Let n be ! ToNumber(arg).
+                // 3. If ! ToString(n) is arg, return n.
                 // 4. Return undefined.
                 const ascii = switch (string.asAsciiOrUtf16()) {
                     .ascii => |ascii| ascii,

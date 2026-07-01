@@ -167,11 +167,11 @@ pub const namespace = struct {
     fn getCanonicalLocales(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const locales = arguments.get(0);
 
-        // 1. Let ll be ? CanonicalizeLocaleList(locales).
+        // 1. Let localeList be ? CanonicalizeLocaleList(locales).
         var locale_list = try canonicalizeLocaleList(agent, locales);
         defer locale_list.deinit(agent.gc_allocator);
 
-        // 2. Return CreateArrayFromList(ll).
+        // 2. Return CreateArrayFromList(localeList).
         const array = try createArrayFromListMapToValue(agent, icu4zig.Locale, locale_list.items, struct {
             fn mapFn(agent_: *Agent, locale_: icu4zig.Locale) std.mem.Allocator.Error!Value {
                 return Value.from(

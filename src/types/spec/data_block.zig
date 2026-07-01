@@ -45,17 +45,17 @@ pub fn createByteDataBlock(agent: *Agent, size: ByteLength) Agent.Error!DataBloc
         return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
 
-    // 2. Let db be a new Data Block value consisting of size bytes. If it is impossible to create
-    //    such a Data Block, throw a RangeError exception.
+    // 2. Let dataBlock be a new Data Block value consisting of size bytes. If it is impossible to
+    //    create such a Data Block, throw a RangeError exception.
     const bytes = agent.gc_allocator.alloc(u8, size_casted) catch {
         return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
     const data_block: DataBlock = .{ .bytes = bytes, .shared = false };
 
-    // 3. Set all of the bytes of db to 0.
+    // 3. Set all of the bytes of dataBlock to 0.
     @memset(data_block.bytes, 0);
 
-    // 4. Return db.
+    // 4. Return dataBlock.
     return data_block;
 }
 
@@ -72,25 +72,25 @@ pub fn createSharedByteDataBlock(agent: *Agent, size: ByteLength) Agent.Error!Da
         return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
 
-    // 1. Let db be a new Shared Data Block value consisting of size bytes. If it is impossible to
-    //    create such a Shared Data Block, throw a RangeError exception.
+    // 1. Let dataBlock be a new Shared Data Block value consisting of size bytes. If it is
+    //    impossible to create such a Shared Data Block, throw a RangeError exception.
     const bytes = agent.gc_allocator.alloc(u8, size_casted) catch {
         return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
     const data_block: DataBlock = .{ .bytes = bytes, .shared = true };
 
-    // 2. Let AR be the Agent Record of the surrounding agent.
-    // 3. Let execution be AR.[[CandidateExecution]].
+    // 2. Let agentRecord be the Agent Record of the surrounding agent.
+    // 3. Let execution be agentRecord.[[CandidateExecution]].
     // 4. Let eventsRecord be the Agent Events Record of execution.[[EventsRecords]] whose
     //    [[AgentSignifier]] is AgentSignifier().
     // 5. Let zero be « 0 ».
-    // 6. For each index i of db, do
-    //     a. Append WriteSharedMemory { [[Order]]: init, [[NoTear]]: true, [[Block]]: db,
-    //        [[ByteIndex]]: i, [[ElementSize]]: 1, [[Payload]]: zero } to
+    // 6. For each index index of dataBlock, do
+    //     a. Append WriteSharedMemory { [[Order]]: init, [[NoTear]]: true, [[Block]]: dataBlock,
+    //        [[ByteIndex]]: index, [[ElementSize]]: 1, [[Payload]]: zero } to
     //        eventsRecord.[[EventList]].
     @memset(data_block.bytes, 0);
 
-    // 7. Return db.
+    // 7. Return dataBlock.
     return data_block;
 }
 

@@ -48,7 +48,7 @@ hostCallJobCallback: *const fn (
     agent: *Agent,
     job_callback: Job.Callback,
     this_value: Value,
-    arguments_list: []const Value,
+    arg_list: []const Value,
 ) Agent.Error!Value = default_host_hooks.hostCallJobCallback,
 hostEnqueueFinalizationRegistryCleanupJob: *const fn (
     agent: *Agent,
@@ -66,7 +66,7 @@ hostEnqueuePromiseJob: *const fn (
 ) std.mem.Allocator.Error!void = default_host_hooks.hostEnqueuePromiseJob,
 hostEnsureCanAddPrivateElement: *const fn (
     agent: *Agent,
-    object: *Object,
+    obj: *Object,
 ) Agent.Error!void = default_host_hooks.hostEnsureCanAddPrivateElement,
 hostEnsureCanCompileStrings: *const fn (
     callee_realm: *Realm,

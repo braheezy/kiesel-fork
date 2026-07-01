@@ -33,7 +33,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "DurationFormat",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -110,14 +110,14 @@ pub const constructor = struct {
         // 4. Set options to optionsResolution.[[Options]].
         const options = options_resolution.options;
 
-        // 5. Let r be optionsResolution.[[ResolvedLocale]].
-        const r = options_resolution.resolved_locale;
-        const locale = r.locale;
+        // 5. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+        const resolved_locale = options_resolution.resolved_locale;
+        const locale = resolved_locale.locale;
 
-        // 6. Set durationFormat.[[Locale]] to r.[[Locale]].
+        // 6. Set durationFormat.[[Locale]] to resolvedLocale.[[Locale]].
         duration_format.fields.locale = locale;
 
-        // TODO: 7. Let resolvedLocaleData be r.[[LocaleData]].
+        // TODO: 7. Let resolvedLocaleData be resolvedLocale.[[LocaleData]].
         // 8. Let digitalFormat be resolvedLocaleData.[[DigitalFormat]].
         const digital_format = .{
             .hour_minute_separator = ':',
@@ -132,11 +132,11 @@ pub const constructor = struct {
         //     digitalFormat.[[MinuteSecondSeparator]].
         duration_format.fields.minute_second_separator = digital_format.minute_second_separator;
 
-        // 11. Set durationFormat.[[NumberingSystem]] to r.[[nu]].
+        // 11. Set durationFormat.[[NumberingSystem]] to resolvedLocale.[[nu]].
         const numbering_system = if (try locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
             try String.fromAscii(agent, nu)
         else
-            r.options.nu orelse String.fromLiteral("latn");
+            resolved_locale.options.nu orelse String.fromLiteral("latn");
         duration_format.fields.numbering_system = numbering_system;
 
         // 12. Let style be ? GetOption(options, "style", string, « "long", "short", "narrow",
@@ -403,28 +403,29 @@ pub const prototype = struct {
         );
 
         // 4. For each row of Table 21, except the header row, in table order, do
-        //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of df's internal slot whose name is the Internal Slot value of
-        //        the current row.
-        //     c. If v is not undefined, then
+        //     a. Let propertyKey be the Property value of the current row.
+        //     b. Let value be the value of df's internal slot whose name is the Internal Slot value
+        //        of the current row.
+        //     c. If value is not undefined, then
         //         i. If there is a Conversion value in the current row, let conversion be that
         //            value; else let conversion be empty.
         //         ii. If conversion is number, then
-        //             1. Set v to 𝔽(v).
+        //             1. Set value to 𝔽(value).
         //         iii. Else if conversion is not empty, then
-        //             1. Assert: conversion is style+display and v is a Duration Unit Options
+        //             1. Assert: conversion is style+display and value is a Duration Unit Options
         //                Record.
-        //             2. NOTE: v.[[Style]] will be represented with a property named p (a plural
-        //                Temporal unit), then v.[[Display]] will be represented with a property
-        //                whose name suffixes p with "Display".
-        //             3. Let style be v.[[Style]].
+        //             2. NOTE: value.[[Style]] will be represented with a property named
+        //                propertyKey (a plural Temporal unit), then value.[[Display]] will be
+        //                represented with a property whose name suffixes propertyKey with
+        //                "Display".
+        //             3. Let style be value.[[Style]].
         //             4. If style is "fractional", then
-        //                 a. Assert: IsFractionalSecondUnitName(p) is true.
+        //                 a. Assert: IsFractionalSecondUnitName(propertyKey) is true.
         //                 b. Set style to "numeric".
-        //             5. Perform ! CreateDataPropertyOrThrow(options, p, style).
-        //             6. Set p to the string-concatenation of p and "Display".
-        //             7. Set v to v.[[Display]].
-        //         iv. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //             5. Perform ! CreateDataPropertyOrThrow(options, propertyKey, style).
+        //             6. Set propertyKey to the string-concatenation of propertyKey and "Display".
+        //             7. Set value to value.[[Display]].
+        //         iv. Perform ! CreateDataPropertyOrThrow(options, propertyKey, value).
         const resolved_options = duration_format.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,
@@ -988,15 +989,15 @@ const Duration = struct {
     }
 };
 
-/// 13.5.2 ToIntegerIfIntegral ( argument )
+/// 13.5.2 ToIntegerIfIntegral ( arg )
 /// https://tc39.es/ecma402/#sec-tointegerifintegral
-fn toIntegerIfIntegral(agent: *Agent, argument: Value) Agent.Error!f64 {
-    // 1. Let number be ? ToNumber(argument).
-    const number = try argument.toNumber(agent);
+fn toIntegerIfIntegral(agent: *Agent, arg: Value) Agent.Error!f64 {
+    // 1. Let number be ? ToNumber(arg).
+    const number = try arg.toNumber(agent);
 
     // 2. If number is not an integral Number, throw a RangeError exception.
     if (!number.isIntegral()) {
-        return agent.throwException(.range_error, "{f} is not an integral number", .{argument});
+        return agent.throwException(.range_error, "{f} is not an integral number", .{arg});
     }
 
     // 3. Return ℝ(number).

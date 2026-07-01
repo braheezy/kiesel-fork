@@ -502,19 +502,19 @@ pub fn substring(
 /// 6.1.4.1 StringIndexOf ( string, searchValue, fromIndex )
 /// https://tc39.es/ecma262/#sec-stringindexof
 pub fn indexOf(self: *const String, search_value: *const String, from_index: u32) ?u32 {
-    // 1. Let len be the length of string.
-    const len = self.length;
-    const search_len = search_value.length;
+    // 1. Let length be the length of string.
+    const length = self.length;
+    const search_length = search_value.length;
 
-    // 2. If searchValue is the empty String and fromIndex ≤ len, return fromIndex.
-    if (search_value.isEmpty() and from_index <= len) return from_index;
+    // 2. If searchValue is the empty String and fromIndex ≤ length, return fromIndex.
+    if (search_value.isEmpty() and from_index <= length) return from_index;
 
-    // 3. Let searchLen be the length of searchValue.
-    // 4. For each integer i such that fromIndex ≤ i ≤ len - searchLen, in ascending order, do
-    //     a. Let candidate be the substring of string from i to i + searchLen.
+    // 3. Let searchLength be the length of searchValue.
+    // 4. For each integer i such that fromIndex ≤ i ≤ length - searchLength, in ascending order, do
+    //     a. Let candidate be the substring of string from i to i + searchLength.
     //     b. If candidate is searchValue, return i.
     // 5. Return not-found.
-    if (from_index >= len or search_len > len) return null;
+    if (from_index >= length or search_length > length) return null;
     if (self.isAscii() and search_value.isAscii()) {
         return if (std.mem.find(
             u8,
@@ -536,9 +536,9 @@ pub fn indexOf(self: *const String, search_value: *const String, from_index: u32
             null;
     }
     var i: u32 = from_index;
-    const end = len - search_len;
+    const end = length - search_length;
     outer: while (i <= end) : (i += 1) {
-        for (0..search_len) |n| {
+        for (0..search_length) |n| {
             if (self.codeUnitAt(i + @as(u32, @intCast(n))) != search_value.codeUnitAt(@intCast(n))) continue :outer;
         }
         return i;
@@ -549,21 +549,21 @@ pub fn indexOf(self: *const String, search_value: *const String, from_index: u32
 /// 6.1.4.2 StringLastIndexOf ( string, searchValue, fromIndex )
 /// https://tc39.es/ecma262/#sec-stringlastindexof
 pub fn lastIndexOf(self: *const String, search_value: *const String, from_index: u32) ?u32 {
-    // 1. Let len be the length of string.
-    const len = self.length;
+    // 1. Let length be the length of string.
+    const length = self.length;
 
-    // 2. Let searchLen be the length of searchValue.
-    const search_len = search_value.length;
+    // 2. Let searchLength be the length of searchValue.
+    const search_length = search_value.length;
 
-    // 3. Assert: fromIndex + searchLen ≤ len.
+    // 3. Assert: fromIndex + searchLength ≤ length.
     // 4. For each integer i such that 0 ≤ i ≤ fromIndex, in descending order, do
-    //     a. Let candidate be the substring of string from i to i + searchLen.
+    //     a. Let candidate be the substring of string from i to i + searchLength.
     //     b. If candidate is searchValue, return i.
     // 5. Return not-found.
-    if (search_value.isEmpty() and from_index <= len) return from_index;
-    if (from_index >= len or search_len > len) return null;
+    if (search_value.isEmpty() and from_index <= length) return from_index;
+    if (from_index >= length or search_length > length) return null;
     if (self.isAscii() and search_value.isAscii()) {
-        const end = std.math.clamp(from_index + search_len, 0, len);
+        const end = std.math.clamp(from_index + search_length, 0, length);
         return if (std.mem.lastIndexOf(
             u8,
             self.asAscii()[0..end],
@@ -574,7 +574,7 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
             null;
     }
     if (self.isUtf16() and search_value.isUtf16()) {
-        const end = std.math.clamp(from_index + search_len, 0, len);
+        const end = std.math.clamp(from_index + search_length, 0, length);
         return if (std.mem.lastIndexOf(
             u16,
             self.asUtf16()[0..end],
@@ -584,9 +584,9 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
         else
             null;
     }
-    var i = std.math.sub(u32, len - search_len, from_index) catch return null;
+    var i = std.math.sub(u32, length - search_length, from_index) catch return null;
     outer: while (true) : (i -= 1) {
-        for (0..search_len) |n| {
+        for (0..search_length) |n| {
             if (self.codeUnitAt(i + @as(u32, @intCast(n))) != search_value.codeUnitAt(@intCast(n))) continue :outer;
         }
         return i;
@@ -598,21 +598,21 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
 pub fn isWellFormedUnicode(self: *const String) bool {
     if (self.isAscii()) return true;
 
-    // 1. Let len be the length of string.
-    const len = self.length;
+    // 1. Let length be the length of string.
+    const length = self.length;
 
     // 2. Let k be 0.
     var k: u32 = 0;
 
-    // 3. Repeat, while k < len,
-    while (k < len) {
-        // a. Let cp be CodePointAt(string, k).
+    // 3. Repeat, while k < length,
+    while (k < length) {
+        // a. Let codePoint be CodePointAt(string, k).
         const code_point = self.codePointAt(k);
 
-        // b. If cp.[[IsUnpairedSurrogate]] is true, return false.
+        // b. If codePoint.[[IsUnpairedSurrogate]] is true, return false.
         if (code_point.is_unpaired_surrogate) return false;
 
-        // c. Set k to k + cp.[[CodeUnitCount]].
+        // c. Set k to k + codePoint.[[CodeUnitCount]].
         k += code_point.code_unit_count;
     }
 
@@ -643,19 +643,19 @@ pub fn codePointAt(self: *const String, position: u32) CodePoint {
             // 3. Let first be the code unit at index position within string.
             const first = utf16[position];
 
-            // 4. Let cp be the code point whose numeric value is the numeric value of first.
+            // 4. Let codePoint be the code point whose numeric value is the numeric value of first.
             var code_point: u21 = first;
 
             // 5. If first is neither a leading surrogate nor a trailing surrogate, then
             if (!std.unicode.utf16IsHighSurrogate(first) and !std.unicode.utf16IsLowSurrogate(first)) {
-                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1,
+                // a. Return the Record { [[CodePoint]]: codePoint, [[CodeUnitCount]]: 1,
                 //    [[IsUnpairedSurrogate]]: false }.
                 return .{ .code_point = code_point, .code_unit_count = 1, .is_unpaired_surrogate = false };
             }
 
             // 6. If first is a trailing surrogate or position + 1 = size, then
             if (std.unicode.utf16IsLowSurrogate(first) or position + 1 == size) {
-                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1,
+                // a. Return the Record { [[CodePoint]]: codePoint, [[CodeUnitCount]]: 1,
                 //    [[IsUnpairedSurrogate]]: true }.
                 return .{ .code_point = code_point, .code_unit_count = 1, .is_unpaired_surrogate = true };
             }
@@ -665,15 +665,15 @@ pub fn codePointAt(self: *const String, position: u32) CodePoint {
 
             // 8. If second is not a trailing surrogate, then
             if (!std.unicode.utf16IsLowSurrogate(second)) {
-                // a. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 1,
+                // a. Return the Record { [[CodePoint]]: codePoint, [[CodeUnitCount]]: 1,
                 //    [[IsUnpairedSurrogate]]: true }.
                 return .{ .code_point = code_point, .code_unit_count = 1, .is_unpaired_surrogate = true };
             }
 
-            // 9. Set cp to UTF16SurrogatePairToCodePoint(first, second).
+            // 9. Set codePoint to UTF16SurrogatePairToCodePoint(first, second).
             code_point = std.unicode.utf16DecodeSurrogatePair(&.{ first, second }) catch unreachable;
 
-            // 10. Return the Record { [[CodePoint]]: cp, [[CodeUnitCount]]: 2,
+            // 10. Return the Record { [[CodePoint]]: codePoint, [[CodeUnitCount]]: 2,
             //     [[IsUnpairedSurrogate]]: false }.
             return .{ .code_point = code_point, .code_unit_count = 2, .is_unpaired_surrogate = false };
         },

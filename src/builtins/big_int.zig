@@ -26,7 +26,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "BigInt",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -55,13 +55,13 @@ pub const constructor = struct {
             return agent.throwException(.type_error, "BigInt is not a constructor", .{});
         }
 
-        // 2. Let prim be ? ToPrimitive(value, number).
+        // 2. Let primitive be ? ToPrimitive(value, number).
         const primitive = try value.toPrimitive(agent, .number);
 
-        // 3. If prim is a Number, return ? NumberToBigInt(prim).
+        // 3. If primitive is a Number, return ? NumberToBigInt(primitive).
         if (primitive.isNumber()) return Value.from(try numberToBigInt(agent, primitive.asNumber()));
 
-        // 4. Return ? ToBigInt(prim).
+        // 4. Return ? ToBigInt(primitive).
         return Value.from(try primitive.toBigInt(agent));
     }
 
@@ -77,9 +77,9 @@ pub const constructor = struct {
         // 2. Set bigint to ? ToBigInt(bigint).
         const big_int = try big_int_value.toBigInt(agent);
 
-        // 3. Let mod be ℝ(bigint) modulo 2**bits.
-        // 4. If mod ≥ 2**(bits - 1), return ℤ(mod - 2**bits).
-        // 5. Return ℤ(mod).
+        // 3. Let remainder be ℝ(bigint) modulo 2**bits.
+        // 4. If remainder ≥ 2**(bits - 1), return ℤ(remainder - 2**bits).
+        // 5. Return ℤ(remainder).
         var result = try std.math.big.int.Managed.init(agent.gc_allocator);
         try result.truncate(&big_int.managed, .signed, @intCast(bits));
         return Value.from(try types.BigInt.fromManaged(agent, result));
@@ -157,16 +157,16 @@ pub const prototype = struct {
         );
     }
 
-    /// 21.2.3.4.1 ThisBigIntValue ( value )
+    /// 21.2.3.4.1 ThisBigIntValue ( arg )
     /// https://tc39.es/ecma262/#sec-thisbigintvalue
-    fn thisBigIntValue(agent: *Agent, value: Value) error{ExceptionThrown}!*const types.BigInt {
-        // 1. If value is a BigInt, return value.
-        if (value.isBigInt()) return value.asBigInt();
+    fn thisBigIntValue(agent: *Agent, arg: Value) error{ExceptionThrown}!*const types.BigInt {
+        // 1. If arg is a BigInt, return arg.
+        if (arg.isBigInt()) return arg.asBigInt();
 
-        // 2. If value is an Object and value has a [[BigIntData]] internal slot, then
-        if (value.castObject(BigInt)) |big_int| {
-            // a. Assert: value.[[BigIntData]] is a BigInt.
-            // b. Return value.[[BigIntData]].
+        // 2. If arg is an Object and arg has a [[BigIntData]] internal slot, then
+        if (arg.castObject(BigInt)) |big_int| {
+            // a. Assert: arg.[[BigIntData]] is a BigInt.
+            // b. Return arg.[[BigIntData]].
             return big_int.fields.big_int_data;
         }
 

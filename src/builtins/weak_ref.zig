@@ -28,7 +28,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "WeakRef",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }

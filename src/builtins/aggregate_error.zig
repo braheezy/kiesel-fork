@@ -31,7 +31,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "AggregateError",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Error%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Error%"() },
         );
         return &builtin_function.object;
     }
@@ -58,7 +58,7 @@ pub const constructor = struct {
         //    newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
-        // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%AggregateError.prototype%",
+        // 2. Let obj be ? OrdinaryCreateFromConstructor(newTarget, "%AggregateError.prototype%",
         //    « [[ErrorData]] »).
         const aggregate_error = try ordinaryCreateFromConstructor(
             AggregateError,
@@ -81,20 +81,20 @@ pub const constructor = struct {
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {
-            // a. Let msg be ? ToString(message).
-            const msg = try message.toString(agent);
+            // a. Let messageString be ? ToString(message).
+            const message_string = try message.toString(agent);
 
-            // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
+            // b. Perform CreateNonEnumerableDataPropertyOrThrow(obj, "message", messageString).
             try aggregate_error.object.createNonEnumerableDataPropertyOrThrow(
                 agent,
                 PropertyKey.from("message"),
-                Value.from(msg),
+                Value.from(message_string),
             );
 
-            aggregate_error.fields.message = msg;
+            aggregate_error.fields.message = message_string;
         }
 
-        // 4. Perform ? InstallErrorCause(O, options).
+        // 4. Perform ? InstallErrorCause(obj, options).
         try installErrorCause(agent, &aggregate_error.object, options);
 
         // 5. Let errorsList be ? IteratorToList(? GetIterator(errors, sync)).
@@ -102,7 +102,7 @@ pub const constructor = struct {
         const errors_list = try iterator.toList(agent);
         defer agent.gc_allocator.free(errors_list);
 
-        // 6. Perform ! DefinePropertyOrThrow(O, "errors", PropertyDescriptor {
+        // 6. Perform ! DefinePropertyOrThrow(obj, "errors", PropertyDescriptor {
         //    [[Configurable]]: true, [[Enumerable]]: false, [[Writable]]: true,
         //    [[Value]]: CreateArrayFromList(errorsList) }).
         const errors_list_array = try createArrayFromList(agent, errors_list);
@@ -117,7 +117,7 @@ pub const constructor = struct {
             },
         );
 
-        // 7. Return O.
+        // 7. Return obj.
         return Value.from(&aggregate_error.object);
     }
 };

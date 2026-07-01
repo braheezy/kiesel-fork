@@ -33,101 +33,102 @@ enumerable: ?bool = null,
 /// [[Configurable]]
 configurable: ?bool = null,
 
-/// 6.2.6.1 IsAccessorDescriptor ( Desc )
+/// 6.2.6.1 IsAccessorDescriptor ( propertyDesc )
 /// https://tc39.es/ecma262/#sec-isaccessordescriptor
-pub fn isAccessorDescriptor(self: *const PropertyDescriptor) bool {
-    // 1. If Desc has a [[Get]] field, return true.
-    // 2. If Desc has a [[Set]] field, return true.
+pub fn isAccessorDescriptor(property_desc: *const PropertyDescriptor) bool {
+    // 1. If propertyDesc has a [[Get]] field, return true.
+    // 2. If propertyDesc has a [[Set]] field, return true.
     // 3. Return false.
-    return self.get != null or self.set != null;
+    return property_desc.get != null or property_desc.set != null;
 }
 
-/// 6.2.6.2 IsDataDescriptor ( Desc )
+/// 6.2.6.2 IsDataDescriptor ( propertyDesc )
 /// https://tc39.es/ecma262/#sec-isdatadescriptor
-pub fn isDataDescriptor(self: *const PropertyDescriptor) bool {
-    // 1. If Desc has a [[Value]] field, return true.
-    // 2. If Desc has a [[Writable]] field, return true.
+pub fn isDataDescriptor(property_desc: *const PropertyDescriptor) bool {
+    // 1. If propertyDesc has a [[Value]] field, return true.
+    // 2. If propertyDesc has a [[Writable]] field, return true.
     // 3. Return false.
-    return self.value != null or self.writable != null;
+    return property_desc.value != null or property_desc.writable != null;
 }
 
-/// 6.2.6.3 IsGenericDescriptor ( Desc )
+/// 6.2.6.3 IsGenericDescriptor ( propertyDesc )
 /// https://tc39.es/ecma262/#sec-isgenericdescriptor
-pub fn isGenericDescriptor(self: *const PropertyDescriptor) bool {
-    // 1. If IsAccessorDescriptor(Desc) is true, return false.
-    // 2. If IsDataDescriptor(Desc) is true, return false.
+pub fn isGenericDescriptor(property_desc: *const PropertyDescriptor) bool {
+    // 1. If IsAccessorDescriptor(propertyDesc) is true, return false.
+    // 2. If IsDataDescriptor(propertyDesc) is true, return false.
     // 3. Return true.
-    return !(self.isAccessorDescriptor() or self.isDataDescriptor());
+    return !(property_desc.isAccessorDescriptor() or property_desc.isDataDescriptor());
 }
 
-/// 6.2.6.4 FromPropertyDescriptor ( Desc )
+/// 6.2.6.4 FromPropertyDescriptor ( propertyDesc )
 /// https://tc39.es/ecma262/#sec-frompropertydescriptor
 pub fn fromPropertyDescriptor(
-    self: *const PropertyDescriptor,
+    property_desc: *const PropertyDescriptor,
     agent: *Agent,
 ) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
-    // 1. If Desc is undefined, return undefined.
+    // 1. If propertyDesc is undefined, return undefined.
 
     // 2. Let obj be OrdinaryObjectCreate(%Object.prototype%).
     // 3. Assert: obj is an extensible ordinary object with no own properties.
-    const object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+    const obj = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
-    // 4. If Desc has a [[Value]] field, then
-    if (self.value) |value| {
-        // a. Perform ! CreateDataPropertyOrThrow(obj, "value", Desc.[[Value]]).
-        try object.createDataPropertyDirect(
+    // 4. If propertyDesc has a [[Value]] field, then
+    if (property_desc.value) |value| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, "value", propertyDesc.[[Value]]).
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("value"),
             value,
         );
     }
 
-    // 5. If Desc has a [[Writable]] field, then
-    if (self.writable) |writable| {
-        // a. Perform ! CreateDataPropertyOrThrow(obj, "writable", Desc.[[Writable]]).
-        try object.createDataPropertyDirect(
+    // 5. If propertyDesc has a [[Writable]] field, then
+    if (property_desc.writable) |writable| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, "writable", propertyDesc.[[Writable]]).
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("writable"),
             Value.from(writable),
         );
     }
 
-    // 6. If Desc has a [[Get]] field, then
-    if (self.get) |get| {
-        // a. Perform ! CreateDataPropertyOrThrow(obj, "get", Desc.[[Get]]).
-        try object.createDataPropertyDirect(
+    // 6. If propertyDesc has a [[Get]] field, then
+    if (property_desc.get) |get| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, "get", propertyDesc.[[Get]]).
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("get"),
             if (get) |o| Value.from(o) else .undefined,
         );
     }
 
-    // 7. If Desc has a [[Set]] field, then
-    if (self.set) |set| {
-        // a. Perform ! CreateDataPropertyOrThrow(obj, "set", Desc.[[Set]]).
-        try object.createDataPropertyDirect(
+    // 7. If propertyDesc has a [[Set]] field, then
+    if (property_desc.set) |set| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, "set", propertyDesc.[[Set]]).
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("set"),
             if (set) |o| Value.from(o) else .undefined,
         );
     }
 
-    // 8. If Desc has an [[Enumerable]] field, then
-    if (self.enumerable) |enumerable| {
-        // a. Perform ! CreateDataPropertyOrThrow(obj, "enumerable", Desc.[[Enumerable]]).
-        try object.createDataPropertyDirect(
+    // 8. If propertyDesc has an [[Enumerable]] field, then
+    if (property_desc.enumerable) |enumerable| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, "enumerable", propertyDesc.[[Enumerable]]).
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("enumerable"),
             Value.from(enumerable),
         );
     }
 
-    // 9. If Desc has a [[Configurable]] field, then
-    if (self.configurable) |configurable| {
-        // a. Perform ! CreateDataPropertyOrThrow(obj, "configurable", Desc.[[Configurable]]).
-        try object.createDataPropertyDirect(
+    // 9. If propertyDesc has a [[Configurable]] field, then
+    if (property_desc.configurable) |configurable| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, "configurable",
+        //    propertyDesc.[[Configurable]]).
+        try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("configurable"),
             Value.from(configurable),
@@ -135,12 +136,12 @@ pub fn fromPropertyDescriptor(
     }
 
     // 10. Return obj.
-    return object;
+    return obj;
 }
 
-/// 6.2.6.6 CompletePropertyDescriptor ( Desc )
+/// 6.2.6.6 CompletePropertyDescriptor ( propertyDesc )
 /// https://tc39.es/ecma262/#sec-completepropertydescriptor
-pub fn completePropertyDescriptor(self: *PropertyDescriptor) void {
+pub fn completePropertyDescriptor(property_desc: *PropertyDescriptor) void {
     // 1. Let like be the Record { [[Value]]: undefined, [[Writable]]: false, [[Get]]: undefined,
     //    [[Set]]: undefined, [[Enumerable]]: false, [[Configurable]]: false }.
     const like: PropertyDescriptor = .{
@@ -150,46 +151,50 @@ pub fn completePropertyDescriptor(self: *PropertyDescriptor) void {
         .configurable = false,
     };
 
-    // 2. If IsGenericDescriptor(Desc) is true or IsDataDescriptor(Desc) is true, then
-    if (self.isGenericDescriptor() or self.isDataDescriptor()) {
-        // a. If Desc does not have a [[Value]] field, set Desc.[[Value]] to like.[[Value]].
-        if (self.value == null) self.value = like.value;
+    // 2. If IsGenericDescriptor(propertyDesc) is true or IsDataDescriptor(propertyDesc) is true,
+    //    then
+    if (property_desc.isGenericDescriptor() or property_desc.isDataDescriptor()) {
+        // a. If propertyDesc does not have a [[Value]] field, set propertyDesc.[[Value]] to
+        //    like.[[Value]].
+        if (property_desc.value == null) property_desc.value = like.value;
 
-        // b. If Desc does not have a [[Writable]] field, set Desc.[[Writable]] to
+        // b. If propertyDesc does not have a [[Writable]] field, set propertyDesc.[[Writable]] to
         //    like.[[Writable]].
-        if (self.writable == null) self.writable = like.writable;
+        if (property_desc.writable == null) property_desc.writable = like.writable;
     } else {
         // 3. Else,
-        // a. If Desc does not have a [[Get]] field, set Desc.[[Get]] to like.[[Get]].
-        // b. If Desc does not have a [[Set]] field, set Desc.[[Set]] to like.[[Set]].
+        // a. If propertyDesc does not have a [[Get]] field, set propertyDesc.[[Get]] to
+        //    like.[[Get]].
+        // b. If propertyDesc does not have a [[Set]] field, set propertyDesc.[[Set]] to
+        //    like.[[Set]].
         // NOTE: These are no-ops, the fields can't be missing.
     }
 
-    // 4. If Desc does not have an [[Enumerable]] field, set Desc.[[Enumerable]] to
+    // 4. If propertyDesc does not have an [[Enumerable]] field, set propertyDesc.[[Enumerable]] to
     //    like.[[Enumerable]].
-    if (self.enumerable == null) self.enumerable = like.enumerable;
+    if (property_desc.enumerable == null) property_desc.enumerable = like.enumerable;
 
-    // 5. If Desc does not have a [[Configurable]] field, set Desc.[[Configurable]] to
-    //    like.[[Configurable]].
-    if (self.configurable == null) self.configurable = like.configurable;
+    // 5. If propertyDesc does not have a [[Configurable]] field, set propertyDesc.[[Configurable]]
+    //    to like.[[Configurable]].
+    if (property_desc.configurable == null) property_desc.configurable = like.configurable;
 
     // 6. Return unused.
 }
 
-pub fn isFullyPopulated(self: *const PropertyDescriptor) bool {
-    return ((self.value != null and self.writable != null) or
-        (self.get != null or self.set != null)) and
-        self.enumerable != null and
-        self.configurable != null;
+pub fn isFullyPopulated(property_desc: *const PropertyDescriptor) bool {
+    return ((property_desc.value != null and property_desc.writable != null) or
+        (property_desc.get != null or property_desc.set != null)) and
+        property_desc.enumerable != null and
+        property_desc.configurable != null;
 }
 
-pub fn hasFields(self: *const PropertyDescriptor) bool {
-    return self.value != null or
-        self.writable != null or
-        self.get != null or
-        self.set != null or
-        self.enumerable != null or
-        self.configurable != null;
+pub fn hasFields(property_desc: *const PropertyDescriptor) bool {
+    return property_desc.value != null or
+        property_desc.writable != null or
+        property_desc.get != null or
+        property_desc.set != null or
+        property_desc.enumerable != null or
+        property_desc.configurable != null;
 }
 
 test isAccessorDescriptor {

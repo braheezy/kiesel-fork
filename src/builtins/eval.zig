@@ -23,58 +23,63 @@ const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionOb
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const noexcept = utils.noexcept;
 
-/// 19.2.1.1 PerformEval ( x, strictCaller, direct )
+/// 19.2.1.1 PerformEval ( source, strictCaller, direct )
 /// https://tc39.es/ecma262/#sec-performeval
-pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) Agent.Error!Value {
+pub fn performEval(
+    agent: *Agent,
+    source: Value,
+    strict_caller: bool,
+    direct: bool,
+) Agent.Error!Value {
     const gpa = agent.gpa;
 
     // 1. Assert: If direct is false, then strictCaller is also false.
     if (!direct) std.debug.assert(!strict_caller);
 
-    // 2. If x is not a String, return x.
-    if (!x.isString()) return x;
+    // 2. If source is not a String, return source.
+    if (!source.isString()) return source;
 
     // 3. Let evalRealm be the current Realm Record.
     // 4. NOTE: In the case of a direct eval, evalRealm is the realm of both the caller of `eval`
     //    and of the `eval` function itself.
     const eval_realm = agent.currentRealm();
 
-    // 5. Perform ? HostEnsureCanCompileStrings(evalRealm, « », x, direct).
-    try agent.host_hooks.hostEnsureCanCompileStrings(eval_realm, &.{}, x.asString(), direct);
+    // 5. Perform ? HostEnsureCanCompileStrings(evalRealm, « », source, direct).
+    try agent.host_hooks.hostEnsureCanCompileStrings(eval_realm, &.{}, source.asString(), direct);
 
-    // 6. Let inFunction be false.
-    var in_function = false;
+    // 6. Let inFunc be false.
+    var in_func = false;
 
     // 7. Let inMethod be false.
     var in_method = false;
 
-    // 8. Let inDerivedConstructor be false.
-    var in_derived_constructor = false;
+    // 8. Let inDerivedCtor be false.
+    var in_derived_ctor = false;
 
     // 9. Let inClassFieldInitializer be false.
     var in_class_field_initializer = false;
 
     // 10. If direct is true, then
     if (direct) {
-        // a. Let thisEnvRec be GetThisEnvironment().
+        // a. Let thisEnvRecord be GetThisEnvironment().
         const this_env = agent.getThisEnvironment();
 
-        // b. If thisEnvRec is a Function Environment Record, then
+        // b. If thisEnvRecord is a Function Environment Record, then
         if (this_env == .function_environment) {
-            // i. Let F be thisEnvRec.[[FunctionObject]].
-            const function_object = this_env.function_environment.function_object;
+            // i. Let func be thisEnvRecord.[[FunctionObject]].
+            const func = this_env.function_environment.function_object;
 
-            // ii. Set inFunction to true.
-            in_function = true;
+            // ii. Set inFunc to true.
+            in_func = true;
 
-            // iii. Set inMethod to thisEnvRec.HasSuperBinding().
+            // iii. Set inMethod to thisEnvRecord.HasSuperBinding().
             in_method = this_env.hasSuperBinding();
 
-            // iv. If F.[[ConstructorKind]] is derived, set inDerivedConstructor to true.
-            in_derived_constructor = function_object.fields.flags.constructor_kind == .derived;
+            // iv. If func.[[ConstructorKind]] is derived, set inDerivedCtor to true.
+            in_derived_ctor = func.fields.flags.constructor_kind == .derived;
 
-            // v. Let classFieldInitializerName be F.[[ClassFieldInitializerName]].
-            const class_field_initializer_name = if (function_object.fields.class_data) |class_data|
+            // v. Let classFieldInitializerName be func.[[ClassFieldInitializerName]].
+            const class_field_initializer_name = if (func.fields.class_data) |class_data|
                 class_data.class_field_initializer_name
             else
                 null;
@@ -87,23 +92,23 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     // 11. Perform the following substeps in an implementation-defined order, possibly interleaving
     //     parsing and error detection:
 
-    const source_text = try x.asString().toUtf8(gpa);
-    defer gpa.free(source_text);
+    // Stored in ExecutionContext.origin, must be GC'd
+    const source_text = try source.asString().toUtf8(agent.gc_allocator);
 
     var diagnostics = Diagnostics.init(gpa);
     defer diagnostics.deinit();
 
-    // a. Let script be ParseText(x, Script).
+    // a. Let script be ParseText(source, Script).
     const script = Parser.parse(ast.Script, agent.gc_allocator, source_text, .{
         .diagnostics = &diagnostics,
         .file_name = "eval",
         .state = .{
             // e-h.
             .in_strict_mode = strict_caller,
-            .new_target_allowed = in_function,
+            .new_target_allowed = in_func,
             .in_method_definition = in_method,
             // TODO: The state should track whether we're in a *derived* constructor
-            .in_class_constructor = in_derived_constructor,
+            .in_class_constructor = in_derived_ctor,
             // TODO: The state should track whether we're in a class field initializer
             // .in_class_field_initializer = in_class_field_initializer,
         },
@@ -132,52 +137,51 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     //     invocation of the `eval` function.
     const running_context = agent.runningExecutionContext();
 
-    var lexical_environment: Environment = undefined;
-    var variable_environment: Environment = undefined;
-    var private_environment: ?*PrivateEnvironment = undefined;
+    var lexical_env: Environment = undefined;
+    var variable_env: Environment = undefined;
+    var private_env: ?*PrivateEnvironment = undefined;
 
     // 16. If direct is true, then
     if (direct) {
-        // a. Let lexEnv be NewDeclarativeEnvironment(runningContext's LexicalEnvironment).
-        lexical_environment = .{
+        // a. Let lexicalEnv be NewDeclarativeEnvironment(runningContext's LexicalEnvironment).
+        lexical_env = .{
             .declarative_environment = try newDeclarativeEnvironment(
                 agent.gc_allocator,
                 running_context.ecmascript_code.lexical_environment,
             ),
         };
 
-        // b. Let varEnv be runningContext's VariableEnvironment.
-        variable_environment = running_context.ecmascript_code.variable_environment;
+        // b. Let variableEnv be runningContext's VariableEnvironment.
+        variable_env = running_context.ecmascript_code.variable_environment;
 
         // c. Let privateEnv be runningContext's PrivateEnvironment.
-        private_environment = running_context.ecmascript_code.private_environment;
+        private_env = running_context.ecmascript_code.private_environment;
     } else {
         // 17. Else,
-        // a. Let lexEnv be NewDeclarativeEnvironment(evalRealm.[[GlobalEnv]]).
-        lexical_environment = .{
+        // a. Let lexicalEnv be NewDeclarativeEnvironment(evalRealm.[[GlobalEnv]]).
+        lexical_env = .{
             .declarative_environment = try newDeclarativeEnvironment(
                 agent.gc_allocator,
                 .{ .global_environment = eval_realm.global_env },
             ),
         };
 
-        // b. Let varEnv be evalRealm.[[GlobalEnv]].
-        variable_environment = .{ .global_environment = eval_realm.global_env };
+        // b. Let variableEnv be evalRealm.[[GlobalEnv]].
+        variable_env = .{ .global_environment = eval_realm.global_env };
 
         // c. Let privateEnv be null.
-        private_environment = null;
+        private_env = null;
     }
 
-    // 18. If strictEval is true, set varEnv to lexEnv.
-    if (strict_eval) variable_environment = lexical_environment;
+    // 18. If strictEval is true, set variableEnv to lexicalEnv.
+    if (strict_eval) variable_env = lexical_env;
 
     // 19. If runningContext is not already suspended, suspend runningContext.
 
     // 20. Let evalContext be a new ECMAScript code execution context.
-    const source = try agent.gc_allocator.dupe(u8, source_text);
     var eval_context: ExecutionContext = .{
         // 21. Set evalContext's Function to null.
-        .origin = .{ .eval = source },
+        .origin = .{ .eval = source_text },
 
         // 22. Set evalContext's Realm to evalRealm.
         .realm = eval_realm,
@@ -186,14 +190,14 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
         .script_or_module = running_context.script_or_module,
 
         .ecmascript_code = .{
-            // 24. Set evalContext's VariableEnvironment to varEnv.
-            .variable_environment = variable_environment,
+            // 24. Set evalContext's VariableEnvironment to variableEnv.
+            .variable_environment = variable_env,
 
-            // 25. Set evalContext's LexicalEnvironment to lexEnv.
-            .lexical_environment = lexical_environment,
+            // 25. Set evalContext's LexicalEnvironment to lexicalEnv.
+            .lexical_environment = lexical_env,
 
             // 26. Set evalContext's PrivateEnvironment to privateEnv.
-            .private_environment = private_environment,
+            .private_environment = private_env,
         },
     };
 
@@ -201,16 +205,16 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     //     execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, &eval_context);
 
-    // 28. Let result be Completion(EvalDeclarationInstantiation(body, varEnv, lexEnv, privateEnv,
-    //     strictEval)).
+    // 28. Let result be Completion(EvalDeclarationInstantiation(body, variableEnv, lexicalEnv,
+    //     privateEnv, strictEval)).
     const result_no_value = evalDeclarationInstantiation(
         agent,
         body,
-        variable_environment,
-        lexical_environment,
-        private_environment,
+        variable_env,
+        lexical_env,
+        private_env,
         strict_eval,
-        source,
+        source_text,
     );
 
     // 29. If result is a normal completion, then
@@ -238,37 +242,38 @@ pub fn performEval(agent: *Agent, x: Value, strict_caller: bool, direct: bool) A
     return result;
 }
 
-/// 19.2.1.3 EvalDeclarationInstantiation ( body, varEnv, lexEnv, privateEnv, strict )
+/// 19.2.1.3 EvalDeclarationInstantiation ( body, variableEnv, lexicalEnv, privateEnv, strict )
 /// https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
 fn evalDeclarationInstantiation(
     agent: *Agent,
     body: ast.Script,
-    var_env: Environment,
-    lex_env: Environment,
+    variable_env: Environment,
+    lexical_env: Environment,
     private_env: ?*PrivateEnvironment,
     strict: bool,
     source: []const u8,
 ) Agent.Error!void {
-    // 1. Let varNames be the VarDeclaredNames of body.
-    var var_names: std.ArrayList(ast.Identifier) = .empty;
-    defer var_names.deinit(agent.gc_allocator);
-    try body.collectVarDeclaredNames(agent.gc_allocator, &var_names);
+    // 1. Let variableNames be the VarDeclaredNames of body.
+    var variable_names: std.ArrayList(ast.Identifier) = .empty;
+    defer variable_names.deinit(agent.gc_allocator);
+    try body.collectVarDeclaredNames(agent.gc_allocator, &variable_names);
 
-    // 2. Let varDeclarations be the VarScopedDeclarations of body.
-    var var_declarations: std.ArrayList(ast.VarScopedDeclaration) = .empty;
-    defer var_declarations.deinit(agent.gc_allocator);
-    try body.collectVarScopedDeclarations(agent.gc_allocator, &var_declarations);
+    // 2. Let variableDecls be the VarScopedDeclarations of body.
+    var variable_decls: std.ArrayList(ast.VarScopedDeclaration) = .empty;
+    defer variable_decls.deinit(agent.gc_allocator);
+    try body.collectVarScopedDeclarations(agent.gc_allocator, &variable_decls);
 
     // 3. If strict is false, then
     if (!strict) {
-        // a. If varEnv is a Global Environment Record, then
-        if (var_env == .global_environment) {
-            // i. For each element name of varNames, do
-            for (var_names.items) |name_utf8| {
+        // a. If variableEnv is a Global Environment Record, then
+        if (variable_env == .global_environment) {
+            // i. For each element name of variableNames, do
+            for (variable_names.items) |name_utf8| {
                 const name = try String.fromUtf8(agent, name_utf8);
 
-                // 1. If HasLexicalDeclaration(varEnv, name) is true, throw a SyntaxError exception.
-                if (var_env.global_environment.hasLexicalDeclaration(name)) {
+                // 1. If HasLexicalDeclaration(variableEnv, name) is true, throw a SyntaxError
+                //    exception.
+                if (variable_env.global_environment.hasLexicalDeclaration(name)) {
                     return agent.throwException(
                         .syntax_error,
                         "Global environment already has a lexical declaration '{f}'",
@@ -281,19 +286,19 @@ fn evalDeclarationInstantiation(
             }
         }
 
-        // b. Let thisEnv be lexEnv.
-        var this_env = lex_env;
+        // b. Let thisEnv be lexicalEnv.
+        var this_env = lexical_env;
 
         // c. Assert: The following loop will terminate.
-        // d. Repeat, while thisEnv and varEnv are not the same Environment Record,
-        while (!std.meta.eql(this_env, var_env)) {
+        // d. Repeat, while thisEnv and variableEnv are not the same Environment Record,
+        while (!std.meta.eql(this_env, variable_env)) {
             // i. If thisEnv is not an Object Environment Record, then
             if (this_env != .object_environment) {
                 // 1. NOTE: The environment of with statements cannot contain any lexical
                 //    declaration so it doesn't need to be checked for var/let hoisting conflicts.
 
-                // 2. For each element name of varNames, do
-                for (var_names.items) |name_utf8| {
+                // 2. For each element name of variableNames, do
+                for (variable_names.items) |name_utf8| {
                     const name = try String.fromUtf8(agent, name_utf8);
 
                     // a. If ! thisEnv.HasBinding(name) is true, then
@@ -319,103 +324,105 @@ fn evalDeclarationInstantiation(
 
     // TODO: 4-7.
 
-    // 8. Let functionsToInitialize be a new empty List.
-    var functions_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
-    defer functions_to_initialize.deinit(agent.gc_allocator);
+    // 8. Let funcsToInitialize be a new empty List.
+    var funcs_to_initialize: std.ArrayList(ast.HoistableDeclaration) = .empty;
+    defer funcs_to_initialize.deinit(agent.gc_allocator);
 
-    // 9. Let declaredFunctionNames be a new empty List.
-    var declared_function_names: String.HashMapUnmanaged(void) = .empty;
-    defer declared_function_names.deinit(agent.gc_allocator);
+    // 9. Let declaredFuncNames be a new empty List.
+    var declared_func_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_func_names.deinit(agent.gc_allocator);
 
-    // 10. For each element d of varDeclarations, in reverse List order, do
-    var it = std.mem.reverseIterator(var_declarations.items);
-    while (it.next()) |var_declaration| {
-        // a. If d is not either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
-        if (var_declaration == .hoistable_declaration) {
-            // i. Assert: d is either a FunctionDeclaration, a GeneratorDeclaration, an
+    // 10. For each element variableDecl of variableDecls, in reverse List order, do
+    var it = std.mem.reverseIterator(variable_decls.items);
+    while (it.next()) |variable_decl| {
+        // a. If variableDecl is not either a VariableDeclaration, a ForBinding, or a
+        //    BindingIdentifier, then
+        if (variable_decl == .hoistable_declaration) {
+            // i. Assert: variableDecl is either a FunctionDeclaration, a GeneratorDeclaration, an
             //    AsyncFunctionDeclaration, or an AsyncGeneratorDeclaration.
-            const hoistable_declaration = var_declaration.hoistable_declaration;
+            const hoistable_decl = variable_decl.hoistable_declaration;
 
             // ii. NOTE: If there are multiple function declarations for the same name, the last
             //     declaration is used.
 
-            // iii. Let fn be the sole element of the BoundNames of d.
-            const function_name = switch (hoistable_declaration) {
-                inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
+            // iii. Let funcName be the sole element of the BoundNames of variableDecl.
+            const func_name = switch (hoistable_decl) {
+                inline else => |func_decl| try String.fromUtf8(agent, func_decl.identifier.?),
             };
 
-            // iv. If declaredFunctionNames does not contain fn, then
-            if (!declared_function_names.contains(function_name)) {
-                // 1. If varEnv is a Global Environment Record, then
-                if (var_env == .global_environment) {
-                    // a. Let fnDefinable be ? CanDeclareGlobalFunction(varEnv, fn).
-                    const function_definable = try var_env.global_environment.canDeclareGlobalFunction(
+            // iv. If declaredFuncNames does not contain funcName, then
+            if (!declared_func_names.contains(func_name)) {
+                // 1. If variableEnv is a Global Environment Record, then
+                if (variable_env == .global_environment) {
+                    // a. Let funcDefinable be ? CanDeclareGlobalFunction(variableEnv, funcName).
+                    const func_definable = try variable_env.global_environment.canDeclareGlobalFunction(
                         agent,
-                        function_name,
+                        func_name,
                     );
 
-                    // b. If fnDefinable is false, throw a TypeError exception.
-                    if (!function_definable) {
+                    // b. If funcDefinable is false, throw a TypeError exception.
+                    if (!func_definable) {
                         return agent.throwException(
                             .type_error,
                             "Cannot declare '{f}' in global environment",
-                            .{function_name.fmtRaw()},
+                            .{func_name.fmtRaw()},
                         );
                     }
                 }
 
-                // 2. Append fn to declaredFunctionNames.
-                try declared_function_names.putNoClobber(agent.gc_allocator, function_name, {});
+                // 2. Append funcName to declaredFuncNames.
+                try declared_func_names.putNoClobber(agent.gc_allocator, func_name, {});
 
-                // 3. Insert d as the first element of functionsToInitialize.
+                // 3. Insert variableDecl as the first element of funcsToInitialize.
                 // NOTE: AFAICT the order isn't observable, so we can append.
-                try functions_to_initialize.append(agent.gc_allocator, hoistable_declaration);
+                try funcs_to_initialize.append(agent.gc_allocator, hoistable_decl);
             }
         }
     }
 
-    // 11. Let declaredVarNames be a new empty List.
-    var declared_var_names: String.HashMapUnmanaged(void) = .empty;
-    defer declared_var_names.deinit(agent.gc_allocator);
+    // 11. Let declaredVariableNames be a new empty List.
+    var declared_variable_names: String.HashMapUnmanaged(void) = .empty;
+    defer declared_variable_names.deinit(agent.gc_allocator);
 
     var bound_names: std.ArrayList(ast.Identifier) = .empty;
     defer bound_names.deinit(agent.gc_allocator);
 
-    // 12. For each element d of varDeclarations, do
-    for (var_declarations.items) |var_declaration| {
-        // a. If d is either a VariableDeclaration, a ForBinding, or a BindingIdentifier, then
-        if (var_declaration == .variable_declaration) {
+    // 12. For each element variableDecl of variableDecls, do
+    for (variable_decls.items) |variable_decl| {
+        // a. If variableDecl is either a VariableDeclaration, a ForBinding, or a BindingIdentifier,
+        //    then
+        if (variable_decl == .variable_declaration) {
             bound_names.clearRetainingCapacity();
-            try var_declaration.variable_declaration.collectBoundNames(agent.gc_allocator, &bound_names);
+            try variable_decl.variable_declaration.collectBoundNames(agent.gc_allocator, &bound_names);
 
-            // i. For each String vn of the BoundNames of d, do
-            for (bound_names.items) |var_name_utf8| {
-                const var_name = try String.fromUtf8(agent, var_name_utf8);
+            // i. For each String name of the BoundNames of variableDecl, do
+            for (bound_names.items) |name_utf8| {
+                const name = try String.fromUtf8(agent, name_utf8);
 
-                // 1. If declaredFunctionNames does not contain vn, then
-                if (!declared_function_names.contains(var_name)) {
-                    // a. If varEnv is a Global Environment Record, then
-                    if (var_env == .global_environment) {
-                        // i. Let vnDefinable be ? CanDeclareGlobalVar(varEnv, vn).
-                        const var_name_definable = try var_env.global_environment.canDeclareGlobalVar(
+                // 1. If declaredFuncNames does not contain name, then
+                if (!declared_func_names.contains(name)) {
+                    // a. If variableEnv is a Global Environment Record, then
+                    if (variable_env == .global_environment) {
+                        // i. Let variableDefinable be ? CanDeclareGlobalVar(variableEnv, name).
+                        const variable_definable = try variable_env.global_environment.canDeclareGlobalVar(
                             agent,
-                            var_name,
+                            name,
                         );
 
-                        // ii. If vnDefinable is false, throw a TypeError exception.
-                        if (!var_name_definable) {
+                        // ii. If variableDefinable is false, throw a TypeError exception.
+                        if (!variable_definable) {
                             return agent.throwException(
                                 .type_error,
                                 "Cannot declare '{f}' in global environment",
-                                .{var_name.fmtRaw()},
+                                .{name.fmtRaw()},
                             );
                         }
                     }
 
-                    // b. If declaredVarNames does not contain vn, then
-                    if (!declared_var_names.contains(var_name)) {
-                        // i. Append vn to declaredVarNames.
-                        try declared_var_names.putNoClobber(agent.gc_allocator, var_name, {});
+                    // b. If declaredVariableNames does not contain name, then
+                    if (!declared_variable_names.contains(name)) {
+                        // i. Append name to declaredVariableNames.
+                        try declared_variable_names.putNoClobber(agent.gc_allocator, name, {});
                     }
                 }
             }
@@ -426,67 +433,68 @@ fn evalDeclarationInstantiation(
     //     Function Declarations Web Legacy Compatibility Semantics, then
     //     [...]
 
-    // 14. NOTE: No abnormal terminations occur after this algorithm step unless varEnv is a Global
-    //     Environment Record and the global object is a Proxy exotic object.
+    // 14. NOTE: No abnormal terminations occur after this algorithm step unless variableEnv is a
+    //     Global Environment Record and the global object is a Proxy exotic object.
 
-    // 15. Let lexDeclarations be the LexicallyScopedDeclarations of body.
-    var lex_declarations: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
-    defer lex_declarations.deinit(agent.gc_allocator);
-    try body.collectLexicallyScopedDeclarations(agent.gc_allocator, &lex_declarations);
+    // 15. Let lexicalDecls be the LexicallyScopedDeclarations of body.
+    var lexical_decls: std.ArrayList(ast.LexicallyScopedDeclaration) = .empty;
+    defer lexical_decls.deinit(agent.gc_allocator);
+    try body.collectLexicallyScopedDeclarations(agent.gc_allocator, &lexical_decls);
 
-    // 16. For each element d of lexDeclarations, do
-    for (lex_declarations.items) |declaration| {
+    // 16. For each element lexicalDecl of lexicalDecls, do
+    for (lexical_decls.items) |lexical_decl| {
         // a. NOTE: Lexically declared names are only instantiated here but not initialized.
 
         bound_names.clearRetainingCapacity();
-        try declaration.collectBoundNames(agent.gc_allocator, &bound_names);
+        try lexical_decl.collectBoundNames(agent.gc_allocator, &bound_names);
 
-        // b. For each element dn of the BoundNames of d, do
+        // b. For each element name of the BoundNames of lexicalDecl, do
         for (bound_names.items) |name_utf8| {
             const name = try String.fromUtf8(agent, name_utf8);
 
-            // i. If IsConstantDeclaration of d is true, then
-            if (declaration.isConstantDeclaration()) {
-                // 1. Perform ? lexEnv.CreateImmutableBinding(dn, true).
-                try lex_env.createImmutableBinding(agent, name, true);
+            // i. If IsConstantDeclaration of lexicalDecl is true, then
+            if (lexical_decl.isConstantDeclaration()) {
+                // 1. Perform ? lexicalEnv.CreateImmutableBinding(name, true).
+                try lexical_env.createImmutableBinding(agent, name, true);
             } else {
                 // ii. Else,
-                // 1. Perform ? lexEnv.CreateMutableBinding(dn, false).
-                try lex_env.createMutableBinding(agent, name, false);
+                // 1. Perform ? lexicalEnv.CreateMutableBinding(name, false).
+                try lexical_env.createMutableBinding(agent, name, false);
             }
         }
     }
 
-    // 17. For each Parse Node f of functionsToInitialize, do
-    for (functions_to_initialize.items) |hoistable_declaration| {
-        // a. Let fn be the sole element of the BoundNames of f.
-        const function_name = switch (hoistable_declaration) {
-            inline else => |function_declaration| try String.fromUtf8(agent, function_declaration.identifier.?),
+    // 17. For each Parse Node funcDecl of funcsToInitialize, do
+    for (funcs_to_initialize.items) |hoistable_decl| {
+        // a. Let funcName be the sole element of the BoundNames of funcDecl.
+        const func_name = switch (hoistable_decl) {
+            inline else => |func_decl| try String.fromUtf8(agent, func_decl.identifier.?),
         };
 
-        // b. Let fo be InstantiateFunctionObject of f with arguments lexEnv and privateEnv.
-        const function_object = try switch (hoistable_declaration) {
-            .function_declaration => |function_declaration| instantiateOrdinaryFunctionObject(agent, function_declaration, lex_env, private_env, source),
-            .generator_declaration => |generator_declaration| instantiateGeneratorFunctionObject(agent, generator_declaration, lex_env, private_env, source),
-            .async_function_declaration => |async_function_declaration| instantiateAsyncFunctionObject(agent, async_function_declaration, lex_env, private_env, source),
-            .async_generator_declaration => |async_generator_declaration| instantiateAsyncGeneratorFunctionObject(agent, async_generator_declaration, lex_env, private_env, source),
+        // b. Let funcObj be InstantiateFunctionObject of funcDecl with arguments lexicalEnv and
+        //    privateEnv.
+        const func_obj = try switch (hoistable_decl) {
+            .function_declaration => |func_decl| instantiateOrdinaryFunctionObject(agent, func_decl, lexical_env, private_env, source),
+            .generator_declaration => |gen_decl| instantiateGeneratorFunctionObject(agent, gen_decl, lexical_env, private_env, source),
+            .async_function_declaration => |async_func_decl| instantiateAsyncFunctionObject(agent, async_func_decl, lexical_env, private_env, source),
+            .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorFunctionObject(agent, async_gen_decl, lexical_env, private_env, source),
         };
 
-        // c. If varEnv is a Global Environment Record, then
-        if (var_env == .global_environment) {
-            // i. Perform ? CreateGlobalFunctionBinding(varEnv, fn, fo, true).
-            try var_env.global_environment.createGlobalFunctionBinding(
+        // c. If variableEnv is a Global Environment Record, then
+        if (variable_env == .global_environment) {
+            // i. Perform ? CreateGlobalFunctionBinding(variableEnv, funcName, funcObj, true).
+            try variable_env.global_environment.createGlobalFunctionBinding(
                 agent,
-                function_name,
-                function_object,
+                func_name,
+                func_obj,
                 true,
             );
         } else {
             // d. Else,
-            // i. Let bindingExists be ! varEnv.HasBinding(fn).
-            const binding_exists = var_env.hasBinding(
+            // i. Let bindingExists be ! variableEnv.HasBinding(funcName).
+            const binding_exists = variable_env.hasBinding(
                 agent,
-                function_name,
+                func_name,
             ) catch |err| try noexcept(err);
 
             // ii. If bindingExists is false, then
@@ -494,58 +502,58 @@ fn evalDeclarationInstantiation(
                 // 1. NOTE: The following invocation cannot return an abrupt completion because of
                 //    the validation preceding step 14.
 
-                // 2. Perform ! varEnv.CreateMutableBinding(fn, true).
-                var_env.createMutableBinding(
+                // 2. Perform ! variableEnv.CreateMutableBinding(funcName, true).
+                variable_env.createMutableBinding(
                     agent,
-                    function_name,
+                    func_name,
                     true,
                 ) catch |err| try noexcept(err);
 
-                // 3. Perform ! varEnv.InitializeBinding(fn, fo).
-                var_env.initializeBinding(
+                // 3. Perform ! variableEnv.InitializeBinding(funcName, funcObj).
+                variable_env.initializeBinding(
                     agent,
-                    function_name,
-                    Value.from(&function_object.object),
+                    func_name,
+                    Value.from(&func_obj.object),
                 ) catch |err| try noexcept(err);
             } else {
                 // iii. Else,
-                // 1. Perform ! varEnv.SetMutableBinding(fn, fo, false).
-                var_env.setMutableBinding(
+                // 1. Perform ! variableEnv.SetMutableBinding(funcName, funcObj, false).
+                variable_env.setMutableBinding(
                     agent,
-                    function_name,
-                    Value.from(&function_object.object),
+                    func_name,
+                    Value.from(&func_obj.object),
                     false,
                 ) catch |err| try noexcept(err);
             }
         }
     }
 
-    // 18. For each String vn of declaredVarNames, do
-    var it_ = declared_var_names.keyIterator();
+    // 18. For each String variableName of declaredVariableNames, do
+    var it_ = declared_variable_names.keyIterator();
     while (it_.next()) |ptr| {
-        const var_name = ptr.*;
+        const variable_name = ptr.*;
 
-        // a. If varEnv is a Global Environment Record, then
-        if (var_env == .global_environment) {
-            // i. Perform ? CreateGlobalVarBinding(varEnv, vn, true).
-            try var_env.global_environment.createGlobalVarBinding(agent, var_name, true);
+        // a. If variableEnv is a Global Environment Record, then
+        if (variable_env == .global_environment) {
+            // i. Perform ? CreateGlobalVarBinding(variableEnv, variableName, true).
+            try variable_env.global_environment.createGlobalVarBinding(agent, variable_name, true);
         } else {
             // b. Else,
-            // i. Let bindingExists be ! varEnv.HasBinding(vn).
-            const binding_exists = var_env.hasBinding(
+            // i. Let bindingExists be ! variableEnv.HasBinding(variableName).
+            const binding_exists = variable_env.hasBinding(
                 agent,
-                var_name,
+                variable_name,
             ) catch |err| try noexcept(err);
 
             // ii. If bindingExists is false, then
             if (!binding_exists) {
                 // 1. NOTE: The following invocation cannot return an abrupt completion because of
                 //    the validation preceding step 14.
-                // 2. Perform ! varEnv.CreateMutableBinding(vn, true).
-                var_env.createMutableBinding(agent, var_name, true) catch |err| try noexcept(err);
+                // 2. Perform ! variableEnv.CreateMutableBinding(variableName, true).
+                variable_env.createMutableBinding(agent, variable_name, true) catch |err| try noexcept(err);
 
-                // 3. Perform ! varEnv.InitializeBinding(vn, undefined).
-                var_env.initializeBinding(agent, var_name, .undefined) catch |err| try noexcept(err);
+                // 3. Perform ! variableEnv.InitializeBinding(variableName, undefined).
+                variable_env.initializeBinding(agent, variable_name, .undefined) catch |err| try noexcept(err);
             }
         }
     }

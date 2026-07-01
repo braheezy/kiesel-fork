@@ -89,11 +89,11 @@ pub const prototype = struct {
         // 5. Let startIndex be iterator.[[IteratedStringNextSegmentCodeUnitIndex]].
         const start_index = iterator.fields.iterated_string_next_segment_code_unit_index;
 
-        // 6. Let len be the length of string.
-        const len = string.length;
+        // 6. Let length be the length of string.
+        const length = string.length;
 
-        // 7. If startIndex ≥ len, then
-        if (start_index >= len) {
+        // 7. If startIndex ≥ length, then
+        if (start_index >= length) {
             // a. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
@@ -145,11 +145,11 @@ pub fn createSegmentDataObject(
 ) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
 
-    // 1. Let len be the length of string.
-    const len = string.length;
+    // 1. Let length be the length of string.
+    const length = string.length;
 
-    // 2. Assert: endIndex ≤ len.
-    std.debug.assert(end_index <= len);
+    // 2. Assert: endIndex ≤ length.
+    std.debug.assert(end_index <= length);
 
     // 3. Assert: startIndex < endIndex.
     std.debug.assert(start_index < end_index);

@@ -25,11 +25,11 @@ const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 25.2.2.1 AllocateSharedArrayBuffer ( constructor, byteLength [ , maxByteLength ] )
+/// 25.2.2.1 AllocateSharedArrayBuffer ( ctor, byteLength [ , maxByteLength ] )
 /// https://tc39.es/ecma262/#sec-allocatesharedarraybuffer
 pub fn allocateSharedArrayBuffer(
     agent: *Agent,
-    constructor_: *Object,
+    ctor: *Object,
     byte_length: ByteLength,
     max_byte_length: OptionalByteLength,
 ) Agent.Error!*ArrayBuffer {
@@ -57,12 +57,11 @@ pub fn allocateSharedArrayBuffer(
     // 4. Else,
     //     a. Append [[ArrayBufferByteLength]] to slots.
 
-    // 5. Let obj be ? OrdinaryCreateFromConstructor(constructor, "%SharedArrayBuffer.prototype%",
-    //    slots).
+    // 5. Let obj be ? OrdinaryCreateFromConstructor(ctor, "%SharedArrayBuffer.prototype%", slots).
     const array_buffer = try ordinaryCreateFromConstructor(
         builtins.ArrayBuffer,
         agent,
-        constructor_,
+        ctor,
         "%SharedArrayBuffer.prototype%",
         .{
             .data_block = undefined,
@@ -132,7 +131,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "SharedArrayBuffer",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -228,11 +227,11 @@ pub const prototype = struct {
     /// 25.2.5.1 get SharedArrayBuffer.prototype.byteLength
     /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.bytelength
     fn byteLength(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[ArrayBufferData]]).
         const array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
 
-        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        // 3. If IsSharedArrayBuffer(obj) is false, throw a TypeError exception.
         if (!isSharedArrayBuffer(array_buffer)) {
             return agent.throwException(
                 .type_error,
@@ -241,7 +240,7 @@ pub const prototype = struct {
             );
         }
 
-        // 4. Let length be ArrayBufferByteLength(O, seq-cst).
+        // 4. Let length be ArrayBufferByteLength(obj, seq-cst).
         const length = arrayBufferByteLength(array_buffer, .seq_cst);
 
         // 5. Return 𝔽(length).
@@ -253,11 +252,11 @@ pub const prototype = struct {
     fn grow(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const new_length = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferMaxByteLength]]).
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[ArrayBufferMaxByteLength]]).
         var array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
 
-        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        // 3. If IsSharedArrayBuffer(obj) is false, throw a TypeError exception.
         if (!isSharedArrayBuffer(array_buffer)) {
             return agent.throwException(
                 .type_error,
@@ -273,7 +272,7 @@ pub const prototype = struct {
         // 4. Let newByteLength be ? ToIndex(newLength).
         const new_byte_length: ByteLength = @enumFromInt(try new_length.toIndex(agent));
 
-        // 5. Let hostHandled be ? HostGrowSharedArrayBuffer(O, newByteLength).
+        // 5. Let hostHandled be ? HostGrowSharedArrayBuffer(obj, newByteLength).
         const host_handled = try agent.host_hooks.hostGrowSharedArrayBuffer(
             array_buffer,
             new_byte_length,
@@ -282,9 +281,9 @@ pub const prototype = struct {
         // 6. If hostHandled is handled, return undefined.
         if (host_handled == .handled) return .undefined;
 
-        // 7. Let AR be the Agent Record of the surrounding agent.
-        // 8. Let isLittleEndian be AR.[[LittleEndian]].
-        // 9. Let byteLengthBlock be O.[[ArrayBufferByteLengthData]].
+        // 7. Let agentRecord be the Agent Record of the surrounding agent.
+        // 8. Let isLittleEndian be agentRecord.[[LittleEndian]].
+        // 9. Let byteLengthBlock be obj.[[ArrayBufferByteLengthData]].
         // 10. Let currentByteLengthRawBytes be GetRawBytesFromSharedBlock(byteLengthBlock, 0,
         //     biguint64, true, seq-cst).
         // 11. Let newByteLengthRawBytes be NumericToRawBytes(biguint64, ℤ(newByteLength),
@@ -302,7 +301,7 @@ pub const prototype = struct {
         if (new_byte_length == current_byte_length) return .undefined;
 
         // d. If newByteLength < currentByteLength or
-        //    newByteLength > O.[[ArrayBufferMaxByteLength]], throw a RangeError exception.
+        //    newByteLength > obj.[[ArrayBufferMaxByteLength]], throw a RangeError exception.
         if (@intFromEnum(new_byte_length) < @intFromEnum(current_byte_length)) {
             return agent.throwException(.range_error, "Cannot shrink buffer", .{});
         }
@@ -329,11 +328,11 @@ pub const prototype = struct {
     /// 25.2.5.4 get SharedArrayBuffer.prototype.growable
     /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.growable
     fn growable(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[ArrayBufferData]]).
         const array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
 
-        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        // 3. If IsSharedArrayBuffer(obj) is false, throw a TypeError exception.
         if (!isSharedArrayBuffer(array_buffer)) {
             return agent.throwException(
                 .type_error,
@@ -342,7 +341,7 @@ pub const prototype = struct {
             );
         }
 
-        // 4. If IsFixedLengthArrayBuffer(O) is false, return true.
+        // 4. If IsFixedLengthArrayBuffer(obj) is false, return true.
         // 5. Return false.
         return Value.from(!isFixedLengthArrayBuffer(array_buffer));
     }
@@ -350,11 +349,11 @@ pub const prototype = struct {
     /// 25.2.5.5 get SharedArrayBuffer.prototype.maxByteLength
     /// https://tc39.es/ecma262/#sec-get-sharedarraybuffer.prototype.maxbytelength
     fn maxByteLength(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[ArrayBufferData]]).
         const array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
 
-        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        // 3. If IsSharedArrayBuffer(obj) is false, throw a TypeError exception.
         if (!isSharedArrayBuffer(array_buffer)) {
             return agent.throwException(
                 .type_error,
@@ -363,13 +362,13 @@ pub const prototype = struct {
             );
         }
 
-        // 4. If IsFixedLengthArrayBuffer(O) is true, then
+        // 4. If IsFixedLengthArrayBuffer(obj) is true, then
         const length = if (isFixedLengthArrayBuffer(array_buffer)) blk: {
-            // a. Let length be O.[[ArrayBufferByteLength]].
+            // a. Let length be obj.[[ArrayBufferByteLength]].
             break :blk array_buffer.fields.byte_length;
         } else blk: {
             // 5. Else,
-            // a. Let length be O.[[ArrayBufferMaxByteLength]].
+            // a. Let length be obj.[[ArrayBufferMaxByteLength]].
             break :blk array_buffer.fields.max_byte_length.unwrap().?;
         };
 
@@ -384,11 +383,11 @@ pub const prototype = struct {
         const start = arguments.get(0);
         const end = arguments.get(1);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[ArrayBufferData]]).
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[ArrayBufferData]]).
         const array_buffer = try this_value.requireInternalSlot(agent, ArrayBuffer);
 
-        // 3. If IsSharedArrayBuffer(O) is false, throw a TypeError exception.
+        // 3. If IsSharedArrayBuffer(obj) is false, throw a TypeError exception.
         if (!isSharedArrayBuffer(array_buffer)) {
             return agent.throwException(
                 .type_error,
@@ -397,9 +396,9 @@ pub const prototype = struct {
             );
         }
 
-        // 4. Let len be ArrayBufferByteLength(O, seq-cst).
-        const len = arrayBufferByteLength(array_buffer, .seq_cst);
-        const len_f64: f64 = @floatFromInt(@intFromEnum(len));
+        // 4. Let length be ArrayBufferByteLength(obj, seq-cst).
+        const length = arrayBufferByteLength(array_buffer, .seq_cst);
+        const length_f64: f64 = @floatFromInt(@intFromEnum(length));
 
         // 5. Let relativeStart be ? ToIntegerOrInfinity(start).
         const relative_start = try start.toIntegerOrInfinity(agent);
@@ -408,18 +407,18 @@ pub const prototype = struct {
         const first_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
             break :blk 0;
         } else if (relative_start < 0) blk: {
-            // 7. Else if relativeStart < 0, let first be max(len + relativeStart, 0).
-            break :blk @max(len_f64 + relative_start, 0);
+            // 7. Else if relativeStart < 0, let first be max(length + relativeStart, 0).
+            break :blk @max(length_f64 + relative_start, 0);
         } else blk: {
-            // 8. Else, let first be min(relativeStart, len).
-            break :blk @min(relative_start, len_f64);
+            // 8. Else, let first be min(relativeStart, length).
+            break :blk @min(relative_start, length_f64);
         };
         const first: u53 = @intFromFloat(first_f64);
 
-        // 9. If end is undefined, let relativeEnd be len; else let relativeEnd be
+        // 9. If end is undefined, let relativeEnd be length; else let relativeEnd be
         //    ? ToIntegerOrInfinity(end).
         const relative_end = if (end.isUndefined())
-            len_f64
+            length_f64
         else
             try end.toIntegerOrInfinity(agent);
 
@@ -427,24 +426,24 @@ pub const prototype = struct {
         const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
             break :blk 0;
         } else if (relative_end < 0) blk: {
-            // 11. Else if relativeEnd < 0, let final be max(len + relativeEnd, 0).
-            break :blk @max(len_f64 + relative_end, 0);
+            // 11. Else if relativeEnd < 0, let final be max(length + relativeEnd, 0).
+            break :blk @max(length_f64 + relative_end, 0);
         } else blk: {
-            // 12. Else, let final be min(relativeEnd, len).
-            break :blk @min(relative_end, len_f64);
+            // 12. Else, let final be min(relativeEnd, length).
+            break :blk @min(relative_end, length_f64);
         };
 
-        // 13. Let newLen be max(final - first, 0).
-        const new_len: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
+        // 13. Let newLength be max(final - first, 0).
+        const new_length: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
 
-        // 14. Let ctor be ? SpeciesConstructor(O, %SharedArrayBuffer%).
-        const constructor_ = try array_buffer.object.speciesConstructor(
+        // 14. Let ctor be ? SpeciesConstructor(obj, %SharedArrayBuffer%).
+        const ctor = try array_buffer.object.speciesConstructor(
             agent,
             try realm.intrinsics.@"%SharedArrayBuffer%"(),
         );
 
-        // 15. Let new be ? Construct(ctor, « 𝔽(newLen) »).
-        const new_object = try constructor_.construct(agent, &.{Value.from(new_len)}, null);
+        // 15. Let new be ? Construct(ctor, « 𝔽(newLength) »).
+        const new_object = try ctor.construct(agent, &.{Value.from(new_length)}, null);
 
         // 16. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
         const new = try Value.from(new_object).requireInternalSlot(agent, ArrayBuffer);
@@ -458,7 +457,7 @@ pub const prototype = struct {
             );
         }
 
-        // 18. If new.[[ArrayBufferData]] is O.[[ArrayBufferData]], throw a TypeError exception.
+        // 18. If new.[[ArrayBufferData]] is obj.[[ArrayBufferData]], throw a TypeError exception.
         if (new.fields.data_block.?.bytes.ptr == array_buffer.fields.data_block.?.bytes.ptr) {
             return agent.throwException(
                 .type_error,
@@ -467,19 +466,19 @@ pub const prototype = struct {
             );
         }
 
-        // 19. If ArrayBufferByteLength(new, seq-cst) < newLen, throw a TypeError exception.
-        if (@intFromEnum(arrayBufferByteLength(new, .seq_cst)) < new_len) {
+        // 19. If ArrayBufferByteLength(new, seq-cst) < newLength, throw a TypeError exception.
+        if (@intFromEnum(arrayBufferByteLength(new, .seq_cst)) < new_length) {
             return agent.throwException(.type_error, "SharedArrayBuffer is too small", .{});
         }
 
-        // 20. Let fromBuf be O.[[ArrayBufferData]].
+        // 20. Let fromBuf be obj.[[ArrayBufferData]].
         const from_buf = array_buffer.fields.data_block.?;
 
         // 21. Let toBuf be new.[[ArrayBufferData]].
         const to_buf = new.fields.data_block.?;
 
-        // 22. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLen).
-        copyDataBlockBytes(to_buf, 0, from_buf, first, new_len);
+        // 22. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLength).
+        copyDataBlockBytes(to_buf, 0, from_buf, first, new_length);
 
         // 23. Return new.
         return Value.from(&new.object);

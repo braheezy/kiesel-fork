@@ -23,7 +23,7 @@ declarative_environment: DeclarativeEnvironment,
 
 pub const IndirectBinding = struct {
     module: Module,
-    binding_name: *const String,
+    target_name: *const String,
 };
 
 pub fn hasBinding(self: *const ModuleEnvironment, name: *const String) bool {
@@ -32,7 +32,7 @@ pub fn hasBinding(self: *const ModuleEnvironment, name: *const String) bool {
     return self.indirect_bindings.contains(name) or self.declarative_environment.bindings.contains(name);
 }
 
-/// 9.1.1.5.1 GetBindingValue ( N, S )
+/// 9.1.1.5.1 GetBindingValue ( name, strict )
 /// https://tc39.es/ecma262/#sec-module-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
     self: *const ModuleEnvironment,
@@ -40,19 +40,20 @@ pub fn getBindingValue(
     name: *const String,
     strict: bool,
 ) error{ ExceptionThrown, OutOfMemory }!Value {
-    // 1. Assert: S is true.
+    // 1. Assert: strict is true.
     std.debug.assert(strict);
 
-    // 2. Assert: envRec has a binding for N.
+    // 2. Assert: envRecord has a binding for name.
     std.debug.assert(self.hasBinding(name));
 
-    // 3. If the binding for N is an indirect binding, then
+    // 3. If the binding for name is an indirect binding, then
     if (self.indirect_bindings.get(name)) |indirect_binding| {
-        // a. Let M and N2 be the indirection values provided when this binding for N was created.
+        // a. Let module and targetName be the indirection values provided when this binding for
+        //    name was created.
         const module = indirect_binding.module;
-        const binding_name = indirect_binding.binding_name;
+        const target_name = indirect_binding.target_name;
 
-        // b. Let targetEnv be M.[[Environment]].
+        // b. Let targetEnv be module.[[Environment]].
         const maybe_target_env = switch (module) {
             inline else => |m| m.environment,
         };
@@ -67,13 +68,13 @@ pub fn getBindingValue(
             );
         };
 
-        // d. Return ? targetEnv.GetBindingValue(N2, true).
-        return target_env.getBindingValue(agent, binding_name, true);
+        // d. Return ? targetEnv.GetBindingValue(targetName, true).
+        return target_env.getBindingValue(agent, target_name, true);
     }
 
     const binding = self.declarative_environment.bindings.get(name).?;
 
-    // 4. If the binding for N in envRec is an uninitialized binding, throw a ReferenceError
+    // 4. If the binding for name in envRecord is an uninitialized binding, throw a ReferenceError
     //    exception.
     if (!binding.initialized) {
         @branchHint(.unlikely);
@@ -84,7 +85,7 @@ pub fn getBindingValue(
         );
     }
 
-    // 5. Return the value currently bound to N in envRec.
+    // 5. Return the value currently bound to name in envRecord.
     return binding.value;
 }
 
@@ -109,7 +110,7 @@ pub fn setMutableBinding(
     return self.declarative_environment.setMutableBinding(agent, name, value, strict);
 }
 
-/// 9.1.1.5.2 DeleteBinding ( N )
+/// 9.1.1.5.2 DeleteBinding ( name )
 /// https://tc39.es/ecma262/#sec-module-environment-records-deletebinding-n
 pub fn deleteBinding(_: *ModuleEnvironment, _: *const String) bool {
     // The DeleteBinding concrete method of a Module Environment Record is never used within this
@@ -131,22 +132,23 @@ pub fn getThisBinding(_: *const ModuleEnvironment) Value {
     return .undefined;
 }
 
-/// 9.1.1.5.5 CreateImportBinding ( envRec, N, M, N2 )
+/// 9.1.1.5.5 CreateImportBinding ( envRecord, name, targetModule, targetName )
 /// https://tc39.es/ecma262/#sec-createimportbinding
 pub fn createImportBinding(
     self: *ModuleEnvironment,
     agent: *Agent,
     name: *const String,
     module: Module,
-    binding_name: *const String,
+    target_name: *const String,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: envRec does not already have a binding for N.
-    // 2. Assert: When M.[[Environment]] is instantiated, it will have a direct binding for N2.
-    // 3. Create an immutable indirect binding in envRec for N that references M and N2 as its
-    //    target binding and record that the binding is initialized.
+    // 1. Assert: envRecord does not already have a binding for name.
+    // 2. Assert: When targetModule.[[Environment]] is instantiated, it will have a direct binding
+    //    for targetName.
+    // 3. Create an immutable indirect binding in envRecord for name that references targetModule
+    //    and targetName as its target binding and record that the binding is initialized.
     try self.indirect_bindings.putNoClobber(agent.gc_allocator, name, .{
         .module = module,
-        .binding_name = binding_name,
+        .target_name = target_name,
     });
 
     // 4. Return unused.
@@ -160,7 +162,7 @@ pub fn getBindingValueIfExists(
 ) Agent.Error!?Value {
     if (self.indirect_bindings.get(name)) |indirect_binding| {
         const module = indirect_binding.module;
-        const binding_name = indirect_binding.binding_name;
+        const target_name = indirect_binding.target_name;
         const maybe_target_env = switch (module) {
             inline else => |m| m.environment,
         };
@@ -172,7 +174,7 @@ pub fn getBindingValueIfExists(
                 .{},
             );
         };
-        return try target_env.getBindingValue(agent, binding_name, true);
+        return try target_env.getBindingValue(agent, target_name, true);
     }
     return self.declarative_environment.getBindingValueIfExists(agent, name);
 }

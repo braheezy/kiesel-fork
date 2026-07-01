@@ -144,7 +144,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Locale",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -415,20 +415,21 @@ pub const constructor = struct {
         // NOTE: This is done as part of step 32.a.
 
         locale.fields = .{
-            // 35. Let r be MakeLocaleRecord(tag, opt, localeExtensionKeys).
-            // 36. Set locale.[[Locale]] to r.[[locale]].
-            // 37. Set locale.[[Calendar]] to r.[[ca]].
-            // 38. Set locale.[[Collation]] to r.[[co]].
-            // 39. Set locale.[[FirstDayOfWeek]] to r.[[fw]].
-            // 40. Set locale.[[HourCycle]] to r.[[hc]].
+            // 35. Let localeRecord be MakeLocaleRecord(tag, opt, localeExtensionKeys).
+            // 36. Set locale.[[Locale]] to localeRecord.[[locale]].
+            // 37. Set locale.[[Calendar]] to localeRecord.[[ca]].
+            // 38. Set locale.[[Collation]] to localeRecord.[[co]].
+            // 39. Set locale.[[FirstDayOfWeek]] to localeRecord.[[fw]].
+            // 40. Set locale.[[HourCycle]] to localeRecord.[[hc]].
             // 41. If localeExtensionKeys contains "kf", then
-            //     a. Set locale.[[CaseFirst]] to r.[[kf]].
+            //     a. Set locale.[[CaseFirst]] to localeRecord.[[kf]].
             // 42. If localeExtensionKeys contains "kn", then
-            //     a. If SameValue(r.[[kn]], "true") is true or r.[[kn]] is the empty String, then
+            //     a. If SameValue(localeRecord.[[kn]], "true") is true or localeRecord.[[kn]] is
+            //        the empty String, then
             //         i. Set locale.[[Numeric]] to true.
             //     b. Else,
             //         i. Set locale.[[Numeric]] to false.
-            // 43. Set locale.[[NumberingSystem]] to r.[[nu]].
+            // 43. Set locale.[[NumberingSystem]] to localeRecord.[[nu]].
             .locale = tag,
         };
 
@@ -783,9 +784,9 @@ pub const Locale = MakeObject(.{
 /// https://tc39.es/ecma402/#sec-weekdaytouvalue
 fn weekdayToUValue(weekday: []const u8) []const u8 {
     // 1. For each row of Table 26, except the header row, in table order, do
-    //     a. Let w be the Weekday value of the current row.
-    //     b. Let s be the String value of the current row.
-    //     c. If fw is equal to w, return s.
+    //     a. Let weekday be the Weekday value of the current row.
+    //     b. Let string be the String value of the current row.
+    //     c. If fw is equal to weekday, return string.
     // 2. Return fw.
     return std.StaticStringMap([]const u8).initComptime(&.{
         .{ "0", "sun" },

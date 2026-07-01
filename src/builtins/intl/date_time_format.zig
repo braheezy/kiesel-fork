@@ -86,18 +86,18 @@ pub fn createDateTimeFormat(
     // 5. Set options to optionsResolution.[[Options]].
     const options = options_resolution.options;
 
-    // 6. Let r be optionsResolution.[[ResolvedLocale]].
-    const r = options_resolution.resolved_locale;
-    const locale = r.locale;
+    // 6. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+    const resolved_locale = options_resolution.resolved_locale;
+    const locale = resolved_locale.locale;
 
-    // 7. Set dateTimeFormat.[[Locale]] to r.[[Locale]].
+    // 7. Set dateTimeFormat.[[Locale]] to resolvedLocale.[[Locale]].
     date_time_format.fields.locale = locale;
 
-    // 8. Let resolvedCalendar be r.[[ca]].
+    // 8. Let resolvedCalendar be resolvedLocale.[[ca]].
     const resolved_calendar = if (try locale.getUnicodeExtension(agent.gc_allocator, "ca")) |ca|
         try String.fromAscii(agent, ca)
     else
-        r.options.ca orelse String.fromLiteral("gregory");
+        resolved_locale.options.ca orelse String.fromLiteral("gregory");
     const calendar = std.StaticStringMap(icu4zig.Calendar.Kind).initComptime(&.{
         .{ "buddhist", .buddhist },
         .{ "chinese", .chinese },
@@ -121,11 +121,11 @@ pub fn createDateTimeFormat(
     // 9. Set dateTimeFormat.[[Calendar]] to resolvedCalendar.
     date_time_format.fields.calendar = calendar;
 
-    // 10. Set dateTimeFormat.[[NumberingSystem]] to r.[[nu]].
+    // 10. Set dateTimeFormat.[[NumberingSystem]] to resolvedLocale.[[nu]].
     const numbering_system = if (try locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
         try String.fromAscii(agent, nu)
     else
-        r.options.nu orelse String.fromLiteral("latn");
+        resolved_locale.options.nu orelse String.fromLiteral("latn");
     date_time_format.fields.numbering_system = numbering_system;
 
     // TODO: 11-14.
@@ -228,11 +228,11 @@ pub fn createDateTimeFormat(
             String.fromLiteral("longGeneric"),
         } },
     }) |property_and_values| {
-        // a. Let prop be the name given in the Property column of the current row.
-        const property, const values = property_and_values;
+        // a. Let propertyKey be the name given in the Property column of the current row.
+        const property_key, const values = property_and_values;
 
-        // b. If prop is "fractionalSecondDigits", then
-        const value = if (comptime std.mem.eql(u8, property, "fractionalSecondDigits")) blk: {
+        // b. If propertyKey is "fractionalSecondDigits", then
+        const value = if (comptime std.mem.eql(u8, property_key, "fractionalSecondDigits")) blk: {
             // i. Let value be ? GetNumberOption(options, "fractionalSecondDigits", 1, 3,
             //    undefined).
             break :blk try getNumberOption(
@@ -247,11 +247,11 @@ pub fn createDateTimeFormat(
             // c. Else,
             // i. Let values be a List whose elements are the strings given in the Values column of
             //    the current row.
-            // ii. Let value be ? GetOption(options, prop, string, values, undefined).
-            break :blk try options.getOption(agent, property, .string, values, null);
+            // ii. Let value be ? GetOption(options, propertyKey, string, values, undefined).
+            break :blk try options.getOption(agent, property_key, .string, values, null);
         };
 
-        // TODO: d. Set formatOptions.[[<prop>]] to value.
+        // TODO: d. Set formatOptions.[[<propertyKey>]] to value.
 
         // e. If value is not undefined, then
         if (value != null) {
@@ -389,7 +389,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "DateTimeFormat",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -488,26 +488,27 @@ pub const prototype = struct {
         );
 
         // 5. For each row of Table 15, except the header row, in table order, do
-        //     a. Let p be the Property value of the current row.
+        //     a. Let propertyKey be the Property value of the current row.
         //     b. If there is an Internal Slot value in the current row, then
-        //         i. Let v be the value of dtf's internal slot whose name is the Internal Slot
+        //         i. Let value be the value of dtf's internal slot whose name is the Internal Slot
         //            value of the current row.
         //     c. Else,
         //         i. Let format be dtf.[[DateTimeFormat]].
-        //         ii. If format has a field [[<p>]] and dtf.[[DateStyle]] is undefined and
-        //             dtf.[[TimeStyle]] is undefined, then
-        //             1. Let v be format.[[<p>]].
+        //         ii. If format has a field [[<propertyKey>]] and dtf.[[DateStyle]] is undefined
+        //             and dtf.[[TimeStyle]] is undefined, then
+        //             1. Let value be format.[[<propertyKey>]].
         //         iii. Else,
-        //             1. Let v be undefined.
-        //     d. If v is not undefined, then
+        //             1. Let value be undefined.
+        //     d. If value is not undefined, then
         //         i. If there is a Conversion value in the current row, then
         //             1. Let conversion be the Conversion value of the current row.
         //             2. If conversion is hour12, then
-        //                 a. If v is "h11" or "h12", set v to true. Otherwise, set v to false.
+        //                 a. If value is "h11" or "h12", set value to true. Otherwise, set value to
+        //                    false.
         //             3. Else,
         //                 a. Assert: conversion is number.
-        //                 b. Set v to 𝔽(v).
-        //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //                 b. Set value to 𝔽(value).
+        //         ii. Perform ! CreateDataPropertyOrThrow(options, propertyKey, value).
         const resolved_options = date_time_format.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,
@@ -567,9 +568,9 @@ pub const prototype = struct {
 
         // 4. If dtf.[[BoundFormat]] is undefined, then
         if (date_time_format.fields.bound_format == null) {
-            // a. Let F be a new built-in function object as defined in DateTime Format Functions
+            // a. Let func be a new built-in function object as defined in DateTime Format Functions
             //    (11.5.4).
-            // b. Set F.[[DateTimeFormat]] to dtf.
+            // b. Set func.[[DateTimeFormat]] to dtf.
             const Captures = struct {
                 date_time_format: *DateTimeFormat,
             };
@@ -585,7 +586,7 @@ pub const prototype = struct {
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
                     const date = arguments.get(0);
 
-                    // 1. Let dtf be F.[[DateTimeFormat]].
+                    // 1. Let dtf be func.[[DateTimeFormat]].
                     // 2. Assert: dtf is an Object and dtf has an [[InitializedDateTimeFormat]]
                     //    internal slot.
                     const date_time_format_ = captures_.date_time_format;
@@ -614,7 +615,7 @@ pub const prototype = struct {
                 .{ .additional_fields = captures },
             );
 
-            // c. Set dtf.[[BoundFormat]] to F.
+            // c. Set dtf.[[BoundFormat]] to func.
             date_time_format.fields.bound_format = bound_format;
         }
 

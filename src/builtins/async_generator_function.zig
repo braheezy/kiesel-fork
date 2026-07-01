@@ -25,7 +25,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "AsyncGeneratorFunction",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function%"() },
         );
         return &builtin_function.object;
     }
@@ -41,25 +41,26 @@ pub const constructor = struct {
         );
     }
 
-    /// 27.4.1.1 AsyncGeneratorFunction ( ...parameterArgs, bodyArg )
+    /// 27.4.1.1 AsyncGeneratorFunction ( ...paramArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-asyncgeneratorfunction
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
-        const parameter_args = arguments.values[0..arguments.count() -| 1];
+        const param_args = arguments.values[0..arguments.count() -| 1];
         const maybe_body_arg = arguments.getOrNull(arguments.count() -| 1);
 
-        // 1. Let C be the active function object.
-        const constructor_ = agent.activeFunctionObject();
+        // 1. Let activeFunc be the active function object.
+        const active_func = agent.activeFunctionObject();
 
         // 2. If bodyArg is not present, set bodyArg to the empty String.
         const body_arg = maybe_body_arg orelse Value.from("");
 
-        // 3. Return ? CreateDynamicFunction(C, NewTarget, async-generator, parameterArgs, bodyArg).
+        // 3. Return ? CreateDynamicFunction(activeFunc, NewTarget, async-generator, paramArgs,
+        //    bodyArg).
         const ecmascript_function = try createDynamicFunction(
             agent,
-            constructor_,
+            active_func,
             new_target,
             .async_generator,
-            parameter_args,
+            param_args,
             body_arg,
         );
         return Value.from(&ecmascript_function.object);

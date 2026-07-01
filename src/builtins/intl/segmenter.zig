@@ -33,7 +33,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Segmenter",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -89,11 +89,11 @@ pub const constructor = struct {
         // 5. Set options to optionsResolution.[[Options]].
         const options = options_resolution.options;
 
-        // 6. Let r be optionsResolution.[[ResolvedLocale]].
-        const r = options_resolution.resolved_locale;
-        const locale = r.locale;
+        // 6. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+        const resolved_locale = options_resolution.resolved_locale;
+        const locale = resolved_locale.locale;
 
-        // 7. Set segmenter.[[Locale]] to r.[[Locale]].
+        // 7. Set segmenter.[[Locale]] to resolvedLocale.[[Locale]].
         segmenter.fields.locale = locale;
 
         // 8. Let granularity be ? GetOption(options, "granularity", string, « "grapheme", "word",
@@ -174,11 +174,11 @@ pub const prototype = struct {
         );
 
         // 4. For each row of Table 34, except the header row, in table order, do
-        //     a. Let p be the Property value of the current row.
-        //     b. Let v be the value of segmenter's internal slot whose name is the Internal Slot
-        //        value of the current row.
-        //     c. Assert: v is not undefined.
-        //     d. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //     a. Let propertyKey be the Property value of the current row.
+        //     b. Let value be the value of segmenter's internal slot whose name is the Internal
+        //        Slot value of the current row.
+        //     c. Assert: value is not undefined.
+        //     d. Perform ! CreateDataPropertyOrThrow(options, propertyKey, value).
         const resolved_options = segmenter.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,
@@ -315,11 +315,11 @@ pub fn findBoundary(
     start_index: u32,
     direction: enum { before, after },
 ) Boundary {
-    // 1. Let len be the length of string.
-    const len = string.length;
+    // 1. Let length be the length of string.
+    const length = string.length;
 
-    // 2. Assert: startIndex < len.
-    std.debug.assert(start_index < len);
+    // 2. Assert: startIndex < length.
+    std.debug.assert(start_index < length);
 
     // 3. Let locale be segmenter.[[Locale]].
 
@@ -346,8 +346,8 @@ pub fn findBoundary(
     // 8. If a boundary is found, return the count of code units in string preceding it.
     if (findBoundaryAfter(string, start_index, granularity)) |boundary| return boundary;
 
-    // 9. Return len.
-    return .{ .index = len };
+    // 9. Return length.
+    return .{ .index = length };
 }
 
 fn findBoundaryBefore(

@@ -83,18 +83,18 @@ fn daysFromCivil(y_: i64, m: i32, d: i32) i64 {
     return era * 146097 + doe - 719468;
 }
 
-/// 21.4.1.3 Day ( t )
+/// 21.4.1.3 Day ( tv )
 /// https://tc39.es/ecma262/#sec-day
-pub fn day(t: f64) f64 {
-    // 1. Return 𝔽(floor(ℝ(t / msPerDay))).
-    return std.math.floor(t / std.time.ms_per_day);
+pub fn day(tv: f64) f64 {
+    // 1. Return 𝔽(floor(ℝ(tv / msPerDay))).
+    return std.math.floor(tv / std.time.ms_per_day);
 }
 
-/// 21.4.1.4 TimeWithinDay ( t )
+/// 21.4.1.4 TimeWithinDay ( tv )
 /// https://tc39.es/ecma262/#sec-timewithinday
-pub fn timeWithinDay(t: f64) f64 {
-    // 1. Return 𝔽(ℝ(t) modulo ℝ(msPerDay)).
-    return @mod(t, std.time.ms_per_day);
+pub fn timeWithinDay(tv: f64) f64 {
+    // 1. Return 𝔽(ℝ(tv) modulo ℝ(msPerDay)).
+    return @mod(tv, std.time.ms_per_day);
 }
 
 /// 21.4.1.5 DaysInYear ( y )
@@ -119,24 +119,25 @@ pub fn daysInYear(year: Year) DaysInYear {
 /// https://tc39.es/ecma262/#sec-dayfromyear
 pub fn dayFromYear(year: Year) f64 {
     // 1. Let ry be ℝ(y).
-    // 2. NOTE: In the following steps, numYears1, numYears4, numYears100, and numYears400 represent
-    //    the number of years divisible by 1, 4, 100, and 400, respectively, that occur between the
-    //    epoch and the start of year y. The number is negative if y is before the epoch.
+    // 2. NOTE: In the following steps, numberYears1, numberYears4, numberYears100, and
+    //    numberYears400 represent the number of years divisible by 1, 4, 100, and 400,
+    //    respectively, that occur between the epoch and the start of year y. The number is negative
+    //    if y is before the epoch.
 
-    // 3. Let numYears1 be (ry - 1970).
-    const num_years_1: f64 = @floatFromInt(year - 1970);
+    // 3. Let numberYears1 be (ry - 1970).
+    const number_years_1: f64 = @floatFromInt(year - 1970);
 
-    // 4. Let numYears4 be floor((ry - 1969) / 4).
-    const num_years_4: f64 = @floatFromInt(@divFloor(year - 1969, 4));
+    // 4. Let numberYears4 be floor((ry - 1969) / 4).
+    const number_years_4: f64 = @floatFromInt(@divFloor(year - 1969, 4));
 
-    // 5. Let numYears100 be floor((ry - 1901) / 100).
-    const num_years_100: f64 = @floatFromInt(@divFloor(year - 1901, 100));
+    // 5. Let numberYears100 be floor((ry - 1901) / 100).
+    const number_years_100: f64 = @floatFromInt(@divFloor(year - 1901, 100));
 
-    // 6. Let numYears400 be floor((ry - 1601) / 400).
-    const num_years_400: f64 = @floatFromInt(@divFloor(year - 1601, 400));
+    // 6. Let numberYears400 be floor((ry - 1601) / 400).
+    const number_years_400: f64 = @floatFromInt(@divFloor(year - 1601, 400));
 
-    // 7. Return 𝔽(365 × numYears1 + numYears4 - numYears100 + numYears400).
-    return 365 * num_years_1 + num_years_4 - num_years_100 + num_years_400;
+    // 7. Return 𝔽(365 × numberYears1 + numberYears4 - numberYears100 + numberYears400).
+    return 365 * number_years_1 + number_years_4 - number_years_100 + number_years_400;
 }
 
 /// 21.4.1.7 TimeFromYear ( y )
@@ -146,40 +147,40 @@ pub fn timeFromYear(year: Year) f64 {
     return std.time.ms_per_day * dayFromYear(year);
 }
 
-/// 21.4.1.8 YearFromTime ( t )
+/// 21.4.1.8 YearFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-yearfromtime
-pub fn yearFromTime(t: f64) Year {
-    // 1. Return the largest integral Number y (closest to +∞) such that TimeFromYear(y) ≤ t.
-    const year: Year = @intFromFloat(@divFloor(t, (365.2425 * std.time.ms_per_day)) + 1970);
+pub fn yearFromTime(tv: f64) Year {
+    // 1. Return the largest integral Number y (closest to +∞) such that TimeFromYear(y) ≤ tv.
+    const year: Year = @intFromFloat(@divFloor(tv, (365.2425 * std.time.ms_per_day)) + 1970);
     const t2 = timeFromYear(year);
-    if (t2 > t) return year - 1;
-    if (t2 + @as(f64, @floatFromInt(daysInYear(year))) * std.time.ms_per_day <= t) return year + 1;
+    if (t2 > tv) return year - 1;
+    if (t2 + @as(f64, @floatFromInt(daysInYear(year))) * std.time.ms_per_day <= tv) return year + 1;
     return year;
 }
 
-/// 21.4.1.9 DayWithinYear ( t )
+/// 21.4.1.9 DayWithinYear ( tv )
 /// https://tc39.es/ecma262/#sec-daywithinyear
-pub fn dayWithinYear(t: f64) DayWithinYear {
-    // 1. Return Day(t) - DayFromYear(YearFromTime(t)).
-    return @intFromFloat(day(t) - dayFromYear(yearFromTime(t)));
+pub fn dayWithinYear(tv: f64) DayWithinYear {
+    // 1. Return Day(tv) - DayFromYear(YearFromTime(tv)).
+    return @intFromFloat(day(tv) - dayFromYear(yearFromTime(tv)));
 }
 
-/// 21.4.1.10 InLeapYear ( t )
+/// 21.4.1.10 InLeapYear ( tv )
 /// https://tc39.es/ecma262/#sec-inleapyear
-pub fn inLeapYear(t: f64) bool {
-    // 1. If DaysInYear(YearFromTime(t)) is 366𝔽, return 1𝔽.
+pub fn inLeapYear(tv: f64) bool {
+    // 1. If DaysInYear(YearFromTime(tv)) is 366𝔽, return 1𝔽.
     // 2. Return +0𝔽.
-    return daysInYear(yearFromTime(t)) == 366;
+    return daysInYear(yearFromTime(tv)) == 366;
 }
 
-/// 21.4.1.11 MonthFromTime ( t )
+/// 21.4.1.11 MonthFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-monthfromtime
-pub fn monthFromTime(t: f64) Month {
-    // 1. Let inLeapYear be InLeapYear(t).
-    const in_leap_year: DayWithinYear = @intFromBool(inLeapYear(t));
+pub fn monthFromTime(tv: f64) Month {
+    // 1. Let inLeapYear be InLeapYear(tv).
+    const in_leap_year: DayWithinYear = @intFromBool(inLeapYear(tv));
 
-    // 2. Let dayWithinYear be DayWithinYear(t).
-    const day_within_year = dayWithinYear(t);
+    // 2. Let dayWithinYear be DayWithinYear(tv).
+    const day_within_year = dayWithinYear(tv);
 
     // 3. If dayWithinYear < 31𝔽, return +0𝔽.
     if (day_within_year < 31) return 0;
@@ -221,17 +222,17 @@ pub fn monthFromTime(t: f64) Month {
     return 11;
 }
 
-/// 21.4.1.12 DateFromTime ( t )
+/// 21.4.1.12 DateFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-datefromtime
-pub fn dateFromTime(t: f64) Date_ {
-    // 1. Let inLeapYear be InLeapYear(t).
-    const in_leap_year: DayWithinYear = @intFromBool(inLeapYear(t));
+pub fn dateFromTime(tv: f64) Date_ {
+    // 1. Let inLeapYear be InLeapYear(tv).
+    const in_leap_year: DayWithinYear = @intFromBool(inLeapYear(tv));
 
-    // 2. Let dayWithinYear be DayWithinYear(t).
-    const day_within_year = dayWithinYear(t);
+    // 2. Let dayWithinYear be DayWithinYear(tv).
+    const day_within_year = dayWithinYear(tv);
 
-    // 3. Let month be MonthFromTime(t).
-    const month = monthFromTime(t);
+    // 3. Let month be MonthFromTime(tv).
+    const month = monthFromTime(tv);
 
     // 4. If month is +0𝔽, return dayWithinYear + 1𝔽.
     if (month == 0) return @intCast(day_within_year + 1);
@@ -273,39 +274,39 @@ pub fn dateFromTime(t: f64) Date_ {
     return @intCast(day_within_year - 333 - in_leap_year);
 }
 
-/// 21.4.1.13 WeekDay ( t )
+/// 21.4.1.13 WeekDay ( tv )
 /// https://tc39.es/ecma262/#sec-weekday
-pub fn weekDay(t: f64) WeekDay {
-    // 1. Return 𝔽(ℝ(Day(t) + 4𝔽) modulo 7).
-    return @intFromFloat(@mod(day(t) + 4, 7));
+pub fn weekDay(tv: f64) WeekDay {
+    // 1. Return 𝔽(ℝ(Day(tv) + 4𝔽) modulo 7).
+    return @intFromFloat(@mod(day(tv) + 4, 7));
 }
 
-/// 21.4.1.14 HourFromTime ( t )
+/// 21.4.1.14 HourFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-hourfromtime
-pub fn hourFromTime(t: f64) Hour {
-    // 1. Return 𝔽(floor(ℝ(t / msPerHour)) modulo HoursPerDay).
-    return @intFromFloat(@mod(std.math.floor(t / std.time.ms_per_hour), hours_per_day));
+pub fn hourFromTime(tv: f64) Hour {
+    // 1. Return 𝔽(floor(ℝ(tv / msPerHour)) modulo HoursPerDay).
+    return @intFromFloat(@mod(std.math.floor(tv / std.time.ms_per_hour), hours_per_day));
 }
 
-/// 21.4.1.15 MinFromTime ( t )
+/// 21.4.1.15 MinFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-minfromtime
-pub fn minFromTime(t: f64) Minute {
-    // 1. Return 𝔽(floor(ℝ(t / msPerMinute)) modulo MinutesPerHour).
-    return @intFromFloat(@mod(std.math.floor(t / std.time.ms_per_min), minutes_per_hour));
+pub fn minFromTime(tv: f64) Minute {
+    // 1. Return 𝔽(floor(ℝ(tv / msPerMinute)) modulo MinutesPerHour).
+    return @intFromFloat(@mod(std.math.floor(tv / std.time.ms_per_min), minutes_per_hour));
 }
 
-/// 21.4.1.16 SecFromTime ( t )
+/// 21.4.1.16 SecFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-secfromtime
-pub fn secFromTime(t: f64) Second {
-    // 1. Return 𝔽(floor(ℝ(t / msPerSecond)) modulo SecondsPerMinute).
-    return @intFromFloat(@mod(std.math.floor(t / std.time.ms_per_s), std.time.s_per_min));
+pub fn secFromTime(tv: f64) Second {
+    // 1. Return 𝔽(floor(ℝ(tv / msPerSecond)) modulo SecondsPerMinute).
+    return @intFromFloat(@mod(std.math.floor(tv / std.time.ms_per_s), std.time.s_per_min));
 }
 
-/// 21.4.1.17 msFromTime ( t )
+/// 21.4.1.17 msFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-msfromtime
-pub fn msFromTime(t: f64) Millisecond {
-    // 1. Return 𝔽(ℝ(t) modulo ℝ(msPerSecond)).
-    return @intFromFloat(@mod(t, std.time.ms_per_s));
+pub fn msFromTime(tv: f64) Millisecond {
+    // 1. Return 𝔽(ℝ(tv) modulo ℝ(msPerSecond)).
+    return @intFromFloat(@mod(tv, std.time.ms_per_s));
 }
 
 /// 21.4.1.21 GetNamedTimeZoneOffsetNanoseconds ( timeZoneIdentifier, epochNanoseconds )
@@ -326,9 +327,9 @@ pub fn systemTimeZoneIdentifier(platform: *const Agent.Platform) Agent.Platform.
     return platform.default_time_zone;
 }
 
-/// 21.4.1.25 LocalTime ( t )
+/// 21.4.1.25 LocalTime ( tv )
 /// https://tc39.es/ecma262/#sec-localtime
-pub fn localTime(platform: *const Agent.Platform, t: f64) f64 {
+pub fn localTime(platform: *const Agent.Platform, tv: f64) f64 {
     // 1. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
     const time_zone = systemTimeZoneIdentifier(platform);
 
@@ -341,15 +342,15 @@ pub fn localTime(platform: *const Agent.Platform, t: f64) f64 {
     } else blk: {
         // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
-        //    ℤ(ℝ(t) × 10**6)).
-        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, t * 1_000_000);
+        //    ℤ(ℝ(tv) × 10**6)).
+        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, tv * 1_000_000);
     };
 
     // 4. Let offsetMs be truncate(offsetNs / 10**6).
     const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 1_000_000);
 
-    // 5. Return t + 𝔽(offsetMs).
-    return t + offset_ms;
+    // 5. Return tv + 𝔽(offsetMs).
+    return tv + offset_ms;
 }
 
 /// 21.4.1.26 UTC ( t )
@@ -436,8 +437,8 @@ pub fn makeDay(year: f64, month: f64, date: f64) f64 {
     // 7. Let mn be 𝔽(ℝ(m) modulo 12).
     const mn = @mod(m, 12);
 
-    // 8. Find a finite time value t such that YearFromTime(t) is ym, MonthFromTime(t) is mn, and
-    //    DateFromTime(t) is 1𝔽; but if this is not possible (because some argument is out of
+    // 8. Find a finite time value tv such that YearFromTime(tv) is ym, MonthFromTime(tv) is mn, and
+    //    DateFromTime(tv) is 1𝔽; but if this is not possible (because some argument is out of
     //    range), return NaN.
     if (ym < @as(f64, @floatFromInt(std.math.minInt(i64))) or
         ym > @as(f64, @floatFromInt(std.math.maxInt(i64))) or
@@ -445,7 +446,7 @@ pub fn makeDay(year: f64, month: f64, date: f64) f64 {
     {
         return std.math.nan(f64);
     }
-    const t = @as(f64, @floatFromInt(
+    const tv = @as(f64, @floatFromInt(
         daysFromCivil(
             @intFromFloat(ym),
             @intFromFloat(mn + 1),
@@ -453,8 +454,8 @@ pub fn makeDay(year: f64, month: f64, date: f64) f64 {
         ),
     )) * std.time.ms_per_day;
 
-    // 9. Return Day(t) + dt - 1𝔽.
-    return day(t) + dt - 1;
+    // 9. Return Day(tv) + dt - 1𝔽.
+    return day(tv) + dt - 1;
 }
 
 /// 21.4.1.29 MakeDate ( day, time )
@@ -839,14 +840,14 @@ fn formatToDateString(data: FormatToDateStringData, writer: *std.Io.Writer) std.
         return;
     }
 
-    // 2. Let t be LocalTime(tv).
-    const t = localTime(platform, time_value);
+    // 2. Let localTime be LocalTime(tv).
+    const local_time = localTime(platform, time_value);
 
-    // 3. Return the string-concatenation of DateString(t), the code unit 0x0020 (SPACE),
-    //    TimeString(t), and TimeZoneString(tv).
+    // 3. Return the string-concatenation of DateString(localTime), the code unit 0x0020 (SPACE),
+    //    TimeString(localTime), and TimeZoneString(tv).
     try writer.print("{f} {f}{f}", .{
-        fmtDateString(t),
-        fmtTimeString(t),
+        fmtDateString(local_time),
+        fmtTimeString(local_time),
         fmtTimeZoneString(platform, time_value),
     });
 }
@@ -860,7 +861,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             7,
             "Date",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -976,7 +977,7 @@ pub const constructor = struct {
             break :blk timeClip(utc(agent.platform, final_date));
         };
 
-        // 6. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Date.prototype%",
+        // 6. Let obj be ? OrdinaryCreateFromConstructor(NewTarget, "%Date.prototype%",
         //    « [[DateValue]] »).
         const date = try ordinaryCreateFromConstructor(
             Date,
@@ -984,12 +985,12 @@ pub const constructor = struct {
             new_target.?,
             "%Date.prototype%",
             .{
-                // 7. Set O.[[DateValue]] to dv.
+                // 7. Set obj.[[DateValue]] to dv.
                 .date_value = date_value,
             },
         );
 
-        // 8. Return O.
+        // 8. Return obj.
         return Value.from(&date.object);
     }
 
@@ -1145,301 +1146,301 @@ pub const prototype = struct {
     /// 21.4.4.2 Date.prototype.getDate ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getdate
     fn getDate(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return DateFromTime(LocalTime(t)).
-        return Value.from(dateFromTime(localTime(agent.platform, time_value)));
+        // 5. Return DateFromTime(LocalTime(tv)).
+        return Value.from(dateFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.3 Date.prototype.getDay ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getday
     fn getDay(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return WeekDay(LocalTime(t)).
-        return Value.from(weekDay(localTime(agent.platform, time_value)));
+        // 5. Return WeekDay(LocalTime(tv)).
+        return Value.from(weekDay(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.4 Date.prototype.getFullYear ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getfullyear
     fn getFullYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return YearFromTime(LocalTime(t)).
-        return Value.from(yearFromTime(localTime(agent.platform, time_value)));
+        // 5. Return YearFromTime(LocalTime(tv)).
+        return Value.from(yearFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.5 Date.prototype.getHours ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.gethours
     fn getHours(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return HourFromTime(LocalTime(t)).
-        return Value.from(hourFromTime(localTime(agent.platform, time_value)));
+        // 5. Return HourFromTime(LocalTime(tv)).
+        return Value.from(hourFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.6 Date.prototype.getMilliseconds ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getmilliseconds
     fn getMilliseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return msFromTime(LocalTime(t)).
-        return Value.from(msFromTime(localTime(agent.platform, time_value)));
+        // 5. Return msFromTime(LocalTime(tv)).
+        return Value.from(msFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.7 Date.prototype.getMinutes ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getminutes
     fn getMinutes(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return MinFromTime(LocalTime(t)).
-        return Value.from(minFromTime(localTime(agent.platform, time_value)));
+        // 5. Return MinFromTime(LocalTime(tv)).
+        return Value.from(minFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.8 Date.prototype.getMonth ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getmonth
     fn getMonth(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return MonthFromTime(LocalTime(t)).
-        return Value.from(monthFromTime(localTime(agent.platform, time_value)));
+        // 5. Return MonthFromTime(LocalTime(tv)).
+        return Value.from(monthFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.9 Date.prototype.getSeconds ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getseconds
     fn getSeconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return SecFromTime(LocalTime(t)).
-        return Value.from(secFromTime(localTime(agent.platform, time_value)));
+        // 5. Return SecFromTime(LocalTime(tv)).
+        return Value.from(secFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.10 Date.prototype.getTime ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.gettime
     fn getTime(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Return dateObject.[[DateValue]].
+        // 3. Return dateObj.[[DateValue]].
         return Value.from(date_object.fields.date_value);
     }
 
     /// 21.4.4.11 Date.prototype.getTimezoneOffset ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.gettimezoneoffset
     fn getTimezoneOffset(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return (t - LocalTime(t)) / msPerMinute.
-        return Value.from((time_value - localTime(agent.platform, time_value)) / std.time.ms_per_min);
+        // 5. Return (tv - LocalTime(tv)) / msPerMinute.
+        return Value.from((tv - localTime(agent.platform, tv)) / std.time.ms_per_min);
     }
 
     /// 21.4.4.12 Date.prototype.getUTCDate ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcdate
     fn getUTCDate(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return DateFromTime(t).
-        return Value.from(dateFromTime(time_value));
+        // 5. Return DateFromTime(tv).
+        return Value.from(dateFromTime(tv));
     }
 
     /// 21.4.4.13 Date.prototype.getUTCDay ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcday
     fn getUTCDay(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return WeekDay(t).
-        return Value.from(weekDay(time_value));
+        // 5. Return WeekDay(tv).
+        return Value.from(weekDay(tv));
     }
 
     /// 21.4.4.14 Date.prototype.getUTCFullYear ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcfullyear
     fn getUTCFullYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return YearFromTime(t).
-        return Value.from(yearFromTime(time_value));
+        // 5. Return YearFromTime(tv).
+        return Value.from(yearFromTime(tv));
     }
 
     /// 21.4.4.15 Date.prototype.getUTCHours ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutchours
     fn getUTCHours(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return HourFromTime(t).
-        return Value.from(hourFromTime(time_value));
+        // 5. Return HourFromTime(tv).
+        return Value.from(hourFromTime(tv));
     }
 
     /// 21.4.4.16 Date.prototype.getUTCMilliseconds ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcmilliseconds
     fn getUTCMilliseconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return msFromTime(t).
-        return Value.from(msFromTime(time_value));
+        // 5. Return msFromTime(tv).
+        return Value.from(msFromTime(tv));
     }
 
     /// 21.4.4.17 Date.prototype.getUTCMinutes ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcminutes
     fn getUTCMinutes(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return MinFromTime(t).
-        return Value.from(minFromTime(time_value));
+        // 5. Return MinFromTime(tv).
+        return Value.from(minFromTime(tv));
     }
 
     /// 21.4.4.18 Date.prototype.getUTCMonth ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcmonth
     fn getUTCMonth(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return MonthFromTime(t).
-        return Value.from(monthFromTime(time_value));
+        // 5. Return MonthFromTime(tv).
+        return Value.from(monthFromTime(tv));
     }
 
     /// 21.4.4.19 Date.prototype.getUTCSeconds ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getutcseconds
     fn getUTCSeconds(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return SecFromTime(t).
-        return Value.from(secFromTime(time_value));
+        // 5. Return SecFromTime(tv).
+        return Value.from(secFromTime(tv));
     }
 
     /// 21.4.4.20 Date.prototype.setDate ( date )
@@ -1447,37 +1448,37 @@ pub const prototype = struct {
     fn setDate(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const date_value = arguments.get(0);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        var tv = date_object.fields.date_value;
 
         // 4. Let dt be ? ToNumber(date).
         const date = (try date_value.toNumber(agent)).asFloat();
 
-        // 5. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 5. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 6. Set t to LocalTime(t).
-        time_value = localTime(agent.platform, time_value);
+        // 6. Set tv to LocalTime(tv).
+        tv = localTime(agent.platform, tv);
 
-        // 7. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(
-        //    t)).
+        // 7. Let newDate be MakeDate(MakeDay(YearFromTime(tv), MonthFromTime(tv), dt),
+        //    TimeWithinDay(tv)).
         const new_date = makeDate(
             makeDay(
-                @floatFromInt(yearFromTime(time_value)),
-                @floatFromInt(monthFromTime(time_value)),
+                @floatFromInt(yearFromTime(tv)),
+                @floatFromInt(monthFromTime(tv)),
                 date,
             ),
-            timeWithinDay(time_value),
+            timeWithinDay(tv),
         );
 
         // 8. Let u be TimeClip(UTC(newDate)).
         const date_value_utc = timeClip(utc(agent.platform, new_date));
 
-        // 9. Set dateObject.[[DateValue]] to u.
+        // 9. Set dateObj.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
 
         // 10. Return u.
@@ -1491,38 +1492,38 @@ pub const prototype = struct {
         const month_value = arguments.getOrNull(1);
         const date_value = arguments.getOrNull(2);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        var tv = date_object.fields.date_value;
 
         // 4. Let y be ? ToNumber(year).
         const year = (try year_value.toNumber(agent)).asFloat();
 
-        // 5. If t is NaN, set t to +0𝔽; else set t to LocalTime(t).
-        time_value = if (std.math.isNan(time_value)) 0 else localTime(agent.platform, time_value);
+        // 5. If tv is NaN, set tv to +0𝔽; else set tv to LocalTime(tv).
+        tv = if (std.math.isNan(tv)) 0 else localTime(agent.platform, tv);
 
-        // 6. If month is present, let m be ? ToNumber(month); else let m be MonthFromTime(t).
+        // 6. If month is present, let m be ? ToNumber(month); else let m be MonthFromTime(tv).
         const month = if (month_value) |month|
             (try month.toNumber(agent)).asFloat()
         else
-            @as(f64, @floatFromInt(monthFromTime(time_value)));
+            @as(f64, @floatFromInt(monthFromTime(tv)));
 
-        // 7. If date is present, let dt be ? ToNumber(date); else let dt be DateFromTime(t).
+        // 7. If date is present, let dt be ? ToNumber(date); else let dt be DateFromTime(tv).
         const date = if (date_value) |date|
             (try date.toNumber(agent)).asFloat()
         else
-            @as(f64, @floatFromInt(dateFromTime(time_value)));
+            @as(f64, @floatFromInt(dateFromTime(tv)));
 
-        // 8. Let newDate be MakeDate(MakeDay(y, m, dt), TimeWithinDay(t)).
-        const new_date = makeDate(makeDay(year, month, date), timeWithinDay(time_value));
+        // 8. Let newDate be MakeDate(MakeDay(y, m, dt), TimeWithinDay(tv)).
+        const new_date = makeDate(makeDay(year, month, date), timeWithinDay(tv));
 
         // 9. Let u be TimeClip(UTC(newDate)).
         const date_value_utc = timeClip(utc(agent.platform, new_date));
 
-        // 10. Set dateObject.[[DateValue]] to u.
+        // 10. Set dateObj.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
 
         // 11. Return u.
@@ -1537,12 +1538,12 @@ pub const prototype = struct {
         const second_value = arguments.getOrNull(2);
         const millisecond_value = arguments.getOrNull(3);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        var tv = date_object.fields.date_value;
 
         // 4. Let h be ? ToNumber(hour).
         const hour = (try hour_value.toNumber(agent)).asFloat();
@@ -1565,28 +1566,28 @@ pub const prototype = struct {
         else
             undefined;
 
-        // 8. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 8. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 9. Set t to LocalTime(t).
-        time_value = localTime(agent.platform, time_value);
+        // 9. Set tv to LocalTime(tv).
+        tv = localTime(agent.platform, tv);
 
-        // 10. If min is not present, let m be MinFromTime(t).
-        if (minute_value == null) minute = @floatFromInt(minFromTime(time_value));
+        // 10. If min is not present, let m be MinFromTime(tv).
+        if (minute_value == null) minute = @floatFromInt(minFromTime(tv));
 
-        // 11. If sec is not present, let s be SecFromTime(t).
-        if (second_value == null) second = @floatFromInt(secFromTime(time_value));
+        // 11. If sec is not present, let s be SecFromTime(tv).
+        if (second_value == null) second = @floatFromInt(secFromTime(tv));
 
-        // 12. If ms is not present, let milli be msFromTime(t).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
+        // 12. If ms is not present, let milli be msFromTime(tv).
+        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
 
-        // 13. Let date be MakeDate(Day(t), MakeTime(h, m, s, milli)).
-        const date = makeDate(day(time_value), makeTime(hour, minute, second, millisecond));
+        // 13. Let date be MakeDate(Day(tv), MakeTime(h, m, s, milli)).
+        const date = makeDate(day(tv), makeTime(hour, minute, second, millisecond));
 
         // 14. Let u be TimeClip(UTC(date)).
         const date_value_utc = timeClip(utc(agent.platform, date));
 
-        // 15. Set dateObject.[[DateValue]] to u.
+        // 15. Set dateObj.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
 
         // 16. Return u.
@@ -1598,34 +1599,34 @@ pub const prototype = struct {
     fn setMilliseconds(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const millisecond_value = arguments.get(0);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        var tv = date_object.fields.date_value;
 
         // 4. Set ms to ? ToNumber(ms).
         const millisecond = (try millisecond_value.toNumber(agent)).asFloat();
 
-        // 5. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 5. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 6. Set t to LocalTime(t).
-        time_value = localTime(agent.platform, time_value);
+        // 6. Set tv to LocalTime(tv).
+        tv = localTime(agent.platform, tv);
 
-        // 7. Let time be MakeTime(HourFromTime(t), MinFromTime(t), SecFromTime(t), ms).
+        // 7. Let time be MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms).
         const time = makeTime(
-            @floatFromInt(hourFromTime(time_value)),
-            @floatFromInt(minFromTime(time_value)),
-            @floatFromInt(secFromTime(time_value)),
+            @floatFromInt(hourFromTime(tv)),
+            @floatFromInt(minFromTime(tv)),
+            @floatFromInt(secFromTime(tv)),
             millisecond,
         );
 
-        // 8. Let u be TimeClip(UTC(MakeDate(Day(t), time))).
-        const date_value_utc = timeClip(utc(agent.platform, makeDate(day(time_value), time)));
+        // 8. Let u be TimeClip(UTC(MakeDate(Day(tv), time))).
+        const date_value_utc = timeClip(utc(agent.platform, makeDate(day(tv), time)));
 
-        // 9. Set dateObject.[[DateValue]] to u.
+        // 9. Set dateObj.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
 
         // 10. Return u.
@@ -1639,12 +1640,12 @@ pub const prototype = struct {
         const second_value = arguments.getOrNull(1);
         const millisecond_value = arguments.getOrNull(2);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        var tv = date_object.fields.date_value;
 
         // 4. Let m be ? ToNumber(min).
         const minute = (try minute_value.toNumber(agent)).asFloat();
@@ -1661,28 +1662,28 @@ pub const prototype = struct {
         else
             undefined;
 
-        // 7. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 7. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 8. Set t to LocalTime(t).
-        time_value = localTime(agent.platform, time_value);
+        // 8. Set tv to LocalTime(tv).
+        tv = localTime(agent.platform, tv);
 
-        // 9. If sec is not present, let s be SecFromTime(t).
-        if (second_value == null) second = @floatFromInt(secFromTime(time_value));
+        // 9. If sec is not present, let s be SecFromTime(tv).
+        if (second_value == null) second = @floatFromInt(secFromTime(tv));
 
-        // 10. If ms is not present, let milli be msFromTime(t).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
+        // 10. If ms is not present, let milli be msFromTime(tv).
+        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
 
-        // 11. Let date be MakeDate(Day(t), MakeTime(HourFromTime(t), m, s, milli)).
+        // 11. Let date be MakeDate(Day(tv), MakeTime(HourFromTime(tv), m, s, milli)).
         const date = makeDate(
-            day(time_value),
-            makeTime(@floatFromInt(hourFromTime(time_value)), minute, second, millisecond),
+            day(tv),
+            makeTime(@floatFromInt(hourFromTime(tv)), minute, second, millisecond),
         );
 
         // 12. Let u be TimeClip(UTC(date)).
         const date_value_utc = timeClip(utc(agent.platform, date));
 
-        // 13. Set dateObject.[[DateValue]] to u.
+        // 13. Set dateObj.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
 
         // 14. Return u.
@@ -1695,12 +1696,12 @@ pub const prototype = struct {
         const month_value = arguments.get(0);
         const date_value = arguments.getOrNull(1);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        var tv = date_object.fields.date_value;
 
         // 4. Let m be ? ToNumber(month).
         const month = (try month_value.toNumber(agent)).asFloat();
@@ -1711,25 +1712,25 @@ pub const prototype = struct {
         else
             undefined;
 
-        // 6. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 6. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 7. Set t to LocalTime(t).
-        time_value = localTime(agent.platform, time_value);
+        // 7. Set tv to LocalTime(tv).
+        tv = localTime(agent.platform, tv);
 
-        // 8. If date is not present, let dt be DateFromTime(t).
-        if (date_value == null) date = @floatFromInt(dateFromTime(time_value));
+        // 8. If date is not present, let dt be DateFromTime(tv).
+        if (date_value == null) date = @floatFromInt(dateFromTime(tv));
 
-        // 9. Let newDate be MakeDate(MakeDay(YearFromTime(t), m, dt), TimeWithinDay(t)).
+        // 9. Let newDate be MakeDate(MakeDay(YearFromTime(tv), m, dt), TimeWithinDay(tv)).
         const new_date = makeDate(
-            makeDay(@floatFromInt(yearFromTime(time_value)), month, date),
-            timeWithinDay(time_value),
+            makeDay(@floatFromInt(yearFromTime(tv)), month, date),
+            timeWithinDay(tv),
         );
 
         // 10. Let u be TimeClip(UTC(newDate)).
         const date_value_utc = timeClip(utc(agent.platform, new_date));
 
-        // 11. Set dateObject.[[DateValue]] to u.
+        // 11. Set dateObj.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
 
         // 12. Return u.
@@ -1742,12 +1743,12 @@ pub const prototype = struct {
         const second_value = arguments.get(0);
         const millisecond_value = arguments.getOrNull(1);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        var tv = date_object.fields.date_value;
 
         // 4. Let s be ? ToNumber(sec).
         const second = (try second_value.toNumber(agent)).asFloat();
@@ -1758,21 +1759,21 @@ pub const prototype = struct {
         else
             undefined;
 
-        // 6. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 6. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 7. Set t to LocalTime(t).
-        time_value = localTime(agent.platform, time_value);
+        // 7. Set tv to LocalTime(tv).
+        tv = localTime(agent.platform, tv);
 
-        // 8. If ms is not present, let milli be msFromTime(t).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
+        // 8. If ms is not present, let milli be msFromTime(tv).
+        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
 
-        // 9. Let date be MakeDate(Day(t), MakeTime(HourFromTime(t), MinFromTime(t), s, milli)).
+        // 9. Let date be MakeDate(Day(tv), MakeTime(HourFromTime(tv), MinFromTime(tv), s, milli)).
         const date = makeDate(
-            day(time_value),
+            day(tv),
             makeTime(
-                @floatFromInt(hourFromTime(time_value)),
-                @floatFromInt(minFromTime(time_value)),
+                @floatFromInt(hourFromTime(tv)),
+                @floatFromInt(minFromTime(tv)),
                 second,
                 millisecond,
             ),
@@ -1781,7 +1782,7 @@ pub const prototype = struct {
         // 10. Let u be TimeClip(UTC(date)).
         const date_value_utc = timeClip(utc(agent.platform, date));
 
-        // 11. Set dateObject.[[DateValue]] to u.
+        // 11. Set dateObj.[[DateValue]] to u.
         date_object.fields.date_value = date_value_utc;
 
         // 12. Return u.
@@ -1793,8 +1794,8 @@ pub const prototype = struct {
     fn setTime(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const time = arguments.get(0);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
         // 3. Let t be ? ToNumber(time).
@@ -1803,7 +1804,7 @@ pub const prototype = struct {
         // 4. Let v be TimeClip(t).
         const date_value = timeClip(time_value);
 
-        // 5. Set dateObject.[[DateValue]] to v.
+        // 5. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value;
 
         // 6. Return v.
@@ -1815,34 +1816,34 @@ pub const prototype = struct {
     fn setUTCDate(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const date_value = arguments.get(0);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. Let dt be ? ToNumber(date).
         const date = (try date_value.toNumber(agent)).asFloat();
 
-        // 5. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 5. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 6. Let newDate be MakeDate(MakeDay(YearFromTime(t), MonthFromTime(t), dt), TimeWithinDay(
-        //    t)).
+        // 6. Let newDate be MakeDate(MakeDay(YearFromTime(tv), MonthFromTime(tv), dt),
+        //    TimeWithinDay(tv)).
         const new_date = makeDate(
             makeDay(
-                @floatFromInt(yearFromTime(time_value)),
-                @floatFromInt(monthFromTime(time_value)),
+                @floatFromInt(yearFromTime(tv)),
+                @floatFromInt(monthFromTime(tv)),
                 date,
             ),
-            timeWithinDay(time_value),
+            timeWithinDay(tv),
         );
 
         // 7. Let v be TimeClip(newDate).
         const date_value_ = timeClip(new_date);
 
-        // 8. Set dateObject.[[DateValue]] to v.
+        // 8. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value_;
 
         // 9. Return v.
@@ -1856,38 +1857,38 @@ pub const prototype = struct {
         const month_value = arguments.getOrNull(1);
         const date_value = arguments.getOrNull(2);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        var tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, set t to +0𝔽.
-        if (std.math.isNan(time_value)) time_value = 0;
+        // 4. If tv is NaN, set tv to +0𝔽.
+        if (std.math.isNan(tv)) tv = 0;
 
         // 5. Let y be ? ToNumber(year).
         const year = (try year_value.toNumber(agent)).asFloat();
 
-        // 6. If month is present, let m be ? ToNumber(month); else let m be MonthFromTime(t).
+        // 6. If month is present, let m be ? ToNumber(month); else let m be MonthFromTime(tv).
         const month = if (month_value) |month|
             (try month.toNumber(agent)).asFloat()
         else
-            @as(f64, @floatFromInt(monthFromTime(time_value)));
+            @as(f64, @floatFromInt(monthFromTime(tv)));
 
-        // 7. If date is present, let dt be ? ToNumber(date); else let dt be DateFromTime(t).
+        // 7. If date is present, let dt be ? ToNumber(date); else let dt be DateFromTime(tv).
         const date = if (date_value) |date|
             (try date.toNumber(agent)).asFloat()
         else
-            @as(f64, @floatFromInt(dateFromTime(time_value)));
+            @as(f64, @floatFromInt(dateFromTime(tv)));
 
-        // 8. Let newDate be MakeDate(MakeDay(y, m, dt), TimeWithinDay(t)).
-        const new_date = makeDate(makeDay(year, month, date), timeWithinDay(time_value));
+        // 8. Let newDate be MakeDate(MakeDay(y, m, dt), TimeWithinDay(tv)).
+        const new_date = makeDate(makeDay(year, month, date), timeWithinDay(tv));
 
         // 9. Let v be TimeClip(newDate).
         const date_value_ = timeClip(new_date);
 
-        // 10. Set dateObject.[[DateValue]] to v.
+        // 10. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value_;
 
         // 11. Return v.
@@ -1902,12 +1903,12 @@ pub const prototype = struct {
         const second_value = arguments.getOrNull(2);
         const millisecond_value = arguments.getOrNull(3);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. Let h be ? ToNumber(hour).
         const hour = (try hour_value.toNumber(agent)).asFloat();
@@ -1930,25 +1931,25 @@ pub const prototype = struct {
         else
             undefined;
 
-        // 8. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 8. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 9. If min is not present, let m be MinFromTime(t).
-        if (minute_value == null) minute = @floatFromInt(minFromTime(time_value));
+        // 9. If min is not present, let m be MinFromTime(tv).
+        if (minute_value == null) minute = @floatFromInt(minFromTime(tv));
 
-        // 10. If sec is not present, let s be SecFromTime(t).
-        if (second_value == null) second = @floatFromInt(secFromTime(time_value));
+        // 10. If sec is not present, let s be SecFromTime(tv).
+        if (second_value == null) second = @floatFromInt(secFromTime(tv));
 
-        // 11. If ms is not present, let milli be msFromTime(t).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
+        // 11. If ms is not present, let milli be msFromTime(tv).
+        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
 
-        // 12. Let date be MakeDate(Day(t), MakeTime(h, m, s, milli)).
-        const date = makeDate(day(time_value), makeTime(hour, minute, second, millisecond));
+        // 12. Let date be MakeDate(Day(tv), MakeTime(h, m, s, milli)).
+        const date = makeDate(day(tv), makeTime(hour, minute, second, millisecond));
 
         // 13. Let v be TimeClip(date).
         const date_value = timeClip(date);
 
-        // 14. Set dateObject.[[DateValue]] to v.
+        // 14. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value;
 
         // 15. Return v.
@@ -1964,31 +1965,31 @@ pub const prototype = struct {
     ) Agent.Error!Value {
         const millisecond_value = arguments.get(0);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. Set ms to ? ToNumber(ms).
         const millisecond = (try millisecond_value.toNumber(agent)).asFloat();
 
-        // 5. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 5. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 6. Let time be MakeTime(HourFromTime(t), MinFromTime(t), SecFromTime(t), ms).
+        // 6. Let time be MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms).
         const time = makeTime(
-            @floatFromInt(hourFromTime(time_value)),
-            @floatFromInt(minFromTime(time_value)),
-            @floatFromInt(secFromTime(time_value)),
+            @floatFromInt(hourFromTime(tv)),
+            @floatFromInt(minFromTime(tv)),
+            @floatFromInt(secFromTime(tv)),
             millisecond,
         );
 
-        // 7. Let v be TimeClip(MakeDate(Day(t), time)).
-        const date_value = timeClip(makeDate(day(time_value), time));
+        // 7. Let v be TimeClip(MakeDate(Day(tv), time)).
+        const date_value = timeClip(makeDate(day(tv), time));
 
-        // 8. Set dateObject.[[DateValue]] to v.
+        // 8. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value;
 
         // 9. Return v.
@@ -2002,12 +2003,12 @@ pub const prototype = struct {
         const second_value = arguments.getOrNull(1);
         const millisecond_value = arguments.getOrNull(2);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. Let m be ? ToNumber(min).
         const minute = (try minute_value.toNumber(agent)).asFloat();
@@ -2024,25 +2025,25 @@ pub const prototype = struct {
         else
             undefined;
 
-        // 7. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 7. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 8. If sec is not present, let s be SecFromTime(t).
-        if (second_value == null) second = @floatFromInt(secFromTime(time_value));
+        // 8. If sec is not present, let s be SecFromTime(tv).
+        if (second_value == null) second = @floatFromInt(secFromTime(tv));
 
-        // 9. If ms is not present, let milli be msFromTime(t).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
+        // 9. If ms is not present, let milli be msFromTime(tv).
+        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
 
-        // 10. Let date be MakeDate(Day(t), MakeTime(HourFromTime(t), m, s, milli)).
+        // 10. Let date be MakeDate(Day(tv), MakeTime(HourFromTime(tv), m, s, milli)).
         const date = makeDate(
-            day(time_value),
-            makeTime(@floatFromInt(hourFromTime(time_value)), minute, second, millisecond),
+            day(tv),
+            makeTime(@floatFromInt(hourFromTime(tv)), minute, second, millisecond),
         );
 
         // 11. Let v be TimeClip(date).
         const date_value = timeClip(date);
 
-        // 12. Set dateObject.[[DateValue]] to v.
+        // 12. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value;
 
         // 13. Return v.
@@ -2055,12 +2056,12 @@ pub const prototype = struct {
         const month_value = arguments.get(0);
         const date_value = arguments.getOrNull(1);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. Let m be ? ToNumber(month).
         const month = (try month_value.toNumber(agent)).asFloat();
@@ -2071,22 +2072,22 @@ pub const prototype = struct {
         else
             undefined;
 
-        // 6. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 6. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 7. If date is not present, let dt be DateFromTime(t).
-        if (date_value == null) date = @floatFromInt(dateFromTime(time_value));
+        // 7. If date is not present, let dt be DateFromTime(tv).
+        if (date_value == null) date = @floatFromInt(dateFromTime(tv));
 
-        // 8. Let newDate be MakeDate(MakeDay(YearFromTime(t), m, dt), TimeWithinDay(t)).
+        // 8. Let newDate be MakeDate(MakeDay(YearFromTime(tv), m, dt), TimeWithinDay(tv)).
         const new_date = makeDate(
-            makeDay(@floatFromInt(yearFromTime(time_value)), month, date),
-            timeWithinDay(time_value),
+            makeDay(@floatFromInt(yearFromTime(tv)), month, date),
+            timeWithinDay(tv),
         );
 
         // 9. Let v be TimeClip(newDate).
         const date_value_ = timeClip(new_date);
 
-        // 10. Set dateObject.[[DateValue]] to v.
+        // 10. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value_;
 
         // 11. Return v.
@@ -2099,12 +2100,12 @@ pub const prototype = struct {
         const second_value = arguments.get(0);
         const millisecond_value = arguments.getOrNull(1);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. Let s be ? ToNumber(sec).
         const second = (try second_value.toNumber(agent)).asFloat();
@@ -2115,18 +2116,18 @@ pub const prototype = struct {
         else
             undefined;
 
-        // 6. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 6. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 7. If ms is not present, let milli be msFromTime(t).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(time_value));
+        // 7. If ms is not present, let milli be msFromTime(tv).
+        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
 
-        // 8. Let date be MakeDate(Day(t), MakeTime(HourFromTime(t), MinFromTime(t), s, milli)).
+        // 8. Let date be MakeDate(Day(tv), MakeTime(HourFromTime(tv), MinFromTime(tv), s, milli)).
         const date = makeDate(
-            day(time_value),
+            day(tv),
             makeTime(
-                @floatFromInt(hourFromTime(time_value)),
-                @floatFromInt(minFromTime(time_value)),
+                @floatFromInt(hourFromTime(tv)),
+                @floatFromInt(minFromTime(tv)),
                 second,
                 millisecond,
             ),
@@ -2135,7 +2136,7 @@ pub const prototype = struct {
         // 9. Let v be TimeClip(date).
         const date_value = timeClip(utc(agent.platform, date));
 
-        // 10. Set dateObject.[[DateValue]] to v.
+        // 10. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value;
 
         // 11. Return v.
@@ -2145,18 +2146,18 @@ pub const prototype = struct {
     /// 21.4.4.35 Date.prototype.toDateString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.todatestring
     fn toDateString_(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let tv be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. If tv is NaN, return "Invalid Date".
-        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+        if (std.math.isNan(tv)) return Value.from("Invalid Date");
 
         // 5. Let t be LocalTime(tv).
-        const t = localTime(agent.platform, time_value);
+        const t = localTime(agent.platform, tv);
 
         // 6. Return DateString(t).
         return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
@@ -2169,15 +2170,15 @@ pub const prototype = struct {
     /// 21.4.4.36 Date.prototype.toISOString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.toisostring
     fn toISOString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let tv be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. If tv is NaN, throw a RangeError exception.
-        if (!std.math.isFinite(time_value)) {
+        if (!std.math.isFinite(tv)) {
             return agent.throwException(.range_error, "Invalid Date object", .{});
         }
 
@@ -2186,7 +2187,7 @@ pub const prototype = struct {
         //    Format, throw a RangeError exception.
         // 7. Return a String representation of tv in the Date Time String Format on the UTC time
         //    scale, including all format elements and the UTC offset representation "Z".
-        const year = yearFromTime(time_value);
+        const year = yearFromTime(tv);
         const year_sign = if (year >= 0 and year <= 9999) "" else if (year > 9999) "+" else "-";
 
         var buf: [6]u8 = undefined;
@@ -2202,12 +2203,12 @@ pub const prototype = struct {
             .{
                 year_sign,
                 padded_year,
-                monthFromTime(time_value) + 1,
-                dateFromTime(time_value),
-                hourFromTime(time_value),
-                minFromTime(time_value),
-                secFromTime(time_value),
-                msFromTime(time_value),
+                monthFromTime(tv) + 1,
+                dateFromTime(tv),
+                hourFromTime(tv),
+                minFromTime(tv),
+                secFromTime(tv),
+                msFromTime(tv),
             },
         )));
     }
@@ -2217,17 +2218,17 @@ pub const prototype = struct {
     fn toJSON(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // NOTE: The argument is ignored.
 
-        // 1. Let O be ? ToObject(this value).
-        const object = try this_value.toObject(agent);
+        // 1. Let obj be ? ToObject(this value).
+        const obj = try this_value.toObject(agent);
 
-        // 2. Let tv be ? ToPrimitive(O, number).
-        const time_value = try Value.from(object).toPrimitive(agent, .number);
+        // 2. Let tv be ? ToPrimitive(obj, number).
+        const tv = try Value.from(obj).toPrimitive(agent, .number);
 
         // 3. If tv is a Number and tv is not finite, return null.
-        if (time_value.isNumber() and !time_value.asNumber().isFinite()) return .null;
+        if (tv.isNumber() and !tv.asNumber().isFinite()) return .null;
 
-        // 4. Return ? Invoke(O, "toISOString").
-        return Value.from(object).invoke(agent, PropertyKey.from("toISOString"), &.{});
+        // 4. Return ? Invoke(obj, "toISOString").
+        return Value.from(obj).invoke(agent, PropertyKey.from("toISOString"), &.{});
     }
 
     /// 21.4.4.38 Date.prototype.toLocaleDateString ( [ reserved1 [ , reserved2 ] ] )
@@ -2254,12 +2255,12 @@ pub const prototype = struct {
         const locales = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        const date_object = try this_value.requireInternalSlot(agent, Date);
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
+        const date_obj = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let x be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let x be dateObj.[[DateValue]].
+        const time_value = date_obj.fields.date_value;
 
         // 4. If x is NaN, return "Invalid Date".
         if (std.math.isNan(time_value)) return Value.from("Invalid Date");
@@ -2303,12 +2304,12 @@ pub const prototype = struct {
         const locales = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        const date_object = try this_value.requireInternalSlot(agent, Date);
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
+        const date_obj = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let x be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let x be dateObj.[[DateValue]].
+        const time_value = date_obj.fields.date_value;
 
         // 4. If x is NaN, return "Invalid Date".
         if (std.math.isNan(time_value)) return Value.from("Invalid Date");
@@ -2352,12 +2353,12 @@ pub const prototype = struct {
         const locales = arguments.get(0);
         const options = arguments.get(1);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
-        const date_object = try this_value.requireInternalSlot(agent, Date);
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
+        const date_obj = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let x be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let x be dateObj.[[DateValue]].
+        const time_value = date_obj.fields.date_value;
 
         // 4. If x is NaN, return "Invalid Date".
         if (std.math.isNan(time_value)) return Value.from("Invalid Date");
@@ -2380,11 +2381,11 @@ pub const prototype = struct {
     /// 21.4.4.41 Date.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let tv be dateObject.[[DateValue]].
+        // 3. Let tv be dateObj.[[DateValue]].
         const time_value = date_object.fields.date_value;
 
         // 4. Return ToDateString(tv).
@@ -2433,26 +2434,26 @@ pub const prototype = struct {
     /// 21.4.4.42 Date.prototype.toTimeString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.totimestring
     fn toTimeString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let tv be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. If tv is NaN, return "Invalid Date".
-        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+        if (std.math.isNan(tv)) return Value.from("Invalid Date");
 
-        // 5. Let t be LocalTime(tv).
-        const t = localTime(agent.platform, time_value);
+        // 5. Let localTime be LocalTime(tv).
+        const local_time = localTime(agent.platform, tv);
 
-        // 6. Return the string-concatenation of TimeString(t) and TimeZoneString(tv).
+        // 6. Return the string-concatenation of TimeString(localTime) and TimeZoneString(tv).
         return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
             agent.gc_allocator,
             "{f}{f}",
             .{
-                fmtTimeString(t),
-                fmtTimeZoneString(agent.platform, time_value),
+                fmtTimeString(local_time),
+                fmtTimeZoneString(agent.platform, tv),
             },
         )));
     }
@@ -2460,27 +2461,27 @@ pub const prototype = struct {
     /// 21.4.4.43 Date.prototype.toUTCString ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.toutcstring
     fn toUTCString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let tv be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
         // 4. If tv is NaN, return "Invalid Date".
-        if (std.math.isNan(time_value)) return Value.from("Invalid Date");
+        if (std.math.isNan(tv)) return Value.from("Invalid Date");
 
         // 5. Let weekday be the Name of the entry in Table 60 with the Number WeekDay(tv).
-        const weekday = week_day_names[weekDay(time_value)];
+        const weekday = week_day_names[weekDay(tv)];
 
         // 6. Let month be the Name of the entry in Table 61 with the Number MonthFromTime(tv).
-        const month = month_names[monthFromTime(time_value)];
+        const month = month_names[monthFromTime(tv)];
 
         // 7. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).
-        const day_ = dateFromTime(time_value);
+        const day_ = dateFromTime(tv);
 
         // 8. Let yv be YearFromTime(tv).
-        const year = yearFromTime(time_value);
+        const year = yearFromTime(tv);
 
         // 9. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; else let yearSign be "-".
         const year_sign = if (year >= 0) "" else "-";
@@ -2501,7 +2502,7 @@ pub const prototype = struct {
                 month,
                 year_sign,
                 padded_year,
-                fmtTimeString(time_value),
+                fmtTimeString(tv),
             },
         )));
     }
@@ -2509,11 +2510,11 @@ pub const prototype = struct {
     /// 21.4.4.44 Date.prototype.valueOf ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.valueof
     fn valueOf(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Return dateObject.[[DateValue]].
+        // 3. Return dateObj.[[DateValue]].
         return Value.from(date_object.fields.date_value);
     }
 
@@ -2522,12 +2523,12 @@ pub const prototype = struct {
     fn @"%Symbol.toPrimitive%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const hint_value = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
         if (!hint_value.isString()) {
             return agent.throwException(.type_error, "{f} is not a string", .{hint_value});
@@ -2552,25 +2553,25 @@ pub const prototype = struct {
             );
         };
 
-        // 6. Return ? OrdinaryToPrimitive(O, tryFirst).
-        return object.ordinaryToPrimitive(agent, try_first);
+        // 6. Return ? OrdinaryToPrimitive(obj, tryFirst).
+        return obj.ordinaryToPrimitive(agent, try_first);
     }
 
     /// B.2.3.1 Date.prototype.getYear ( )
     /// https://tc39.es/ecma262/#sec-date.prototype.getyear
     fn getYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        const time_value = date_object.fields.date_value;
+        // 3. Let tv be dateObj.[[DateValue]].
+        const tv = date_object.fields.date_value;
 
-        // 4. If t is NaN, return NaN.
-        if (std.math.isNan(time_value)) return .nan;
+        // 4. If tv is NaN, return NaN.
+        if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return YearFromTime(LocalTime(t)) - 1900𝔽.
-        return Value.from(yearFromTime(localTime(agent.platform, time_value)) - 1900);
+        // 5. Return YearFromTime(LocalTime(tv)) - 1900𝔽.
+        return Value.from(yearFromTime(localTime(agent.platform, tv)) - 1900);
     }
 
     /// B.2.3.2 Date.prototype.setYear ( year )
@@ -2578,40 +2579,40 @@ pub const prototype = struct {
     fn setYear(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const year_value = arguments.get(0);
 
-        // 1. Let dateObject be the this value.
-        // 2. Perform ? RequireInternalSlot(dateObject, [[DateValue]]).
+        // 1. Let dateObj be the this value.
+        // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
         const date_object = try this_value.requireInternalSlot(agent, Date);
 
-        // 3. Let t be dateObject.[[DateValue]].
-        var time_value = date_object.fields.date_value;
+        // 3. Let time be dateObj.[[DateValue]].
+        var time = date_object.fields.date_value;
 
-        // 4. Let y be ? ToNumber(year).
+        // 4. Let year be ? ToNumber(year).
         const year = try year_value.toNumber(agent);
 
-        // 5. If t is NaN, set t to +0𝔽; else set t to LocalTime(t).
-        time_value = if (std.math.isNan(time_value)) 0 else localTime(agent.platform, time_value);
+        // 5. If time is NaN, set time to +0𝔽; else set time to LocalTime(time).
+        time = if (std.math.isNan(time)) 0 else localTime(agent.platform, time);
 
-        // 6. Let yyyy be MakeFullYear(y).
+        // 6. Let fullYear be MakeFullYear(year).
         const full_year = makeFullYear(year.asFloat());
 
-        // 7. Let d be MakeDay(yyyy, MonthFromTime(t), DateFromTime(t)).
+        // 7. Let day be MakeDay(fullYear, MonthFromTime(time), DateFromTime(time)).
         const day_ = makeDay(
             full_year,
-            @floatFromInt(monthFromTime(time_value)),
-            @floatFromInt(dateFromTime(time_value)),
+            @floatFromInt(monthFromTime(time)),
+            @floatFromInt(dateFromTime(time)),
         );
 
-        // 8. Let date be MakeDate(d, TimeWithinDay(t)).
-        const date = makeDate(day_, timeWithinDay(time_value));
+        // 8. Let date be MakeDate(day, TimeWithinDay(time)).
+        const date = makeDate(day_, timeWithinDay(time));
 
-        // 9. Let u be TimeClip(UTC(date)).
-        const date_value_utc = timeClip(utc(agent.platform, date));
+        // 9. Let utcTimestamp be TimeClip(UTC(date)).
+        const utc_timestamp = timeClip(utc(agent.platform, date));
 
-        // 10. Set dateObject.[[DateValue]] to u.
-        date_object.fields.date_value = date_value_utc;
+        // 10. Set dateObj.[[DateValue]] to utcTimestamp.
+        date_object.fields.date_value = utc_timestamp;
 
-        // 11. Return u.
-        return Value.from(date_value_utc);
+        // 11. Return utcTimestamp.
+        return Value.from(utc_timestamp);
     }
 };
 

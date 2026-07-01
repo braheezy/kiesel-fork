@@ -161,13 +161,13 @@ fn prettyPrintArrayIterator(
 }
 
 fn prettyPrintAsyncGenerator(
-    async_generator: *const builtins.AsyncGenerator,
+    async_gen: *const builtins.AsyncGenerator,
     terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     try terminal.setColor(.white);
     try terminal.writer.writeAll("AsyncGenerator(");
     try terminal.setColor(.reset);
-    switch (async_generator.fields.async_generator_state) {
+    switch (async_gen.fields.async_generator_state) {
         .suspended_start => {
             try terminal.writer.writeAll("state: ");
             try terminal.setColor(.cyan);
@@ -278,13 +278,13 @@ fn prettyPrintFinalizationRegistry(
 }
 
 fn prettyPrintGenerator(
-    generator: *const builtins.Generator,
+    gen: *const builtins.Generator,
     terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     try terminal.setColor(.white);
     try terminal.writer.writeAll("Generator(");
     try terminal.setColor(.reset);
-    switch (generator.fields.generator_state) {
+    switch (gen.fields.generator_state) {
         .suspended_start => {
             try terminal.writer.writeAll("state: ");
             try terminal.setColor(.cyan);
@@ -479,7 +479,7 @@ fn prettyPrintRegExpStringIterator(
     switch (reg_exp_string_iterator.fields) {
         .state => |state_| {
             try terminal.writer.print("{f}, {f}", .{
-                Value.from(state_.iterating_reg_exp).fmtPretty(terminal.mode),
+                Value.from(state_.iterating_regexp).fmtPretty(terminal.mode),
                 Value.from(state_.iterated_string).fmtPretty(terminal.mode),
             });
         },
@@ -1292,8 +1292,8 @@ fn prettyPrintObject(
 
     var printed_properties: usize = 0;
     for (property_keys) |property_key| {
-        const property_descriptor = (object.getPropertyCreateLazyIfNeeded(property_key) catch return).?;
-        if (!property_descriptor.attributes.enumerable) continue;
+        const property_desc = (object.getPropertyCreateLazyIfNeeded(property_key) catch return).?;
+        if (!property_desc.attributes.enumerable) continue;
 
         if (printed_properties > 0) try terminal.writer.writeAll(",");
         printed_properties += 1;
@@ -1324,7 +1324,7 @@ fn prettyPrintObject(
         }
         try terminal.writer.writeAll(": ");
 
-        switch (property_descriptor.value_or_accessor) {
+        switch (property_desc.value_or_accessor) {
             .value => |value| {
                 try terminal.writer.print("{f}", .{value.fmtPretty(terminal.mode)});
             },

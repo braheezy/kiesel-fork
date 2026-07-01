@@ -47,7 +47,7 @@ fn toF64(value: Value) ?f64 {
 
 fn cb(
     agent: *Agent,
-    object: *Object,
+    obj: *Object,
     callback: Value,
     this_arg: Value,
     value: Value,
@@ -56,13 +56,13 @@ fn cb(
     _ = try callback.callAssumeCallable(
         agent,
         this_arg,
-        &.{ value, Value.from(@as(u53, @intCast(index))), Value.from(object) },
+        &.{ value, Value.from(@as(u53, @intCast(index))), Value.from(obj) },
     );
 }
 
 fn cbToBool(
     agent: *Agent,
-    object: *Object,
+    obj: *Object,
     callback: Value,
     this_arg: Value,
     value: Value,
@@ -71,7 +71,7 @@ fn cbToBool(
     const result = try callback.callAssumeCallable(
         agent,
         this_arg,
-        &.{ value, Value.from(@as(u53, @intCast(index))), Value.from(object) },
+        &.{ value, Value.from(@as(u53, @intCast(index))), Value.from(obj) },
     );
     return result.toBoolean();
 }
@@ -79,23 +79,23 @@ fn cbToBool(
 /// Fast path for `Array.prototype.every()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with at least `len` items
+/// - Dense indexed property storage with at least `length` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
 ///
 /// If the indexed property storage is modified in a way that changes its type or size iteration
 /// will continue on the slow path from the returned index.
 pub fn every(
     agent: *Agent,
-    object: *Object,
-    len: u53,
+    obj: *Object,
+    length: u53,
     callback: Value,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done: bool,
     continue_slow: usize,
 } {
-    const indexed_properties = object.indexedProperties();
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const indexed_properties = obj.indexedProperties();
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -103,14 +103,14 @@ pub fn every(
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        indexed_properties.count() < len) return null;
+        indexed_properties.count() < length) return null;
 
-    const end_index: usize = @intCast(len);
+    const end_index: usize = @intCast(length);
     switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |*dense_i32| for (0..end_index) |index| {
             const value = Value.from(dense_i32.items[index]);
-            if (!try cbToBool(agent, object, callback, this_arg, value, index)) {
+            if (!try cbToBool(agent, obj, callback, this_arg, value, index)) {
                 return .{ .done = false };
             }
             if (indexed_properties.storage != .dense_i32 or
@@ -119,7 +119,7 @@ pub fn every(
         },
         .dense_f64 => |*dense_f64| for (0..end_index) |index| {
             const value = Value.from(dense_f64.items[index]);
-            if (!try cbToBool(agent, object, callback, this_arg, value, index)) {
+            if (!try cbToBool(agent, obj, callback, this_arg, value, index)) {
                 return .{ .done = false };
             }
             if (indexed_properties.storage != .dense_f64 or
@@ -128,7 +128,7 @@ pub fn every(
         },
         .dense_value => |*dense_value| for (0..end_index) |index| {
             const value = dense_value.items[index];
-            if (!try cbToBool(agent, object, callback, this_arg, value, index)) {
+            if (!try cbToBool(agent, obj, callback, this_arg, value, index)) {
                 return .{ .done = false };
             }
             if (indexed_properties.storage != .dense_value or
@@ -149,13 +149,13 @@ pub fn every(
 ///   extensible
 pub fn fill(
     allocator: std.mem.Allocator,
-    object: *Object,
-    len: u53,
+    obj: *Object,
+    length: u53,
     start: u53,
     end: u53,
     value: Value,
 ) std.mem.Allocator.Error!?void {
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         // Dependencies of ordinary [[Set]]
         .ordinary_get_own_property,
@@ -164,18 +164,18 @@ pub fn fill(
         .ordinary_define_own_property,
     }));
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
-    if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
+    if (!has_ordinary_internal_methods and !obj.is(builtins.Array)) return null;
     if (start > std.math.maxInt(Object.IndexedProperties.Index) or
         end > std.math.maxInt(Object.IndexedProperties.Index)) return null;
-    if (len > 0 and
-        object.indexedProperties().storage == .none and
-        !object.extensible()) return null;
+    if (length > 0 and
+        obj.indexedProperties().storage == .none and
+        !obj.extensible()) return null;
 
     if (start >= end) return;
     const start_index: usize = @intCast(start);
-    const end_index: usize = @intCast(@min(end, len));
+    const end_index: usize = @intCast(@min(end, length));
 
-    const indexed_properties = try object.ensureIndexedProperties(allocator);
+    const indexed_properties = try obj.ensureIndexedProperties(allocator);
     try indexed_properties.migrateStorageIfNeeded(allocator, 0, .{
         .value_or_accessor = .{ .value = value },
         .attributes = .all,
@@ -208,15 +208,15 @@ pub fn fill(
 /// - `Array.prototype.findLastIndex()`
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with at least `len` items
+/// - Dense indexed property storage with at least `length` items
 /// - Ordinary internal methods: `[[Get]]`
 ///
 /// If the indexed property storage is modified in a way that changes its type or size iteration
 /// will continue on the slow path from the returned index.
 pub fn findViaPredicate(
     agent: *Agent,
-    object: *Object,
-    len: u53,
+    obj: *Object,
+    length: u53,
     comptime direction: FindViaPredicateDirection,
     predicate: Value,
     this_arg: Value,
@@ -224,23 +224,23 @@ pub fn findViaPredicate(
     done: FindViaPredicateResult,
     continue_slow: ?usize,
 } {
-    const indexed_properties = object.indexedProperties();
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const indexed_properties = obj.indexedProperties();
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         // Dependencies of ordinary [[Get]]
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        indexed_properties.count() < len) return null;
+        indexed_properties.count() < length) return null;
 
-    const end_index: usize = @intCast(len);
+    const end_index: usize = @intCast(length);
     switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |*dense_i32| switch (direction) {
             .ascending => for (0..end_index) |index| {
                 const value = Value.from(dense_i32.items[index]);
-                if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
+                if (try cbToBool(agent, obj, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
                 if (indexed_properties.storage != .dense_i32 or
@@ -250,7 +250,7 @@ pub fn findViaPredicate(
             .descending => for (0..end_index) |tmp| {
                 const index = end_index - tmp - 1;
                 const value = Value.from(dense_i32.items[index]);
-                if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
+                if (try cbToBool(agent, obj, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
                 if (indexed_properties.storage != .dense_i32 or
@@ -261,7 +261,7 @@ pub fn findViaPredicate(
         .dense_f64 => |*dense_f64| switch (direction) {
             .ascending => for (0..end_index) |index| {
                 const value = Value.from(dense_f64.items[index]);
-                if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
+                if (try cbToBool(agent, obj, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
                 if (indexed_properties.storage != .dense_f64 or
@@ -271,7 +271,7 @@ pub fn findViaPredicate(
             .descending => for (0..end_index) |tmp| {
                 const index = end_index - tmp - 1;
                 const value = Value.from(dense_f64.items[index]);
-                if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
+                if (try cbToBool(agent, obj, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
                 if (indexed_properties.storage != .dense_f64 or
@@ -282,7 +282,7 @@ pub fn findViaPredicate(
         .dense_value => |*dense_value| switch (direction) {
             .ascending => for (0..end_index) |index| {
                 const value = dense_value.items[index];
-                if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
+                if (try cbToBool(agent, obj, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
                 if (indexed_properties.storage != .dense_value or
@@ -292,7 +292,7 @@ pub fn findViaPredicate(
             .descending => for (0..end_index) |tmp| {
                 const index = end_index - tmp - 1;
                 const value = dense_value.items[index];
-                if (try cbToBool(agent, object, predicate, this_arg, value, index)) {
+                if (try cbToBool(agent, obj, predicate, this_arg, value, index)) {
                     return .{ .done = .{ .index = Value.from(@as(u53, @intCast(index))), .value = value } };
                 }
                 if (indexed_properties.storage != .dense_value or
@@ -308,23 +308,23 @@ pub fn findViaPredicate(
 /// Fast path for `Array.prototype.forEach()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with at least `len` items
+/// - Dense indexed property storage with at least `length` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
 ///
 /// If the indexed property storage is modified in a way that changes its type or size iteration
 /// will continue on the slow path from the returned index.
 pub fn forEach(
     agent: *Agent,
-    object: *Object,
-    len: u53,
+    obj: *Object,
+    length: u53,
     callback: Value,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done,
     continue_slow: usize,
 } {
-    const indexed_properties = object.indexedProperties();
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const indexed_properties = obj.indexedProperties();
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -332,28 +332,28 @@ pub fn forEach(
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        indexed_properties.count() < len) return null;
+        indexed_properties.count() < length) return null;
 
-    const end_index: usize = @intCast(len);
+    const end_index: usize = @intCast(length);
     switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |*dense_i32| for (0..end_index) |index| {
             const value = Value.from(dense_i32.items[index]);
-            try cb(agent, object, callback, this_arg, value, index);
+            try cb(agent, obj, callback, this_arg, value, index);
             if (indexed_properties.storage != .dense_i32 or
                 dense_i32.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
         .dense_f64 => |*dense_f64| for (0..end_index) |index| {
             const value = Value.from(dense_f64.items[index]);
-            try cb(agent, object, callback, this_arg, value, index);
+            try cb(agent, obj, callback, this_arg, value, index);
             if (indexed_properties.storage != .dense_f64 or
                 dense_f64.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
         },
         .dense_value => |*dense_value| for (0..end_index) |index| {
             const value = dense_value.items[index];
-            try cb(agent, object, callback, this_arg, value, index);
+            try cb(agent, obj, callback, this_arg, value, index);
             if (indexed_properties.storage != .dense_value or
                 dense_value.items.len < end_index)
                 return .{ .continue_slow = index + 1 };
@@ -366,23 +366,23 @@ pub fn forEach(
 /// Fast path for `Array.prototype.includes()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with at least `len` items
+/// - Dense indexed property storage with at least `length` items
 /// - Ordinary internal methods: `[[Get]]`
-pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Value) ?bool {
-    const indexed_properties = object.indexedProperties();
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+pub fn includes(obj: *Object, length: u53, from_index: u53, search_element: Value) ?bool {
+    const indexed_properties = obj.indexedProperties();
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         // Dependencies of ordinary [[Get]]
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        indexed_properties.count() < len or
+        indexed_properties.count() < length or
         from_index > std.math.maxInt(Object.IndexedProperties.Index)) return null;
 
-    if (from_index >= len) return false;
+    if (from_index >= length) return false;
     const start_index: usize = @intCast(from_index);
-    const end_index: usize = @intCast(len);
+    const end_index: usize = @intCast(length);
     switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |dense_i32| {
@@ -423,11 +423,11 @@ pub fn includes(object: *Object, len: u53, from_index: u53, search_element: Valu
 /// Fast path for `Array.prototype.indexOf()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with at least `len` items
+/// - Dense indexed property storage with at least `length` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
-pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value) ?Value {
-    const indexed_properties = object.indexedProperties();
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+pub fn indexOf(obj: *Object, length: u53, from_index: u53, search_element: Value) ?Value {
+    const indexed_properties = obj.indexedProperties();
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -435,12 +435,12 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        indexed_properties.count() < len or
+        indexed_properties.count() < length or
         from_index > std.math.maxInt(Object.IndexedProperties.Index)) return null;
 
-    if (from_index >= len) return Value.from(-1);
+    if (from_index >= length) return Value.from(-1);
     const start_index: usize = @intCast(from_index);
-    const end_index: usize = @intCast(len);
+    const end_index: usize = @intCast(length);
     switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |dense_i32| {
@@ -480,11 +480,11 @@ pub fn indexOf(object: *Object, len: u53, from_index: u53, search_element: Value
 /// Fast path for `Array.prototype.lastIndexOf()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with at least `len` items
+/// - Dense indexed property storage with at least `length` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
-pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: Value) ?Value {
-    const indexed_properties = object.indexedProperties();
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+pub fn lastIndexOf(obj: *Object, length: u53, from_index: u53, search_element: Value) ?Value {
+    const indexed_properties = obj.indexedProperties();
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -492,10 +492,10 @@ pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: V
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        indexed_properties.count() < len or
+        indexed_properties.count() < length or
         from_index > std.math.maxInt(Object.IndexedProperties.Index)) return null;
 
-    if (from_index >= len) return Value.from(-1);
+    if (from_index >= length) return Value.from(-1);
     const start_index: usize = @intCast(from_index);
     switch (indexed_properties.storage) {
         .none => {},
@@ -538,11 +538,11 @@ pub fn lastIndexOf(object: *Object, len: u53, from_index: u53, search_element: V
 /// Fast path for `Array.prototype.reverse()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with exactly `len` items
+/// - Dense indexed property storage with exactly `length` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
-pub fn reverse(object: *Object, len: u53) ?void {
-    const indexed_properties = object.indexedProperties();
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+pub fn reverse(obj: *Object, length: u53) ?void {
+    const indexed_properties = obj.indexedProperties();
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         .ordinary_set,
@@ -554,8 +554,8 @@ pub fn reverse(object: *Object, len: u53) ?void {
         .ordinary_define_own_property,
     }));
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
-    if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
-    if (indexed_properties.count() != len) return null;
+    if (!has_ordinary_internal_methods and !obj.is(builtins.Array)) return null;
+    if (indexed_properties.count() != length) return null;
 
     switch (indexed_properties.storage) {
         .none => {},
@@ -575,10 +575,10 @@ pub fn reverse(object: *Object, len: u53) ?void {
 /// Fast path for `Array.prototype.pop()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with exactly `len` items
+/// - Dense indexed property storage with exactly `length` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
-pub fn pop(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+pub fn pop(agent: *Agent, obj: *Object, length: u53) Agent.Error!?Value {
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         .ordinary_set,
@@ -590,15 +590,15 @@ pub fn pop(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
         .ordinary_define_own_property,
     }));
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
-    if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
-    if (object.indexedProperties().count() != len) return null;
+    if (!has_ordinary_internal_methods and !obj.is(builtins.Array)) return null;
+    if (obj.indexedProperties().count() != length) return null;
 
-    if (len == 0) {
-        try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
+    if (length == 0) {
+        try obj.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
         return .undefined;
     }
 
-    var extra_data = object.extra_data.?;
+    var extra_data = obj.extra_data.?;
     const indexed_properties = &extra_data.indexed_properties;
     const element: Value = switch (indexed_properties.storage) {
         .none => unreachable,
@@ -607,19 +607,19 @@ pub fn pop(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
         .dense_value => |*dense_value| dense_value.pop().?,
         .sparse_value, .sparse_property_descriptor => return null,
     };
-    try object.set(agent, PropertyKey.from("length"), Value.from(len - 1), .throw);
+    try obj.set(agent, PropertyKey.from("length"), Value.from(length - 1), .throw);
     return element;
 }
 
 /// Fast path for `Array.prototype.push()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with exactly `len` items
+/// - Dense indexed property storage with exactly `length` items
 /// - Ordinary internal methods: `[[Set]]`
 /// - If the object has no property storage yet and `values.len` > 0 it must be extensible
 /// - No indexed properties on the prototype chain
-pub fn push(agent: *Agent, object: *Object, len: u53, values: []const Value) Agent.Error!?Value {
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+pub fn push(agent: *Agent, obj: *Object, length: u53, values: []const Value) Agent.Error!?Value {
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         // Dependencies of ordinary [[Set]]
         .ordinary_get_own_property,
@@ -630,40 +630,40 @@ pub fn push(agent: *Agent, object: *Object, len: u53, values: []const Value) Age
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path as long as
     // their length is writable.
     if (!has_ordinary_internal_methods) {
-        const array = object.cast(builtins.Array) orelse return null;
+        const array = obj.cast(builtins.Array) orelse return null;
         if (!array.fields.length_writable) return null;
     }
-    if (object.indexedProperties().count() != len) return null;
-    var prototype = object.prototype();
+    if (obj.indexedProperties().count() != length) return null;
+    var prototype = obj.prototype();
     while (prototype) |p| : (prototype = p.prototype()) {
         if (p.indexedProperties().count() > 0) return null;
     }
 
-    const new_len = std.math.add(u53, len, @intCast(values.len)) catch return null;
-    if (new_len > std.math.maxInt(Object.IndexedProperties.Index)) return null;
+    const new_length = std.math.add(u53, length, @intCast(values.len)) catch return null;
+    if (new_length > std.math.maxInt(Object.IndexedProperties.Index)) return null;
     if (values.len > 0 and
-        object.indexedProperties().storage == .none and
-        !object.extensible()) return null;
+        obj.indexedProperties().storage == .none and
+        !obj.extensible()) return null;
 
-    const indexed_properties = try object.ensureIndexedProperties(agent.gc_allocator);
+    const indexed_properties = try obj.ensureIndexedProperties(agent.gc_allocator);
     for (values, 0..) |value, i| {
         try indexed_properties.set(
             agent.gc_allocator,
-            @intCast(len + i),
+            @intCast(length + i),
             .{ .value_or_accessor = .{ .value = value }, .attributes = .all },
         );
     }
-    try object.set(agent, PropertyKey.from("length"), Value.from(new_len), .throw);
-    return Value.from(new_len);
+    try obj.set(agent, PropertyKey.from("length"), Value.from(new_length), .throw);
+    return Value.from(new_length);
 }
 
 /// Fast path for `Array.prototype.shift()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with exactly `len` items
+/// - Dense indexed property storage with exactly `length` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`, `[[Set]]`, `[[Delete]]`
-pub fn shift(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+pub fn shift(agent: *Agent, obj: *Object, length: u53) Agent.Error!?Value {
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         .ordinary_set,
@@ -675,15 +675,15 @@ pub fn shift(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
         .ordinary_define_own_property,
     }));
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path (obviously).
-    if (!has_ordinary_internal_methods and !object.is(builtins.Array)) return null;
-    if (object.indexedProperties().count() != len) return null;
+    if (!has_ordinary_internal_methods and !obj.is(builtins.Array)) return null;
+    if (obj.indexedProperties().count() != length) return null;
 
-    if (len == 0) {
-        try object.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
+    if (length == 0) {
+        try obj.set(agent, PropertyKey.from("length"), Value.from(0), .throw);
         return .undefined;
     }
 
-    var extra_data = object.extra_data.?;
+    var extra_data = obj.extra_data.?;
     const indexed_properties = &extra_data.indexed_properties;
     const element: Value = switch (indexed_properties.storage) {
         .none => unreachable,
@@ -692,30 +692,30 @@ pub fn shift(agent: *Agent, object: *Object, len: u53) Agent.Error!?Value {
         .dense_value => |*dense_value| dense_value.orderedRemove(0),
         .sparse_value, .sparse_property_descriptor => return null,
     };
-    try object.set(agent, PropertyKey.from("length"), Value.from(len - 1), .throw);
+    try obj.set(agent, PropertyKey.from("length"), Value.from(length - 1), .throw);
     return element;
 }
 
 /// Fast path for `Array.prototype.some()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with at least `len` items
+/// - Dense indexed property storage with at least `length` items
 /// - Ordinary internal methods: `[[HasProperty]]`, `[[Get]]`
 ///
 /// If the indexed property storage is modified in a way that changes its type or size iteration
 /// will continue on the slow path from the returned index.
 pub fn some(
     agent: *Agent,
-    object: *Object,
-    len: u53,
+    obj: *Object,
+    length: u53,
     callback: Value,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done: bool,
     continue_slow: usize,
 } {
-    const indexed_properties = object.indexedProperties();
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const indexed_properties = obj.indexedProperties();
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_has_property,
         .ordinary_get,
         // Dependencies of ordinary [[HasProperty]] and [[Get]]
@@ -723,14 +723,14 @@ pub fn some(
         .ordinary_get_prototype_of,
     }));
     if (!has_ordinary_internal_methods or
-        indexed_properties.count() < len) return null;
+        indexed_properties.count() < length) return null;
 
-    const end_index: usize = @intCast(len);
+    const end_index: usize = @intCast(length);
     switch (indexed_properties.storage) {
         .none => {},
         .dense_i32 => |*dense_i32| for (0..end_index) |index| {
             const value = Value.from(dense_i32.items[index]);
-            if (try cbToBool(agent, object, callback, this_arg, value, index)) {
+            if (try cbToBool(agent, obj, callback, this_arg, value, index)) {
                 return .{ .done = true };
             }
             if (indexed_properties.storage != .dense_i32 or
@@ -739,7 +739,7 @@ pub fn some(
         },
         .dense_f64 => |*dense_f64| for (0..end_index) |index| {
             const value = Value.from(dense_f64.items[index]);
-            if (try cbToBool(agent, object, callback, this_arg, value, index)) {
+            if (try cbToBool(agent, obj, callback, this_arg, value, index)) {
                 return .{ .done = true };
             }
             if (indexed_properties.storage != .dense_f64 or
@@ -748,7 +748,7 @@ pub fn some(
         },
         .dense_value => |*dense_value| for (0..end_index) |index| {
             const value = dense_value.items[index];
-            if (try cbToBool(agent, object, callback, this_arg, value, index)) {
+            if (try cbToBool(agent, obj, callback, this_arg, value, index)) {
                 return .{ .done = true };
             }
             if (indexed_properties.storage != .dense_value or
@@ -763,17 +763,17 @@ pub fn some(
 /// Fast path for `Array.prototype.unshift()`.
 ///
 /// Only applicable to objects that meet the following requirements:
-/// - Dense indexed property storage with exactly `len` items
+/// - Dense indexed property storage with exactly `length` items
 /// - Ordinary internal methods: `[[Set]]`
 /// - If the object has no property storage yet and `values.len` > 0 it must be extensible
 /// - No indexed properties on the prototype chain
 pub fn unshift(
     agent: *Agent,
-    object: *Object,
-    len: u53,
+    obj: *Object,
+    length: u53,
     values: []const Value,
 ) Agent.Error!?Value {
-    const has_ordinary_internal_methods = object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = obj.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         // Dependencies of ordinary [[Set]]
         .ordinary_get_own_property,
@@ -784,22 +784,22 @@ pub fn unshift(
     // Arrays have a custom `[[DefineOwnProperty]]` but are eligible for this fast path as long as
     // their length is writable.
     if (!has_ordinary_internal_methods) {
-        const array = object.cast(builtins.Array) orelse return null;
+        const array = obj.cast(builtins.Array) orelse return null;
         if (!array.fields.length_writable) return null;
     }
-    if (object.indexedProperties().count() != len) return null;
-    var prototype = object.prototype();
+    if (obj.indexedProperties().count() != length) return null;
+    var prototype = obj.prototype();
     while (prototype) |p| : (prototype = p.prototype()) {
         if (p.indexedProperties().count() > 0) return null;
     }
 
-    const new_len = std.math.add(u53, len, @intCast(values.len)) catch return null;
-    if (new_len > std.math.maxInt(Object.IndexedProperties.Index)) return null;
+    const new_length = std.math.add(u53, length, @intCast(values.len)) catch return null;
+    if (new_length > std.math.maxInt(Object.IndexedProperties.Index)) return null;
     if (values.len > 0 and
-        object.indexedProperties().storage == .none and
-        !object.extensible()) return null;
+        obj.indexedProperties().storage == .none and
+        !obj.extensible()) return null;
 
-    const indexed_properties = try object.ensureIndexedProperties(agent.gc_allocator);
+    const indexed_properties = try obj.ensureIndexedProperties(agent.gc_allocator);
     switch (indexed_properties.storage) {
         .none => {
             for (values, 0..) |value, i| {
@@ -836,6 +836,6 @@ pub fn unshift(
         .sparse_value, .sparse_property_descriptor => return null,
     }
 
-    try object.set(agent, PropertyKey.from("length"), Value.from(new_len), .throw);
-    return Value.from(new_len);
+    try obj.set(agent, PropertyKey.from("length"), Value.from(new_length), .throw);
+    return Value.from(new_length);
 }

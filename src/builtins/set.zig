@@ -70,26 +70,27 @@ const SetRecord = struct {
 
 /// 24.2.1.2 GetSetRecord ( obj )
 /// https://tc39.es/ecma262/#sec-getsetrecord
-fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
+fn getSetRecord(agent: *Agent, obj_value: Value) Agent.Error!SetRecord {
     // 1. If obj is not an Object, throw a TypeError exception.
-    const object = if (!object_value.isObject()) {
+    if (!obj_value.isObject()) {
         return agent.throwException(
             .type_error,
             "{f} is not an Object",
-            .{object_value},
+            .{obj_value},
         );
-    } else object_value.asObject();
+    }
+    const obj = obj_value.asObject();
 
     // 2. Let rawSize be ? Get(obj, "size").
-    const raw_size = try object.get(agent, PropertyKey.from("size"));
+    const raw_size = try obj.get(agent, PropertyKey.from("size"));
 
-    // 3. Let numSize be ? ToNumber(rawSize).
-    const num_size = try raw_size.toNumber(agent);
+    // 3. Let numberSize be ? ToNumber(rawSize).
+    const number_size = try raw_size.toNumber(agent);
 
-    // 4. NOTE: If rawSize is undefined, then numSize will be NaN.
+    // 4. NOTE: If rawSize is undefined, then numberSize will be NaN.
 
-    // 5. If numSize is NaN, throw a TypeError exception.
-    if (num_size.isNan()) {
+    // 5. If numberSize is NaN, throw a TypeError exception.
+    if (number_size.isNan()) {
         return agent.throwException(
             .type_error,
             "Size of Set-like object must not be NaN",
@@ -97,8 +98,8 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
         );
     }
 
-    // 6. Let intSize be ! ToIntegerOrInfinity(numSize).
-    const int_size = Value.from(num_size).toIntegerOrInfinity(agent) catch |err| try noexcept(err);
+    // 6. Let intSize be ! ToIntegerOrInfinity(numberSize).
+    const int_size = Value.from(number_size).toIntegerOrInfinity(agent) catch |err| try noexcept(err);
 
     // 7. If intSize < 0, throw a RangeError exception.
     if (int_size < 0) {
@@ -110,7 +111,7 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     }
 
     // 8. Let has be ? Get(obj, "has").
-    const has = try object.get(agent, PropertyKey.from("has"));
+    const has = try obj.get(agent, PropertyKey.from("has"));
 
     // 9. If IsCallable(has) is false, throw a TypeError exception.
     if (!has.isCallable()) {
@@ -122,7 +123,7 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     }
 
     // 10. Let keys be ? Get(obj, "keys").
-    const keys = try object.get(agent, PropertyKey.from("keys"));
+    const keys = try obj.get(agent, PropertyKey.from("keys"));
 
     // 11. If IsCallable(keys) is false, throw a TypeError exception.
     if (!keys.isCallable()) {
@@ -136,7 +137,7 @@ fn getSetRecord(agent: *Agent, object_value: Value) Agent.Error!SetRecord {
     // 12. Return a new Set Record { [[SetObject]]: obj, [[Size]]: intSize, [[Has]]: has,
     //     [[Keys]]: keys }.
     return .{
-        .set_object = object,
+        .set_object = obj,
         .size = @intFromFloat(int_size),
         .has = has.asObject(),
         .keys = keys.asObject(),
@@ -158,8 +159,8 @@ fn setDataIndex(set_data: SetData, value: Value) ?usize {
     // 2. Let size be the number of elements in setData.
     // 3. Let index be 0.
     // 4. Repeat, while index < size,
-    //    a. Let e be setData[index].
-    //    b. If e is not empty and e is value, then
+    //    a. Let element be setData[index].
+    //    b. If element is not empty and element is value, then
     //       i. Return index.
     //    c. Set index to index + 1.
     // 5. Return not-found.
@@ -170,8 +171,8 @@ fn setDataIndex(set_data: SetData, value: Value) ?usize {
 /// https://tc39.es/ecma262/#sec-setdatasize
 fn setDataSize(set_data: SetData, dead_entries: usize) usize {
     // 1. Let count be 0.
-    // 2. For each element e of setData, do
-    //     a. If e is not empty, set count to count + 1.
+    // 2. For each element element of setData, do
+    //     a. If element is not empty, set count to count + 1.
     // 3. Return count.
     return set_data.count() - dead_entries;
 }
@@ -185,7 +186,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Set",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -322,36 +323,36 @@ pub const prototype = struct {
     fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var value = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
         // 3. Set value to CanonicalizeKeyedCollectionKey(value).
         value = value.canonicalizeKeyedCollectionKey();
 
-        // 4. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and SameValue(e, value) is true, then
-        //         i. Return S.
-        // 5. Append value to S.[[SetData]].
+        // 4. For each element entry of set.[[SetData]], do
+        //     a. If entry is not empty and SameValue(entry, value) is true, then
+        //         i. Return set.
+        // 5. Append value to set.[[SetData]].
         const result = try set.fields.set_data.getOrPut(agent.gc_allocator, value);
         if (!result.found_existing) {
             result.value_ptr.* = {};
         }
 
-        // 6. Return S.
+        // 6. Return set.
         return Value.from(&set.object);
     }
 
     /// 24.2.4.2 Set.prototype.clear ( )
     /// https://tc39.es/ecma262/#sec-set.prototype.clear
     fn clear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. For each element e of S.[[SetData]], do
-        //     a. Replace the element of S.[[SetData]] whose value is e with an element whose value
-        //        is empty.
+        // 3. For each element entry of set.[[SetData]], do
+        //     a. Replace the element of set.[[SetData]] whose value is entry with an element whose
+        //        value is empty.
         @memset(set.fields.set_data.keys(), .uninitialized);
         set.fields.dead_entries = set.fields.set_data.count();
         try set.fields.compactIfNeeded(agent.gc_allocator);
@@ -365,18 +366,18 @@ pub const prototype = struct {
     fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var value = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
         // 3. Set value to CanonicalizeKeyedCollectionKey(value).
         value = value.canonicalizeKeyedCollectionKey();
 
-        // 4. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and SameValue(e, value) is true, then
+        // 4. For each element entry of set.[[SetData]], do
+        //     a. If entry is not empty and SameValue(entry, value) is true, then
         if (set.fields.set_data.getIndex(value)) |index| {
-            // i. Replace the element of S.[[SetData]] whose value is e with an element whose value
-            //    is empty.
+            // i. Replace the element of set.[[SetData]] whose value is entry with an element whose
+            //    value is empty.
             set.fields.set_data.entries.set(index, .{
                 .hash = {},
                 .key = .uninitialized,
@@ -398,37 +399,37 @@ pub const prototype = struct {
     pub fn difference(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const other = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[SetData]]).
-        const object = try this_value.requireInternalSlot(agent, Set);
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. Let otherRec be ? GetSetRecord(other).
-        const other_rec = try getSetRecord(agent, other);
+        // 3. Let otherRecord be ? GetSetRecord(other).
+        const other_record = try getSetRecord(agent, other);
 
-        // 4. Let resultSetData be a copy of O.[[SetData]].
-        var result_set_data = try object.fields.set_data.clone(agent.gc_allocator);
+        // 4. Let resultSetData be a copy of set.[[SetData]].
+        var result_set_data = try set.fields.set_data.clone(agent.gc_allocator);
 
         var dead_entries: usize = 0;
 
-        // 5. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
-        if (setDataSize(object.fields.set_data, object.fields.dead_entries) <= other_rec.size) {
-            // a. Let thisSize be the number of elements in O.[[SetData]].
-            const this_size = object.fields.set_data.count();
+        // 5. If SetDataSize(set.[[SetData]]) ≤ otherRecord.[[Size]], then
+        if (setDataSize(set.fields.set_data, set.fields.dead_entries) <= other_record.size) {
+            // a. Let thisSize be the number of elements in set.[[SetData]].
+            const this_size = set.fields.set_data.count();
 
             // b. Let index be 0.
             var index: usize = 0;
 
             // c. Repeat, while index < thisSize,
             while (index < this_size) : (index += 1) {
-                // i. Let e be resultSetData[index].
+                // i. Let entry be resultSetData[index].
                 const entry = result_set_data.entries.get(index);
 
-                // ii. If e is not empty, then
-                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]],
-                //    « e »)).
-                const in_other = (try Value.from(other_rec.has).callAssumeCallable(
+                // ii. If entry is not empty, then
+                // 1. Let inOther be ToBoolean(? Call(otherRecord.[[Has]],
+                //    otherRecord.[[SetObject]], « entry »)).
+                const in_other = (try Value.from(other_record.has).callAssumeCallable(
                     agent,
-                    Value.from(other_rec.set_object),
+                    Value.from(other_record.set_object),
                     &.{entry.key},
                 )).toBoolean();
 
@@ -447,19 +448,19 @@ pub const prototype = struct {
             }
         } else {
             // 6. Else,
-            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]],
-            //    otherRec.[[Keys]]).
-            var keys_iter = try getIteratorFromMethod(
+            // a. Let keysIterator be ? GetIteratorFromMethod(otherRecord.[[SetObject]],
+            //    otherRecord.[[Keys]]).
+            var keys_iterator = try getIteratorFromMethod(
                 agent,
-                Value.from(other_rec.set_object),
-                other_rec.keys,
+                Value.from(other_record.set_object),
+                other_record.keys,
             );
 
             // b. Let next be not-started.
             // c. Repeat, while next is not done,
-            //     i. Set next to ? IteratorStepValue(keysIter).
+            //     i. Set next to ? IteratorStepValue(keysIterator).
             //     ii. If next is not done, then
-            while (try keys_iter.stepValue(agent)) |next_| {
+            while (try keys_iterator.stepValue(agent)) |next_| {
                 // 1. Set next to CanonicalizeKeyedCollectionKey(next).
                 const next = next_.canonicalizeKeyedCollectionKey();
 
@@ -505,10 +506,10 @@ pub const prototype = struct {
     /// 24.2.4.6 Set.prototype.entries ( )
     /// https://tc39.es/ecma262/#sec-set.prototype.entries
     fn entries(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
+        // 1. Let set be the this value.
         const set = this_value;
 
-        // 2. Return ? CreateSetIterator(S, key+value).
+        // 2. Return ? CreateSetIterator(set, key+value).
         const set_iterator = try createSetIterator(agent, set, .key_value);
         return Value.from(&set_iterator.object);
     }
@@ -519,8 +520,8 @@ pub const prototype = struct {
         const callback = arguments.get(0);
         const this_arg = arguments.get(1);
 
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
@@ -528,28 +529,28 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{callback});
         }
 
-        // 4. Let entries be S.[[SetData]].
+        // 4. Let entries be set.[[SetData]].
         const entries_ = &set.fields.set_data;
 
         set.fields.active_iterators += 1;
         defer set.fields.active_iterators -= 1;
 
-        // 5. Let numEntries be the number of elements in entries.
-        var num_entries = entries_.count();
+        // 5. Let entriesCount be the number of elements in entries.
+        var entries_count = entries_.count();
 
         // 6. Let index be 0.
         var index: usize = 0;
 
-        // 7. Repeat, while index < numEntries,
-        while (index < num_entries) : (index += 1) {
-            // a. Let e be entries[index].
+        // 7. Repeat, while index < entriesCount,
+        while (index < entries_count) : (index += 1) {
+            // a. Let entry be entries[index].
             const entry = entries_.entries.get(index);
 
             // b. Set index to index + 1.
 
-            // c. If e is not empty, then
+            // c. If entry is not empty, then
             if (!entry.key.isUninitialized()) {
-                // i. Perform ? Call(callback, thisArg, « e, e, S »).
+                // i. Perform ? Call(callback, thisArg, « entry, entry, set »).
                 _ = try callback.callAssumeCallable(
                     agent,
                     this_arg,
@@ -558,8 +559,8 @@ pub const prototype = struct {
 
                 // ii. NOTE: The number of elements in entries may have increased during execution
                 //     of callback.
-                // iii. Set numEntries to the number of elements in entries.
-                num_entries = entries_.count();
+                // iii. Set entriesCount to the number of elements in entries.
+                entries_count = entries_.count();
             }
         }
 
@@ -572,15 +573,15 @@ pub const prototype = struct {
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var value = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
         // 3. Set value to CanonicalizeKeyedCollectionKey(value).
         value = value.canonicalizeKeyedCollectionKey();
 
-        // 4. For each element e of S.[[SetData]], do
-        //     a. If e is not empty and SameValue(e, value) is true, return true.
+        // 4. For each element entry of set.[[SetData]], do
+        //     a. If entry is not empty and SameValue(entry, value) is true, return true.
         // 5. Return false.
         return Value.from(set.fields.set_data.contains(value));
     }
@@ -590,76 +591,76 @@ pub const prototype = struct {
     fn intersection(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const other = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[SetData]]).
-        const object = try this_value.requireInternalSlot(agent, Set);
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. Let otherRec be ? GetSetRecord(other).
-        const other_rec = try getSetRecord(agent, other);
+        // 3. Let otherRecord be ? GetSetRecord(other).
+        const other_record = try getSetRecord(agent, other);
 
         // 4. Let resultSetData be a new empty List.
         var result_set_data: SetData = .empty;
 
-        // 5. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
-        if (setDataSize(object.fields.set_data, object.fields.dead_entries) <= other_rec.size) {
-            // a. Let thisSize be the number of elements in O.[[SetData]].
-            var this_size = object.fields.set_data.count();
+        // 5. If SetDataSize(set.[[SetData]]) ≤ otherRecord.[[Size]], then
+        if (setDataSize(set.fields.set_data, set.fields.dead_entries) <= other_record.size) {
+            // a. Let thisSize be the number of elements in set.[[SetData]].
+            var this_size = set.fields.set_data.count();
 
             // b. Let index be 0.
             var index: usize = 0;
 
             // c. Repeat, while index < thisSize,
             while (index < this_size) : (index += 1) {
-                // i. Let e be O.[[SetData]][index].
-                const entry = object.fields.set_data.entries.get(index);
+                // i. Let entry be set.[[SetData]][index].
+                const entry = set.fields.set_data.entries.get(index);
 
                 // ii. Set index to index + 1.
-                // iii. If e is not empty, then
+                // iii. If entry is not empty, then
 
-                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]],
-                //    « e »)).
-                const in_other = (try Value.from(other_rec.has).callAssumeCallable(
+                // 1. Let inOther be ToBoolean(? Call(otherRecord.[[Has]],
+                //    otherRecord.[[SetObject]], « entry »)).
+                const in_other = (try Value.from(other_record.has).callAssumeCallable(
                     agent,
-                    Value.from(other_rec.set_object),
+                    Value.from(other_record.set_object),
                     &.{entry.key},
                 )).toBoolean();
 
                 // 2. If inOther is true, then
                 if (in_other) {
-                    // a. NOTE: It is possible for earlier calls to otherRec.[[Has]] to remove and
-                    //    re-add an element of O.[[SetData]], which can cause the same element to be
-                    //    visited twice during this iteration.
-                    // b. If SetDataHas(resultSetData, e) is false, then
-                    //     i. Append e to resultSetData.
+                    // a. NOTE: It is possible for earlier calls to otherRecord.[[Has]] to remove
+                    //    and re-add an element of set.[[SetData]], which can cause the same element
+                    //    to be visited twice during this iteration.
+                    // b. If SetDataHas(resultSetData, entry) is false, then
+                    //     i. Append entry to resultSetData.
                     // NOTE: We do not need to check because put allows clobbers.
                     try result_set_data.put(agent.gc_allocator, entry.key, {});
                 }
 
-                // 3. NOTE: The number of elements in O.[[SetData]] may have increased during
-                //    execution of otherRec.[[Has]].
-                // 4. Set thisSize to the number of elements in O.[[SetData]].
-                this_size = object.fields.set_data.count();
+                // 3. NOTE: The number of elements in set.[[SetData]] may have increased during
+                //    execution of otherRecord.[[Has]].
+                // 4. Set thisSize to the number of elements in set.[[SetData]].
+                this_size = set.fields.set_data.count();
             }
         } else {
             // 6. Else,
-            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]],
-            //    otherRec.[[Keys]]).
-            var keys_iter = try getIteratorFromMethod(
+            // a. Let keysIterator be ? GetIteratorFromMethod(otherRecord.[[SetObject]],
+            //    otherRecord.[[Keys]]).
+            var keys_iterator = try getIteratorFromMethod(
                 agent,
-                Value.from(other_rec.set_object),
-                other_rec.keys,
+                Value.from(other_record.set_object),
+                other_record.keys,
             );
 
             // b. Let next be not-started.
             // c. Repeat, while next is not done,
-            //     i. Set next to ? IteratorStepValue(keysIter).
+            //     i. Set next to ? IteratorStepValue(keysIterator).
             //     ii. If next is not done, then
-            while (try keys_iter.stepValue(agent)) |next_| {
+            while (try keys_iterator.stepValue(agent)) |next_| {
                 // 1. Set next to CanonicalizeKeyedCollectionKey(next).
                 const next = next_.canonicalizeKeyedCollectionKey();
 
-                // 2. Let inThis be SetDataHas(O.[[SetData]], next).
-                const in_this = setDataHas(object.fields.set_data, next);
+                // 2. Let inThis be SetDataHas(set.[[SetData]], next).
+                const in_this = setDataHas(set.fields.set_data, next);
 
                 // 3. If inThis is true, then
                 if (in_this) {
@@ -693,34 +694,34 @@ pub const prototype = struct {
     pub fn isDisjointFrom(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const other = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[SetData]]).
-        const object = try this_value.requireInternalSlot(agent, Set);
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. Let otherRec be ? GetSetRecord(other).
-        const other_rec = try getSetRecord(agent, other);
+        // 3. Let otherRecord be ? GetSetRecord(other).
+        const other_record = try getSetRecord(agent, other);
 
-        // 4. If SetDataSize(O.[[SetData]]) ≤ otherRec.[[Size]], then
-        if (setDataSize(object.fields.set_data, object.fields.dead_entries) <= other_rec.size) {
-            // a. Let thisSize be the number of elements in O.[[SetData]].
-            var this_size = object.fields.set_data.count();
+        // 4. If SetDataSize(set.[[SetData]]) ≤ otherRecord.[[Size]], then
+        if (setDataSize(set.fields.set_data, set.fields.dead_entries) <= other_record.size) {
+            // a. Let thisSize be the number of elements in set.[[SetData]].
+            var this_size = set.fields.set_data.count();
 
             // b. Let index be 0.
             var index: usize = 0;
 
             // c. Repeat, while index < thisSize,
             while (index < this_size) : (index += 1) {
-                // i. Let e be O.[[SetData]][index].
-                const entry = object.fields.set_data.entries.get(index);
+                // i. Let entry be set.[[SetData]][index].
+                const entry = set.fields.set_data.entries.get(index);
 
                 // ii. Set index to index + 1.
-                // iii. If e is not empty, then
+                // iii. If entry is not empty, then
 
-                // 1. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]],
-                //    « e »)).
-                const in_other = (try Value.from(other_rec.has).callAssumeCallable(
+                // 1. Let inOther be ToBoolean(? Call(otherRecord.[[Has]],
+                //    otherRecord.[[SetObject]], « entry »)).
+                const in_other = (try Value.from(other_record.has).callAssumeCallable(
                     agent,
-                    Value.from(other_rec.set_object),
+                    Value.from(other_record.set_object),
                     &.{entry.key},
                 )).toBoolean();
 
@@ -729,30 +730,30 @@ pub const prototype = struct {
                     return .false;
                 }
 
-                // 3. NOTE: The number of elements in O.[[SetData]] may have increased during
-                //    execution of otherRec.[[Has]].
-                // 4. Set thisSize to the number of elements in O.[[SetData]].
-                this_size = object.fields.set_data.count();
+                // 3. NOTE: The number of elements in set.[[SetData]] may have increased during
+                //    execution of otherRecord.[[Has]].
+                // 4. Set thisSize to the number of elements in set.[[SetData]].
+                this_size = set.fields.set_data.count();
             }
         } else {
             // 5. Else,
-            // a. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]],
-            //    otherRec.[[Keys]]).
-            var keys_iter = try getIteratorFromMethod(
+            // a. Let keysIterator be ? GetIteratorFromMethod(otherRecord.[[SetObject]],
+            //    otherRecord.[[Keys]]).
+            var keys_iterator = try getIteratorFromMethod(
                 agent,
-                Value.from(other_rec.set_object),
-                other_rec.keys,
+                Value.from(other_record.set_object),
+                other_record.keys,
             );
 
             // b. Let next be not-started.
             // c. Repeat, while next is not done,
-            //     i. Set next to ? IteratorStepValue(keysIter).
+            //     i. Set next to ? IteratorStepValue(keysIterator).
             //     ii. If next is not done, then
-            while (try keys_iter.stepValue(agent)) |next| {
-                // 1. If SetDataHas(O.[[SetData]], next) is true, then
-                if (setDataHas(object.fields.set_data, next)) {
-                    // a. Perform ? IteratorClose(keysIter, NormalCompletion(unused)).
-                    try keys_iter.close(agent, @as(Agent.Error!void, {}));
+            while (try keys_iterator.stepValue(agent)) |next| {
+                // 1. If SetDataHas(set.[[SetData]], next) is true, then
+                if (setDataHas(set.fields.set_data, next)) {
+                    // a. Perform ? IteratorClose(keysIterator, NormalCompletion(unused)).
+                    try keys_iterator.close(agent, @as(Agent.Error!void, {}));
 
                     // b. Return false.
                     return .false;
@@ -769,36 +770,37 @@ pub const prototype = struct {
     pub fn isSubsetOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const other = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[SetData]]).
-        const object = try this_value.requireInternalSlot(agent, Set);
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. Let otherRec be ? GetSetRecord(other).
-        const other_rec = try getSetRecord(agent, other);
+        // 3. Let otherRecord be ? GetSetRecord(other).
+        const other_record = try getSetRecord(agent, other);
 
-        // 4. If SetDataSize(O.[[SetData]]) > otherRec.[[Size]], return false.
-        if (setDataSize(object.fields.set_data, object.fields.dead_entries) > other_rec.size) {
+        // 4. If SetDataSize(set.[[SetData]]) > otherRecord.[[Size]], return false.
+        if (setDataSize(set.fields.set_data, set.fields.dead_entries) > other_record.size) {
             return .false;
         }
 
-        // 5. Let thisSize be the number of elements in O.[[SetData]].
-        var this_size = object.fields.set_data.count();
+        // 5. Let thisSize be the number of elements in set.[[SetData]].
+        var this_size = set.fields.set_data.count();
 
         // 6. Let index be 0.
         var index: usize = 0;
 
         // 7. Repeat, while index < thisSize,
         while (index < this_size) : (index += 1) {
-            // a. Let e be O.[[SetData]][index].
-            const entry = object.fields.set_data.entries.get(index);
+            // a. Let entry be set.[[SetData]][index].
+            const entry = set.fields.set_data.entries.get(index);
 
             // b. Set index to index + 1.
-            // c. If e is not empty, then
+            // c. If entry is not empty, then
 
-            // i. Let inOther be ToBoolean(? Call(otherRec.[[Has]], otherRec.[[SetObject]], « e »)).
-            const in_other = (try Value.from(other_rec.has).callAssumeCallable(
+            // i. Let inOther be ToBoolean(? Call(otherRecord.[[Has]], otherRecord.[[SetObject]],
+            //    « entry »)).
+            const in_other = (try Value.from(other_record.has).callAssumeCallable(
                 agent,
-                Value.from(other_rec.set_object),
+                Value.from(other_record.set_object),
                 &.{entry.key},
             )).toBoolean();
 
@@ -807,10 +809,10 @@ pub const prototype = struct {
                 return .false;
             }
 
-            // iii. NOTE: The number of elements in O.[[SetData]] may have increased during
-            //      execution of otherRec.[[Has]].
-            // iv. Set thisSize to the number of elements in O.[[SetData]].
-            this_size = object.fields.set_data.count();
+            // iii. NOTE: The number of elements in set.[[SetData]] may have increased during
+            //      execution of otherRecord.[[Has]].
+            // iv. Set thisSize to the number of elements in set.[[SetData]].
+            this_size = set.fields.set_data.count();
         }
 
         // 8. Return true.
@@ -822,34 +824,35 @@ pub const prototype = struct {
     pub fn isSupersetOf(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const other = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[SetData]]).
-        const object = try this_value.requireInternalSlot(agent, Set);
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. Let otherRec be ? GetSetRecord(other).
-        const other_rec = try getSetRecord(agent, other);
+        // 3. Let otherRecord be ? GetSetRecord(other).
+        const other_record = try getSetRecord(agent, other);
 
-        // 4. If SetDataSize(O.[[SetData]]) < otherRec.[[Size]], return false.
-        if (setDataSize(object.fields.set_data, object.fields.dead_entries) < other_rec.size) {
+        // 4. If SetDataSize(set.[[SetData]]) < otherRecord.[[Size]], return false.
+        if (setDataSize(set.fields.set_data, set.fields.dead_entries) < other_record.size) {
             return .false;
         }
 
-        // 5. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]], otherRec.[[Keys]]).
-        var keys_iter = try getIteratorFromMethod(
+        // 5. Let keysIterator be ? GetIteratorFromMethod(otherRecord.[[SetObject]],
+        //    otherRecord.[[Keys]]).
+        var keys_iterator = try getIteratorFromMethod(
             agent,
-            Value.from(other_rec.set_object),
-            other_rec.keys,
+            Value.from(other_record.set_object),
+            other_record.keys,
         );
 
         // 6. Let next be not-started.
         // 7. Repeat, while next is not done,
-        //     a. Set next to ? IteratorStepValue(keysIter).
+        //     a. Set next to ? IteratorStepValue(keysIterator).
         //     b. If next is not done, then
-        while (try keys_iter.stepValue(agent)) |next| {
-            // i. If SetDataHas(O.[[SetData]], next) is false, then
-            if (!setDataHas(object.fields.set_data, next)) {
-                // 1. Perform ? IteratorClose(keysIter, NormalCompletion(unused)).
-                try keys_iter.close(agent, @as(Agent.Error!void, {}));
+        while (try keys_iterator.stepValue(agent)) |next| {
+            // i. If SetDataHas(set.[[SetData]], next) is false, then
+            if (!setDataHas(set.fields.set_data, next)) {
+                // 1. Perform ? IteratorClose(keysIterator, NormalCompletion(unused)).
+                try keys_iterator.close(agent, @as(Agent.Error!void, {}));
 
                 // 2. Return false.
                 return .false;
@@ -863,11 +866,11 @@ pub const prototype = struct {
     /// 24.2.4.14 get Set.prototype.size
     /// https://tc39.es/ecma262/#sec-get-set.prototype.size
     fn size(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[SetData]]).
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. Let size be SetDataSize(S.[[SetData]]).
+        // 3. Let size be SetDataSize(set.[[SetData]]).
         const size_ = setDataSize(set.fields.set_data, set.fields.dead_entries);
 
         // 4. Return 𝔽(size).
@@ -879,30 +882,31 @@ pub const prototype = struct {
     pub fn symmetricDifference(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const other = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[SetData]]).
-        const object = try this_value.requireInternalSlot(agent, Set);
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
+        const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. Let otherRec be ? GetSetRecord(other).
-        const other_rec = try getSetRecord(agent, other);
+        // 3. Let otherRecord be ? GetSetRecord(other).
+        const other_record = try getSetRecord(agent, other);
 
-        // 4. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]], otherRec.[[Keys]]).
-        var keys_iter = try getIteratorFromMethod(
+        // 4. Let keysIterator be ? GetIteratorFromMethod(otherRecord.[[SetObject]],
+        //    otherRecord.[[Keys]]).
+        var keys_iterator = try getIteratorFromMethod(
             agent,
-            Value.from(other_rec.set_object),
-            other_rec.keys,
+            Value.from(other_record.set_object),
+            other_record.keys,
         );
 
-        // 5. Let resultSetData be a copy of O.[[SetData]].
-        var result_set_data = try object.fields.set_data.clone(agent.gc_allocator);
+        // 5. Let resultSetData be a copy of set.[[SetData]].
+        var result_set_data = try set.fields.set_data.clone(agent.gc_allocator);
 
         var dead_entries: usize = 0;
 
         // 6. Let next be not-started.
         // 7. Repeat, while next is not done,
-        //     a. Set next to ? IteratorStepValue(keysIter).
+        //     a. Set next to ? IteratorStepValue(keysIterator).
         //     b. If next is not done, then
-        while (try keys_iter.stepValue(agent)) |next_| {
+        while (try keys_iterator.stepValue(agent)) |next_| {
             // i. Set next to CanonicalizeKeyedCollectionKey(next).
             const next = next_.canonicalizeKeyedCollectionKey();
 
@@ -911,8 +915,8 @@ pub const prototype = struct {
             //      alreadyInResult be true.
             const maybe_result_index = setDataIndex(result_set_data, next);
 
-            // iv. If SetDataHas(O.[[SetData]], next) is true, then
-            if (setDataHas(object.fields.set_data, next)) {
+            // iv. If SetDataHas(set.[[SetData]], next) is true, then
+            if (setDataHas(set.fields.set_data, next)) {
                 // 1. If alreadyInResult is true, set resultSetData[resultIndex] to empty.
                 if (maybe_result_index) |result_index| {
                     result_set_data.entries.set(result_index, .{
@@ -959,28 +963,29 @@ pub const prototype = struct {
     fn @"union"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const other = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[SetData]]).
+        // 1. Let set be the this value.
+        // 2. Perform ? RequireInternalSlot(set, [[SetData]]).
         const set = try this_value.requireInternalSlot(agent, Set);
 
-        // 3. Let otherRec be ? GetSetRecord(other).
-        const other_rec = try getSetRecord(agent, other);
+        // 3. Let otherRecord be ? GetSetRecord(other).
+        const other_record = try getSetRecord(agent, other);
 
-        // 4. Let keysIter be ? GetIteratorFromMethod(otherRec.[[SetObject]], otherRec.[[Keys]]).
-        var keys_iter = try getIteratorFromMethod(
+        // 4. Let keysIterator be ? GetIteratorFromMethod(otherRecord.[[SetObject]],
+        //    otherRecord.[[Keys]]).
+        var keys_iterator = try getIteratorFromMethod(
             agent,
-            Value.from(other_rec.set_object),
-            other_rec.keys,
+            Value.from(other_record.set_object),
+            other_record.keys,
         );
 
-        // 5. Let resultSetData be a copy of O.[[SetData]].
+        // 5. Let resultSetData be a copy of set.[[SetData]].
         var result_set_data = try set.fields.set_data.clone(agent.gc_allocator);
 
         // 6. Let next be not-started.
         // 7. Repeat, while next is not done,
-        //     a. Set next to ? IteratorStepValue(keysIter).
+        //     a. Set next to ? IteratorStepValue(keysIterator).
         //     b. If next is not done, then
-        while (try keys_iter.stepValue(agent)) |next_| {
+        while (try keys_iterator.stepValue(agent)) |next_| {
             // i. Set next to CanonicalizeKeyedCollectionKey(next).
             const next = next_.canonicalizeKeyedCollectionKey();
 
@@ -1008,10 +1013,10 @@ pub const prototype = struct {
     /// 24.2.4.17 Set.prototype.values ( )
     /// https://tc39.es/ecma262/#sec-set.prototype.values
     fn values(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let S be the this value.
+        // 1. Let set be the this value.
         const set = this_value;
 
-        // 2. Return ? CreateSetIterator(S, value).
+        // 2. Return ? CreateSetIterator(set, value).
         const set_iterator = try createSetIterator(agent, set, .value);
         return Value.from(&set_iterator.object);
     }

@@ -83,8 +83,8 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const maybe_value = arguments.getOrNull(0);
 
-        // 1. Let O be the this value.
-        // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+        // 1. Let obj be the this value.
+        // 2. Assert: obj is an Object that has a [[SyncIteratorRecord]] internal slot.
         const async_from_sync_iterator = this_value.asObject().as(AsyncFromSyncIterator);
 
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
@@ -93,7 +93,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+        // 4. Let syncIteratorRecord be obj.[[SyncIteratorRecord]].
         const sync_iterator = &async_from_sync_iterator.fields.sync_iterator;
 
         // 5. If value is present, then
@@ -128,8 +128,8 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const maybe_value = arguments.getOrNull(0);
 
-        // 1. Let O be the this value.
-        // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+        // 1. Let obj be the this value.
+        // 2. Assert: obj is an Object that has a [[SyncIteratorRecord]] internal slot.
         const async_from_sync_iterator = this_value.asObject().as(AsyncFromSyncIterator);
 
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
@@ -138,7 +138,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+        // 4. Let syncIteratorRecord be obj.[[SyncIteratorRecord]].
         const sync_iterator = &async_from_sync_iterator.fields.sync_iterator;
 
         // 5. Let syncIterator be syncIteratorRecord.[[Iterator]].
@@ -226,8 +226,8 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const maybe_value = arguments.getOrNull(0);
 
-        // 1. Let O be the this value.
-        // 2. Assert: O is an Object that has a [[SyncIteratorRecord]] internal slot.
+        // 1. Let obj be the this value.
+        // 2. Assert: obj is an Object that has a [[SyncIteratorRecord]] internal slot.
         const async_from_sync_iterator = this_value.asObject().as(AsyncFromSyncIterator);
 
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
@@ -236,7 +236,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         ) catch |err| try noexcept(err);
 
-        // 4. Let syncIteratorRecord be O.[[SyncIteratorRecord]].
+        // 4. Let syncIteratorRecord be obj.[[SyncIteratorRecord]].
         const sync_iterator = &async_from_sync_iterator.fields.sync_iterator;
 
         // 5. Let syncIterator be syncIteratorRecord.[[Iterator]].

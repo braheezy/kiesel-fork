@@ -22,10 +22,10 @@ pub fn resolvePrivateIdentifier(
     identifier: []const u8,
 ) PrivateName {
     // 1. Let names be privateEnv.[[Names]].
-    // 2. For each Private Name pn of names, do
-    //     a. If pn.[[Description]] is identifier, then
+    // 2. For each Private Name privateName of names, do
+    //     a. If privateName.[[Description]] is identifier, then
     if (self.names.get(identifier)) |private_name| {
-        // i. Return pn.
+        // i. Return privateName.
         return private_name;
     }
 

@@ -30,7 +30,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "FinalizationRegistry",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -65,8 +65,8 @@ pub const constructor = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{cleanup_callback});
         }
 
-        // 4. Let fn be the active function object.
-        const function = agent.activeFunctionObject();
+        // 4. Let activeFunc be the active function object.
+        const active_func = agent.activeFunctionObject();
 
         // 3. Let finalizationRegistry be ? OrdinaryCreateFromConstructor(NewTarget,
         //    "%FinalizationRegistry.prototype%", « [[Realm]], [[CleanupCallback]], [[Cells]] »).
@@ -76,8 +76,8 @@ pub const constructor = struct {
             new_target.?,
             "%FinalizationRegistry.prototype%",
             .{
-                // 5. Set finalizationRegistry.[[Realm]] to fn.[[Realm]].
-                .realm = function.as(builtins.BuiltinFunction).fields.realm,
+                // 5. Set finalizationRegistry.[[Realm]] to activeFunc.[[Realm]].
+                .realm = active_func.as(builtins.BuiltinFunction).fields.realm,
 
                 // 6. Set finalizationRegistry.[[CleanupCallback]] to HostMakeJobCallback(
                 //    cleanupCallback).

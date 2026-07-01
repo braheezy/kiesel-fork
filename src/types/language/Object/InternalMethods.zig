@@ -16,19 +16,19 @@ const Value = types.Value;
 
 const InternalMethods = @This();
 
-pub const GetPrototypeOf = *const fn (agent: *Agent, object: *Object) Agent.Error!?*Object;
-pub const SetPrototypeOf = *const fn (agent: *Agent, object: *Object, prototype: ?*Object) Agent.Error!bool;
-pub const IsExtensible = *const fn (agent: *Agent, object: *Object) Agent.Error!bool;
-pub const PreventExtensions = *const fn (agent: *Agent, object: *Object) Agent.Error!bool;
-pub const GetOwnProperty = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!?PropertyDescriptor;
-pub const DefineOwnProperty = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey, property_descriptor: PropertyDescriptor) Agent.Error!bool;
-pub const HasProperty = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool;
-pub const Get = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value;
-pub const Set = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool;
-pub const Delete = *const fn (agent: *Agent, object: *Object, property_key: PropertyKey) Agent.Error!bool;
-pub const OwnPropertyKeys = *const fn (agent: *Agent, object: *Object) Agent.Error![]PropertyKey;
-pub const Call = *const fn (agent: *Agent, object: *Object, this_value: Value, arguments: Arguments) Agent.Error!Value;
-pub const Construct = *const fn (agent: *Agent, object: *Object, arguments: Arguments, new_target: *Object) Agent.Error!*Object;
+pub const GetPrototypeOf = *const fn (agent: *Agent, obj: *Object) Agent.Error!?*Object;
+pub const SetPrototypeOf = *const fn (agent: *Agent, obj: *Object, proto: ?*Object) Agent.Error!bool;
+pub const IsExtensible = *const fn (agent: *Agent, obj: *Object) Agent.Error!bool;
+pub const PreventExtensions = *const fn (agent: *Agent, obj: *Object) Agent.Error!bool;
+pub const GetOwnProperty = *const fn (agent: *Agent, obj: *Object, property_key: PropertyKey) Agent.Error!?PropertyDescriptor;
+pub const DefineOwnProperty = *const fn (agent: *Agent, obj: *Object, property_key: PropertyKey, property_desc: PropertyDescriptor) Agent.Error!bool;
+pub const HasProperty = *const fn (agent: *Agent, obj: *Object, property_key: PropertyKey) Agent.Error!bool;
+pub const Get = *const fn (agent: *Agent, obj: *Object, property_key: PropertyKey, receiver: Value) Agent.Error!Value;
+pub const Set = *const fn (agent: *Agent, obj: *Object, property_key: PropertyKey, value: Value, receiver: Value) Agent.Error!bool;
+pub const Delete = *const fn (agent: *Agent, obj: *Object, property_key: PropertyKey) Agent.Error!bool;
+pub const OwnPropertyKeys = *const fn (agent: *Agent, obj: *Object) Agent.Error![]PropertyKey;
+pub const Call = *const fn (agent: *Agent, obj: *Object, this_value: Value, arguments: Arguments) Agent.Error!Value;
+pub const Construct = *const fn (agent: *Agent, obj: *Object, arguments: Arguments, new_target: *Object) Agent.Error!*Object;
 
 /// [[GetPrototypeOf]]
 getPrototypeOf: GetPrototypeOf,

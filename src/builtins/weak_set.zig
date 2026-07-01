@@ -30,7 +30,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "WeakSet",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -147,9 +147,9 @@ pub const prototype = struct {
     fn add(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[WeakSetData]]).
-        const set = try this_value.requireInternalSlot(agent, WeakSet);
+        // 1. Let weakSet be the this value.
+        // 2. Perform ? RequireInternalSlot(weakSet, [[WeakSetData]]).
+        const weak_set = try this_value.requireInternalSlot(agent, WeakSet);
 
         // 3. If CanBeHeldWeakly(value) is false, throw a TypeError exception.
         if (!value.canBeHeldWeakly(agent)) {
@@ -160,11 +160,11 @@ pub const prototype = struct {
             );
         }
 
-        // 4. For each element e of S.[[WeakSetData]], do
-        //    a. If e is not empty and SameValue(e, value) is true, then
-        //       i. Return S.
-        // 5. Append value to S.[[WeakSetData]].
-        const weak_set_data = &set.fields.weak_set_data;
+        // 4. For each element entry of weakSet.[[WeakSetData]], do
+        //    a. If entry is not empty and SameValue(entry, value) is true, then
+        //       i. Return weakSet.
+        // 5. Append value to weakSet.[[WeakSetData]].
+        const weak_set_data = &weak_set.fields.weak_set_data;
         const weak_value = Value.Weak.init(value);
         const gop = try weak_set_data.getOrPut(agent.gc_allocator, weak_value);
         if (build_options.enable_libgc and !gop.found_existing) {
@@ -184,7 +184,7 @@ pub const prototype = struct {
             }.finalizer);
         }
 
-        // 6. Return S.
+        // 6. Return weakSet.
         return this_value;
     }
 
@@ -198,22 +198,22 @@ pub const prototype = struct {
     fn delete(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[WeakSetData]]).
-        const set = try this_value.requireInternalSlot(agent, WeakSet);
+        // 1. Let weakSet be the this value.
+        // 2. Perform ? RequireInternalSlot(weakSet, [[WeakSetData]]).
+        const weak_set = try this_value.requireInternalSlot(agent, WeakSet);
 
         // 3. If CanBeHeldWeakly(value) is false, return false.
         if (!value.canBeHeldWeakly(agent)) {
             return .false;
         }
 
-        // 4. For each element e of S.[[WeakSetData]], do
-        //     a. If e is not empty and SameValue(e, value) is true, then
-        //         i. Replace the element of S.[[WeakSetData]] whose value is e with an element
-        //            whose value is empty.
+        // 4. For each element entry of weakSet.[[WeakSetData]], do
+        //     a. If entry is not empty and SameValue(entry, value) is true, then
+        //         i. Replace the element of weakSet.[[WeakSetData]] whose value is entry with an
+        //            element whose value is empty.
         //         ii. Return true.
         // 5. Return false.
-        const is_removed = set.fields.weak_set_data.remove(Value.Weak.init(value));
+        const is_removed = weak_set.fields.weak_set_data.remove(Value.Weak.init(value));
         return Value.from(is_removed);
     }
 
@@ -222,19 +222,19 @@ pub const prototype = struct {
     fn has(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. Let S be the this value.
-        // 2. Perform ? RequireInternalSlot(S, [[WeakSetData]]).
-        const set = try this_value.requireInternalSlot(agent, WeakSet);
+        // 1. Let weakSet be the this value.
+        // 2. Perform ? RequireInternalSlot(weakSet, [[WeakSetData]]).
+        const weak_set = try this_value.requireInternalSlot(agent, WeakSet);
 
         // 3. If CanBeHeldWeakly(value) is false, return false.
         if (!value.canBeHeldWeakly(agent)) {
             return .false;
         }
 
-        // 4. For each element e of S.[[WeakSetData]], do
-        //     a. If e is not empty and SameValue(e, value) is true, return true.
+        // 4. For each element entry of weakSet.[[WeakSetData]], do
+        //     a. If entry is not empty and SameValue(entry, value) is true, return true.
         // 5. Return false.
-        const is_present = set.fields.weak_set_data.contains(Value.Weak.init(value));
+        const is_present = weak_set.fields.weak_set_data.contains(Value.Weak.init(value));
         return Value.from(is_present);
     }
 };

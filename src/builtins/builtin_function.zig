@@ -86,45 +86,45 @@ pub const internal_methods_constructor = Object.InternalMethods.initComptime(.{
     .construct = construct,
 });
 
-/// 10.3.1 [[Call]] ( thisArgument, argumentsList )
+/// 10.3.1 [[Call]] ( thisArg, argList )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist
 fn call(
     agent: *Agent,
-    object: *Object,
-    this_argument: Value,
-    arguments_list: Arguments,
+    func: *Object,
+    this_arg: Value,
+    arg_list: Arguments,
 ) Agent.Error!Value {
-    const function = object.as(BuiltinFunction);
+    const function = func.as(BuiltinFunction);
 
-    // 1. Return ? BuiltinCallOrConstruct(F, thisArgument, argumentsList, undefined).
-    return builtinCallOrConstruct(agent, function, this_argument, arguments_list, null);
+    // 1. Return ? BuiltinCallOrConstruct(func, thisArg, argList, undefined).
+    return builtinCallOrConstruct(agent, function, this_arg, arg_list, null);
 }
 
-/// 10.3.2 [[Construct]] ( argumentsList, newTarget )
+/// 10.3.2 [[Construct]] ( argList, newTarget )
 /// https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget
 pub fn construct(
     agent: *Agent,
-    object: *Object,
-    arguments_list: Arguments,
+    func: *Object,
+    arg_list: Arguments,
     new_target: *Object,
 ) Agent.Error!*Object {
-    const function = object.as(BuiltinFunction);
+    const function = func.as(BuiltinFunction);
 
-    // 1. Let result be ? BuiltinCallOrConstruct(F, uninitialized, argumentsList, newTarget).
-    const result = try builtinCallOrConstruct(agent, function, null, arguments_list, new_target);
+    // 1. Let result be ? BuiltinCallOrConstruct(func, uninitialized, argList, newTarget).
+    const result = try builtinCallOrConstruct(agent, function, null, arg_list, new_target);
 
     // 2. Assert: result is an Object.
     // 3. Return result.
     return result.asObject();
 }
 
-/// 10.3.3 BuiltinCallOrConstruct ( F, thisArgument, argumentsList, newTarget )
+/// 10.3.3 BuiltinCallOrConstruct ( func, thisArg, argList, newTarget )
 /// https://tc39.es/ecma262/#sec-builtincallorconstruct
 pub fn builtinCallOrConstruct(
     agent: *Agent,
     builtin_function: *BuiltinFunction,
-    this_argument: ?Value,
-    arguments_list: Arguments,
+    this_arg: ?Value,
+    arg_list: Arguments,
     new_target: ?*Object,
 ) Agent.Error!Value {
     // 1. Let callerContext be the running execution context.
@@ -132,10 +132,10 @@ pub fn builtinCallOrConstruct(
 
     // 3. Let calleeContext be a new execution context.
     var callee_context: ExecutionContext = .{
-        // 4. Set the Function of calleeContext to F.
+        // 4. Set the Function of calleeContext to func.
         .origin = .{ .function = &builtin_function.object },
 
-        // 5. Let calleeRealm be F.[[Realm]].
+        // 5. Let calleeRealm be func.[[Realm]].
         // 6. Set the Realm of calleeContext to calleeRealm.
         .realm = builtin_function.fields.realm,
 
@@ -151,7 +151,7 @@ pub fn builtinCallOrConstruct(
     //    execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, &callee_context);
 
-    // 10. If F.[[Async]] is true, then
+    // 10. If func.[[Async]] is true, then
     if (builtin_function.fields.flags.async) {
         const realm = agent.currentRealm();
 
@@ -163,39 +163,38 @@ pub fn builtinCallOrConstruct(
 
         const Captures = struct {
             builtin_function: *BuiltinFunction,
-            this_argument: ?Value,
-            arguments_list: Arguments,
+            this_arg: ?Value,
+            arg_list: Arguments,
             new_target: ?*Object,
         };
         const captures = try agent.gc_allocator.create(Captures);
         captures.* = .{
             .builtin_function = builtin_function,
-            .this_argument = this_argument,
-            .arguments_list = arguments_list,
+            .this_arg = this_arg,
+            .arg_list = arg_list,
             .new_target = new_target,
         };
 
-        // b. Let resultsClosure be a new Abstract Closure with no parameters that captures F,
-        //    thisArgument, argumentsList, and newTarget and performs the following steps when
-        //    called:
+        // b. Let resultsClosure be a new Abstract Closure with no parameters that captures func,
+        //    thisArg, argList, and newTarget and performs the following steps when called:
         const resultsClosure = struct {
             fn func(agent_: *Agent, captures_ptr: *anyopaque) Agent.Error!Value {
                 const captures_: *Captures = @ptrCast(@alignCast(captures_ptr));
                 const builtin_function_ = captures_.builtin_function;
-                const this_argument_ = captures_.this_argument;
-                const arguments_list_ = captures_.arguments_list;
+                const this_arg_ = captures_.this_arg;
+                const arg_list_ = captures_.arg_list;
                 const new_target_ = captures_.new_target;
 
-                // i. Let result be the Completion Record that is the result of evaluating F in a
-                //    manner that conforms to the specification of F. If thisArgument is
-                //    uninitialized, the this value is uninitialized; else thisArgument provides the
-                //    this value. argumentsList provides the named parameters. newTarget provides
-                //    the NewTarget value.
-                // ii. NOTE: If F is defined in this document, “the specification of F” is the
+                // i. Let result be the Completion Record that is the result of evaluating func in a
+                //    manner that conforms to the specification of func. If thisArg is
+                //    uninitialized, the this value is uninitialized; else thisArg provides the this
+                //    value. argList provides the named parameters. newTarget provides the NewTarget
+                //    value.
+                // ii. NOTE: If func is defined in this document, “the specification of func” is the
                 //     behaviour specified for it via algorithm steps or other means.
                 const result = switch (builtin_function_.fields.behaviour) {
-                    .function => |function| function(agent_, this_argument_.?, arguments_list_),
-                    .constructor => |constructor| constructor(agent_, arguments_list_, new_target_),
+                    .function => |function| function(agent_, this_arg_.?, arg_list_),
+                    .constructor => |constructor| constructor(agent_, arg_list_, new_target_),
                 };
 
                 // iii. Return Completion(result).
@@ -219,15 +218,15 @@ pub fn builtinCallOrConstruct(
         return Value.from(promise_capability.promise);
     }
 
-    // 11. Let result be the Completion Record that is the result of evaluating F in a manner that
-    //     conforms to the specification of F. If thisArgument is uninitialized, the this value is
-    //     uninitialized; else thisArgument provides the this value. argumentsList provides the
-    //     named parameters. newTarget provides the NewTarget value.
-    // 12. NOTE: If F is defined in this document, “the specification of F” is the behaviour
+    // 11. Let result be the Completion Record that is the result of evaluating func in a manner
+    //     that conforms to the specification of func. If thisArg is uninitialized, the this value
+    //     is uninitialized; else thisArg provides the this value. argList provides the named
+    //     parameters. newTarget provides the NewTarget value.
+    // 12. NOTE: If func is defined in this document, “the specification of func” is the behaviour
     //     specified for it via algorithm steps or other means.
     const result = switch (builtin_function.fields.behaviour) {
-        .function => |function| function(agent, this_argument.?, arguments_list),
-        .constructor => |constructor| constructor(agent, arguments_list, new_target),
+        .function => |function| function(agent, this_arg.?, arg_list),
+        .constructor => |constructor| constructor(agent, arg_list, new_target),
     };
 
     // 13. Remove calleeContext from the execution context stack and restore callerContext as the
@@ -238,7 +237,7 @@ pub fn builtinCallOrConstruct(
     return result;
 }
 
-/// 10.3.4 CreateBuiltinFunction ( behaviour, length, name, additionalInternalSlotsList [ , realm [ , prototype [ , prefix [ , async ] ] ] ] )
+/// 10.3.4 CreateBuiltinFunction ( behaviour, length, name, additionalInternalSlotsList [ , realm [ , proto [ , prefix [ , async ] ] ] ] )
 /// https://tc39.es/ecma262/#sec-createbuiltinfunction
 pub fn createBuiltinFunction(
     agent: *Agent,
@@ -249,7 +248,7 @@ pub fn createBuiltinFunction(
         realm: ?*Realm = null,
         // NOTE: I don't think any builtin functions are created with a null prototype,
         //       so the null state can serve as 'not present'.
-        prototype: ?*Object = null,
+        proto: ?*Object = null,
         prefix: ?[]const u8 = null,
         flags: Flags = .{ .async = false, .is_class_constructor = false },
         additional_fields: ?*anyopaque = null,
@@ -258,15 +257,14 @@ pub fn createBuiltinFunction(
     // 1. If realm is not present, set realm to the current Realm Record.
     const realm = args.realm orelse agent.currentRealm();
 
-    // 2. If prototype is not present, set prototype to
-    //    realm.[[Intrinsics]].[[%Function.prototype%]].
-    const prototype = args.prototype orelse try realm.intrinsics.@"%Function.prototype%"();
+    // 2. If proto is not present, set proto to realm.[[Intrinsics]].[[%Function.prototype%]].
+    const proto = args.proto orelse try realm.intrinsics.@"%Function.prototype%"();
 
     // 3. If async is not present, set async to false.
 
     // 4. Let internalSlotsList be a List containing the names of all the internal slots that 10.3
     //    requires for the built-in function object that is about to be created.
-    // 5. Append the elements of additionalInternalSlotsList to internalSlotsList .
+    // 5. Append the elements of additionalInternalSlotsList to internalSlotsList.
 
     // 6. Let func be a new built-in function object that, when called, performs the action
     //    described by behaviour using the provided arguments as the values of the corresponding
@@ -281,8 +279,8 @@ pub fn createBuiltinFunction(
         // 7. Set func.[[Async]] to async.
         // NOTE: This is done via `flags`.
 
-        // 8. Set func.[[Prototype]] to prototype.
-        .prototype = prototype,
+        // 8. Set func.[[Prototype]] to proto.
+        .prototype = proto,
 
         // 9. Set func.[[Extensible]] to true.
         .extensible = true,

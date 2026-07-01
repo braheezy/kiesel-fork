@@ -28,7 +28,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Number",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -141,15 +141,15 @@ pub const constructor = struct {
         const n = blk: {
             // 1. If value is present, then
             if (arguments.count() != 0) {
-                // a. Let prim be ? ToNumeric(value).
+                // a. Let primitive be ? ToNumeric(value).
                 const primitive = try value.toNumeric(agent);
 
-                // b. If prim is a BigInt, let n be 𝔽(ℝ(prim)).
+                // b. If primitive is a BigInt, let n be 𝔽(ℝ(primitive)).
                 if (primitive == .big_int) {
                     break :blk types.Number.from(primitive.big_int.asFloat());
                 }
 
-                // c. Else, let n be prim.
+                // c. Else, let n be primitive.
                 break :blk primitive.number;
             } else {
                 // 2. Else,
@@ -161,21 +161,21 @@ pub const constructor = struct {
         // 3. If NewTarget is undefined, return n.
         if (new_target == null) return Value.from(n);
 
-        // 4. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%Number.prototype%",
+        // 4. Let obj be ? OrdinaryCreateFromConstructor(NewTarget, "%Number.prototype%",
         //    « [[NumberData]] »).
-        const object = try ordinaryCreateFromConstructor(
+        const number = try ordinaryCreateFromConstructor(
             Number,
             agent,
             new_target.?,
             "%Number.prototype%",
             .{
-                // 5. Set O.[[NumberData]] to n.
+                // 5. Set obj.[[NumberData]] to n.
                 .number_data = n,
             },
         );
 
-        // 6. Return O.
-        return Value.from(&object.object);
+        // 6. Return obj.
+        return Value.from(&number.object);
     }
 
     /// 21.1.2.2 Number.isFinite ( number )
@@ -268,17 +268,17 @@ pub const prototype = struct {
         );
     }
 
-    /// 21.1.3.7.1 ThisNumberValue ( value )
+    /// 21.1.3.7.1 ThisNumberValue ( arg )
     /// https://tc39.es/ecma262/#sec-thisnumbervalue
-    fn thisNumberValue(agent: *Agent, value: Value) error{ExceptionThrown}!types.Number {
-        // 1. If value is a Number, return value.
-        if (value.isNumber()) return value.asNumber();
+    fn thisNumberValue(agent: *Agent, arg: Value) error{ExceptionThrown}!types.Number {
+        // 1. If arg is a Number, return arg.
+        if (arg.isNumber()) return arg.asNumber();
 
-        // 2. If value is an Object and value has a [[NumberData]] internal slot, then
-        if (value.castObject(Number)) |number| {
-            // a. Let n be value.[[NumberData]].
-            // b. Assert: n is a Number.
-            // c. Return n.
+        // 2. If arg is an Object and arg has a [[NumberData]] internal slot, then
+        if (arg.castObject(Number)) |number| {
+            // a. Let number be arg.[[NumberData]].
+            // b. Assert: number is a Number.
+            // c. Return number.
             return number.fields.number_data;
         }
 
@@ -362,71 +362,76 @@ pub const prototype = struct {
     fn toFixed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const fraction_digits_value = arguments.get(0);
 
-        // 1. Let x be ? ThisNumberValue(this value).
-        const x_number = try thisNumberValue(agent, this_value);
+        // 1. Let number be ? ThisNumberValue(this value).
+        const number = try thisNumberValue(agent, this_value);
 
-        // 2. Let f be ? ToIntegerOrInfinity(fractionDigits).
-        // 3. Assert: If fractionDigits is undefined, then f is 0.
+        // 2. Let fractionCount be ? ToIntegerOrInfinity(fractionDigits).
+        // 3. Assert: If fractionDigits is undefined, then fractionCount is 0.
         const fraction_digits_f64 = try fraction_digits_value.toIntegerOrInfinity(agent);
 
-        // 4. If f is not finite, throw a RangeError exception.
+        // 4. If fractionCount is not finite, throw a RangeError exception.
         if (!std.math.isFinite(fraction_digits_f64)) {
             return agent.throwException(.range_error, "Fraction digits must be a finite number", .{});
         }
 
-        // 5. If f < 0 or f > 100, throw a RangeError exception.
+        // 5. If fractionCount < 0 or fractionCount > 100, throw a RangeError exception.
         if (fraction_digits_f64 < 0 or fraction_digits_f64 > 100) {
             return agent.throwException(.range_error, "Fraction digits must be in range 0-100", .{});
         }
         const fraction_digits: usize = @intFromFloat(fraction_digits_f64);
 
-        // 6. If x is not finite, return Number::toString(x, 10).
-        if (!x_number.isFinite()) {
-            return Value.from(try x_number.toString(agent, 10));
+        // 6. If number is not finite, return Number::toString(number, 10).
+        if (!number.isFinite()) {
+            return Value.from(try number.toString(agent, 10));
         }
 
-        // 7. Set x to ℝ(x).
-        var x = x_number.asFloat();
+        // 7. Set number to ℝ(number).
+        var number_f64 = number.asFloat();
 
-        // 8. Let s be the empty String.
+        // 8. Let sign be the empty String.
         var sign: []const u8 = "";
 
-        // 9. If x < 0, then
-        if (x < 0) {
-            // a. Set s to "-".
+        // 9. If number < 0, then
+        if (number_f64 < 0) {
+            // a. Set sign to "-".
             sign = "-";
 
-            // b. Set x to -x.
-            x = -x;
+            // b. Set number to -number.
+            number_f64 = -number_f64;
         }
 
-        // 10. If x ≥ 10**21, then
-        if (x >= 10e21) {
-            // a. Let m be ! ToString(𝔽(x)).
-            return Value.from(Value.from(x).toString(agent) catch |err| try noexcept(err));
+        // 10. If number ≥ 10**21, then
+        if (number_f64 >= 10e21) {
+            // a. Let digitString be ! ToString(𝔽(number)).
+            return Value.from(Value.from(number_f64).toString(agent) catch |err| try noexcept(err));
         }
 
         // 11. Else,
-        //     a. Let n be an integer for which n / 10**f - x is as close to zero as possible. If
-        //        there are two such n, pick the larger n.
-        //     b. If n = 0, let m be "0"; else let m be the String value consisting of the digits of
-        //        the decimal representation of n (in order, with no leading zeroes).
-        //     c. If f ≠ 0, then
-        //         i. Let k be the length of m.
-        //         ii. If k ≤ f, then
-        //             1. Let z be the String value consisting of f + 1 - k occurrences of the code
-        //                unit 0x0030 (DIGIT ZERO).
-        //             2. Set m to the string-concatenation of z and m.
-        //             3. Set k to f + 1.
-        //         iii. Let a be the first k - f code units of m.
-        //         iv. Let b be the other f code units of m.
-        //         v. Set m to the string-concatenation of a, ".", and b.
-        // 12. Return the string-concatenation of s and m.
+        //     a. Let intValue be an integer for which intValue / 10**fractionCount - number is as
+        //        close to zero as possible. If there are two such intValue, pick the larger
+        //        intValue.
+        //     b. If intValue = 0, let digitString be "0"; else let digitString be the String value
+        //        consisting of the digits of the decimal representation of intValue (in order, with
+        //        no leading zeroes).
+        //     c. If fractionCount ≠ 0, then
+        //         i. Let digitCount be the length of digitString.
+        //         ii. If digitCount ≤ fractionCount, then
+        //             1. Let zeroPad be the String value consisting of
+        //                fractionCount + 1 - digitCount occurrences of the code unit 0x0030 (DIGIT
+        //                ZERO).
+        //             2. Set digitString to the string-concatenation of zeroPad and digitString.
+        //             3. Set digitCount to fractionCount + 1.
+        //         iii. Let intPart be the first digitCount - fractionCount code units of
+        //              digitString.
+        //         iv. Let fractionalPart be the other fractionCount code units of digitString.
+        //         v. Set digitString to the string-concatenation of intPart, ".", and
+        //            fractionalPart.
+        // 12. Return the string-concatenation of sign and digitString.
         return Value.from(
             try String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{s}{d:.[2]}",
-                .{ sign, x, fraction_digits },
+                .{ sign, number_f64, fraction_digits },
             )),
         );
     }
@@ -434,8 +439,8 @@ pub const prototype = struct {
     /// 21.1.3.4 Number.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-number.prototype.tolocalestring
     fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        const x = try thisNumberValue(agent, this_value);
-        return Value.from(try x.toString(agent, 10));
+        const number = try thisNumberValue(agent, this_value);
+        return Value.from(try number.toString(agent, 10));
     }
 
     /// 21.1.3.5 Number.prototype.toPrecision ( precision )
@@ -443,167 +448,174 @@ pub const prototype = struct {
     fn toPrecision(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const precision_value = arguments.get(0);
 
-        // 1. Let x be ? ThisNumberValue(this value).
-        const x_number = try thisNumberValue(agent, this_value);
+        // 1. Let number be ? ThisNumberValue(this value).
+        const number = try thisNumberValue(agent, this_value);
 
-        // 2. If precision is undefined, return ! ToString(x).
+        // 2. If precision is undefined, return ! ToString(number).
         if (precision_value.isUndefined()) {
-            return Value.from(Value.from(x_number).toString(agent) catch |err| try noexcept(err));
+            return Value.from(Value.from(number).toString(agent) catch |err| try noexcept(err));
         }
 
-        // 3. Let p be ? ToIntegerOrInfinity(precision).
-        const precision_f64 = try precision_value.toIntegerOrInfinity(agent);
+        // 3. Let precisionCount be ? ToIntegerOrInfinity(precision).
+        const precision_count = try precision_value.toIntegerOrInfinity(agent);
 
-        // 4. If x is not finite, return Number::toString(x, 10).
-        if (!x_number.isFinite()) {
-            return Value.from(try x_number.toString(agent, 10));
+        // 4. If number is not finite, return Number::toString(number, 10).
+        if (!number.isFinite()) {
+            return Value.from(try number.toString(agent, 10));
         }
 
-        // 5. If p < 1 or p > 100, throw a RangeError exception.
-        if (precision_f64 < 1 or precision_f64 > 100) {
+        // 5. If precisionCount < 1 or precisionCount > 100, throw a RangeError exception.
+        if (precision_count < 1 or precision_count > 100) {
             return agent.throwException(.range_error, "Precision must be in range 1-100", .{});
         }
-        const precision: usize = @intFromFloat(precision_f64);
+        const precision: usize = @intFromFloat(precision_count);
 
-        // 6. Set x to ℝ(x).
-        var x = x_number.asFloat();
+        // 6. Set number to ℝ(number).
+        var number_f64 = number.asFloat();
 
-        // 7. Let s be the empty String.
+        // 7. Let sign be the empty String.
         var sign: []const u8 = "";
 
-        // 8. If x < 0, then
-        if (x < 0) {
-            // a. Set s to the code unit 0x002D (HYPHEN-MINUS).
+        // 8. If number < 0, then
+        if (number_f64 < 0) {
+            // a. Set sign to the code unit 0x002D (HYPHEN-MINUS).
             sign = "-";
 
-            // b. Set x to -x.
-            x = -x;
+            // b. Set number to -number.
+            number_f64 = -number_f64;
         }
 
         var exponent: i64 = undefined;
-        var number_string: []const u8 = undefined;
+        var significand: []const u8 = undefined;
 
-        // 9. If x = 0, then
-        if (x == 0) {
-            // a. Let m be the String value consisting of p occurrences of the code unit 0x0030
-            //    (DIGIT ZERO).
-            number_string = try std.fmt.allocPrint(
+        // 9. If number = 0, then
+        if (number_f64 == 0) {
+            // a. Let significand be the String value consisting of precisionCount occurrences of
+            //    the code unit 0x0030 (DIGIT ZERO).
+            significand = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{s:0>[1]}",
                 .{ "", precision },
             );
 
-            // b. Let e be 0.
+            // b. Let exponent be 0.
             exponent = 0;
         } else {
             // 10. Else,
-            // a. Let e and n be integers such that 10**(p - 1) ≤ n < 10**p and for which
-            //    n × 10**(e - p + 1) - x is as close to zero as possible. If there are two such
-            //    sets of e and n, pick the e and n for which n × 10**(e - p + 1) is larger.
-            exponent = @intFromFloat(@floor(std.math.log10(x)));
-            const number = @round(
-                x / std.math.pow(
+            // a. Let exponent and intSignificand be integers such that
+            //    10**(precisionCount - 1) ≤ intSignificand < 10**precisionCount and for which
+            //    intSignificand × 10**(exponent - precisionCount + 1) - number is as close to zero
+            //    as possible. If there are two such sets of exponent and intSignificand, pick the
+            //    exponent and intSignificand for which
+            //    intSignificand × 10**(exponent - precisionCount + 1) is larger.
+            exponent = @intFromFloat(@floor(std.math.log10(number_f64)));
+            const int_significand = @round(
+                number_f64 / std.math.pow(
                     f64,
                     10,
                     @floatFromInt(exponent - @as(i64, @intCast(precision)) + 1),
                 ),
             );
 
-            // b. Let m be the String value consisting of the digits of the decimal representation
-            //    of n (in order, with no leading zeroes).
-            number_string = try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{number});
+            // b. Let significand be the String value consisting of the digits of the decimal
+            //    representation of intSignificand (in order, with no leading zeroes).
+            significand = try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{int_significand});
 
-            // c. If e < -6 or e ≥ p, then
+            // c. If exponent < -6 or exponent ≥ precisionCount, then
             if (exponent < -6 or exponent >= precision) {
-                // i. Assert: e ≠ 0.
+                // i. Assert: exponent ≠ 0.
                 std.debug.assert(exponent != 0);
 
-                // ii. If p ≠ 1, then
+                // ii. If precisionCount ≠ 1, then
                 if (precision != 1) {
-                    // 1. Let a be the first code unit of m.
-                    const a = number_string[0..1];
+                    // 1. Let intPart be the first code unit of significand.
+                    const int_part = significand[0..1];
 
-                    // 2. Let b be the other p - 1 code units of m.
-                    const b = number_string[1..];
+                    // 2. Let fractionalPart be the other precisionCount - 1 code units of
+                    //    significand.
+                    const fractional_part = significand[1..];
 
-                    // 3. Set m to the string-concatenation of a, ".", and b.
-                    number_string = try std.fmt.allocPrint(
+                    // 3. Set significand to the string-concatenation of intPart, ".", and
+                    //    fractionalPart.
+                    significand = try std.fmt.allocPrint(
                         agent.gc_allocator,
                         "{s}.{s}",
-                        .{ a, b },
+                        .{ int_part, fractional_part },
                     );
                 }
 
                 var exponent_sign: u8 = undefined;
 
-                // iii. If e > 0, then
+                // iii. If exponent > 0, then
                 if (exponent > 0) {
-                    // 1. Let c be the code unit 0x002B (PLUS SIGN).
+                    // 1. Let exponentSign be the code unit 0x002B (PLUS SIGN).
                     exponent_sign = '+';
                 } else {
                     // iv. Else,
-                    // 1. Assert: e < 0.
+                    // 1. Assert: exponent < 0.
                     std.debug.assert(exponent < 0);
 
-                    // 2. Let c be the code unit 0x002D (HYPHEN-MINUS).
+                    // 2. Let exponentSign be the code unit 0x002D (HYPHEN-MINUS).
                     exponent_sign = '-';
 
-                    // 3. Set e to -e.
+                    // 3. Set exponent to -exponent.
                     exponent = -exponent;
                 }
 
-                // v. Let d be the String value consisting of the digits of the decimal
-                //    representation of e (in order, with no leading zeroes).
-                // vi. Return the string-concatenation of s, m, the code unit 0x0065 (LATIN SMALL
-                //     LETTER E), c, and d.
+                // v. Let exponentDigits be the String value consisting of the digits of the decimal
+                //    representation of exponent (in order, with no leading zeroes).
+                // vi. Return the string-concatenation of sign, significand, the code unit 0x0065
+                //     (LATIN SMALL LETTER E), exponentSign, and exponentDigits.
                 return Value.from(
                     try String.fromAscii(agent, try std.fmt.allocPrint(
                         agent.gc_allocator,
                         "{s}{s}e{c}{d}",
-                        .{ sign, number_string, exponent_sign, exponent },
+                        .{ sign, significand, exponent_sign, exponent },
                     )),
                 );
             }
         }
 
-        // 11. If e = p - 1, return the string-concatenation of s and m.
+        // 11. If exponent = precisionCount - 1, return the string-concatenation of sign and
+        //     significand.
         if (exponent == precision - 1) {
             return Value.from(
                 try String.fromAscii(agent, try std.fmt.allocPrint(
                     agent.gc_allocator,
                     "{s}{s}",
-                    .{ sign, number_string },
+                    .{ sign, significand },
                 )),
             );
         }
 
-        // 12. If e ≥ 0, then
+        // 12. If exponent ≥ 0, then
         if (exponent >= 0) {
-            // a. Set m to the string-concatenation of the first e + 1 code units of m, the code
-            //    unit 0x002E (FULL STOP), and the remaining p - (e + 1) code units of m.
-            number_string = try std.fmt.allocPrint(
+            // a. Set significand to the string-concatenation of the first exponent + 1 code units
+            //    of significand, the code unit 0x002E (FULL STOP), and the remaining
+            //    precisionCount - (exponent + 1) code units of significand.
+            significand = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{s}.{s}",
-                .{ number_string[0..@intCast(exponent + 1)], number_string[@intCast(exponent + 1)..] },
+                .{ significand[0..@intCast(exponent + 1)], significand[@intCast(exponent + 1)..] },
             );
         } else {
             // 13. Else,
-            // a. Set m to the string-concatenation of the code unit 0x0030 (DIGIT ZERO), the code
-            //    unit 0x002E (FULL STOP), -(e + 1) occurrences of the code unit 0x0030 (DIGIT
-            //    ZERO), and the String m.
-            number_string = try std.fmt.allocPrint(
+            // a. Set significand to the string-concatenation of the code unit 0x0030 (DIGIT ZERO),
+            //    the code unit 0x002E (FULL STOP), -(exponent + 1) occurrences of the code unit
+            //    0x0030 (DIGIT ZERO), and the String significand.
+            significand = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "0.{s:0>[2]}{s}",
-                .{ "", number_string, @as(usize, @intCast(-(exponent + 1))) },
+                .{ "", significand, @as(usize, @intCast(-(exponent + 1))) },
             );
         }
 
-        // 14. Return the string-concatenation of s and m.
+        // 14. Return the string-concatenation of sign and significand.
         return Value.from(
             try String.fromAscii(agent, try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{s}{s}",
-                .{ sign, number_string },
+                .{ sign, significand },
             )),
         );
     }

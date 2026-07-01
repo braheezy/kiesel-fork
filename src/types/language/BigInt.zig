@@ -107,22 +107,22 @@ pub fn orderWithFloat(
     return self.managed.toConst().order(mutable.toConst());
 }
 
-/// 6.1.6.2.1 BigInt::unaryMinus ( x )
+/// 6.1.6.2.1 BigInt::unaryMinus ( bigint )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-unaryMinus
-pub fn unaryMinus(x: *const BigInt, agent: *Agent) std.mem.Allocator.Error!*const BigInt {
-    // 1. If x = 0ℤ, return 0ℤ.
-    if (x.managed.eqlZero()) return x;
+pub fn unaryMinus(self: *const BigInt, agent: *Agent) std.mem.Allocator.Error!*const BigInt {
+    // 1. If bigint = 0ℤ, return 0ℤ.
+    if (self.managed.eqlZero()) return self;
 
-    // 2. Return -x.
-    var result = try x.managed.clone();
+    // 2. Return -bigint.
+    var result = try self.managed.clone();
     result.negate();
     return fromManaged(agent, result);
 }
 
-/// 6.1.6.2.2 BigInt::bitwiseNOT ( x )
+/// 6.1.6.2.2 BigInt::bitwiseNOT ( bigint )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseNOT
 pub fn bitwiseNOT(self: *const BigInt, agent: *Agent) std.mem.Allocator.Error!*const BigInt {
-    // 1. Return -x - 1ℤ.
+    // 1. Return -bigint - 1ℤ.
     var result = try self.managed.clone();
     result.negate();
     try result.sub(&result, &one.managed);
@@ -176,22 +176,26 @@ pub fn divide(x: *const BigInt, agent: *Agent, y: *const BigInt) Agent.Error!*co
     return fromManaged(agent, quotient);
 }
 
-/// 6.1.6.2.6 BigInt::remainder ( n, d )
+/// 6.1.6.2.6 BigInt::remainder ( numerator, denominator )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-remainder
-pub fn remainder(n: *const BigInt, agent: *Agent, d: *const BigInt) Agent.Error!*const BigInt {
-    // 1. If d = 0ℤ, throw a RangeError exception.
-    if (d.managed.eqlZero()) return agent.throwException(.range_error, "Division by zero", .{});
+pub fn remainder(
+    numerator: *const BigInt,
+    agent: *Agent,
+    denominator: *const BigInt,
+) Agent.Error!*const BigInt {
+    // 1. If denominator = 0ℤ, throw a RangeError exception.
+    if (denominator.managed.eqlZero()) return agent.throwException(.range_error, "Division by zero", .{});
 
-    // 2. If n = 0ℤ, return 0ℤ.
-    if (n.managed.eqlZero()) return n;
+    // 2. If numerator = 0ℤ, return 0ℤ.
+    if (numerator.managed.eqlZero()) return numerator;
 
-    // 3. Let quotient be ℝ(n) / ℝ(d).
-    // 4. Let q be ℤ(truncate(quotient)).
-    // 5. Return n - (d × q).
+    // 3. Let quotient be ℝ(numerator) / ℝ(denominator).
+    // 4. Let truncatedQuotient be ℤ(truncate(quotient)).
+    // 5. Return numerator - (denominator × truncatedQuotient).
     var quotient = try std.math.big.int.Managed.init(agent.gc_allocator);
     defer quotient.deinit();
     var r = try std.math.big.int.Managed.init(agent.gc_allocator);
-    try quotient.divTrunc(&r, &n.managed, &d.managed);
+    try quotient.divTrunc(&r, &numerator.managed, &denominator.managed);
     return fromManaged(agent, r);
 }
 

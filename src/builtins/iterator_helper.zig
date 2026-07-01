@@ -47,7 +47,7 @@ pub const prototype = struct {
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, undefined, "Iterator Helper").
 
-        // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
+        // 1. Let state be ? GeneratorValidate(gen, genBrand).
         const iterator_helper = try this_value.requireInternalSlot(agent, IteratorHelper);
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
@@ -76,9 +76,9 @@ pub const prototype = struct {
     /// 27.1.2.1.2 %IteratorHelperPrototype%.return ( )
     /// https://tc39.es/ecma262/#sec-%iteratorhelperprototype%.return
     fn @"return"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be this value.
-        // 2. Perform ? RequireInternalSlot(O, [[UnderlyingIterators]]).
-        // 3. Assert: O has a [[GeneratorState]] internal slot.
+        // 1. Let obj be this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[UnderlyingIterators]]).
+        // 3. Assert: obj has a [[GeneratorState]] internal slot.
         const iterator_helper = try this_value.requireInternalSlot(agent, IteratorHelper);
 
         if (iterator_helper.fields == .completed) {
@@ -89,26 +89,26 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "Generator is already executing", .{});
         }
 
-        // 4. If O.[[GeneratorState]] is suspended-start, then
+        // 4. If obj.[[GeneratorState]] is suspended-start, then
         if (!iterator_helper.fields.state.has_yielded) {
             const underlying_iterators = iterator_helper.fields.state.underlying_iterators;
 
-            // a. Set O.[[GeneratorState]] to completed.
+            // a. Set obj.[[GeneratorState]] to completed.
             iterator_helper.fields = .completed;
 
             // b. NOTE: Once a generator enters the completed state it never leaves it and its
             //    associated execution context is never resumed. Any execution state associated with
-            //    O can be discarded at this point.
+            //    obj can be discarded at this point.
 
-            // c. Perform ? IteratorCloseAll(O.[[UnderlyingIterators]], NormalCompletion(unused)).
+            // c. Perform ? IteratorCloseAll(obj.[[UnderlyingIterators]], NormalCompletion(unused)).
             _ = try Iterator.closeAll(agent, underlying_iterators, @as(Agent.Error!void, {}));
 
             // d. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));
         }
 
-        // 5. Let C be ReturnCompletion(undefined).
-        // 6. Return ? GeneratorResumeAbrupt(O, C, "Iterator Helper").
+        // 5. Let completion be ReturnCompletion(undefined).
+        // 6. Return ? GeneratorResumeAbrupt(obj, completion, "Iterator Helper").
 
         iterator_helper.fields.state.executing = true;
         defer iterator_helper.fields = .completed;

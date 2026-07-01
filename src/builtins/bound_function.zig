@@ -12,89 +12,89 @@ const MakeObject = types.MakeObject;
 const Object = types.Object;
 const Value = types.Value;
 
-/// 10.4.1.1 [[Call]] ( thisArgument, argumentsList )
+/// 10.4.1.1 [[Call]] ( thisArg, argList )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-call-thisargument-argumentslist
-fn call(agent: *Agent, object: *Object, _: Value, arguments_list: Arguments) Agent.Error!Value {
+fn call(agent: *Agent, obj: *Object, _: Value, arg_list: Arguments) Agent.Error!Value {
     const gpa = agent.gpa;
-    const function = object.as(BoundFunction);
+    const function = obj.as(BoundFunction);
 
-    // 1. Let target be F.[[BoundTargetFunction]].
+    // 1. Let target be func.[[BoundTargetFunction]].
     const target = function.fields.bound_target_function;
 
-    // 2. Let boundThis be F.[[BoundThis]].
+    // 2. Let boundThis be func.[[BoundThis]].
     const bound_this = function.fields.bound_this;
 
-    // 3. Let boundArgs be F.[[BoundArguments]].
+    // 3. Let boundArgs be func.[[BoundArguments]].
     const bound_args = function.fields.bound_arguments;
 
-    // 4. Let args be the list-concatenation of boundArgs and argumentsList.
-    const args = try std.mem.concat(gpa, Value, &.{ bound_args, arguments_list.values });
+    // 4. Let args be the list-concatenation of boundArgs and argList.
+    const args = try std.mem.concat(gpa, Value, &.{ bound_args, arg_list.values });
     defer gpa.free(args);
 
     // 5. Return ? Call(target, boundThis, args).
     return Value.from(target).callAssumeCallable(agent, bound_this, args);
 }
 
-/// 10.4.1.2 [[Construct]] ( argumentsList, newTarget )
+/// 10.4.1.2 [[Construct]] ( argList, newTarget )
 /// https://tc39.es/ecma262/#sec-bound-function-exotic-objects-construct-argumentslist-newtarget
 fn construct(
     agent: *Agent,
-    object: *Object,
-    arguments_list: Arguments,
+    obj: *Object,
+    arg_list: Arguments,
     new_target: *Object,
 ) Agent.Error!*Object {
     const gpa = agent.gpa;
-    const function = object.as(BoundFunction);
+    const function = obj.as(BoundFunction);
 
-    // 1. Let target be F.[[BoundTargetFunction]].
+    // 1. Let target be func.[[BoundTargetFunction]].
     const target = function.fields.bound_target_function;
 
     // 2. Assert: IsConstructor(target) is true.
     std.debug.assert(Value.from(target).isConstructor());
 
-    // 3. Let boundArgs be F.[[BoundArguments]].
+    // 3. Let boundArgs be func.[[BoundArguments]].
     const bound_args = function.fields.bound_arguments;
 
-    // 4. Let args be the list-concatenation of boundArgs and argumentsList.
-    const args = try std.mem.concat(gpa, Value, &.{ bound_args, arguments_list.values });
+    // 4. Let args be the list-concatenation of boundArgs and argList.
+    const args = try std.mem.concat(gpa, Value, &.{ bound_args, arg_list.values });
     defer gpa.free(args);
 
-    // 5. If SameValue(F, newTarget) is true, set newTarget to target.
-    const new_target_ = if (object == new_target) target else new_target;
+    // 5. If SameValue(func, newTarget) is true, set newTarget to target.
+    const new_target_ = if (obj == new_target) target else new_target;
 
     // 6. Return ? Construct(target, args, newTarget).
     return target.construct(agent, args, new_target_);
 }
 
-/// 10.4.1.3 BoundFunctionCreate ( targetFunction, boundThis, boundArgs )
+/// 10.4.1.3 BoundFunctionCreate ( targetFunc, boundThis, boundArgs )
 /// https://tc39.es/ecma262/#sec-boundfunctioncreate
 pub fn boundFunctionCreate(
     agent: *Agent,
-    target_function: *Object,
+    target_func: *Object,
     bound_this: Value,
     bound_args: []const Value,
 ) Agent.Error!*BoundFunction {
-    // 1. Let proto be ? targetFunction.[[GetPrototypeOf]]().
-    const prototype = try target_function.internalMethods().getPrototypeOf(agent, target_function);
+    // 1. Let proto be ? targetFunc.[[GetPrototypeOf]]().
+    const proto = try target_func.internalMethods().getPrototypeOf(agent, target_func);
 
     // 2. Let internalSlotsList be the list-concatenation of « [[Prototype]], [[Extensible]] » and
     //    the internal slots listed in Table 26.
     // 3. Let obj be MakeBasicObject(internalSlotsList).
     const bound_function = try BoundFunction.create(agent, .{
         // 4. Set obj.[[Prototype]] to proto.
-        .prototype = prototype,
+        .prototype = proto,
 
         // 5. Set obj.[[Call]] as specified in 10.4.1.1.
-        // 6. If IsConstructor(targetFunction) is true, then
+        // 6. If IsConstructor(targetFunc) is true, then
         //     a. Set obj.[[Construct]] as specified in 10.4.1.2.
-        .internal_methods = if (Value.from(target_function).isConstructor())
+        .internal_methods = if (Value.from(target_func).isConstructor())
             .initComptime(.{ .call = call, .construct = construct })
         else
             .initComptime(.{ .call = call }),
 
         .fields = .{
-            // 7. Set obj.[[BoundTargetFunction]] to targetFunction.
-            .bound_target_function = target_function,
+            // 7. Set obj.[[BoundTargetFunction]] to targetFunc.
+            .bound_target_function = target_func,
 
             // 8. Set obj.[[BoundThis]] to boundThis.
             .bound_this = bound_this,

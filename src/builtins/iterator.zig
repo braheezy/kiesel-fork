@@ -32,7 +32,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Iterator",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -152,20 +152,21 @@ pub const constructor = struct {
                         const iterable = iterables_[index.*];
                         index.* += 1;
 
-                        // i. Let iter be ? Call(iterable.[[OpenMethod]], iterable.[[Iterable]]).
-                        const iter = try Value.from(iterable.open_method).callAssumeCallable(
+                        // i. Let iterator be ? Call(iterable.[[OpenMethod]],
+                        //    iterable.[[Iterable]]).
+                        const iterator = try Value.from(iterable.open_method).callAssumeCallable(
                             agent_,
                             Value.from(iterable.iterable),
                             &.{},
                         );
 
-                        // ii. If iter is not an Object, throw a TypeError exception.
-                        if (!iter.isObject()) {
-                            return agent_.throwException(.type_error, "{f} is not an Object", .{iter});
+                        // ii. If iterator is not an Object, throw a TypeError exception.
+                        if (!iterator.isObject()) {
+                            return agent_.throwException(.type_error, "{f} is not an Object", .{iterator});
                         }
 
-                        // iii. Let iteratorRecord be ? GetIteratorDirect(iter).
-                        inner_iterator_.* = try getIteratorDirect(agent_, iter.asObject());
+                        // iii. Let iteratorRecord be ? GetIteratorDirect(iterator).
+                        inner_iterator_.* = try getIteratorDirect(agent_, iterator.asObject());
 
                         continue :loop .inner;
                     },
@@ -219,14 +220,14 @@ pub const constructor = struct {
         return Value.from(&gen.object);
     }
 
-    /// 27.1.3.2.2 Iterator.from ( O )
+    /// 27.1.3.2.2 Iterator.from ( obj )
     /// https://tc39.es/ecma262/#sec-iterator.from
     fn from(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. Let iteratorRecord be ? GetIteratorFlattenable(O, iterate-string-primitives).
-        const iterator = try getIteratorFlattenable(agent, object, .iterate_string_primitives);
+        // 1. Let iteratorRecord be ? GetIteratorFlattenable(obj, iterate-string-primitives).
+        const iterator = try getIteratorFlattenable(agent, obj, .iterate_string_primitives);
 
         // 2. Let hasInstance be ? OrdinaryHasInstance(%Iterator%, iteratorRecord.[[Iterator]]).
         const has_instance = try Value.from(
@@ -965,29 +966,29 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const limit = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
 
-        // 4. Let numLimit be Completion(ToNumber(limit)).
-        const num_limit = limit.toNumber(agent) catch |err| {
-            // 5. IfAbruptCloseIterator(numLimit, iterated).
+        // 4. Let numberLimit be Completion(ToNumber(limit)).
+        const number_limit = limit.toNumber(agent) catch |err| {
+            // 5. IfAbruptCloseIterator(numberLimit, iterated).
             return iterated.close(agent, @as(Agent.Error!Value, err));
         };
 
-        // 6. If numLimit is NaN, then
-        if (num_limit.isNan()) {
+        // 6. If numberLimit is NaN, then
+        if (number_limit.isNan()) {
             // a. Let error be ThrowCompletion(a newly created RangeError object).
             const @"error" = agent.throwException(
                 .range_error,
@@ -999,11 +1000,11 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 7. Let integerLimit be ! ToIntegerOrInfinity(numLimit).
-        const integer_limit = Value.from(num_limit).toIntegerOrInfinity(agent) catch unreachable;
+        // 7. Let intLimit be ! ToIntegerOrInfinity(numberLimit).
+        const int_limit = Value.from(number_limit).toIntegerOrInfinity(agent) catch unreachable;
 
-        // 8. If integerLimit < 0, then
-        if (integer_limit < 0) {
+        // 8. If intLimit < 0, then
+        if (int_limit < 0) {
             // a. Let error be ThrowCompletion(a newly created RangeError object).
             const @"error" = agent.throwException(
                 .range_error,
@@ -1015,31 +1016,31 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 9. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 9. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
         iterated_list[0] = iterated;
 
         const Captures = struct {
             iterated: *types.Iterator,
-            integer_limit: f64,
+            int_limit: f64,
         };
         const captures = try agent.gc_allocator.create(Captures);
         captures.* = .{
             .iterated = &iterated_list[0],
-            .integer_limit = integer_limit,
+            .int_limit = int_limit,
         };
 
         // 10. Let closure be a new Abstract Closure with no parameters that captures iterated and
-        //     integerLimit and performs the following steps when called:
+        //     intLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
 
-                // a. Let remaining be integerLimit.
-                const remaining = &captures_.integer_limit;
+                // a. Let remaining be intLimit.
+                const remaining = &captures_.int_limit;
 
                 // b. Repeat, while remaining > 0,
                 while (remaining.* > 0) {
@@ -1092,17 +1093,17 @@ pub const prototype = struct {
     fn every(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
@@ -1120,8 +1121,8 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 5. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         // 6. Let counter be 0.
         var counter: u53 = 0;
@@ -1158,17 +1159,17 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const predicate = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
@@ -1186,8 +1187,8 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 5. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
         iterated_list[0] = iterated;
@@ -1268,17 +1269,17 @@ pub const prototype = struct {
     fn find(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
@@ -1296,8 +1297,8 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 5. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         // 6. Let counter be 0.
         var counter: u53 = 0;
@@ -1334,17 +1335,17 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const mapper = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
@@ -1362,8 +1363,8 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 5. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
         iterated_list[0] = iterated;
@@ -1499,17 +1500,17 @@ pub const prototype = struct {
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const procedure = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
@@ -1527,8 +1528,8 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 5. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         // 6. Let counter be 0.
         var counter: u53 = 0;
@@ -1559,17 +1560,17 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const mapper = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
@@ -1587,8 +1588,8 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 5. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
         iterated_list[0] = iterated;
@@ -1666,17 +1667,17 @@ pub const prototype = struct {
         const reducer = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
@@ -1694,8 +1695,8 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 5. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         var accumulator: Value = undefined;
         var counter: u53 = undefined;
@@ -1752,17 +1753,17 @@ pub const prototype = struct {
     fn some(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
@@ -1780,8 +1781,8 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 5. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 5. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         // 6. Let counter be 0.
         var counter: u53 = 0;
@@ -1818,29 +1819,29 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
         const limit = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
-            .iterator = object,
+            .iterator = obj,
             .next_method = .undefined,
             .done = false,
         };
 
-        // 4. Let numLimit be Completion(ToNumber(limit)).
-        const num_limit = limit.toNumber(agent) catch |err| {
-            // 5. IfAbruptCloseIterator(numLimit, iterated).
+        // 4. Let numberLimit be Completion(ToNumber(limit)).
+        const number_limit = limit.toNumber(agent) catch |err| {
+            // 5. IfAbruptCloseIterator(numberLimit, iterated).
             return iterated.close(agent, @as(Agent.Error!Value, err));
         };
 
-        // 6. If numLimit is NaN, then
-        if (num_limit.isNan()) {
+        // 6. If numberLimit is NaN, then
+        if (number_limit.isNan()) {
             // a. Let error be ThrowCompletion(a newly created RangeError object).
             const @"error" = agent.throwException(
                 .range_error,
@@ -1852,11 +1853,11 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 7. Let integerLimit be ! ToIntegerOrInfinity(numLimit).
-        const integer_limit = Value.from(num_limit).toIntegerOrInfinity(agent) catch unreachable;
+        // 7. Let intLimit be ! ToIntegerOrInfinity(numberLimit).
+        const int_limit = Value.from(number_limit).toIntegerOrInfinity(agent) catch unreachable;
 
-        // 8. If integerLimit < 0, then
-        if (integer_limit < 0) {
+        // 8. If intLimit < 0, then
+        if (int_limit < 0) {
             // a. Let error be ThrowCompletion(a newly created RangeError object).
             const @"error" = agent.throwException(
                 .range_error,
@@ -1868,31 +1869,31 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 9. Set iterated to ? GetIteratorDirect(O).
-        iterated = try getIteratorDirect(agent, object);
+        // 9. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
         iterated_list[0] = iterated;
 
         const Captures = struct {
             iterated: *types.Iterator,
-            integer_limit: f64,
+            int_limit: f64,
         };
         const captures = try agent.gc_allocator.create(Captures);
         captures.* = .{
             .iterated = &iterated_list[0],
-            .integer_limit = integer_limit,
+            .int_limit = int_limit,
         };
 
         // 10. Let closure be a new Abstract Closure with no parameters that captures iterated and
-        //     integerLimit and performs the following steps when called:
+        //     intLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
 
-                // a. Let remaining be integerLimit.
-                const remaining = &captures_.integer_limit;
+                // a. Let remaining be intLimit.
+                const remaining = &captures_.int_limit;
 
                 // b. Repeat,
                 while (true) {
@@ -1942,15 +1943,15 @@ pub const prototype = struct {
     /// 27.1.3.3.12 Iterator.prototype.toArray ( )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.toarray
     fn toArray(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let iterated be ? GetIteratorDirect(O).
-        var iterated = try getIteratorDirect(agent, object);
+        // 3. Let iterated be ? GetIteratorDirect(obj).
+        var iterated = try getIteratorDirect(agent, obj);
 
         // 4. Let items be a new empty List.
         var items: std.ArrayList(Value) = .empty;

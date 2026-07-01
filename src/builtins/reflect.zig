@@ -50,31 +50,31 @@ pub const namespace = struct {
         );
     }
 
-    /// 28.1.1 Reflect.apply ( target, thisArgument, argumentsList )
+    /// 28.1.1 Reflect.apply ( target, thisArg, args )
     /// https://tc39.es/ecma262/#sec-reflect.apply
     fn apply(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const this_argument = arguments.get(1);
-        const arguments_list = arguments.get(2);
+        const this_arg = arguments.get(1);
+        const args = arguments.get(2);
 
         // 1. If IsCallable(target) is false, throw a TypeError exception.
         if (!target.isCallable()) {
             return agent.throwException(.type_error, "{f} is not callable", .{target});
         }
 
-        // 2. Let args be ? CreateListFromArrayLike(argumentsList).
-        const args = try arguments_list.createListFromArrayLike(agent, null);
+        // 2. Let argList be ? CreateListFromArrayLike(args).
+        const arg_list = try args.createListFromArrayLike(agent, null);
 
         // 3. Perform PrepareForTailCall().
-        // 4. Return ? Call(target, thisArgument, args).
-        return target.call(agent, this_argument, args);
+        // 4. Return ? Call(target, thisArg, argList).
+        return target.call(agent, this_arg, arg_list);
     }
 
-    /// 28.1.2 Reflect.construct ( target, argumentsList [ , newTarget ] )
+    /// 28.1.2 Reflect.construct ( target, args [ , newTarget ] )
     /// https://tc39.es/ecma262/#sec-reflect.construct
     fn construct(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const arguments_list = arguments.get(1);
+        const args = arguments.get(1);
         var new_target = arguments.get(2);
 
         // 1. If IsConstructor(target) is false, throw a TypeError exception.
@@ -91,115 +91,115 @@ pub const namespace = struct {
             return agent.throwException(.type_error, "{f} is not a constructor", .{new_target});
         }
 
-        // 4. Let args be ? CreateListFromArrayLike(argumentsList).
-        const args = try arguments_list.createListFromArrayLike(agent, null);
+        // 4. Let argList be ? CreateListFromArrayLike(args).
+        const arg_list = try args.createListFromArrayLike(agent, null);
 
-        // 5. Return ? Construct(target, args, newTarget).
-        return Value.from(try target.asObject().construct(agent, args, new_target.asObject()));
+        // 5. Return ? Construct(target, argList, newTarget).
+        return Value.from(try target.asObject().construct(agent, arg_list, new_target.asObject()));
     }
 
-    /// 28.1.3 Reflect.defineProperty ( target, propertyKey, attributes )
+    /// 28.1.3 Reflect.defineProperty ( target, key, attrs )
     /// https://tc39.es/ecma262/#sec-reflect.defineproperty
     fn defineProperty(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const property_key = arguments.get(1);
-        const attributes = arguments.get(2);
+        const key = arguments.get(1);
+        const attrs = arguments.get(2);
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
-        // 2. Let key be ? ToPropertyKey(propertyKey).
-        const key = try property_key.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 3. Let desc be ? ToPropertyDescriptor(attributes).
-        const descriptor = try attributes.toPropertyDescriptor(agent);
+        // 3. Let propertyDesc be ? ToPropertyDescriptor(attrs).
+        const property_desc = try attrs.toPropertyDescriptor(agent);
 
-        // 4. Return ? target.[[DefineOwnProperty]](key, desc).
+        // 4. Return ? target.[[DefineOwnProperty]](propertyKey, propertyDesc).
         return Value.from(
             try target.asObject().internalMethods().defineOwnProperty(
                 agent,
                 target.asObject(),
-                key,
-                descriptor,
+                property_key,
+                property_desc,
             ),
         );
     }
 
-    /// 28.1.4 Reflect.deleteProperty ( target, propertyKey )
+    /// 28.1.4 Reflect.deleteProperty ( target, key )
     /// https://tc39.es/ecma262/#sec-reflect.deleteproperty
     fn deleteProperty(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const property_key = arguments.get(1);
+        const key = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
-        // 2. Let key be ? ToPropertyKey(propertyKey).
-        const key = try property_key.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 3. Return ? target.[[Delete]](key).
+        // 3. Return ? target.[[Delete]](propertyKey).
         return Value.from(try target.asObject().internalMethods().delete(
             agent,
             target.asObject(),
-            key,
+            property_key,
         ));
     }
 
-    /// 28.1.5 Reflect.get ( target, propertyKey [ , receiver ] )
+    /// 28.1.5 Reflect.get ( target, key [ , receiver ] )
     /// https://tc39.es/ecma262/#sec-reflect.get
     fn get(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const property_key = arguments.get(1);
+        const key = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
-        // 2. Let key be ? ToPropertyKey(propertyKey).
-        const key = try property_key.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
         // 3. If receiver is not present, then
         //     a. Set receiver to target.
         const receiver = arguments.getOrNull(2) orelse target;
 
-        // 4. Return ? target.[[Get]](key, receiver).
+        // 4. Return ? target.[[Get]](propertyKey, receiver).
         return try target.asObject().internalMethods().get(
             agent,
             target.asObject(),
-            key,
+            property_key,
             receiver,
         );
     }
 
-    /// 28.1.6 Reflect.getOwnPropertyDescriptor ( target, propertyKey )
+    /// 28.1.6 Reflect.getOwnPropertyDescriptor ( target, key )
     /// https://tc39.es/ecma262/#sec-reflect.getownpropertydescriptor
     fn getOwnPropertyDescriptor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const property_key = arguments.get(1);
+        const key = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
-        // 2. Let key be ? ToPropertyKey(propertyKey).
-        const key = try property_key.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 3. Let desc be ? target.[[GetOwnProperty]](key).
-        const maybe_descriptor = try target.asObject().internalMethods().getOwnProperty(
+        // 3. Let propertyDesc be ? target.[[GetOwnProperty]](propertyKey).
+        const maybe_property_desc = try target.asObject().internalMethods().getOwnProperty(
             agent,
             target.asObject(),
-            key,
+            property_key,
         );
 
-        // 4. Return FromPropertyDescriptor(desc).
-        if (maybe_descriptor) |descriptor|
-            return Value.from(try descriptor.fromPropertyDescriptor(agent))
+        // 4. Return FromPropertyDescriptor(propertyDesc).
+        if (maybe_property_desc) |property_desc|
+            return Value.from(try property_desc.fromPropertyDescriptor(agent))
         else
             return .undefined;
     }
@@ -223,23 +223,23 @@ pub const namespace = struct {
         );
     }
 
-    /// 28.1.8 Reflect.has ( target, propertyKey )
+    /// 28.1.8 Reflect.has ( target, key )
     /// https://tc39.es/ecma262/#sec-reflect.has
     fn has(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const property_key = arguments.get(1);
+        const key = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
-        // 2. Let key be ? ToPropertyKey(propertyKey).
-        const key = try property_key.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
-        // 3. Return ? target.[[HasProperty]](key).
+        // 3. Return ? target.[[HasProperty]](propertyKey).
         return Value.from(
-            try target.asObject().internalMethods().hasProperty(agent, target.asObject(), key),
+            try target.asObject().internalMethods().hasProperty(agent, target.asObject(), property_key),
         );
     }
 
@@ -301,11 +301,11 @@ pub const namespace = struct {
         );
     }
 
-    /// 28.1.12 Reflect.set ( target, propertyKey, V [ , receiver ] )
+    /// 28.1.12 Reflect.set ( target, key, value [ , receiver ] )
     /// https://tc39.es/ecma262/#sec-reflect.set
     fn set(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const property_key = arguments.get(1);
+        const key = arguments.get(1);
         const value = arguments.get(2);
 
         // 1. If target is not an Object, throw a TypeError exception.
@@ -313,19 +313,19 @@ pub const namespace = struct {
             return agent.throwException(.type_error, "{f} is not an Object", .{target});
         }
 
-        // 2. Let key be ? ToPropertyKey(propertyKey).
-        const key = try property_key.toPropertyKey(agent);
+        // 2. Let propertyKey be ? ToPropertyKey(key).
+        const property_key = try key.toPropertyKey(agent);
 
         // 3. If receiver is not present, then
         //     a. Set receiver to target.
         const receiver = arguments.getOrNull(3) orelse target;
 
-        // 4. Return ? target.[[Set]](key, V, receiver).
+        // 4. Return ? target.[[Set]](propertyKey, value, receiver).
         return Value.from(
             try target.asObject().internalMethods().set(
                 agent,
                 target.asObject(),
-                key,
+                property_key,
                 value,
                 receiver,
             ),
@@ -336,7 +336,7 @@ pub const namespace = struct {
     /// https://tc39.es/ecma262/#sec-reflect.setprototypeof
     fn setPrototypeOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const target = arguments.get(0);
-        const prototype = arguments.get(1);
+        const proto = arguments.get(1);
 
         // 1. If target is not an Object, throw a TypeError exception.
         if (!target.isObject()) {
@@ -344,8 +344,8 @@ pub const namespace = struct {
         }
 
         // 2. If proto is not an Object and proto is not null, throw a TypeError exception.
-        if (!prototype.isObject() and !prototype.isNull()) {
-            return agent.throwException(.type_error, "{f} is not an Object or null", .{prototype});
+        if (!proto.isObject() and !proto.isNull()) {
+            return agent.throwException(.type_error, "{f} is not an Object or null", .{proto});
         }
 
         // 3. Return ? target.[[SetPrototypeOf]](proto).
@@ -353,7 +353,7 @@ pub const namespace = struct {
             try target.asObject().internalMethods().setPrototypeOf(
                 agent,
                 target.asObject(),
-                if (prototype.isObject()) prototype.asObject() else null,
+                if (proto.isObject()) proto.asObject() else null,
             ),
         );
     }

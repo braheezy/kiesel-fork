@@ -1126,9 +1126,9 @@ pub const StatementList = struct {
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
-        // 1. Let declarations1 be the LexicallyScopedDeclarations of StatementList.
-        // 2. Let declarations2 be the LexicallyScopedDeclarations of StatementListItem.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the LexicallyScopedDeclarations of StatementList.
+        // 2. Let decls2 be the LexicallyScopedDeclarations of StatementListItem.
+        // 3. Return the list-concatenation of decls1 and decls2.
         for (self.items) |item| {
             try item.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
         }
@@ -1160,9 +1160,9 @@ pub const StatementList = struct {
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
-        // 1. Let declarations1 be the VarScopedDeclarations of StatementList.
-        // 2. Let declarations2 be the VarScopedDeclarations of StatementListItem.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the VarScopedDeclarations of StatementList.
+        // 2. Let decls2 be the VarScopedDeclarations of StatementListItem.
+        // 3. Return the list-concatenation of decls1 and decls2.
         // StatementListItem : Declaration
         // 1. Return a new empty List.
         for (self.items) |item| {
@@ -1194,9 +1194,9 @@ pub const StatementList = struct {
         lexically_scoped_declarations: *std.ArrayList(LexicallyScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
-        // 1. Let declarations1 be the TopLevelLexicallyScopedDeclarations of StatementList.
-        // 2. Let declarations2 be the TopLevelLexicallyScopedDeclarations of StatementListItem.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the TopLevelLexicallyScopedDeclarations of StatementList.
+        // 2. Let decls2 be the TopLevelLexicallyScopedDeclarations of StatementListItem.
+        // 3. Return the list-concatenation of decls1 and decls2.
         for (self.items) |item| {
             try item.collectTopLevelLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
         }
@@ -1250,9 +1250,9 @@ pub const StatementList = struct {
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // StatementList : StatementList StatementListItem
-        // 1. Let declarations1 be the TopLevelVarScopedDeclarations of StatementList.
-        // 2. Let declarations2 be the TopLevelVarScopedDeclarations of StatementListItem.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the TopLevelVarScopedDeclarations of StatementList.
+        // 2. Let decls2 be the TopLevelVarScopedDeclarations of StatementListItem.
+        // 3. Return the list-concatenation of decls1 and decls2.
         for (self.items) |item| switch (item) {
             // StatementListItem : Statement
             .statement => |statement| {
@@ -1271,8 +1271,8 @@ pub const StatementList = struct {
                 switch (declaration.*) {
                     // 1. If Declaration is Declaration : HoistableDeclaration , then
                     .hoistable_declaration => |hoistable_declaration| {
-                        // a. Let declaration be the DeclarationPart of HoistableDeclaration.
-                        // b. Return « declaration ».
+                        // a. Let decl be the DeclarationPart of HoistableDeclaration.
+                        // b. Return « decl ».
                         try var_scoped_declarations.append(allocator, .{ .hoistable_declaration = hoistable_declaration });
                     },
 
@@ -1601,8 +1601,8 @@ pub const VariableDeclarationList = struct {
         // VariableDeclarationList : VariableDeclaration
         // 1. Return « VariableDeclaration ».
         // VariableDeclarationList : VariableDeclarationList , VariableDeclaration
-        // 1. Let declarations1 be the VarScopedDeclarations of VariableDeclarationList.
-        // 2. Return the list-concatenation of declarations1 and « VariableDeclaration ».
+        // 1. Let decls1 be the VarScopedDeclarations of VariableDeclarationList.
+        // 2. Return the list-concatenation of decls1 and « VariableDeclaration ».
         try var_scoped_declarations.ensureUnusedCapacity(allocator, self.items.len);
         for (self.items) |variable_declaration| {
             var_scoped_declarations.appendAssumeCapacity(.{ .variable_declaration = variable_declaration });
@@ -1908,9 +1908,9 @@ pub const IfStatement = struct {
         // IfStatement : if ( Expression ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         // IfStatement : if ( Expression ) Statement else Statement
-        // 1. Let declarations1 be the VarScopedDeclarations of the first Statement.
-        // 2. Let declarations2 be the VarScopedDeclarations of the second Statement.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the VarScopedDeclarations of the first Statement.
+        // 2. Let decls2 be the VarScopedDeclarations of the second Statement.
+        // 3. Return the list-concatenation of decls1 and decls2.
         try self.consequent_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         if (self.alternate_statement) |alternate_statement| {
             try alternate_statement.collectVarScopedDeclarations(allocator, var_scoped_declarations);
@@ -2031,9 +2031,9 @@ pub const ForStatement = struct {
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // ForStatement : for ( var VariableDeclarationList ; Expression[opt] ; Expression[opt] ) Statement
-        // 1. Let declarations1 be the VarScopedDeclarations of VariableDeclarationList.
-        // 2. Let declarations2 be the VarScopedDeclarations of Statement.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the VarScopedDeclarations of VariableDeclarationList.
+        // 2. Let decls2 be the VarScopedDeclarations of Statement.
+        // 3. Return the list-concatenation of decls1 and decls2.
         // ForStatement : for ( Expression[opt] ; Expression[opt] ; Expression[opt] ) Statement
         // 1. Return the VarScopedDeclarations of Statement.
         // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
@@ -2121,9 +2121,9 @@ pub const ForInOfStatement = struct {
         //     for ( var ForBinding of AssignmentExpression ) Statement
         //     for await ( var ForBinding of AssignmentExpression ) Statement
         else {
-            // 1. Let declarations1 be « ForBinding ».
-            // 2. Let declarations2 be the VarScopedDeclarations of Statement.
-            // 3. Return the list-concatenation of declarations1 and declarations2.
+            // 1. Let decls1 be « ForBinding ».
+            // 2. Let decls2 be the VarScopedDeclarations of Statement.
+            // 3. Return the list-concatenation of decls1 and decls2.
             try var_scoped_declarations.append(allocator, .{
                 .variable_declaration = switch (self.initializer.for_binding) {
                     .binding_identifier => |binding_identifier| .{
@@ -2291,18 +2291,18 @@ pub const CaseBlock = struct {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
-        // 1. If the first CaseClauses is present, let declarations1 be the
-        //    LexicallyScopedDeclarations of the first CaseClauses.
-        // 2. Else, let declarations1 be a new empty List.
-        // 3. Let declarations2 be the LexicallyScopedDeclarations of DefaultClause.
-        // 4. If the second CaseClauses is present, let declarations3 be the
-        //    LexicallyScopedDeclarations of the second CaseClauses.
-        // 5. Else, let declarations3 be a new empty List.
-        // 6. Return the list-concatenation of declarations1, declarations2, and declarations3.
+        // 1. If the first CaseClauses is present, let decls1 be the LexicallyScopedDeclarations of
+        //    the first CaseClauses.
+        // 2. Else, let decls1 be a new empty List.
+        // 3. Let decls2 be the LexicallyScopedDeclarations of DefaultClause.
+        // 4. If the second CaseClauses is present, let decls3 be the LexicallyScopedDeclarations of
+        //    the second CaseClauses.
+        // 5. Else, let decls3 be a new empty List.
+        // 6. Return the list-concatenation of decls1, decls2, and decls3.
         // CaseClauses : CaseClauses CaseClause
-        // 1. Let declarations1 be the LexicallyScopedDeclarations of CaseClauses.
-        // 2. Let declarations2 be the LexicallyScopedDeclarations of CaseClause.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the LexicallyScopedDeclarations of CaseClauses.
+        // 2. Let decls2 be the LexicallyScopedDeclarations of CaseClause.
+        // 3. Return the list-concatenation of decls1 and decls2.
         for (self.items) |item| switch (item) {
             inline else => |node| try node.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations),
         };
@@ -2345,18 +2345,18 @@ pub const CaseBlock = struct {
         // CaseBlock : { }
         // 1. Return a new empty List.
         // CaseBlock : { CaseClauses[opt] DefaultClause CaseClauses[opt] }
-        // 1. If the first CaseClauses is present, let declarations1 be the VarScopedDeclarations of
-        //    the first CaseClauses.
-        // 2. Else, let declarations1 be a new empty List.
-        // 3. Let declarations2 be the VarScopedDeclarations of DefaultClause.
-        // 4. If the second CaseClauses is present, let declarations3 be the VarScopedDeclarations
-        //    of the second CaseClauses.
-        // 5. Else, let declarations3 be a new empty List.
-        // 6. Return the list-concatenation of declarations1, declarations2, and declarations3.
+        // 1. If the first CaseClauses is present, let decls1 be the VarScopedDeclarations of the
+        //    first CaseClauses.
+        // 2. Else, let decls1 be a new empty List.
+        // 3. Let decls2 be the VarScopedDeclarations of DefaultClause.
+        // 4. If the second CaseClauses is present, let decls3 be the VarScopedDeclarations of the
+        //    second CaseClauses.
+        // 5. Else, let decls3 be a new empty List.
+        // 6. Return the list-concatenation of decls1, decls2, and decls3.
         // CaseClauses : CaseClauses CaseClause
-        // 1. Let declarations1 be the VarScopedDeclarations of CaseClauses.
-        // 2. Let declarations2 be the VarScopedDeclarations of CaseClause.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the VarScopedDeclarations of CaseClauses.
+        // 2. Let decls2 be the VarScopedDeclarations of CaseClause.
+        // 3. Return the list-concatenation of decls1 and decls2.
         for (self.items) |item| switch (item) {
             inline else => |node| try node.collectVarScopedDeclarations(allocator, var_scoped_declarations),
         };
@@ -2703,18 +2703,18 @@ pub const TryStatement = struct {
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // TryStatement : try Block Catch
-        // 1. Let declarations1 be the VarScopedDeclarations of Block.
-        // 2. Let declarations2 be the VarScopedDeclarations of Catch.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the VarScopedDeclarations of Block.
+        // 2. Let decls2 be the VarScopedDeclarations of Catch.
+        // 3. Return the list-concatenation of decls1 and decls2.
         // TryStatement : try Block Finally
-        // 1. Let declarations1 be the VarScopedDeclarations of Block.
-        // 2. Let declarations2 be the VarScopedDeclarations of Finally.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the VarScopedDeclarations of Block.
+        // 2. Let decls2 be the VarScopedDeclarations of Finally.
+        // 3. Return the list-concatenation of decls1 and decls2.
         // TryStatement : try Block Catch Finally
-        // 1. Let declarations1 be the VarScopedDeclarations of Block.
-        // 2. Let declarations2 be the VarScopedDeclarations of Catch.
-        // 3. Let declarations3 be the VarScopedDeclarations of Finally.
-        // 4. Return the list-concatenation of declarations1, declarations2, and declarations3.
+        // 1. Let decls1 be the VarScopedDeclarations of Block.
+        // 2. Let decls2 be the VarScopedDeclarations of Catch.
+        // 3. Let decls3 be the VarScopedDeclarations of Finally.
+        // 4. Return the list-concatenation of decls1, decls2, and decls3.
         // Catch : catch ( CatchParameter ) Block
         // 1. Return the VarScopedDeclarations of Block.
         try self.try_block.statement_list.collectVarScopedDeclarations(allocator, var_scoped_declarations);
@@ -3532,9 +3532,9 @@ pub const Module = struct {
         // Module : [empty]
         // 1. Return a new empty List.
         // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let declarations1 be the LexicallyScopedDeclarations of ModuleItemList.
-        // 2. Let declarations2 be the LexicallyScopedDeclarations of ModuleItem.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the LexicallyScopedDeclarations of ModuleItemList.
+        // 2. Let decls2 be the LexicallyScopedDeclarations of ModuleItem.
+        // 3. Return the list-concatenation of decls1 and decls2.
         try self.module_item_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
@@ -3578,10 +3578,10 @@ pub const Module = struct {
             },
         };
 
-        // 3. For each ModuleRequest Record mr of additionalRequests, do
-        //      a. If requests does not contain a ModuleRequest Record mr2 such that
-        //         ModuleRequestsEqual(mr, mr2) is true, then
-        //          i. Append mr to requests.
+        // 3. For each ModuleRequest Record moduleRequest of additionalRequests, do
+        //      a. If requests does not contain a ModuleRequest Record otherModuleRequest such that
+        //         ModuleRequestsEqual(moduleRequest, otherModuleRequest) is true, then
+        //          i. Append moduleRequest to requests.
         var deduplicated: ModuleRequest.ArrayHashMapUnmanaged(void) = .empty;
         for (module_requests.items) |module_request| {
             try deduplicated.put(allocator, module_request, {});
@@ -3897,9 +3897,9 @@ pub const ModuleItemList = struct {
         var_scoped_declarations: *std.ArrayList(VarScopedDeclaration),
     ) std.mem.Allocator.Error!void {
         // ModuleItemList : ModuleItemList ModuleItem
-        // 1. Let declarations1 be the VarScopedDeclarations of ModuleItemList.
-        // 2. Let declarations2 be the VarScopedDeclarations of ModuleItem.
-        // 3. Return the list-concatenation of declarations1 and declarations2.
+        // 1. Let decls1 be the VarScopedDeclarations of ModuleItemList.
+        // 2. Let decls2 be the VarScopedDeclarations of ModuleItem.
+        // 3. Return the list-concatenation of decls1 and decls2.
         for (self.items) |module_item| {
             try module_item.collectVarScopedDeclarations(allocator, var_scoped_declarations);
         }
@@ -4047,26 +4047,26 @@ pub const ImportDeclaration = struct {
         //    [[Specifier]]: specifier, [[Attributes]]: « » }.
         // ImportDeclaration : import ImportClause FromClause WithClause ;
         // 1. Let specifier be the SV of FromClause.
-        // 2. Let attributes be WithClauseToAttributes of WithClause.
+        // 2. Let attrs be WithClauseToAttributes of WithClause.
         // 3. Return a List whose sole element is the ModuleRequest Record {
-        //    [[Specifier]]: specifier, [[Attributes]]: attributes }.
+        //    [[Specifier]]: specifier, [[Attributes]]: attrs }.
         // ImportDeclaration : import ModuleSpecifier ;
         // 1. Let specifier be the SV of ModuleSpecifier.
         // 2. Return a List whose sole element is the ModuleRequest Record {
         //    [[Specifier]]: specifier, [[Attributes]]: « » }.
         // ImportDeclaration : import ModuleSpecifier WithClause ;
         // 1. Let specifier be the SV of ModuleSpecifier.
-        // 2. Let attributes be WithClauseToAttributes of WithClause.
+        // 2. Let attrs be WithClauseToAttributes of WithClause.
         // 3. Return a List whose sole element is the ModuleRequest Record {
-        //    [[Specifier]]: specifier, [[Attributes]]: attributes }.
+        //    [[Specifier]]: specifier, [[Attributes]]: attrs }.
         const specifier = try self.module_specifier.stringValue(allocator);
-        const attributes = if (self.with_clause) |with_clause|
+        const attrs = if (self.with_clause) |with_clause|
             try with_clause.toAttributes(allocator)
         else
             &.{};
         const module_request: ModuleRequest = .{
             .specifier = specifier,
-            .attributes = attributes,
+            .attributes = attrs,
         };
         try module_requests.append(allocator, module_request);
     }
@@ -4315,12 +4315,12 @@ pub const WithClause = struct {
         // WithClause : with { }
         // 1. Return a new empty List.
         // WithClause : with { WithEntries ,[opt] }
-        // 1. Let attributes be WithClauseToAttributes of WithEntries.
-        // 2. Sort attributes according to the lexicographic order of their [[Key]] field, treating
-        //    the value of each such field as a sequence of UTF-16 code unit values. NOTE: This
-        //    sorting is observable only in that hosts are prohibited from changing behaviour based
-        //    on the order in which attributes are enumerated.
-        // 3. Return attributes.
+        // 1. Let attrs be WithClauseToAttributes of WithEntries.
+        // 2. Sort attrs according to the lexicographic order of their [[Key]] field, treating the
+        //    value of each such field as a sequence of UTF-16 code unit values. NOTE: This sorting
+        //    is observable only in that hosts are prohibited from changing behaviour based on the
+        //    order in which attributes are enumerated.
+        // 3. Return attrs.
         // WithEntries : AttributeKey : StringLiteral
         // 1. Let key be the PropName of AttributeKey.
         // 2. Let entry be the ImportAttribute Record { [[Key]]: key, [[Value]]: the SV of
@@ -4410,36 +4410,36 @@ pub const ExportDeclaration = union(enum) {
 
             // ExportDeclaration : export default HoistableDeclaration
             .default_hoistable_declaration => |hoistable_declaration| {
-                // 1. Let declarationNames be the BoundNames of HoistableDeclaration.
-                var declaration_names: std.ArrayList(Identifier) = .empty;
-                defer declaration_names.deinit(allocator);
-                try hoistable_declaration.collectBoundNames(allocator, &declaration_names);
+                // 1. Let declNames be the BoundNames of HoistableDeclaration.
+                var decl_names: std.ArrayList(Identifier) = .empty;
+                defer decl_names.deinit(allocator);
+                try hoistable_declaration.collectBoundNames(allocator, &decl_names);
 
-                // 2. If declarationNames does not include the element "*default*", append
-                //    "*default*" to declarationNames.
-                if (!containsSlice(declaration_names.items, "*default*")) {
-                    try declaration_names.append(allocator, "*default*");
+                // 2. If declNames does not include the element "*default*", append "*default*" to
+                //    declNames.
+                if (!containsSlice(decl_names.items, "*default*")) {
+                    try decl_names.append(allocator, "*default*");
                 }
 
-                // 3. Return declarationNames.
-                try bound_names.appendSlice(allocator, declaration_names.items);
+                // 3. Return declNames.
+                try bound_names.appendSlice(allocator, decl_names.items);
             },
 
             // ExportDeclaration : export default ClassDeclaration
             .default_class_declaration => |class_declaration| {
-                // 1. Let declarationNames be the BoundNames of ClassDeclaration.
-                var declaration_names: std.ArrayList(Identifier) = .empty;
-                defer declaration_names.deinit(allocator);
-                try class_declaration.collectBoundNames(allocator, &declaration_names);
+                // 1. Let declNames be the BoundNames of ClassDeclaration.
+                var decl_names: std.ArrayList(Identifier) = .empty;
+                defer decl_names.deinit(allocator);
+                try class_declaration.collectBoundNames(allocator, &decl_names);
 
-                // 2. If declarationNames does not include the element "*default*", append
-                //    "*default*" to declarationNames.
-                if (!containsSlice(declaration_names.items, "*default*")) {
-                    try declaration_names.append(allocator, "*default*");
+                // 2. If declNames does not include the element "*default*", append "*default*" to
+                //    declNames.
+                if (!containsSlice(decl_names.items, "*default*")) {
+                    try decl_names.append(allocator, "*default*");
                 }
 
-                // 3. Return declarationNames.
-                try bound_names.appendSlice(allocator, declaration_names.items);
+                // 3. Return declNames.
+                try bound_names.appendSlice(allocator, decl_names.items);
             },
 
             // ExportDeclaration : export default AssignmentExpression ;
@@ -4464,18 +4464,18 @@ pub const ExportDeclaration = union(enum) {
             //    [[Specifier]]: specifier, [[Attributes]]: « » }.
             // ExportDeclaration : export ExportFromClause FromClause WithClause ;
             // 1. Let specifier be the SV of FromClause.
-            // 2. Let attributes be WithClauseToAttributes of WithClause.
+            // 2. Let attrs be WithClauseToAttributes of WithClause.
             // 3. Return a List whose sole element is the ModuleRequest Record {
-            //    [[Specifier]]: specifier, [[Attributes]]: attributes }.
+            //    [[Specifier]]: specifier, [[Attributes]]: attrs }.
             .export_from => |export_from| {
                 const specifier = try export_from.module_specifier.stringValue(allocator);
-                const attributes = if (export_from.with_clause) |with_clause|
+                const attrs = if (export_from.with_clause) |with_clause|
                     try with_clause.toAttributes(allocator)
                 else
                     &.{};
                 const module_request: ModuleRequest = .{
                     .specifier = specifier,
-                    .attributes = attributes,
+                    .attributes = attrs,
                 };
                 try module_requests.append(allocator, module_request);
             },

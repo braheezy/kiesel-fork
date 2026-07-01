@@ -36,7 +36,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "PluralRules",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -109,14 +109,15 @@ pub const constructor = struct {
         // 4. Set options to optionsResolution.[[Options]].
         const options = options_resolution.options;
 
-        // 5. Let r be optionsResolution.[[ResolvedLocale]].
-        const r = options_resolution.resolved_locale;
-        const locale = r.locale;
+        // 5. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+        const resolved_locale = options_resolution.resolved_locale;
+        const locale = resolved_locale.locale;
 
-        // 6. Set pluralRules.[[Locale]] to r.[[Locale]].
+        // 6. Set pluralRules.[[Locale]] to resolvedLocale.[[Locale]].
         plural_rules.fields.locale = locale;
 
-        // 7. Let t be ? GetOption(options, "type", string, « "cardinal", "ordinal" », "cardinal").
+        // 7. Let type be ? GetOption(options, "type", string, « "cardinal", "ordinal" »,
+        //    "cardinal").
         const type_string = try options.getOption(
             agent,
             "type",
@@ -129,7 +130,7 @@ pub const constructor = struct {
             .{ "ordinal", .ordinal },
         }).get(type_string.asAscii()).?;
 
-        // 8. Set pluralRules.[[Type]] to t.
+        // 8. Set pluralRules.[[Type]] to type.
         plural_rules.fields.type = @"type";
 
         // 9. Let notation be ? GetOption(options, "notation", string, « "standard", "scientific",
@@ -268,17 +269,17 @@ pub const prototype = struct {
         defer plural_categories.deinit(agent.gc_allocator);
 
         // 5. For each row of Table 32, except the header row, in table order, do
-        //     a. Let p be the Property value of the current row.
-        //     b. If p is "pluralCategories", then
-        //         i. Let v be CreateArrayFromList(pluralCategories).
+        //     a. Let propertyKey be the Property value of the current row.
+        //     b. If propertyKey is "pluralCategories", then
+        //         i. Let value be CreateArrayFromList(pluralCategories).
         //     c. Else,
-        //         i. Let v be the value of pr's internal slot whose name is the Internal Slot value
-        //            of the current row.
-        //     d. If v is not undefined, then
+        //         i. Let value be the value of pr's internal slot whose name is the Internal Slot
+        //            value of the current row.
+        //     d. If value is not undefined, then
         //         i. If there is a Conversion value in the current row, then
         //             1. Assert: The Conversion value of the current row is number.
-        //             2. Set v to 𝔽(v).
-        //         ii. Perform ! CreateDataPropertyOrThrow(options, p, v).
+        //             2. Set value to 𝔽(value).
+        //         ii. Perform ! CreateDataPropertyOrThrow(options, propertyKey, value).
         const resolved_options = plural_rules.fields.resolvedOptions();
         try options.createDataPropertyDirect(
             agent,
@@ -531,14 +532,17 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: IntlMathematica
 } {
     const decimal = switch (n) {
         // 1. If n is not-a-number, then
-        //     a. Let s be an ILD String value indicating the NaN value.
-        //     b. Return the Record { [[PluralCategory]]: "other", [[FormattedString]]: s }.
+        //     a. Let formattedString be an ILD String value indicating the NaN value.
+        //     b. Return the Record { [[PluralCategory]]: "other",
+        //        [[FormattedString]]: formattedString }.
         // 2. If n is positive-infinity, then
-        //     a. Let s be an ILD String value indicating positive infinity.
-        //     b. Return the Record { [[PluralCategory]]: "other", [[FormattedString]]: s }.
+        //     a. Let formattedString be an ILD String value indicating positive infinity.
+        //     b. Return the Record { [[PluralCategory]]: "other",
+        //        [[FormattedString]]: formattedString }.
         // 3. If n is negative-infinity, then
-        //     a. Let s be an ILD String value indicating negative infinity.
-        //     b. Return the Record { [[PluralCategory]]: "other", [[FormattedString]]: s }.
+        //     a. Let formattedString be an ILD String value indicating negative infinity.
+        //     b. Return the Record { [[PluralCategory]]: "other",
+        //        [[FormattedString]]: formattedString }.
         .not_a_number, .positive_infinity, .negative_infinity => {
             return .{ .plural_category = .other };
         },
@@ -548,7 +552,7 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: IntlMathematica
     defer if (n == .negative_zero) decimal.deinit();
 
     // TODO: 4. Let res be FormatNumericToString(pluralRules, n).
-    // TODO: 5. Let s be res.[[FormattedString]].
+    // TODO: 5. Let formattedString be res.[[FormattedString]].
 
     // 6. Let locale be pluralRules.[[Locale]].
     const locale = plural_rules_object.fields.locale;
@@ -562,7 +566,8 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: IntlMathematica
     // 9. Let compactDisplay be pluralRules.[[CompactDisplay]].
     const compact_display = plural_rules_object.fields.compact_display;
 
-    // 10. Let p be PluralRuleSelect(locale, type, notation, compactDisplay, s).
+    // 10. Let pluralCategory be PluralRuleSelect(locale, type, notation, compactDisplay,
+    //     formattedString).
     // TODO: Use these once ICU4X supports it.
     _ = notation;
     _ = compact_display;
@@ -573,7 +578,8 @@ pub fn resolvePlural(plural_rules_object: *const PluralRules, n: IntlMathematica
     defer plural_rules.deinit();
     const plural_category = plural_rules.categoryFor(decimal);
 
-    // 11. Return the Record { [[PluralCategory]]: p, [[FormattedString]]: s }.
+    // 11. Return the Record { [[PluralCategory]]: pluralCategory,
+    //     [[FormattedString]]: formattedString }.
     return .{ .plural_category = plural_category };
 }
 
@@ -614,10 +620,10 @@ fn resolvePluralRange(
     };
     defer if (y == .negative_zero) decimal_y.deinit();
 
-    // 2. Let xp be ResolvePlural(pluralRules, x).
-    // 3. Let yp be ResolvePlural(pluralRules, y).
-    // 4. If xp.[[FormattedString]] is yp.[[FormattedString]], then
-    //     a. Return xp.[[PluralCategory]].
+    // 2. Let xResult be ResolvePlural(pluralRules, x).
+    // 3. Let yResult be ResolvePlural(pluralRules, y).
+    // 4. If xResult.[[FormattedString]] is yResult.[[FormattedString]], then
+    //     a. Return xResult.[[PluralCategory]].
 
     // 5. Let locale be pluralRules.[[Locale]].
     const locale = plural_rules_object.fields.locale;
@@ -632,7 +638,7 @@ fn resolvePluralRange(
     const compact_display = plural_rules_object.fields.compact_display;
 
     // 9. Return PluralRuleSelectRange(locale, type, notation, compactDisplay,
-    //    xp.[[PluralCategory]], yp.[[PluralCategory]]).
+    //    xResult.[[PluralCategory]], yResult.[[PluralCategory]]).
     // TODO: Use these once ICU4X supports it.
     _ = notation;
     _ = compact_display;

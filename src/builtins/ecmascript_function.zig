@@ -141,13 +141,13 @@ pub const ECMAScriptFunction = MakeObject(.{
             if (self.cached_bytecode) |bc| return bc;
 
             const gpa = agent.gpa;
-            const function: *ECMAScriptFunction = @alignCast(@fieldParentPtr("fields", self));
-            const object = &function.object;
-            const name_value = object.getPropertyValueDirect(PropertyKey.from("name"));
+            const func: *ECMAScriptFunction = @alignCast(@fieldParentPtr("fields", self));
+            const obj = &func.object;
+            const name_value = obj.getPropertyValueDirect(PropertyKey.from("name"));
             const name = try name_value.asString().toUtf8(gpa);
             defer gpa.free(name);
 
-            if (function.fields.flags.this_mode == .lexical) {
+            if (func.fields.flags.this_mode == .lexical) {
                 // FDI IR lowering does not have [[ThisMode]] information and instead relies on the
                 // parser setting these.
                 std.debug.assert(!self.formal_parameters.arguments_object_needed);
@@ -180,15 +180,15 @@ pub const internal_methods_constructor = Object.InternalMethods.initComptime(.{
     .construct = construct,
 });
 
-/// 10.2.1 [[Call]] ( thisArgument, argumentsList )
+/// 10.2.1 [[Call]] ( thisArg, argList )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-call-thisargument-argumentslist
 fn call(
     agent: *Agent,
-    object: *Object,
-    this_argument: Value,
-    arguments_list: Arguments,
+    obj: *Object,
+    this_arg: Value,
+    arg_list: Arguments,
 ) Agent.Error!Value {
-    const function = object.as(ECMAScriptFunction);
+    const func = obj.as(ECMAScriptFunction);
 
     if (agent.platform.checkStackOverflow()) {
         return agent.throwException(.internal_error, "Stack overflow", .{});
@@ -197,18 +197,18 @@ fn call(
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to restore the context, which is a simple pop().
 
-    // 2. Let calleeContext be PrepareForOrdinaryCall(F, undefined).
+    // 2. Let calleeContext be PrepareForOrdinaryCall(func, undefined).
     var callee_context: ExecutionContext = undefined;
-    try prepareForOrdinaryCall(agent, function, null, &callee_context);
+    try prepareForOrdinaryCall(agent, func, null, &callee_context);
 
     // 3. Assert: calleeContext is now the running execution context.
     std.debug.assert(&callee_context == agent.runningExecutionContext());
 
-    // 4. If F.[[IsClassConstructor]] is true, then
-    if (function.fields.flags.is_class_constructor) {
+    // 4. If func.[[IsClassConstructor]] is true, then
+    if (func.fields.flags.is_class_constructor) {
         // a. Let error be a newly created TypeError object.
-        // b. NOTE: error is created in calleeContext with F's associated Realm Record.
-        const err = agent.throwException(.type_error, "{f} is not callable", .{object});
+        // b. NOTE: error is created in calleeContext with func's associated Realm Record.
+        const err = agent.throwException(.type_error, "{f} is not callable", .{obj});
 
         // c. Remove calleeContext from the execution context stack and restore callerContext as the
         //    running execution context.
@@ -218,11 +218,11 @@ fn call(
         return err;
     }
 
-    // 5. Perform OrdinaryCallBindThis(F, calleeContext, thisArgument).
-    try ordinaryCallBindThis(agent, function, &callee_context, this_argument);
+    // 5. Perform OrdinaryCallBindThis(func, calleeContext, thisArg).
+    try ordinaryCallBindThis(agent, func, &callee_context, this_arg);
 
-    // 6. Let result be Completion(OrdinaryCallEvaluateBody(F, argumentsList)).
-    const result = ordinaryCallEvaluateBody(agent, function, arguments_list);
+    // 6. Let result be Completion(OrdinaryCallEvaluateBody(func, argList)).
+    const result = ordinaryCallEvaluateBody(agent, func, arg_list);
 
     // 7. Remove calleeContext from the execution context stack and restore callerContext as the
     //    running execution context.
@@ -234,31 +234,31 @@ fn call(
     return result;
 }
 
-/// 10.2.1.1 PrepareForOrdinaryCall ( F, newTarget )
+/// 10.2.1.1 PrepareForOrdinaryCall ( func, newTarget )
 /// https://tc39.es/ecma262/#sec-prepareforordinarycall
 fn prepareForOrdinaryCall(
     agent: *Agent,
-    function: *ECMAScriptFunction,
+    func: *ECMAScriptFunction,
     new_target: ?*Object,
     callee_context: *ExecutionContext,
 ) std.mem.Allocator.Error!void {
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to suspend the context, which we don't do yet.
 
-    // 7. Let localEnv be NewFunctionEnvironment(F, newTarget).
-    const local_env = try newFunctionEnvironment(agent.gc_allocator, function, new_target);
+    // 7. Let localEnv be NewFunctionEnvironment(func, newTarget).
+    const local_env = try newFunctionEnvironment(agent.gc_allocator, func, new_target);
 
     // 2. Let calleeContext be a new ECMAScript code execution context.
     callee_context.* = .{
-        // 3. Set the Function of calleeContext to F.
-        .origin = .{ .function = &function.object },
+        // 3. Set the Function of calleeContext to func.
+        .origin = .{ .function = &func.object },
 
-        // 4. Let calleeRealm be F.[[Realm]].
+        // 4. Let calleeRealm be func.[[Realm]].
         // 5. Set the Realm of calleeContext to calleeRealm.
-        .realm = function.fields.realm,
+        .realm = func.fields.realm,
 
-        // 6. Set the ScriptOrModule of calleeContext to F.[[ScriptOrModule]].
-        .script_or_module = function.fields.script_or_module,
+        // 6. Set the ScriptOrModule of calleeContext to func.[[ScriptOrModule]].
+        .script_or_module = func.fields.script_or_module,
 
         .ecmascript_code = .{
             // 8. Set the LexicalEnvironment of calleeContext to localEnv.
@@ -267,8 +267,8 @@ fn prepareForOrdinaryCall(
             // 9. Set the VariableEnvironment of calleeContext to localEnv.
             .variable_environment = .{ .function_environment = local_env },
 
-            // 10. Set the PrivateEnvironment of calleeContext to F.[[PrivateEnvironment]].
-            .private_environment = function.fields.private_environment,
+            // 10. Set the PrivateEnvironment of calleeContext to func.[[PrivateEnvironment]].
+            .private_environment = func.fields.private_environment,
         },
     };
 
@@ -282,22 +282,22 @@ fn prepareForOrdinaryCall(
     // 14. Return calleeContext.
 }
 
-/// 10.2.1.2 OrdinaryCallBindThis ( F, calleeContext, thisArgument )
+/// 10.2.1.2 OrdinaryCallBindThis ( func, calleeContext, thisArg )
 /// https://tc39.es/ecma262/#sec-ordinarycallbindthis
 pub fn ordinaryCallBindThis(
     agent: *Agent,
-    function: *ECMAScriptFunction,
+    func: *ECMAScriptFunction,
     callee_context: *ExecutionContext,
-    this_argument: Value,
+    this_arg: Value,
 ) std.mem.Allocator.Error!void {
-    // 1. Let thisMode be F.[[ThisMode]].
-    const this_mode = function.fields.flags.this_mode;
+    // 1. Let thisMode be func.[[ThisMode]].
+    const this_mode = func.fields.flags.this_mode;
 
     // 2. If thisMode is lexical, return unused.
     if (this_mode == .lexical) return;
 
-    // 3. Let calleeRealm be F.[[Realm]].
-    const callee_realm = function.fields.realm;
+    // 3. Let calleeRealm be func.[[Realm]].
+    const callee_realm = func.fields.realm;
 
     // 4. Let localEnv be the LexicalEnvironment of calleeContext.
     const local_env = callee_context.ecmascript_code.lexical_environment;
@@ -305,12 +305,12 @@ pub fn ordinaryCallBindThis(
     const this_value = blk: {
         // 5. If thisMode is strict, then
         if (this_mode == .strict) {
-            // a. Let thisValue be thisArgument.
-            break :blk this_argument;
+            // a. Let thisValue be thisArg.
+            break :blk this_arg;
         } else {
             // 6. Else,
-            // a. If thisArgument is either undefined or null, then
-            if (this_argument.isUndefined() or this_argument.isNull()) {
+            // a. If thisArg is either undefined or null, then
+            if (this_arg.isUndefined() or this_arg.isNull()) {
                 // i. Let globalEnv be calleeRealm.[[GlobalEnv]].
                 const global_env = callee_realm.global_env;
 
@@ -319,9 +319,9 @@ pub fn ordinaryCallBindThis(
                 break :blk Value.from(global_env.global_this_value);
             } else {
                 // b. Else,
-                // i. Let thisValue be ! ToObject(thisArgument).
+                // i. Let thisValue be ! ToObject(thisArg).
                 // ii. NOTE: ToObject produces wrapper objects using calleeRealm.
-                break :blk Value.from(this_argument.toObject(agent) catch |err| try noexcept(err));
+                break :blk Value.from(this_arg.toObject(agent) catch |err| try noexcept(err));
             }
         }
     };
@@ -335,44 +335,40 @@ pub fn ordinaryCallBindThis(
     // 10. Return unused.
 }
 
-/// 10.2.1.4 OrdinaryCallEvaluateBody ( F, argumentsList )
+/// 10.2.1.4 OrdinaryCallEvaluateBody ( func, argList )
 /// https://tc39.es/ecma262/#sec-ordinarycallevaluatebody
 pub fn ordinaryCallEvaluateBody(
     agent: *Agent,
-    function: *ECMAScriptFunction,
-    arguments_list: Arguments,
+    func: *ECMAScriptFunction,
+    arg_list: Arguments,
 ) Agent.Error!Value {
-    // 1. Return ? EvaluateBody of F.[[ECMAScriptCode]] with arguments F and argumentsList.
-    const function_body = function.fields.ecmascript_code;
+    // 1. Return ? EvaluateBody of func.[[ECMAScriptCode]] with arguments func and argList.
+    const function_body = func.fields.ecmascript_code;
 
     // 10.2.1.3 Runtime Semantics: EvaluateBody
     // https://tc39.es/ecma262/#sec-runtime-semantics-evaluatebody
     return switch (function_body.type) {
         // FunctionBody : FunctionStatementList
-        // 1. Return ? EvaluateFunctionBody of FunctionBody with arguments functionObject and
-        //    argumentsList.
+        // 1. Return ? EvaluateFunctionBody of FunctionBody with arguments func and argList.
         // ConciseBody : ExpressionBody
-        // 1. Return ? EvaluateConciseBody of ConciseBody with arguments functionObject and
-        //    argumentsList.
-        .normal => evaluateFunctionBody(agent, function, arguments_list),
+        // 1. Return ? EvaluateConciseBody of ConciseBody with arguments func and argList.
+        .normal => evaluateFunctionBody(agent, func, arg_list),
 
         // GeneratorBody : FunctionBody
-        // 1. Return ? EvaluateGeneratorBody of GeneratorBody with arguments functionObject and
-        //    argumentsList.
-        .generator => evaluateGeneratorBody(agent, function, arguments_list),
+        // 1. Return ? EvaluateGeneratorBody of GeneratorBody with arguments func and argList.
+        .generator => evaluateGeneratorBody(agent, func, arg_list),
 
         // AsyncGeneratorBody : FunctionBody
-        // 1. Return ? EvaluateAsyncGeneratorBody of AsyncGeneratorBody with arguments
-        //    functionObject and argumentsList.
-        .async_generator => evaluateAsyncGeneratorBody(agent, function, arguments_list),
+        // 1. Return ? EvaluateAsyncGeneratorBody of AsyncGeneratorBody with arguments func and
+        //    argList.
+        .async_generator => evaluateAsyncGeneratorBody(agent, func, arg_list),
 
         // AsyncFunctionBody : FunctionBody
-        // 1. Return ? EvaluateAsyncFunctionBody of AsyncFunctionBody with arguments functionObject
-        //    and argumentsList.
+        // 1. Return ? EvaluateAsyncFunctionBody of AsyncFunctionBody with arguments func and
+        //    argList.
         // AsyncConciseBody : ExpressionBody
-        // 1. Return ? EvaluateAsyncConciseBody of AsyncConciseBody with arguments functionObject
-        //    and argumentsList.
-        .async => evaluateAsyncFunctionBody(agent, function, arguments_list),
+        // 1. Return ? EvaluateAsyncConciseBody of AsyncConciseBody with arguments func and argList.
+        .async => evaluateAsyncFunctionBody(agent, func, arg_list),
     };
 }
 
@@ -380,12 +376,12 @@ pub fn ordinaryCallEvaluateBody(
 /// https://tc39.es/ecma262/#sec-runtime-semantics-evaluatefunctionbody
 fn evaluateFunctionBody(
     agent: *Agent,
-    function: *ECMAScriptFunction,
-    arguments_list: Arguments,
+    func: *ECMAScriptFunction,
+    arg_list: Arguments,
 ) Agent.Error!Value {
     // FunctionBody : FunctionStatementList
 
-    const bc = try function.fields.compile(agent);
+    const bc = try func.fields.compile(agent);
     var temp_vm: ?interpreter.Vm = null;
     defer if (temp_vm) |*vm| vm.deinit();
 
@@ -396,13 +392,13 @@ fn evaluateFunctionBody(
         break :blk &temp_vm.?;
     };
 
-    // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
+    // 1. Perform ? FunctionDeclarationInstantiation(funcObj, argList).
     // NOTE: FDI is handled via the generated bytecode.
 
     // 2. Perform ? Evaluation of FunctionStatementList.
     // 3. NOTE: If the previous step resulted in a normal completion, then evaluation finished by
     //    proceeding past the end of the FunctionStatementList.
-    try vm.pushCallFrame(bc, arguments_list.values);
+    try vm.pushCallFrame(bc, arg_list.values);
     errdefer vm.popCallFrame();
     const result = try vm.run(.{});
 
@@ -417,12 +413,12 @@ fn evaluateFunctionBody(
 /// https://tc39.es/ecma262/#sec-runtime-semantics-evaluategeneratorbody
 fn evaluateGeneratorBody(
     agent: *Agent,
-    function: *ECMAScriptFunction,
-    arguments_list: Arguments,
+    func: *ECMAScriptFunction,
+    arg_list: Arguments,
 ) Agent.Error!Value {
     // GeneratorBody : FunctionBody
-    // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    const bc = try function.fields.compile(agent);
+    // 1. Perform ? FunctionDeclarationInstantiation(funcObj, argList).
+    const bc = try func.fields.compile(agent);
     var temp_vm: ?interpreter.Vm = null;
     defer if (temp_vm) |*vm| vm.deinit();
 
@@ -433,7 +429,7 @@ fn evaluateGeneratorBody(
         break :blk &temp_vm.?;
     };
 
-    try vm.pushCallFrame(bc, arguments_list.values);
+    try vm.pushCallFrame(bc, arg_list.values);
     errdefer vm.popCallFrame();
     const result = try vm.run(.{});
     const initial_suspension = switch (result) {
@@ -443,39 +439,39 @@ fn evaluateGeneratorBody(
     errdefer agent.gc_allocator.free(initial_suspension.stack);
     std.debug.assert(initial_suspension.yield_reg == .none);
 
-    // 2. Let G be ? OrdinaryCreateFromConstructor(functionObject, "%GeneratorPrototype%",
+    // 2. Let gen be ? OrdinaryCreateFromConstructor(funcObj, "%GeneratorPrototype%",
     //    « [[GeneratorState]], [[GeneratorContext]], [[GeneratorBrand]] »).
-    const generator = try ordinaryCreateFromConstructor(
+    const gen = try ordinaryCreateFromConstructor(
         builtins.Generator,
         agent,
-        &function.object,
+        &func.object,
         "%GeneratorPrototype%",
         .{
-            // 3. Set G.[[GeneratorBrand]] to empty.
-            // 4. Set G.[[GeneratorState]] to suspended-start.
+            // 3. Set gen.[[GeneratorBrand]] to empty.
+            // 4. Set gen.[[GeneratorState]] to suspended-start.
             .generator_state = .suspended_start,
             .generator_context = undefined,
             .evaluation_state = undefined,
         },
     );
 
-    // 5. Perform GeneratorStart(G, FunctionBody).
-    try generatorStart(agent, generator, function, initial_suspension);
+    // 5. Perform GeneratorStart(gen, FunctionBody).
+    try generatorStart(agent, gen, func, initial_suspension);
 
-    // 6. Return ReturnCompletion(G).
-    return Value.from(&generator.object);
+    // 6. Return ReturnCompletion(gen).
+    return Value.from(&gen.object);
 }
 
 /// 15.6.2 Runtime Semantics: EvaluateAsyncGeneratorBody
 /// https://tc39.es/ecma262/#sec-runtime-semantics-evaluateasyncgeneratorbody
 fn evaluateAsyncGeneratorBody(
     agent: *Agent,
-    function: *ECMAScriptFunction,
-    arguments_list: Arguments,
+    func: *ECMAScriptFunction,
+    arg_list: Arguments,
 ) Agent.Error!Value {
     // AsyncGeneratorBody : FunctionBody
-    // 1. Perform ? FunctionDeclarationInstantiation(functionObject, argumentsList).
-    const bc = try function.fields.compile(agent);
+    // 1. Perform ? FunctionDeclarationInstantiation(funcObj, argList).
+    const bc = try func.fields.compile(agent);
     var temp_vm: ?interpreter.Vm = null;
     defer if (temp_vm) |*vm| vm.deinit();
 
@@ -486,7 +482,7 @@ fn evaluateAsyncGeneratorBody(
         break :blk &temp_vm.?;
     };
 
-    try vm.pushCallFrame(bc, arguments_list.values);
+    try vm.pushCallFrame(bc, arg_list.values);
     errdefer vm.popCallFrame();
     const result = try vm.run(.{});
     const initial_suspension = switch (result) {
@@ -496,17 +492,17 @@ fn evaluateAsyncGeneratorBody(
     errdefer agent.gc_allocator.free(initial_suspension.stack);
     std.debug.assert(initial_suspension.yield_reg == .none);
 
-    // 2. Let generator be ? OrdinaryCreateFromConstructor(functionObject,
-    //    "%AsyncGeneratorPrototype%", « [[AsyncGeneratorState]], [[AsyncGeneratorContext]],
-    //    [[AsyncGeneratorQueue]], [[GeneratorBrand]] »).
-    const generator = try ordinaryCreateFromConstructor(
+    // 2. Let gen be ? OrdinaryCreateFromConstructor(funcObj, "%AsyncGeneratorPrototype%",
+    //    « [[AsyncGeneratorState]], [[AsyncGeneratorContext]], [[AsyncGeneratorQueue]],
+    //    [[GeneratorBrand]] »).
+    const gen = try ordinaryCreateFromConstructor(
         builtins.AsyncGenerator,
         agent,
-        &function.object,
+        &func.object,
         "%AsyncGeneratorPrototype%",
         .{
-            // 3. Set generator.[[GeneratorBrand]] to empty.
-            // 4. Set generator.[[AsyncGeneratorState]] to suspended-start.
+            // 3. Set gen.[[GeneratorBrand]] to empty.
+            // 4. Set gen.[[AsyncGeneratorState]] to suspended-start.
             .async_generator_state = .suspended_start,
             .async_generator_context = undefined,
             .async_generator_queue = undefined,
@@ -514,19 +510,19 @@ fn evaluateAsyncGeneratorBody(
         },
     );
 
-    // 5. Perform AsyncGeneratorStart(generator, FunctionBody).
-    try asyncGeneratorStart(agent, generator, function, initial_suspension);
+    // 5. Perform AsyncGeneratorStart(gen, FunctionBody).
+    try asyncGeneratorStart(agent, gen, func, initial_suspension);
 
-    // 6. Return ReturnCompletion(generator).
-    return Value.from(&generator.object);
+    // 6. Return ReturnCompletion(gen).
+    return Value.from(&gen.object);
 }
 
 /// 15.8.4 Runtime Semantics: EvaluateAsyncFunctionBody
 /// https://tc39.es/ecma262/#sec-runtime-semantics-evaluateasyncfunctionbody
 fn evaluateAsyncFunctionBody(
     agent: *Agent,
-    function: *ECMAScriptFunction,
-    arguments_list: Arguments,
+    func: *ECMAScriptFunction,
+    arg_list: Arguments,
 ) std.mem.Allocator.Error!Value {
     // AsyncFunctionBody : FunctionBody
     const realm = agent.currentRealm();
@@ -537,31 +533,30 @@ fn evaluateAsyncFunctionBody(
         Value.from(try realm.intrinsics.@"%Promise%"()),
     ) catch |err| try noexcept(err);
 
-    // 2. Let completion be Completion(FunctionDeclarationInstantiation(functionObject,
-    //    argumentsList)).
+    // 2. Let completion be Completion(FunctionDeclarationInstantiation(funcObj, argList)).
     // 3. If completion is an abrupt completion, then
     //     a. Perform ! Call(promiseCapability.[[Reject]], undefined, « completion.[[Value]] »).
     // 4. Else,
     //     a. Perform AsyncFunctionStart(promiseCapability, FunctionBody).
     // NOTE: FDI is handled via the generated bytecode.
     try asyncFunctionStart(agent, promise_capability, .{ .ecmascript_function = .{
-        .function = function,
-        .arguments = arguments_list.values,
+        .function = func,
+        .arguments = arg_list.values,
     } });
 
     // 5. Return ReturnCompletion(promiseCapability.[[Promise]]).
     return Value.from(promise_capability.promise);
 }
 
-/// 10.2.2 [[Construct]] ( argumentsList, newTarget )
+/// 10.2.2 [[Construct]] ( argList, newTarget )
 /// https://tc39.es/ecma262/#sec-ecmascript-function-objects-construct-argumentslist-newtarget
 fn construct(
     agent: *Agent,
-    object: *Object,
-    arguments_list: Arguments,
+    obj: *Object,
+    arg_list: Arguments,
     new_target: *Object,
 ) Agent.Error!*Object {
-    const function = object.as(ECMAScriptFunction);
+    const func = obj.as(ECMAScriptFunction);
 
     if (agent.platform.checkStackOverflow()) {
         return agent.throwException(.internal_error, "Stack overflow", .{});
@@ -570,40 +565,40 @@ fn construct(
     // 1. Let callerContext be the running execution context.
     // NOTE: This is only used to restore the context, which is a simple pop().
 
-    // 2. Let kind be F.[[ConstructorKind]].
-    const kind = function.fields.flags.constructor_kind;
+    // 2. Let kind be func.[[ConstructorKind]].
+    const kind = func.fields.flags.constructor_kind;
 
-    var this_argument: *Object = undefined;
+    var this_arg: *Object = undefined;
 
     // 3. If kind is base, then
     if (kind == .base) {
-        // a. Let thisArgument be ? OrdinaryCreateFromConstructor(newTarget, "%Object.prototype%").
-        const this_argument_object = try ordinaryCreateFromConstructor(
+        // a. Let thisArg be ? OrdinaryCreateFromConstructor(newTarget, "%Object.prototype%").
+        const this_arg_object = try ordinaryCreateFromConstructor(
             builtins.Object,
             agent,
             new_target,
             "%Object.prototype%",
             {},
         );
-        this_argument = &this_argument_object.object;
+        this_arg = &this_arg_object.object;
     }
 
-    // 4. Let calleeContext be PrepareForOrdinaryCall(F, newTarget).
+    // 4. Let calleeContext be PrepareForOrdinaryCall(func, newTarget).
     var callee_context: ExecutionContext = undefined;
-    try prepareForOrdinaryCall(agent, function, new_target, &callee_context);
+    try prepareForOrdinaryCall(agent, func, new_target, &callee_context);
 
     // 5. Assert: calleeContext is now the running execution context.
     std.debug.assert(&callee_context == agent.runningExecutionContext());
 
     // 6. If kind is base, then
     if (kind == .base) {
-        // a. Perform OrdinaryCallBindThis(F, calleeContext, thisArgument).
-        try ordinaryCallBindThis(agent, function, &callee_context, Value.from(this_argument));
+        // a. Perform OrdinaryCallBindThis(func, calleeContext, thisArg).
+        try ordinaryCallBindThis(agent, func, &callee_context, Value.from(this_arg));
 
-        // b. Let initializeResult be Completion(InitializeInstanceElements(thisArgument, F)).
-        const initialize_result = this_argument.initializeInstanceElements(
+        // b. Let initializeResult be Completion(InitializeInstanceElements(thisArg, func)).
+        const initialize_result = this_arg.initializeInstanceElements(
             agent,
-            &function.object,
+            &func.object,
         );
 
         // c. If initializeResult is an abrupt completion, then
@@ -617,11 +612,11 @@ fn construct(
         };
     }
 
-    // 7. Let constructorEnv be the LexicalEnvironment of calleeContext.
-    const constructor_env = callee_context.ecmascript_code.lexical_environment;
+    // 7. Let ctorEnv be the LexicalEnvironment of calleeContext.
+    const ctor_env = callee_context.ecmascript_code.lexical_environment;
 
-    // 8. Let result be Completion(OrdinaryCallEvaluateBody(F, argumentsList)).
-    const result = ordinaryCallEvaluateBody(agent, function, arguments_list);
+    // 8. Let result be Completion(OrdinaryCallEvaluateBody(func, argList)).
+    const result = ordinaryCallEvaluateBody(agent, func, arg_list);
 
     // 9. Remove calleeContext from the execution context stack and restore callerContext as the
     //    running execution context.
@@ -635,8 +630,8 @@ fn construct(
     // 12. If result.[[Value]] is an Object, return result.[[Value]].
     if (value.isObject()) return value.asObject();
 
-    // 13. If kind is base, return thisArgument.
-    if (kind == .base) return this_argument;
+    // 13. If kind is base, return thisArg.
+    if (kind == .base) return this_arg;
 
     // 14. If result.[[Value]] is not undefined, throw a TypeError exception.
     if (!value.isUndefined()) {
@@ -647,8 +642,8 @@ fn construct(
         );
     }
 
-    // 15. Let thisBinding be ? constructorEnv.GetThisBinding().
-    const this_binding = try constructor_env.getThisBinding(agent);
+    // 15. Let thisBinding be ? ctorEnv.GetThisBinding().
+    const this_binding = try ctor_env.getThisBinding(agent);
 
     // 16. Assert: thisBinding is an Object.
     std.debug.assert(this_binding.isObject());
@@ -657,86 +652,86 @@ fn construct(
     return this_binding.asObject();
 }
 
-/// 10.2.3 OrdinaryFunctionCreate ( functionPrototype, sourceText, ParameterList, Body, thisMode, env, privateEnv )
+/// 10.2.3 OrdinaryFunctionCreate ( proto, sourceText, paramList, body, thisMode, envRecord, privateEnv )
 /// https://tc39.es/ecma262/#sec-ordinaryfunctioncreate
 pub fn ordinaryFunctionCreate(
     agent: *Agent,
-    function_prototype: *Object,
+    proto: *Object,
     source_text: SourceText,
-    parameter_list: ast.FormalParameters,
+    param_list: ast.FormalParameters,
     body: ast.FunctionBody,
     this_mode: enum { lexical_this, non_lexical_this },
     env: Environment,
     private_env: ?*PrivateEnvironment,
 ) std.mem.Allocator.Error!*ECMAScriptFunction {
-    // 7. Let Strict be IsStrict(Body).
+    // 7. Let strict be IsStrict(body).
     const strict = body.strict;
 
     // 1. Let internalSlotsList be the internal slots listed in Table 25.
-    // 2. Let F be OrdinaryObjectCreate(functionPrototype, internalSlotsList).
-    const function = try ECMAScriptFunction.create(agent, .{
-        // 3. Set F.[[Call]] to the definition specified in 10.2.1.
+    // 2. Let func be OrdinaryObjectCreate(proto, internalSlotsList).
+    const func = try ECMAScriptFunction.create(agent, .{
+        // 3. Set func.[[Call]] to the definition specified in 10.2.1.
         .internal_methods = internal_methods,
-        .prototype = function_prototype,
+        .prototype = proto,
         .fields = .{
-            // 4. Set F.[[SourceText]] to sourceText.
+            // 4. Set func.[[SourceText]] to sourceText.
             .source_text = source_text,
 
-            // 5. Set F.[[FormalParameters]] to ParameterList.
-            .formal_parameters = parameter_list,
+            // 5. Set func.[[FormalParameters]] to paramList.
+            .formal_parameters = param_list,
 
-            // 6. Set F.[[ECMAScriptCode]] to Body.
+            // 6. Set func.[[ECMAScriptCode]] to body.
             .ecmascript_code = body,
 
             .flags = .{
-                // 8. Set F.[[Strict]] to Strict.
+                // 8. Set func.[[Strict]] to strict.
                 .strict = strict,
 
-                // 9. If thisMode is lexical-this, set F.[[ThisMode]] to lexical.
-                // 10. Else if Strict is true, set F.[[ThisMode]] to strict.
-                // 11. Else, set F.[[ThisMode]] to global.
+                // 9. If thisMode is lexical-this, set func.[[ThisMode]] to lexical.
+                // 10. Else if strict is true, set func.[[ThisMode]] to strict.
+                // 11. Else, set func.[[ThisMode]] to global.
                 .this_mode = switch (this_mode) {
                     .lexical_this => .lexical,
                     else => if (strict) .strict else .global,
                 },
 
-                // 12. Set F.[[IsClassConstructor]] to false.
+                // 12. Set func.[[IsClassConstructor]] to false.
                 .is_class_constructor = false,
 
                 // NOTE: Not in the spec but we need to provide a value
                 .constructor_kind = .base,
             },
 
-            // 13. Set F.[[Environment]] to env.
+            // 13. Set func.[[Environment]] to envRecord.
             .environment = env,
 
-            // 14. Set F.[[PrivateEnvironment]] to privateEnv.
+            // 14. Set func.[[PrivateEnvironment]] to privateEnv.
             .private_environment = private_env,
 
-            // 15. Set F.[[ScriptOrModule]] to GetActiveScriptOrModule().
+            // 15. Set func.[[ScriptOrModule]] to GetActiveScriptOrModule().
             .script_or_module = agent.getActiveScriptOrModule().?,
 
-            // 16. Set F.[[Realm]] to the current Realm Record.
+            // 16. Set func.[[Realm]] to the current Realm Record.
             .realm = agent.currentRealm(),
 
-            // 17. Set F.[[HomeObject]] to undefined.
+            // 17. Set func.[[HomeObject]] to undefined.
             .home_object = null,
 
-            // 18. Set F.[[Fields]] to a new empty List.
-            // 19. Set F.[[PrivateMethods]] to a new empty List.
-            // 20. Set F.[[ClassFieldInitializerName]] to empty.
+            // 18. Set func.[[Fields]] to a new empty List.
+            // 19. Set func.[[PrivateMethods]] to a new empty List.
+            // 20. Set func.[[ClassFieldInitializerName]] to empty.
             .class_data = null,
         },
     });
 
-    // 21. Let len be the ExpectedArgumentCount of ParameterList.
-    const len = parameter_list.expectedArgumentCount();
+    // 21. Let length be the ExpectedArgumentCount of paramList.
+    const length = param_list.expectedArgumentCount();
 
-    // 22. Perform SetFunctionLength(F, len).
-    try setFunctionLength(agent, &function.object, @floatFromInt(len));
+    // 22. Perform SetFunctionLength(func, length).
+    try setFunctionLength(agent, &func.object, @floatFromInt(length));
 
-    // 23. Return F.
-    return function;
+    // 23. Return func.
+    return func;
 }
 
 pub fn ordinaryFunctionCreateFast(
@@ -755,7 +750,7 @@ pub fn ordinaryFunctionCreateFast(
     const function_shape, const function_offsets = try realm.shapes.ordinaryFunction();
     const prototype_shape, const prototype_offsets = try realm.shapes.ordinaryFunctionPrototype();
 
-    const function = try ECMAScriptFunction.createWithShape(agent, .{
+    const func = try ECMAScriptFunction.createWithShape(agent, .{
         .shape = function_shape,
         .fields = .{
             .source_text = source_text,
@@ -776,28 +771,28 @@ pub fn ordinaryFunctionCreateFast(
         },
     });
 
-    const prototype = try builtins.Object.createWithShape(agent, .{ .shape = prototype_shape });
-    prototype.object.setValueAtPropertyOffset(prototype_offsets.constructor, Value.from(&function.object));
+    const proto = try builtins.Object.createWithShape(agent, .{ .shape = prototype_shape });
+    proto.object.setValueAtPropertyOffset(prototype_offsets.constructor, Value.from(&func.object));
 
-    function.object.setValueAtPropertyOffset(function_offsets.length, Value.from(length));
-    function.object.setValueAtPropertyOffset(function_offsets.name, Value.from(name));
-    function.object.setValueAtPropertyOffset(function_offsets.prototype, Value.from(&prototype.object));
+    func.object.setValueAtPropertyOffset(function_offsets.length, Value.from(length));
+    func.object.setValueAtPropertyOffset(function_offsets.name, Value.from(name));
+    func.object.setValueAtPropertyOffset(function_offsets.prototype, Value.from(&proto.object));
 
-    return function;
+    return func;
 }
 
-/// 10.2.4 AddRestrictedFunctionProperties ( F, realm )
+/// 10.2.4 AddRestrictedFunctionProperties ( func, realm )
 /// https://tc39.es/ecma262/#sec-addrestrictedfunctionproperties
 pub fn addRestrictedFunctionProperties(
     agent: *Agent,
-    function: *Object,
+    func: *Object,
     realm: *Realm,
 ) std.mem.Allocator.Error!void {
     // 1. Assert: realm.[[Intrinsics]].[[%ThrowTypeError%]] exists and has been initialized.
     // 2. Let thrower be realm.[[Intrinsics]].[[%ThrowTypeError%]].
     const thrower = try realm.intrinsics.@"%ThrowTypeError%"();
 
-    const property_descriptor: Object.CompletePropertyDescriptor = .{
+    const property_desc: Object.CompletePropertyDescriptor = .{
         .value_or_accessor = .{
             .accessor = .{
                 .get = thrower,
@@ -807,104 +802,104 @@ pub fn addRestrictedFunctionProperties(
         .attributes = .builtin_default,
     };
 
-    // 3. Perform ! DefinePropertyOrThrow(F, "caller", PropertyDescriptor { [[Get]]: thrower,
+    // 3. Perform ! DefinePropertyOrThrow(func, "caller", PropertyDescriptor { [[Get]]: thrower,
     //    [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true }).
-    try function.definePropertyDirect(
+    try func.definePropertyDirect(
         agent,
         PropertyKey.from("caller"),
-        property_descriptor,
+        property_desc,
     );
 
-    // 4. Perform ! DefinePropertyOrThrow(F, "arguments", PropertyDescriptor { [[Get]]: thrower,
+    // 4. Perform ! DefinePropertyOrThrow(func, "arguments", PropertyDescriptor { [[Get]]: thrower,
     //    [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true }).
-    try function.definePropertyDirect(
+    try func.definePropertyDirect(
         agent,
         PropertyKey.from("arguments"),
-        property_descriptor,
+        property_desc,
     );
 
     // 5. Return unused.
 }
 
-/// 10.2.5 MakeConstructor ( F [ , writablePrototype [ , prototype ] ] )
+/// 10.2.5 MakeConstructor ( func [ , writableProto [ , proto ] ] )
 /// https://tc39.es/ecma262/#sec-makeconstructor
 pub fn makeConstructor(
     agent: *Agent,
-    function: *Object,
+    func: *Object,
     args: struct {
-        writable_prototype: bool = true,
-        prototype: ?*Object = null,
+        writable_proto: bool = true,
+        proto: ?*Object = null,
     },
 ) std.mem.Allocator.Error!void {
     const realm = agent.currentRealm();
 
-    // 1. If F is an ECMAScript function object, then
-    if (function.is(ECMAScriptFunction)) {
-        // a. Assert: IsConstructor(F) is false.
-        std.debug.assert(function.internalMethods() == internal_methods);
+    // 1. If func is an ECMAScript function object, then
+    if (func.is(ECMAScriptFunction)) {
+        // a. Assert: IsConstructor(func) is false.
+        std.debug.assert(func.internalMethods() == internal_methods);
 
-        // b. Assert: F is an extensible object that does not have a "prototype" own property.
+        // b. Assert: func is an extensible object that does not have a "prototype" own property.
         std.debug.assert(
-            function.extensible() and !function.containsProperty(PropertyKey.from("prototype")),
+            func.extensible() and !func.containsProperty(PropertyKey.from("prototype")),
         );
 
-        // c. Set F.[[Construct]] to the definition specified in 10.2.2.
-        try function.setInternalMethods(agent, internal_methods_constructor);
+        // c. Set func.[[Construct]] to the definition specified in 10.2.2.
+        try func.setInternalMethods(agent, internal_methods_constructor);
     } else {
         // 2. Else,
         // NOTE: ClassDefinitionEvaluation may synthesize the default constructor for a class via
         //       CreateBuiltinFunction with a [[Construct]] internal method followed by calling
         //       MakeConstructor on it to wire up the prototype/constructor properties.
-        std.debug.assert(function.internalMethods() == builtins.builtin_function.internal_methods or
-            function.internalMethods() == builtins.builtin_function.internal_methods_constructor);
+        std.debug.assert(func.internalMethods() == builtins.builtin_function.internal_methods or
+            func.internalMethods() == builtins.builtin_function.internal_methods_constructor);
 
-        // a. Set F.[[Construct]] to the definition specified in 10.3.2.
-        try function.setInternalMethods(agent, builtins.builtin_function.internal_methods_constructor);
+        // a. Set func.[[Construct]] to the definition specified in 10.3.2.
+        try func.setInternalMethods(agent, builtins.builtin_function.internal_methods_constructor);
     }
 
-    // 3. Set F.[[ConstructorKind]] to base.
-    if (function.cast(ECMAScriptFunction)) |ecmascript_function| {
+    // 3. Set func.[[ConstructorKind]] to base.
+    if (func.cast(ECMAScriptFunction)) |ecmascript_function| {
         ecmascript_function.fields.flags.constructor_kind = .base;
-    } else if (function.cast(BuiltinFunction)) |builtin_function| {
+    } else if (func.cast(BuiltinFunction)) |builtin_function| {
         if (builtin_function.fields.flags.is_class_constructor) {
             const class_constructor_fields = builtin_function.fields.additionalFieldsAs(ClassConstructorFields);
             class_constructor_fields.constructor_kind = .base;
         }
     }
 
-    // 4. If writablePrototype is not present, set writablePrototype to true.
+    // 4. If writableProto is not present, set writableProto to true.
     // NOTE: This is done via the default argument.
 
-    // 5. If prototype is not present, then
-    const prototype = args.prototype orelse blk: {
-        // a. Set prototype to OrdinaryObjectCreate(%Object.prototype%).
-        const prototype = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+    // 5. If proto is not present, then
+    const proto = args.proto orelse blk: {
+        // a. Set proto to OrdinaryObjectCreate(%Object.prototype%).
+        const proto = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
 
-        // b. Perform ! DefinePropertyOrThrow(prototype, "constructor", PropertyDescriptor {
-        //    [[Value]]: F, [[Writable]]: writablePrototype, [[Enumerable]]: false,
+        // b. Perform ! DefinePropertyOrThrow(proto, "constructor", PropertyDescriptor {
+        //    [[Value]]: func, [[Writable]]: writableProto, [[Enumerable]]: false,
         //    [[Configurable]]: true }).
-        try prototype.definePropertyDirect(agent, PropertyKey.from("constructor"), .{
+        try proto.definePropertyDirect(agent, PropertyKey.from("constructor"), .{
             .value_or_accessor = .{
-                .value = Value.from(function),
+                .value = Value.from(func),
             },
             .attributes = .{
-                .writable = args.writable_prototype,
+                .writable = args.writable_proto,
                 .enumerable = false,
                 .configurable = true,
             },
         });
 
-        break :blk prototype;
+        break :blk proto;
     };
 
-    // 6. Perform ! DefinePropertyOrThrow(F, "prototype", PropertyDescriptor { [[Value]]: prototype,
-    //    [[Writable]]: writablePrototype, [[Enumerable]]: false, [[Configurable]]: false }).
-    try function.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
+    // 6. Perform ! DefinePropertyOrThrow(func, "prototype", PropertyDescriptor { [[Value]]: proto,
+    //    [[Writable]]: writableProto, [[Enumerable]]: false, [[Configurable]]: false }).
+    try func.definePropertyDirect(agent, PropertyKey.from("prototype"), .{
         .value_or_accessor = .{
-            .value = Value.from(prototype),
+            .value = Value.from(proto),
         },
         .attributes = .{
-            .writable = args.writable_prototype,
+            .writable = args.writable_proto,
             .enumerable = false,
             .configurable = false,
         },
@@ -913,65 +908,65 @@ pub fn makeConstructor(
     // 7. Return unused.
 }
 
-/// 10.2.6 MakeClassConstructor ( F )
+/// 10.2.6 MakeClassConstructor ( func )
 /// https://tc39.es/ecma262/#sec-makeclassconstructor
-pub fn makeClassConstructor(function: *ECMAScriptFunction) void {
-    // 1. Assert: F.[[IsClassConstructor]] is false.
-    std.debug.assert(!function.fields.flags.is_class_constructor);
+pub fn makeClassConstructor(func: *ECMAScriptFunction) void {
+    // 1. Assert: func.[[IsClassConstructor]] is false.
+    std.debug.assert(!func.fields.flags.is_class_constructor);
 
-    // 2. Set F.[[IsClassConstructor]] to true.
-    function.fields.flags.is_class_constructor = true;
+    // 2. Set func.[[IsClassConstructor]] to true.
+    func.fields.flags.is_class_constructor = true;
 
     // 3. Return unused.
 }
 
-/// 10.2.7 MakeMethod ( F, homeObject )
+/// 10.2.7 MakeMethod ( func, homeObj )
 /// https://tc39.es/ecma262/#sec-makemethod
-pub fn makeMethod(function: *ECMAScriptFunction, home_object: *Object) void {
-    // 1. Assert: homeObject is an ordinary object.
-    // 2. Set F.[[HomeObject]] to homeObject.
-    function.fields.home_object = home_object;
+pub fn makeMethod(func: *ECMAScriptFunction, home_obj: *Object) void {
+    // 1. Assert: homeObj is an ordinary object.
+    // 2. Set func.[[HomeObject]] to homeObj.
+    func.fields.home_object = home_obj;
 
     // 3. Return unused.
 }
 
-/// 10.2.8 DefineMethodProperty ( homeObject, key, closure, enumerable )
+/// 10.2.8 DefineMethodProperty ( homeObj, name, closure, enumerable )
 /// https://tc39.es/ecma262/#sec-definemethodproperty
 pub fn defineMethodProperty(
     agent: *Agent,
-    home_object: *Object,
-    key: PropertyKeyOrPrivateName,
+    home_obj: *Object,
+    name: PropertyKeyOrPrivateName,
     closure: *Object,
     enumerable: bool,
 ) Agent.Error!?PrivateMethodDefinition {
-    // 1. Assert: homeObject is an ordinary, extensible object.
+    // 1. Assert: homeObj is an ordinary, extensible object.
 
-    switch (key) {
+    switch (name) {
         .private_name => |private_name| {
-            // 2. If key is a Private Name, return PrivateElement { [[Key]]: key, [[Kind]]: method,
-            //    [[Value]]: closure }.
+            // 2. If name is a Private Name, return PrivateElement { [[Key]]: name,
+            //    [[Kind]]: method, [[Value]]: closure }.
             const private_element: PrivateElement = .{ .method = closure };
             return .{ .private_name = private_name, .private_element = private_element };
         },
         .property_key => |property_key| {
-            // 3. Let desc be the PropertyDescriptor { [[Value]]: closure, [[Writable]]: true,
-            //    [[Enumerable]]: enumerable, [[Configurable]]: true }.
-            const property_descriptor: PropertyDescriptor = .{
+            // 3. Let propertyDesc be the PropertyDescriptor { [[Value]]: closure,
+            //    [[Writable]]: true, [[Enumerable]]: enumerable, [[Configurable]]: true }.
+            const property_desc: PropertyDescriptor = .{
                 .value = Value.from(closure),
                 .writable = true,
                 .enumerable = enumerable,
                 .configurable = true,
             };
 
-            // 4. Perform ? DefinePropertyOrThrow(homeObject, key, desc).
-            try home_object.definePropertyOrThrow(
+            // 4. Perform ? DefinePropertyOrThrow(homeObj, name, propertyDesc).
+            try home_obj.definePropertyOrThrow(
                 agent,
                 property_key,
-                property_descriptor,
+                property_desc,
             );
 
             // 5. NOTE: DefinePropertyOrThrow only returns an abrupt completion when attempting to
-            //    define a class static method whose key is "prototype".
+            //    define a class static method whose name is "prototype".
 
             // 6. Return unused.
             return null;
@@ -979,19 +974,19 @@ pub fn defineMethodProperty(
     }
 }
 
-/// 10.2.9 SetFunctionName ( F, name [ , prefix ] )
+/// 10.2.9 SetFunctionName ( func, name [ , prefix ] )
 /// https://tc39.es/ecma262/#sec-setfunctionname
 pub fn setFunctionName(
     agent: *Agent,
-    function: *Object,
+    func: *Object,
     key: anytype,
     prefix: ?[]const u8,
 ) std.mem.Allocator.Error!void {
     comptime std.debug.assert(@TypeOf(key) == PropertyKey or @TypeOf(key) == PropertyKeyOrPrivateName);
 
-    // 1. Assert: F is an extensible object that does not have a "name" own property.
+    // 1. Assert: func is an extensible object that does not have a "name" own property.
     std.debug.assert(
-        function.extensible() and !function.containsProperty(PropertyKey.from("name")),
+        func.extensible() and !func.containsProperty(PropertyKey.from("name")),
     );
 
     var name: *const String = switch (if (@TypeOf(key) == PropertyKey) PropertyKeyOrPrivateName{ .property_key = key } else key) {
@@ -1021,9 +1016,9 @@ pub fn setFunctionName(
         },
     };
 
-    // 4. If F has an [[InitialName]] internal slot, then
-    if (function.cast(BuiltinFunction)) |builtin_function| {
-        // a. Set F.[[InitialName]] to name.
+    // 4. If func has an [[InitialName]] internal slot, then
+    if (func.cast(BuiltinFunction)) |builtin_function| {
+        // a. Set func.[[InitialName]] to name.
         builtin_function.fields.initial_name = name;
     }
 
@@ -1037,18 +1032,18 @@ pub fn setFunctionName(
             name,
         });
 
-        // b. If F has an [[InitialName]] internal slot, then
-        if (function.cast(BuiltinFunction)) |builtin_function| {
+        // b. If func has an [[InitialName]] internal slot, then
+        if (func.cast(BuiltinFunction)) |builtin_function| {
             // i. NOTE: The choice in the following step is made independently each time this
             //    Abstract Operation is invoked.
-            // ii. Optionally, set F.[[InitialName]] to name.
+            // ii. Optionally, set func.[[InitialName]] to name.
             builtin_function.fields.initial_name = name;
         }
     }
 
-    // 6. Perform ! DefinePropertyOrThrow(F, "name", PropertyDescriptor { [[Value]]: name,
+    // 6. Perform ! DefinePropertyOrThrow(func, "name", PropertyDescriptor { [[Value]]: name,
     //    [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true }).
-    try function.definePropertyDirect(agent, PropertyKey.from("name"), .{
+    try func.definePropertyDirect(agent, PropertyKey.from("name"), .{
         .value_or_accessor = .{
             .value = Value.from(name),
         },
@@ -1062,22 +1057,22 @@ pub fn setFunctionName(
     // 7. Return unused.
 }
 
-/// 10.2.10 SetFunctionLength ( F, length )
+/// 10.2.10 SetFunctionLength ( func, length )
 /// https://tc39.es/ecma262/#sec-setfunctionlength
-pub fn setFunctionLength(agent: *Agent, function: *Object, length: f64) std.mem.Allocator.Error!void {
+pub fn setFunctionLength(agent: *Agent, func: *Object, length: f64) std.mem.Allocator.Error!void {
     std.debug.assert(
         std.math.isPositiveInf(length) or
             (std.math.isFinite(length) and std.math.trunc(length) == length and length >= 0),
     );
 
-    // 1. Assert: F is an extensible object that does not have a "length" own property.
+    // 1. Assert: func is an extensible object that does not have a "length" own property.
     std.debug.assert(
-        function.extensible() and !function.containsProperty(PropertyKey.from("length")),
+        func.extensible() and !func.containsProperty(PropertyKey.from("length")),
     );
 
-    // 2. Perform ! DefinePropertyOrThrow(F, "length", PropertyDescriptor { [[Value]]: 𝔽(length),
+    // 2. Perform ! DefinePropertyOrThrow(func, "length", PropertyDescriptor { [[Value]]: 𝔽(length),
     //    [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true }).
-    try function.definePropertyDirect(agent, PropertyKey.from("length"), .{
+    try func.definePropertyDirect(agent, PropertyKey.from("length"), .{
         .value_or_accessor = .{
             .value = Value.from(length),
         },

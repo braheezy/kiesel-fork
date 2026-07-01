@@ -119,11 +119,11 @@ fn setSyntheticModuleExport(
     // 1. Assert: module.[[ExportNames]] contains exportName.
     std.debug.assert(containsSlice(self.export_names, export_name));
 
-    // 2. Let envRec be module.[[Environment]].
-    // 3. Assert: envRec is not empty.
+    // 2. Let envRecord be module.[[Environment]].
+    // 3. Assert: envRecord is not empty.
     const env = self.environment.?;
 
-    // 4. Perform ! envRec.SetMutableBinding(exportName, exportValue, true).
+    // 4. Perform ! envRecord.SetMutableBinding(exportName, exportValue, true).
     env.setMutableBinding(
         agent,
         try String.fromUtf8(agent, export_name),
@@ -196,22 +196,22 @@ pub fn link(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!void 
     // 1. Let realm be module.[[Realm]].
     const realm = self.realm;
 
-    // 2. Let env be NewModuleEnvironment(realm.[[GlobalEnv]]).
+    // 2. Let envRecord be NewModuleEnvironment(realm.[[GlobalEnv]]).
     const env: Environment = .{
         .module_environment = try newModuleEnvironment(agent.gc_allocator, realm.global_env),
     };
 
-    // 3. Set module.[[Environment]] to env.
+    // 3. Set module.[[Environment]] to envRecord.
     self.environment = env;
 
     // 4. For each String exportName of module.[[ExportNames]], do
     for (self.export_names) |export_name| {
         const name = try String.fromUtf8(agent, export_name);
 
-        // a. Perform ! env.CreateMutableBinding(exportName, false).
+        // a. Perform ! envRecord.CreateMutableBinding(exportName, false).
         env.createMutableBinding(agent, name, false) catch |err| try noexcept(err);
 
-        // b. Perform ! env.InitializeBinding(exportName, undefined).
+        // b. Perform ! envRecord.InitializeBinding(exportName, undefined).
         env.initializeBinding(agent, name, .undefined) catch |err| try noexcept(err);
     }
 
@@ -263,26 +263,26 @@ pub fn evaluate(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!*
     // 12. Resume the context that is now on the top of the execution context stack as the running
     //     execution context.
 
-    // 13. Let pc be ! NewPromiseCapability(%Promise%).
+    // 13. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
         agent,
         Value.from(try realm.intrinsics.@"%Promise%"()),
     ) catch |err| try noexcept(err);
 
-    // 14. IfAbruptRejectPromise(result, pc).
+    // 14. IfAbruptRejectPromise(result, promiseCapability).
     result catch |err| {
         const promise = promise_capability.rejectPromise(agent, err) catch |err_| try noexcept(err_);
         return promise.as(builtins.Promise);
     };
 
-    // 15. Perform ! Call(pc.[[Resolve]], undefined, « undefined »).
+    // 15. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
     _ = Value.from(promise_capability.resolve).callAssumeCallable(
         agent,
         .undefined,
         &.{.undefined},
     ) catch |err| try noexcept(err);
 
-    // 16. Return pc.[[Promise]].
+    // 16. Return promiseCapability.[[Promise]].
     return promise_capability.promise.as(builtins.Promise);
 }
 

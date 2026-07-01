@@ -300,13 +300,13 @@ pub const namespace = struct {
         //     c. If nx is either +0𝔽 or -0𝔽, return an implementation-approximated Number value
         //        representing -π / 2.
         // 11. Assert: nx is finite and is neither +0𝔽 nor -0𝔽.
-        // 12. Let r be the inverse tangent of abs(ℝ(ny) / ℝ(nx)).
+        // 12. Let result be the inverse tangent of abs(ℝ(ny) / ℝ(nx)).
         // 13. If nx < -0𝔽, then
-        //     a. If ny > +0𝔽, set r to π - r.
-        //     b. Else, set r to -π + r.
+        //     a. If ny > +0𝔽, set result to π - result.
+        //     b. Else, set result to -π + result.
         // 14. Else,
-        //     a. If ny < -0𝔽, set r to -r.
-        // 15. Return an implementation-approximated Number value representing r.
+        //     a. If ny < -0𝔽, set result to -result.
+        // 15. Return an implementation-approximated Number value representing result.
         return Value.from(std.math.atan2(ny.asFloat(), nx.asFloat()));
     }
 

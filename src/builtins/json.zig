@@ -50,13 +50,13 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
         },
         .object => |x| blk: {
             const realm = agent.currentRealm();
-            const object = try ordinaryObjectCreate(
+            const obj = try ordinaryObjectCreate(
                 agent,
                 try realm.intrinsics.@"%Object.prototype%"(),
             );
             var it = x.iterator();
             while (it.next()) |entry| {
-                try object.createDataPropertyDirect(
+                try obj.createDataPropertyDirect(
                     agent,
                     PropertyKey.from(
                         try String.fromUtf8(agent, try agent.gc_allocator.dupe(u8, entry.key_ptr.*)),
@@ -64,7 +64,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
                     try convertJsonValue(agent, entry.value_ptr.*),
                 );
             }
-            break :blk Value.from(object);
+            break :blk Value.from(obj);
         },
     };
 }
@@ -122,7 +122,7 @@ const JSONParseRecord = struct {
     };
 };
 
-/// 25.5.2.3 CreateJSONParseRecord ( parseNode, key, val )
+/// 25.5.2.3 CreateJSONParseRecord ( parseNode, key, value )
 /// https://tc39.es/ecma262/#sec-createjsonparserecord
 fn createJSONParseRecord(
     agent: *Agent,
@@ -131,18 +131,18 @@ fn createJSONParseRecord(
 ) std.mem.Allocator.Error!JSONParseRecord {
     const gpa = agent.gpa;
 
-    // 1. Let typedValNode be ShallowestContainedJSONValue(parseNode).
-    // 2. Assert: typedValNode is not empty.
+    // 1. Let typedValueNode be ShallowestContainedJSONValue(parseNode).
+    // 2. Assert: typedValueNode is not empty.
     // 3. Let elements be a new empty List.
     // 4. Let entries be a new empty List.
     var contents: JSONParseRecord.Contents = .{ .primitive = "" };
 
-    // 5. If val is an Object, then
+    // 5. If value is an Object, then
     if (value.isObject()) {
-        // a. Let isArray be ! IsArray(val).
+        // a. Let isArray be ! IsArray(value).
         // b. If isArray is true, then
         if (value.asObject().cast(builtins.Array)) |array| {
-            // i. Assert: typedValNode is an ArrayLiteral Parse Node.
+            // i. Assert: typedValueNode is an ArrayLiteral Parse Node.
             {
                 const token = scanner.next() catch |err| switch (err) {
                     error.OutOfMemory => |e| return e,
@@ -151,25 +151,25 @@ fn createJSONParseRecord(
                 std.debug.assert(token == .array_begin);
             }
 
-            // ii. Let contentNodes be the JSONArrayLiteralContentNodes of typedValNode.
-            // iii. Let len be the number of elements in contentNodes.
-            // iv. Let valLen be ! LengthOfArrayLike(val).
-            // v. Assert: valLen is len.
-            const len = array.fields.length;
-            const elements = try agent.gc_allocator.alloc(JSONParseRecord, len);
+            // ii. Let contentNodes be the JSONArrayLiteralContentNodes of typedValueNode.
+            // iii. Let length be the number of elements in contentNodes.
+            // iv. Let valueLength be ! LengthOfArrayLike(value).
+            // v. Assert: valueLength is length.
+            const length = array.fields.length;
+            const elements = try agent.gc_allocator.alloc(JSONParseRecord, length);
 
             // vi. Let index be 0.
-            // vii. Repeat, while index < len,
+            // vii. Repeat, while index < length,
             for (elements, 0..) |*element, index| {
-                // 1. Let propName be ! ToString(𝔽(index)).
-                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
+                // 1. Let propertyName be ! ToString(𝔽(index)).
+                const property_name = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(index)));
 
-                // 2. Let elementParseRecord be CreateJSONParseRecord(contentNodes[index], propName,
-                //    ! Get(val, propName)).
+                // 2. Let elementParseRecord be CreateJSONParseRecord(contentNodes[index],
+                //    propertyName, ! Get(value, propertyName)).
                 const element_parse_record = try createJSONParseRecord(
                     agent,
                     scanner,
-                    value.asObject().getPropertyValueDirect(property_key),
+                    value.asObject().getPropertyValueDirect(property_name),
                 );
 
                 // 3. Append elementParseRecord to elements.
@@ -188,7 +188,7 @@ fn createJSONParseRecord(
             }
         } else {
             // c. Else,
-            // i. Assert: typedValNode is an ObjectLiteral Parse Node.
+            // i. Assert: typedValueNode is an ObjectLiteral Parse Node.
             {
                 const token = scanner.next() catch |err| switch (err) {
                     error.OutOfMemory => |e| return e,
@@ -197,7 +197,7 @@ fn createJSONParseRecord(
                 std.debug.assert(token == .object_begin);
             }
 
-            // ii. Let propertyNodes be the PropertyDefinitionNodes of typedValNode.
+            // ii. Let propertyNodes be the PropertyDefinitionNodes of typedValueNode.
             // Stores owned keys and slices into `scanner.input`.
             var property_nodes: std.StringHashMapUnmanaged([]const u8) = .empty;
             defer {
@@ -234,10 +234,10 @@ fn createJSONParseRecord(
             var entries: String.HashMapUnmanaged(JSONParseRecord) = .empty;
             try entries.ensureTotalCapacity(agent.gc_allocator, property_nodes.count());
 
-            // iii. NOTE: Because val was produced from JSON text and has not been modified, all of
-            //      its property keys are Strings and will be exhaustively enumerated.
-            // iv. Let keys be ! EnumerableOwnProperties(val, key).
-            // v. For each String P of keys, do
+            // iii. NOTE: Because value was produced from JSON text and has not been modified, all
+            //      of its property keys are Strings and will be exhaustively enumerated.
+            // iv. Let keys be ! EnumerableOwnProperties(value, key).
+            // v. For each String propertyKey of keys, do
             var it = property_nodes.iterator();
             while (it.next()) |entry| {
                 // 1. NOTE: In the case of JSON text specifying multiple name/value pairs with the
@@ -246,8 +246,8 @@ fn createJSONParseRecord(
                 //    by the last pair with that name.
                 // 2. Let propertyDefinition be empty.
                 // 3. For each Parse Node propertyNode of propertyNodes, do
-                //     a. Let propName be the PropName of propertyNode.
-                //     b. If propName is P, set propertyDefinition to propertyNode.
+                //     a. Let propertyName be the PropName of propertyNode.
+                //     b. If propertyName is propertyKey, set propertyDefinition to propertyNode.
                 // 4. Assert: propertyDefinition is PropertyDefinition : PropertyName :
                 //    AssignmentExpression .
                 // 5. Let propertyValueNode be the AssignmentExpression of propertyDefinition.
@@ -261,8 +261,8 @@ fn createJSONParseRecord(
                 );
                 const property_key = PropertyKey.from(key);
 
-                // 6. Let entryParseRecord be CreateJSONParseRecord(propertyValueNode, P, ! Get(val,
-                //    P)).
+                // 6. Let entryParseRecord be CreateJSONParseRecord(propertyValueNode, propertyKey,
+                //    ! Get(value, propertyKey)).
                 const entry_parse_record = try createJSONParseRecord(
                     agent,
                     &sub_scanner,
@@ -276,8 +276,8 @@ fn createJSONParseRecord(
         }
     } else {
         // 6. Else,
-        // a. Assert: typedValNode is neither an ArrayLiteral Parse Node nor an ObjectLiteral Parse
-        //    Node.
+        // a. Assert: typedValueNode is neither an ArrayLiteral Parse Node nor an ObjectLiteral
+        //    Parse Node.
         _ = scanner.peekNextTokenType() catch unreachable;
         const start = scanner.cursor;
         scanner.skipValue() catch |err| switch (err) {
@@ -287,8 +287,8 @@ fn createJSONParseRecord(
         contents = .{ .primitive = scanner.input[start..scanner.cursor] };
     }
 
-    // 7. Return the JSON Parse Record { [[ParseNode]]: typedValNode, [[Key]]: key, [[Value]]: val,
-    //    [[Elements]]: elements, [[Entries]]: entries }.
+    // 7. Return the JSON Parse Record { [[ParseNode]]: typedValueNode, [[Key]]: key,
+    //    [[Value]]: value, [[Elements]]: elements, [[Entries]]: entries }.
     return .{
         .value = value,
         .contents = contents,
@@ -306,7 +306,7 @@ fn internalizeJSONProperty(
 ) Agent.Error!Value {
     const realm = agent.currentRealm();
 
-    // 1. Let val be ? Get(holder, name).
+    // 1. Let value be ? Get(holder, name).
     const value = try holder.get(agent, name);
 
     // 2. Let context be OrdinaryObjectCreate(%Object.prototype%).
@@ -320,12 +320,12 @@ fn internalizeJSONProperty(
         object: *const String.HashMapUnmanaged(JSONParseRecord),
         none,
     } = blk: {
-        // 3. If parseRecord is a JSON Parse Record and SameValue(parseRecord.[[Value]], val) is
+        // 3. If parseRecord is a JSON Parse Record and SameValue(parseRecord.[[Value]], value) is
         //    true, then
         const parse_record = maybe_parse_record orelse break :blk .none;
         if (!value.sameValue(parse_record.value)) break :blk .none;
         switch (parse_record.contents) {
-            // a. If val is not an Object, then
+            // a. If value is not an Object, then
             .primitive => |source| {
                 // i. Let parseNode be parseRecord.[[ParseNode]].
                 // ii. Assert: parseNode is neither an ArrayLiteral Parse Node nor an ObjectLiteral
@@ -359,39 +359,39 @@ fn internalizeJSONProperty(
         comptime unreachable;
     };
 
-    // 5. If val is an Object, then
+    // 5. If value is an Object, then
     if (value.isObject()) {
-        // a. Let isArray be ? IsArray(val).
+        // a. Let isArray be ? IsArray(value).
         const is_array = try value.isArray(agent);
 
         // b. If isArray is true, then
         if (is_array) {
-            // i. Let elementRecordsLen be the number of elements in elementRecords.
+            // i. Let elementRecordsLength be the number of elements in elementRecords.
             const element_records = switch (records) {
                 .array => |elements| elements,
                 .object, .none => &.{},
             };
-            const element_records_len = element_records.len;
+            const element_records_length = element_records.len;
 
-            // ii. Let len be ? LengthOfArrayLike(val).
-            const len = try value.asObject().lengthOfArrayLike(agent);
+            // ii. Let length be ? LengthOfArrayLike(value).
+            const length = try value.asObject().lengthOfArrayLike(agent);
 
             // iii. Let index be 0.
             var index: u53 = 0;
 
-            // iv. Repeat, while index < len,
-            while (index < len) : (index += 1) {
-                // 1. Let prop be ! ToString(𝔽(index)).
+            // iv. Repeat, while index < length,
+            while (index < length) : (index += 1) {
+                // 1. Let propertyKey be ! ToString(𝔽(index)).
                 const property_key = PropertyKey.from(index);
 
-                // 2. If index < elementRecordsLen, let elementRecord be elementRecords[index]; else
-                //    let elementRecord be empty.
-                const element_record = if (index < element_records_len)
+                // 2. If index < elementRecordsLength, let elementRecord be elementRecords[index];
+                //    else let elementRecord be empty.
+                const element_record = if (index < element_records_length)
                     element_records[@intCast(index)]
                 else
                     null;
 
-                // 3. Let newElement be ? InternalizeJSONProperty(val, prop, reviver,
+                // 3. Let newElement be ? InternalizeJSONProperty(value, propertyKey, reviver,
                 //    elementRecord).
                 const new_element = try internalizeJSONProperty(
                     agent,
@@ -403,7 +403,7 @@ fn internalizeJSONProperty(
 
                 // 4. If newElement is undefined, then
                 if (new_element.isUndefined()) {
-                    // a. Perform ? val.[[Delete]](prop).
+                    // a. Perform ? value.[[Delete]](propertyKey).
                     _ = try value.asObject().internalMethods().delete(
                         agent,
                         value.asObject(),
@@ -411,7 +411,7 @@ fn internalizeJSONProperty(
                     );
                 } else {
                     // 5. Else,
-                    // a. Perform ? CreateDataProperty(val, prop, newElement).
+                    // a. Perform ? CreateDataProperty(value, propertyKey, newElement).
                     _ = try value.asObject().createDataProperty(agent, property_key, new_element);
                 }
 
@@ -419,22 +419,23 @@ fn internalizeJSONProperty(
             }
         } else {
             // c. Else,
-            // i. Let keys be ? EnumerableOwnProperties(val, key).
+            // i. Let keys be ? EnumerableOwnProperties(value, key).
             var keys = try value.asObject().enumerableOwnProperties(agent, .key);
             defer keys.deinit(agent.gc_allocator);
 
-            // ii. For each String P of keys, do
+            // ii. For each String propertyKey of keys, do
             for (keys.items) |key| {
                 const property_key = try key.toPropertyKey(agent);
 
-                // 1. If there exists an element e of entryRecords such that e.[[Key]] is P, let
-                //    entryRecord be e; else let entryRecord be empty.
+                // 1. If there exists an element entry of entryRecords such that entry.[[Key]] is
+                //    propertyKey, let entryRecord be entry; else let entryRecord be empty.
                 const entry_record = switch (records) {
                     .object => |entries| entries.get(key.asString()),
                     .array, .none => null,
                 };
 
-                // 2. Let newElement be ? InternalizeJSONProperty(val, P, reviver, entryRecord).
+                // 2. Let newElement be ? InternalizeJSONProperty(value, propertyKey, reviver,
+                //    entryRecord).
                 const new_element = try internalizeJSONProperty(
                     agent,
                     value.asObject(),
@@ -445,7 +446,7 @@ fn internalizeJSONProperty(
 
                 // 3. If newElement is undefined, then
                 if (new_element.isUndefined()) {
-                    // a. Perform ? val.[[Delete]](P).
+                    // a. Perform ? value.[[Delete]](propertyKey).
                     _ = try value.asObject().internalMethods().delete(
                         agent,
                         value.asObject(),
@@ -453,14 +454,14 @@ fn internalizeJSONProperty(
                     );
                 } else {
                     // 4. Else,
-                    // a. Perform ? CreateDataProperty(val, P, newElement).
+                    // a. Perform ? CreateDataProperty(value, propertyKey, newElement).
                     _ = try value.asObject().createDataProperty(agent, property_key, new_element);
                 }
             }
         }
     }
 
-    // 6. Return ? Call(reviver, holder, « name, val, context »).
+    // 6. Return ? Call(reviver, holder, « name, value, context »).
     return Value.from(reviver).callAssumeCallable(agent, Value.from(holder), &.{
         name.toValue(agent) catch unreachable,
         value,
@@ -611,14 +612,21 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
     var product: std.ArrayList(u8) = .empty;
     try product.append(agent.gc_allocator, '"');
 
-    // 2. For each code point C of StringToCodePoints(value), do
+    // 2. For each code point codePoint of StringToCodePoints(value), do
     var it = value.codeUnitIterator();
-    while (it.next()) |c| {
-        // a. If C is listed in the “Code Point” column of Table 77, then
-        if (c == 0x08 or c == 0x09 or c == 0x0A or c == 0x0C or c == 0x0D or c == 0x22 or c == 0x5C) {
-            // i. Set product to the string-concatenation of product and the escape sequence for C
-            //    as specified in the “Escape Sequence” column of the corresponding row.
-            switch (c) {
+    while (it.next()) |code_point| {
+        // a. If codePoint is listed in the “Code Point” column of Table 77, then
+        if (code_point == 0x08 or
+            code_point == 0x09 or
+            code_point == 0x0A or
+            code_point == 0x0C or
+            code_point == 0x0D or
+            code_point == 0x22 or
+            code_point == 0x5C)
+        {
+            // i. Set product to the string-concatenation of product and the escape sequence for
+            //    codePoint as specified in the “Escape Sequence” column of the corresponding row.
+            switch (code_point) {
                 0x08 => try product.appendSlice(agent.gc_allocator, "\\b"),
                 0x09 => try product.appendSlice(agent.gc_allocator, "\\t"),
                 0x0A => try product.appendSlice(agent.gc_allocator, "\\n"),
@@ -629,18 +637,19 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
                 else => unreachable,
             }
         }
-        // b. Else if C has a numeric value less than 0x0020 (SPACE) or C has the same numeric value
-        //    as a leading surrogate or trailing surrogate, then
-        else if (c < 0x20 or std.unicode.utf16IsLowSurrogate(c) or std.unicode.utf16IsHighSurrogate(c)) {
-            // i. Let unit be the code unit whose numeric value is the numeric value of C.
+        // b. Else if codePoint has a numeric value less than 0x0020 (SPACE) or codePoint has the
+        //    same numeric value as a leading surrogate or trailing surrogate, then
+        else if (code_point < 0x20 or std.unicode.utf16IsLowSurrogate(code_point) or std.unicode.utf16IsHighSurrogate(code_point)) {
+            // i. Let unit be the code unit whose numeric value is the numeric value of codePoint.
             // ii. Set product to the string-concatenation of product and UnicodeEscape(unit).
-            try product.appendSlice(agent.gc_allocator, try unicodeEscape(agent, c));
+            try product.appendSlice(agent.gc_allocator, try unicodeEscape(agent, code_point));
         } else {
             // c. Else,
-            // i. Set product to the string-concatenation of product and UTF16EncodeCodePoint(C).
+            // i. Set product to the string-concatenation of product and UTF16EncodeCodePoint(
+            //    codePoint).
             try product.appendSlice(
                 agent.gc_allocator,
-                std.unicode.utf16LeToUtf8Alloc(agent.gc_allocator, &.{c}) catch |err| switch (err) {
+                std.unicode.utf16LeToUtf8Alloc(agent.gc_allocator, &.{code_point}) catch |err| switch (err) {
                     error.OutOfMemory => |e| return e,
                     error.DanglingSurrogateHalf,
                     error.ExpectedSecondSurrogateHalf,
@@ -659,15 +668,15 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
     return String.fromUtf8(agent, try product.toOwnedSlice(agent.gc_allocator));
 }
 
-/// 25.5.4.4 UnicodeEscape ( C )
+/// 25.5.4.4 UnicodeEscape ( codeUnit )
 /// https://tc39.es/ecma262/#sec-unicodeescape
-fn unicodeEscape(agent: *Agent, c: u16) std.mem.Allocator.Error![]const u8 {
-    // 1. Let n be the numeric value of C.
+fn unicodeEscape(agent: *Agent, code_unit: u16) std.mem.Allocator.Error![]const u8 {
+    // 1. Let n be the numeric value of codeUnit.
     // 2. Assert: n ≤ 0xFFFF.
     // 3. Let hex be the String representation of n, formatted as a lowercase hexadecimal number.
     // 4. Return the string-concatenation of the code unit 0x005C (REVERSE SOLIDUS), "u", and
     //    StringPad(hex, 4, "0", start).
-    return std.fmt.allocPrint(agent.gc_allocator, "\\u{x:0>4}", .{c});
+    return std.fmt.allocPrint(agent.gc_allocator, "\\u{x:0>4}", .{code_unit});
 }
 
 /// 25.5.4.5 SerializeJSONObject ( state, value )
@@ -693,9 +702,9 @@ fn serializeJSONObject(
     state.indent = try String.concat(agent, &.{ state.indent, state.gap });
 
     // 5. If state.[[PropertyList]] is not undefined, then
-    //     a. Let K be state.[[PropertyList]].
+    //     a. Let keys be state.[[PropertyList]].
     // 6. Else,
-    //     a. Let K be ? EnumerableOwnProperties(value, key).
+    //     a. Let keys be ? EnumerableOwnProperties(value, key).
     var keys = state.property_list orelse blk: {
         var keys = try value.enumerableOwnProperties(agent, .key);
         defer keys.deinit(agent.gc_allocator);
@@ -712,24 +721,24 @@ fn serializeJSONObject(
     var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, keys.count());
     defer partial.deinit(agent.gc_allocator);
 
-    // 8. For each element P of K, do
+    // 8. For each element propertyKey of keys, do
     for (keys.keys()) |property_key| {
-        // a. Let strP be ? SerializeJSONProperty(state, P, value).
-        const str_property = try serializeJSONProperty(
+        // a. Let stringP be ? SerializeJSONProperty(state, propertyKey, value).
+        const string_property = try serializeJSONProperty(
             agent,
             state,
             property_key,
             value,
         );
 
-        // b. If strP is not undefined, then
-        if (str_property != null) {
-            // i. Let member be QuoteJSONString(P).
+        // b. If stringP is not undefined, then
+        if (string_property != null) {
+            // i. Let member be QuoteJSONString(propertyKey).
             // ii. Set member to the string-concatenation of member and ":".
             // iii. If state.[[Gap]] is not the empty String, then
             //     1. Set member to the string-concatenation of member and the code unit 0x0020
             //        (SPACE).
-            // iv. Set member to the string-concatenation of member and strP.
+            // iv. Set member to the string-concatenation of member and stringP.
             const member = try std.fmt.allocPrint(
                 agent.gc_allocator,
                 "{f}:{s}{f}",
@@ -739,7 +748,7 @@ fn serializeJSONObject(
                         (try property_key.toStringOrSymbol(agent)).string,
                     )).fmtRaw(),
                     if (!state.gap.isEmpty()) " " else "",
-                    str_property.?.fmtRaw(),
+                    string_property.?.fmtRaw(),
                 },
             );
 
@@ -823,34 +832,34 @@ fn serializeJSONArray(
     // 4. Set state.[[Indent]] to the string-concatenation of state.[[Indent]] and state.[[Gap]].
     state.indent = try String.concat(agent, &.{ state.indent, state.gap });
 
-    // 6. Let len be ? LengthOfArrayLike(value).
-    const len = try value.lengthOfArrayLike(agent);
+    // 6. Let length be ? LengthOfArrayLike(value).
+    const length = try value.lengthOfArrayLike(agent);
 
     // 5. Let partial be a new empty List.
-    var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(len));
+    var partial = try std.ArrayList([]const u8).initCapacity(agent.gc_allocator, @intCast(length));
     defer partial.deinit(agent.gc_allocator);
 
     // 7. Let index be 0.
     var index: u53 = 0;
 
-    // 8. Repeat, while index < len,
-    while (index < len) : (index += 1) {
-        // a. Let strP be ? SerializeJSONProperty(state, ! ToString(𝔽(index)), value).
-        const str_property = try serializeJSONProperty(
+    // 8. Repeat, while index < length,
+    while (index < length) : (index += 1) {
+        // a. Let stringP be ? SerializeJSONProperty(state, ! ToString(𝔽(index)), value).
+        const string_property = try serializeJSONProperty(
             agent,
             state,
             PropertyKey.from(index),
             value,
         );
 
-        // b. If strP is undefined, then
-        if (str_property == null) {
+        // b. If stringP is undefined, then
+        if (string_property == null) {
             // i. Append "null" to partial.
             partial.appendAssumeCapacity("null");
         } else {
             // c. Else,
-            // i. Append strP to partial.
-            partial.appendAssumeCapacity(try str_property.?.toUtf8(agent.gc_allocator));
+            // i. Append stringP to partial.
+            partial.appendAssumeCapacity(try string_property.?.toUtf8(agent.gc_allocator));
         }
 
         // d. Set index to index + 1.
@@ -938,14 +947,14 @@ pub const namespace = struct {
         try object.defineBuiltinFunction(agent, "stringify", stringify, 3, realm);
     }
 
-    /// 25.5.1 JSON.isRawJSON ( O )
+    /// 25.5.1 JSON.isRawJSON ( obj )
     /// https://tc39.es/ecma262/#sec-json.israwjson
     fn isRawJSON(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const object = arguments.get(0);
+        const obj = arguments.get(0);
 
-        // 1. If O is an Object and O has an [[IsRawJSON]] internal slot, return true.
+        // 1. If obj is an Object and obj has an [[IsRawJSON]] internal slot, return true.
         // 2. Return false.
-        return Value.from(object.isObject() and object.asObject().is(RawJSON));
+        return Value.from(obj.isObject() and obj.asObject().is(RawJSON));
     }
 
     /// 25.5.2 JSON.parse ( text [ , reviver ] )
@@ -1055,19 +1064,19 @@ pub const namespace = struct {
         // 2. Let indent be the empty String.
         const indent: *const String = .empty;
 
-        // 3. Let PropertyList be undefined.
+        // 3. Let propertyList be undefined.
         var property_list: ?PropertyKey.ArrayHashMapUnmanaged(void) = null;
         defer if (property_list) |*p| p.deinit(agent.gc_allocator);
 
-        // 4. Let ReplacerFunction be undefined.
-        var replacer_function: ?*Object = null;
+        // 4. Let replacerFunc be undefined.
+        var replacer_func: ?*Object = null;
 
         // 5. If replacer is an Object, then
         if (replacer.isObject()) {
             // a. If IsCallable(replacer) is true, then
             if (replacer.isCallable()) {
-                // i. Set ReplacerFunction to replacer.
-                replacer_function = replacer.asObject();
+                // i. Set replacerFunc to replacer.
+                replacer_func = replacer.asObject();
             } else {
                 // b. Else,
                 // i. Let isArray be ? IsArray(replacer).
@@ -1075,50 +1084,50 @@ pub const namespace = struct {
 
                 // ii. If isArray is true, then
                 if (is_array) {
-                    // 1. Set PropertyList to a new empty List.
+                    // 1. Set propertyList to a new empty List.
                     property_list = .empty;
 
-                    // 2. Let len be ? LengthOfArrayLike(replacer).
-                    const len = try replacer.asObject().lengthOfArrayLike(agent);
+                    // 2. Let length be ? LengthOfArrayLike(replacer).
+                    const length = try replacer.asObject().lengthOfArrayLike(agent);
 
                     // 3. Let k be 0.
                     var k: u53 = 0;
 
-                    // 4. Repeat, while k < len,
-                    while (k < len) : (k += 1) {
-                        // a. Let prop be ! ToString(𝔽(k)).
+                    // 4. Repeat, while k < length,
+                    while (k < length) : (k += 1) {
+                        // a. Let propertyKey be ! ToString(𝔽(k)).
                         const property_key = PropertyKey.from(k);
 
-                        // b. Let v be ? Get(replacer, prop).
-                        const k_value = try replacer.asObject().get(agent, property_key);
+                        // b. Let propertyValue be ? Get(replacer, propertyKey).
+                        const property_value = try replacer.asObject().get(agent, property_key);
 
                         // c. Let item be undefined.
                         var item: ?PropertyKey = null;
 
-                        // d. If v is a String, then
-                        if (k_value.isString()) {
-                            // i. Set item to v.
-                            item = PropertyKey.from(k_value.asString());
+                        // d. If propertyValue is a String, then
+                        if (property_value.isString()) {
+                            // i. Set item to propertyValue.
+                            item = PropertyKey.from(property_value.asString());
                         }
-                        // e. Else if v is a Number, then
-                        else if (k_value.isNumber()) {
-                            // i. Set item to ! ToString(v).
+                        // e. Else if propertyValue is a Number, then
+                        else if (property_value.isNumber()) {
+                            // i. Set item to ! ToString(propertyValue).
                             item = PropertyKey.from(
-                                try k_value.asNumber().toString(agent, 10),
+                                try property_value.asNumber().toString(agent, 10),
                             );
                         }
-                        // f. Else if v is an Object, then
-                        else if (k_value.isObject()) {
-                            // i. If v has a [[StringData]] or [[NumberData]] internal slot, set
-                            //    item to ? ToString(v).
-                            if (k_value.asObject().is(builtins.String) or k_value.asObject().is(builtins.Number)) {
-                                item = PropertyKey.from(try k_value.toString(agent));
+                        // f. Else if propertyValue is an Object, then
+                        else if (property_value.isObject()) {
+                            // i. If propertyValue has a [[StringData]] or [[NumberData]] internal
+                            //    slot, set item to ? ToString(propertyValue).
+                            if (property_value.asObject().is(builtins.String) or property_value.asObject().is(builtins.Number)) {
+                                item = PropertyKey.from(try property_value.toString(agent));
                             }
                         }
 
-                        // g. If item is not undefined and PropertyList does not contain item, then
+                        // g. If item is not undefined and propertyList does not contain item, then
                         if (item != null and !property_list.?.contains(item.?)) {
-                            // i. Append item to PropertyList.
+                            // i. Append item to propertyList.
                             try property_list.?.putNoClobber(agent.gc_allocator, item.?, {});
                         }
 
@@ -1180,10 +1189,10 @@ pub const namespace = struct {
         // 11. Perform ! CreateDataPropertyOrThrow(wrapper, the empty String, value).
         try wrapper.createDataPropertyDirect(agent, PropertyKey.from(""), value);
 
-        // 12. Let state be the JSON Serialization Record { [[ReplacerFunction]]: ReplacerFunction,
-        //     [[Stack]]: stack, [[Indent]]: indent, [[Gap]]: gap, [[PropertyList]]: PropertyList }.
+        // 12. Let state be the JSON Serialization Record { [[ReplacerFunction]]: replacerFunc,
+        //     [[Stack]]: stack, [[Indent]]: indent, [[Gap]]: gap, [[PropertyList]]: propertyList }.
         var state: JSONSerialization = .{
-            .replacer_function = replacer_function,
+            .replacer_function = replacer_func,
             .stack = stack,
             .indent = indent,
             .gap = gap,

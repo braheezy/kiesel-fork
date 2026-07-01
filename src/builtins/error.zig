@@ -28,7 +28,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Error",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -56,7 +56,7 @@ pub const constructor = struct {
         //    newTarget be NewTarget.
         const new_target_ = new_target orelse agent.activeFunctionObject();
 
-        // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, "%Error.prototype%",
+        // 2. Let obj be ? OrdinaryCreateFromConstructor(newTarget, "%Error.prototype%",
         //    « [[ErrorData]] »).
         const @"error" = try ordinaryCreateFromConstructor(
             Error,
@@ -79,23 +79,23 @@ pub const constructor = struct {
 
         // 3. If message is not undefined, then
         if (!message.isUndefined()) {
-            // a. Let msg be ? ToString(message).
-            const msg = try message.toString(agent);
+            // a. Let messageString be ? ToString(message).
+            const message_string = try message.toString(agent);
 
-            // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
+            // b. Perform CreateNonEnumerableDataPropertyOrThrow(obj, "message", messageString).
             try @"error".object.createNonEnumerableDataPropertyOrThrow(
                 agent,
                 PropertyKey.from("message"),
-                Value.from(msg),
+                Value.from(message_string),
             );
 
-            @"error".fields.message = msg;
+            @"error".fields.message = message_string;
         }
 
-        // 4. Perform ? InstallErrorCause(O, options).
+        // 4. Perform ? InstallErrorCause(obj, options).
         try installErrorCause(agent, &@"error".object, options);
 
-        // 5. Return O.
+        // 5. Return obj.
         return Value.from(&@"error".object);
     }
 
@@ -119,19 +119,19 @@ pub const constructor = struct {
 ///       message and doesn't act on property changes.
 pub fn internalSet(
     agent: *Agent,
-    object: *Object,
+    obj: *Object,
     property_key: PropertyKey,
     value: Value,
     receiver: Value,
 ) Agent.Error!bool {
     if (property_key == .string and value.isString()) {
         if (property_key.string.eql(String.fromLiteral("name"))) {
-            object.as(Error).fields.name = value.asString();
+            obj.as(Error).fields.name = value.asString();
         } else if (property_key.string.eql(String.fromLiteral("message"))) {
-            object.as(Error).fields.message = value.asString();
+            obj.as(Error).fields.message = value.asString();
         }
     }
-    return builtins.ordinarySet(agent, object, property_key, value, receiver);
+    return builtins.ordinarySet(agent, obj, property_key, value, receiver);
 }
 
 /// 20.5.3 Properties of the Error Prototype Object
@@ -227,35 +227,36 @@ pub const prototype = struct {
     /// 20.5.3.4 Error.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-error.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const object = this_value.asObject();
+        const obj = this_value.asObject();
 
-        // 3. Let name be ? Get(O, "name").
-        const name = try object.get(agent, PropertyKey.from("name"));
+        // 3. Let name be ? Get(obj, "name").
+        const name = try obj.get(agent, PropertyKey.from("name"));
 
         // 4. If name is undefined, set name to "Error"; else set name to ? ToString(name).
         const name_string = if (name.isUndefined()) String.fromLiteral("Error") else try name.toString(agent);
 
-        // 5. Let msg be ? Get(O, "message").
-        const msg = try object.get(agent, PropertyKey.from("message"));
+        // 5. Let message be ? Get(obj, "message").
+        const message = try obj.get(agent, PropertyKey.from("message"));
 
-        // 6. If msg is undefined, set msg to the empty String; else set msg to ? ToString(msg).
-        const msg_string: *const String = if (msg.isUndefined()) .empty else try msg.toString(agent);
+        // 6. If message is undefined, set message to the empty String; else set message to
+        //    ? ToString(message).
+        const message_string: *const String = if (message.isUndefined()) .empty else try message.toString(agent);
 
-        // 7. If name is the empty String, return msg.
-        if (name_string.isEmpty()) return Value.from(msg_string);
+        // 7. If name is the empty String, return message.
+        if (name_string.isEmpty()) return Value.from(message_string);
 
-        // 8. If msg is the empty String, return name.
-        if (msg_string.isEmpty()) return Value.from(name_string);
+        // 8. If message is the empty String, return name.
+        if (message_string.isEmpty()) return Value.from(name_string);
 
         // 9. Return the string-concatenation of name, the code unit 0x003A (COLON), the code unit
-        //    0x0020 (SPACE), and msg.
+        //    0x0020 (SPACE), and message.
         return Value.from(
-            try String.concat(agent, &.{ name_string, String.fromLiteral(": "), msg_string }),
+            try String.concat(agent, &.{ name_string, String.fromLiteral(": "), message_string }),
         );
     }
 };
@@ -331,7 +332,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 .{ .constructor = impl },
                 1,
                 name,
-                .{ .realm = realm, .prototype = try realm.intrinsics.@"%Error%"() },
+                .{ .realm = realm, .proto = try realm.intrinsics.@"%Error%"() },
             );
             return &builtin_function.object;
         }
@@ -369,7 +370,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             //    newTarget be NewTarget.
             const new_target_ = new_target orelse agent.activeFunctionObject();
 
-            // 2. Let O be ? OrdinaryCreateFromConstructor(newTarget, `"%NativeError.prototype%"`,
+            // 2. Let obj be ? OrdinaryCreateFromConstructor(newTarget, `"%NativeError.prototype%"`,
             //    « [[ErrorData]] »).
             const @"error" = try ordinaryCreateFromConstructor(
                 T,
@@ -392,23 +393,23 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 
             // 3. If message is not undefined, then
             if (!message.isUndefined()) {
-                // a. Let msg be ? ToString(message).
-                const msg = try message.toString(agent);
+                // a. Let messageString be ? ToString(message).
+                const message_string = try message.toString(agent);
 
-                // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "message", msg).
+                // b. Perform CreateNonEnumerableDataPropertyOrThrow(obj, "message", messageString).
                 try @"error".object.createNonEnumerableDataPropertyOrThrow(
                     agent,
                     PropertyKey.from("message"),
-                    Value.from(msg),
+                    Value.from(message_string),
                 );
 
-                @"error".fields.message = msg;
+                @"error".fields.message = message_string;
             }
 
-            // 4. Perform ? InstallErrorCause(O, options).
+            // 4. Perform ? InstallErrorCause(obj, options).
             try installErrorCause(agent, &@"error".object, options);
 
-            // 5. Return O.
+            // 5. Return obj.
             return Value.from(&@"error".object);
         }
     };
@@ -465,9 +466,9 @@ fn MakeNativeError(comptime name: []const u8) type {
     });
 }
 
-/// 20.5.8.1 InstallErrorCause ( O, options )
+/// 20.5.8.1 InstallErrorCause ( obj, options )
 /// https://tc39.es/ecma262/#sec-installerrorcause
-pub fn installErrorCause(agent: *Agent, object: *Object, options: Value) Agent.Error!void {
+pub fn installErrorCause(agent: *Agent, obj: *Object, options: Value) Agent.Error!void {
     // 1. If options is an Object and ? HasProperty(options, "cause") is true, then
     if (options.isObject() and
         try options.asObject().hasProperty(agent, PropertyKey.from("cause")))
@@ -475,8 +476,8 @@ pub fn installErrorCause(agent: *Agent, object: *Object, options: Value) Agent.E
         // a. Let cause be ? Get(options, "cause").
         const cause = try options.get(agent, PropertyKey.from("cause"));
 
-        // b. Perform CreateNonEnumerableDataPropertyOrThrow(O, "cause", cause).
-        try object.createNonEnumerableDataPropertyOrThrow(
+        // b. Perform CreateNonEnumerableDataPropertyOrThrow(obj, "cause", cause).
+        try obj.createNonEnumerableDataPropertyOrThrow(
             agent,
             PropertyKey.from("cause"),
             cause,

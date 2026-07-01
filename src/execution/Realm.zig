@@ -136,81 +136,83 @@ pub fn initializeHostDefinedRealm(
     // 18. Return unused.
 }
 
-/// 9.3.2 CreateIntrinsics ( realmRec )
+/// 9.3.2 CreateIntrinsics ( realmRecord )
 /// https://tc39.es/ecma262/#sec-createintrinsics
-fn createIntrinsics(self: *Realm, agent: *Agent) std.mem.Allocator.Error!void {
-    // 1. Set realmRec.[[Intrinsics]] to a new Record.
-    self.intrinsics = .{ .realm = self };
+fn createIntrinsics(realm: *Realm, agent: *Agent) std.mem.Allocator.Error!void {
+    // 1. Set realmRecord.[[Intrinsics]] to a new Record.
+    realm.intrinsics = .{ .realm = realm };
 
     // Ensure %Object.prototype% exists before %Function.prototype% is created, otherwise the
     // latter will be created twice.
-    _ = try self.intrinsics.@"%Object.prototype%"();
+    _ = try realm.intrinsics.@"%Object.prototype%"();
 
-    // 2. Set fields of realmRec.[[Intrinsics]] with the values listed in Table 6. The field names
-    //    are the names listed in the “Intrinsic Name” column of the table. The value of each field
-    //    is a new object value fully and recursively populated with property values as defined by
-    //    the specification of each object in clauses 19 through 28. All object property values are
-    //    newly created object values. All values that are built-in function objects are created by
-    //    performing CreateBuiltinFunction(steps, length, name, slots, realmRec, prototype, async)
-    //    where steps is the definition of that function provided by this specification, name is the
-    //    initial value of the function's "name" property, length is the initial value of the
-    //    function's "length" property, slots is a list of the names, if any, of the function's
-    //    specified internal slots, prototype is the specified value of the function's [[Prototype]]
-    //    internal slot, and async is true if the function is described as “async” and false
-    //    otherwise. The creation of the intrinsics and their properties must be ordered to avoid
-    //    any dependencies upon objects that have not yet been created.
+    // 2. Set fields of realmRecord.[[Intrinsics]] with the values listed in Table 6. The field
+    //    names are the names listed in the “Intrinsic Name” column of the table. The value of each
+    //    field is a new object value fully and recursively populated with property values as
+    //    defined by the specification of each object in clauses 19 through 28. All object property
+    //    values are newly created object values. All values that are built-in function objects are
+    //    created by performing CreateBuiltinFunction(steps, length, name, slots, realmRecord,
+    //    proto, async) where steps is the definition of that function provided by this
+    //    specification, name is the initial value of the function's "name" property, length is the
+    //    initial value of the function's "length" property, slots is a list of the names, if any,
+    //    of the function's specified internal slots, proto is the specified value of the function's
+    //    [[Prototype]] internal slot, and async is true if the function is described as “async” and
+    //    false otherwise. The creation of the intrinsics and their properties must be ordered to
+    //    avoid any dependencies upon objects that have not yet been created.
     // NOTE: Intrinsics are lazily allocated, see the struct itself for details.
 
-    // 3. Perform AddRestrictedFunctionProperties(realmRec.[[Intrinsics]].[[%Function.prototype%]],
-    //    realmRec).
+    // 3. Perform AddRestrictedFunctionProperties(
+    //    realmRecord.[[Intrinsics]].[[%Function.prototype%]], realmRecord).
     try addRestrictedFunctionProperties(
         agent,
-        try self.intrinsics.@"%Function.prototype%"(),
-        self,
+        try realm.intrinsics.@"%Function.prototype%"(),
+        realm,
     );
 
     // 4. Return unused.
 }
 
-/// 9.3.3 SetDefaultGlobalBindings ( realmRec )
+/// 9.3.3 SetDefaultGlobalBindings ( realmRecord )
 /// https://tc39.es/ecma262/#sec-setdefaultglobalbindings
-fn setDefaultGlobalBindings(self: *Realm) Agent.Error!void {
-    // 1. Let global be realmRec.[[GlobalObject]].
-    const global = self.global_object;
+fn setDefaultGlobalBindings(realm: *Realm) Agent.Error!void {
+    const agent = realm.agent;
+
+    // 1. Let global be realmRecord.[[GlobalObject]].
+    const global = realm.global_object;
 
     // Why export a constant when you can do reflection instead!
     const global_properties_count = @typeInfo(@typeInfo(@TypeOf(globalObjectProperties)).@"fn".return_type.?).array.len;
     const lazy_properties_count = global_properties_count - 4; // globalThis, Infinity, NaN, undefined
-    try global.ensureProperties(self.agent.gc_allocator, global_properties_count);
-    const extra_data = try global.ensureExtraData(self.agent.gc_allocator);
-    try extra_data.lazy_properties.ensureUnusedCapacity(self.agent.gc_allocator, lazy_properties_count);
+    try global.ensureProperties(agent.gc_allocator, global_properties_count);
+    const extra_data = try global.ensureExtraData(agent.gc_allocator);
+    try extra_data.lazy_properties.ensureUnusedCapacity(agent.gc_allocator, lazy_properties_count);
 
     // 2. For each property of the Global Object specified in clause 19, do
-    for (globalObjectProperties(self)) |property| {
+    for (globalObjectProperties(realm)) |property| {
         // a. Let name be the String value of the property name.
-        const name = try String.fromAscii(self.agent, property[0]);
+        const name = try String.fromAscii(agent, property[0]);
         const property_key = PropertyKey.from(name);
 
-        // b. Let desc be the fully populated data Property Descriptor for the property, containing
-        //    the specified attributes for the property. For properties listed in 19.2, 19.3, or
-        //    19.4 the value of the [[Value]] attribute is the corresponding intrinsic object from
-        //    realmRec.
+        // b. Let propertyDesc be the fully populated data Property Descriptor for the property,
+        //    containing the specified attributes for the property. For properties listed in 19.2,
+        //    19.3, or 19.4 the value of the [[Value]] attribute is the corresponding intrinsic
+        //    object from realmRecord.
         switch (property[1]) {
-            .property_descriptor => |property_descriptor| {
-                // c. Perform ? DefinePropertyOrThrow(global, name, desc).
-                try global.definePropertyOrThrow(self.agent, property_key, property_descriptor);
+            .property_descriptor => |property_desc| {
+                // c. Perform ? DefinePropertyOrThrow(global, name, propertyDesc).
+                try global.definePropertyOrThrow(agent, property_key, property_desc);
             },
             .lazy_property => |initializer| {
                 // NOTE: There aren't any accessors on the global object so this only ever creates data properties.
                 std.debug.assert(initializer == .value);
-                try global.definePropertyOrThrow(self.agent, property_key, .{
+                try global.definePropertyOrThrow(agent, property_key, .{
                     .value = .uninitialized,
                     .writable = true,
                     .enumerable = false,
                     .configurable = true,
                 });
                 extra_data.lazy_properties.putAssumeCapacity(property_key, .{
-                    .realm = self,
+                    .realm = realm,
                     .initializer = initializer,
                 });
             },

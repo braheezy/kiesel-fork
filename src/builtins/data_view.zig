@@ -226,9 +226,9 @@ fn setViewValue(
     // 3. Let getIndex be ? ToIndex(requestIndex).
     const get_index = try request_index.toIndex(agent);
 
-    // 4. If IsBigIntElementType(type) is true, let numberValue be ? ToBigInt(value).
-    // 5. Else, let numberValue be ? ToNumber(value).
-    const number_value = if (@"type".isBigIntElementType())
+    // 4. If IsBigIntElementType(type) is true, let number be ? ToBigInt(value).
+    // 5. Else, let number be ? ToNumber(value).
+    const number = if (@"type".isBigIntElementType())
         Value.from(try value.toBigInt(agent))
     else
         Value.from(try value.toNumber(agent));
@@ -267,14 +267,14 @@ fn setViewValue(
     // 14. Let bufferIndex be getIndex + viewOffset.
     const buffer_index = get_index + @intFromEnum(view_offset);
 
-    // 15. Perform SetValueInBuffer(view.[[ViewedArrayBuffer]], bufferIndex, type, numberValue,
-    //     false, unordered, isLittleEndian).
+    // 15. Perform SetValueInBuffer(view.[[ViewedArrayBuffer]], bufferIndex, type, number, false,
+    //     unordered, isLittleEndian).
     try setValueInBuffer(
         agent,
         data_view.fields.viewed_array_buffer,
         buffer_index,
         @"type",
-        number_value,
+        number,
         false,
         .unordered,
         is_little_endian,
@@ -293,7 +293,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "DataView",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -383,7 +383,7 @@ pub const constructor = struct {
             break :blk view_byte_length.toAuto();
         };
 
-        // 10. Let O be ? OrdinaryCreateFromConstructor(NewTarget, "%DataView.prototype%",
+        // 10. Let obj be ? OrdinaryCreateFromConstructor(NewTarget, "%DataView.prototype%",
         //     « [[DataView]], [[ViewedArrayBuffer]], [[ByteLength]], [[ByteOffset]] »).
         const data_view = try ordinaryCreateFromConstructor(
             DataView,
@@ -430,16 +430,16 @@ pub const constructor = struct {
             }
         }
 
-        // 15. Set O.[[ViewedArrayBuffer]] to buffer.
+        // 15. Set obj.[[ViewedArrayBuffer]] to buffer.
         data_view.fields.viewed_array_buffer = buffer;
 
-        // 16. Set O.[[ByteLength]] to viewByteLength.
+        // 16. Set obj.[[ByteLength]] to viewByteLength.
         data_view.fields.byte_length = view_byte_length;
 
-        // 17. Set O.[[ByteOffset]] to offset.
+        // 17. Set obj.[[ByteOffset]] to offset.
         data_view.fields.byte_offset = offset;
 
-        // 18. Return O.
+        // 18. Return obj.
         return Value.from(&data_view.object);
     }
 };
@@ -503,13 +503,13 @@ pub const prototype = struct {
     /// 25.3.4.1 get DataView.prototype.buffer
     /// https://tc39.es/ecma262/#sec-get-dataview.prototype.buffer
     fn buffer(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[DataView]]).
-        const object = try this_value.requireInternalSlot(agent, DataView);
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[DataView]]).
+        const data_view = try this_value.requireInternalSlot(agent, DataView);
 
-        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
-        // 4. Let buffer be O.[[ViewedArrayBuffer]].
-        const buffer_ = object.fields.viewed_array_buffer;
+        // 3. Assert: obj has a [[ViewedArrayBuffer]] internal slot.
+        // 4. Let buffer be obj.[[ViewedArrayBuffer]].
+        const buffer_ = data_view.fields.viewed_array_buffer;
 
         // 5. Return buffer.
         return Value.from(&buffer_.object);
@@ -518,13 +518,13 @@ pub const prototype = struct {
     /// 25.3.4.2 get DataView.prototype.byteLength
     /// https://tc39.es/ecma262/#sec-get-dataview.prototype.bytelength
     fn byteLength(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[DataView]]).
-        const object = try this_value.requireInternalSlot(agent, DataView);
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[DataView]]).
+        const data_view = try this_value.requireInternalSlot(agent, DataView);
 
-        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
-        // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(O, seq-cst).
-        const view = makeDataViewWithBufferWitnessRecord(object, .seq_cst);
+        // 3. Assert: obj has a [[ViewedArrayBuffer]] internal slot.
+        // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(obj, seq-cst).
+        const view = makeDataViewWithBufferWitnessRecord(data_view, .seq_cst);
 
         // 5. If IsViewOutOfBounds(viewRecord) is true, throw a TypeError exception.
         if (isViewOutOfBounds(view)) {
@@ -541,21 +541,21 @@ pub const prototype = struct {
     /// 25.3.4.3 get DataView.prototype.byteOffset
     /// https://tc39.es/ecma262/#sec-get-dataview.prototype.byteoffset
     fn byteOffset(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[DataView]]).
-        const object = try this_value.requireInternalSlot(agent, DataView);
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[DataView]]).
+        const data_view = try this_value.requireInternalSlot(agent, DataView);
 
-        // 3. Assert: O has a [[ViewedArrayBuffer]] internal slot.
-        // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(O, seq-cst).
-        const view = makeDataViewWithBufferWitnessRecord(object, .seq_cst);
+        // 3. Assert: obj has a [[ViewedArrayBuffer]] internal slot.
+        // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(obj, seq-cst).
+        const view = makeDataViewWithBufferWitnessRecord(data_view, .seq_cst);
 
         // 5. If IsViewOutOfBounds(viewRecord) is true, throw a TypeError exception.
         if (isViewOutOfBounds(view)) {
             return agent.throwException(.type_error, "DataView is out of bounds", .{});
         }
 
-        // 6. Let offset be O.[[ByteOffset]].
-        const offset = object.fields.byte_offset;
+        // 6. Let offset be obj.[[ByteOffset]].
+        const offset = data_view.fields.byte_offset;
 
         // 7. Return 𝔽(offset).
         return Value.from(@intFromEnum(offset));

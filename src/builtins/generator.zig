@@ -73,14 +73,14 @@ pub const prototype = struct {
     fn @"return"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
-        // 1. Let g be the this value.
-        const generator = this_value;
+        // 1. Let gen be the this value.
+        const gen = this_value;
 
-        // 2. Let C be ReturnCompletion(value).
+        // 2. Let completion be ReturnCompletion(value).
         const completion: Completion = .{ .@"return" = value };
 
-        // 3. Return ? GeneratorResumeAbrupt(g, C, empty).
-        return Value.from(try generatorResumeAbrupt(agent, generator, completion));
+        // 3. Return ? GeneratorResumeAbrupt(gen, completion, empty).
+        return Value.from(try generatorResumeAbrupt(agent, gen, completion));
     }
 
     /// 27.5.1.4 %GeneratorPrototype%.throw ( exception )
@@ -88,14 +88,14 @@ pub const prototype = struct {
     fn throw(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const exception = arguments.get(0);
 
-        // 1. Let g be the this value.
-        const generator = this_value;
+        // 1. Let gen be the this value.
+        const gen = this_value;
 
-        // 2. Let C be ThrowCompletion(exception).
+        // 2. Let completion be ThrowCompletion(exception).
         const completion: Completion = .{ .throw = exception };
 
-        // 3. Return ? GeneratorResumeAbrupt(g, C, empty).
-        return Value.from(try generatorResumeAbrupt(agent, generator, completion));
+        // 3. Return ? GeneratorResumeAbrupt(gen, completion, empty).
+        return Value.from(try generatorResumeAbrupt(agent, gen, completion));
     }
 };
 
@@ -119,7 +119,7 @@ pub const Generator = MakeObject(.{
         // Non-standard
         evaluation_state: struct {
             closure: *const fn (*Agent, *builtins.ECMAScriptFunction, Completion) Agent.Error!*Object,
-            generator_function: *builtins.ECMAScriptFunction,
+            gen_func: *builtins.ECMAScriptFunction,
             suspension_result: ?Value = null,
             suspension: ?interpreter.Vm.GeneratorSuspension = null,
         },
@@ -134,28 +134,28 @@ pub const Completion = union(enum) {
     throw: Value,
 };
 
-/// 27.5.3.1 GeneratorStart ( generator, generatorBody )
+/// 27.5.3.1 GeneratorStart ( gen, genBody )
 /// https://tc39.es/ecma262/#sec-generatorstart
 pub fn generatorStart(
     agent: *Agent,
-    generator: *Generator,
-    generator_function: *builtins.ECMAScriptFunction,
+    gen: *Generator,
+    gen_func: *builtins.ECMAScriptFunction,
     initial_suspension: interpreter.Vm.GeneratorSuspension,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: generator.[[GeneratorState]] is suspended-start.
-    std.debug.assert(generator.fields.generator_state == .suspended_start);
+    // 1. Assert: gen.[[GeneratorState]] is suspended-start.
+    std.debug.assert(gen.fields.generator_state == .suspended_start);
 
     // 2. Let genContext be the running execution context.
     // NOTE: The running execution context may be stack-allocated by the caller, so we replace it
     //       with a heap-allocated one here since generators store it for later resumption.
-    const generator_context = try agent.gc_allocator.create(ExecutionContext);
-    generator_context.* = agent.runningExecutionContext().*;
-    agent.execution_context_stack.items[agent.execution_context_stack.items.len - 1] = generator_context;
+    const gen_context = try agent.gc_allocator.create(ExecutionContext);
+    gen_context.* = agent.runningExecutionContext().*;
+    agent.execution_context_stack.items[agent.execution_context_stack.items.len - 1] = gen_context;
 
-    // 3. Set the Generator component of genContext to generator.
-    generator_context.generator = .{ .generator = generator };
+    // 3. Set the Generator component of genContext to gen.
+    gen_context.generator = .{ .generator = gen };
 
-    // 4. Let closure be a new Abstract Closure with no parameters that captures generatorBody and
+    // 4. Let closure be a new Abstract Closure with no parameters that captures genBody and
     //    performs the following steps when called:
     const closure = struct {
         fn func(
@@ -164,13 +164,13 @@ pub fn generatorStart(
             resume_completion: Completion,
         ) Agent.Error!*Object {
             // a. Let acGenContext be the running execution context.
-            const closure_generator_context = agent_.runningExecutionContext();
+            const closure_gen_context = agent_.runningExecutionContext();
 
-            // b. Let acGenerator be the Generator component of acGenContext.
-            const closure_generator = closure_generator_context.generator.generator;
+            // b. Let acGen be the Generator component of acGenContext.
+            const closure_gen = closure_gen_context.generator.generator;
 
             const vm = agent_.active_vm.?;
-            const suspension = &closure_generator.fields.evaluation_state.suspension.?;
+            const suspension = &closure_gen.fields.evaluation_state.suspension.?;
 
             // If resuming causes another yield the suspension will be overwritten, so we
             // have to capture the stack to free it regardless.
@@ -185,8 +185,8 @@ pub fn generatorStart(
                 // TODO: Integrate throw/return completions with exception handlers in the Vm
                 .@"return", .throw => |value| {
                     _ = agent_.execution_context_stack.pop().?;
-                    closure_generator.fields.generator_state = .completed;
-                    closure_generator.fields.evaluation_state = undefined;
+                    closure_gen.fields.generator_state = .completed;
+                    closure_gen.fields.evaluation_state = undefined;
 
                     if (resume_completion == .@"return") {
                         return createIteratorResultObject(agent_, value, true);
@@ -200,24 +200,24 @@ pub fn generatorStart(
                 },
             }
 
-            // c. If generatorBody is a Parse Node, then
-            //     i. Let result be Completion(Evaluation of generatorBody).
+            // c. If genBody is a Parse Node, then
+            //     i. Let result be Completion(Evaluation of genBody).
             // d. Else,
-            //     i. Assert: generatorBody is an Abstract Closure with no parameters.
-            //     ii. Let result be Completion(generatorBody()).
+            //     i. Assert: genBody is an Abstract Closure with no parameters.
+            //     ii. Let result be Completion(genBody()).
             const bc = generator_function_.fields.cached_bytecode.?;
             const result = vm.@"resume"(bc, suspension.*) catch |err| {
                 // f-h, k.
                 _ = agent_.execution_context_stack.pop().?;
-                closure_generator.fields.generator_state = .completed;
-                closure_generator.fields.evaluation_state = undefined;
+                closure_gen.fields.generator_state = .completed;
+                closure_gen.fields.evaluation_state = undefined;
                 return err;
             };
             switch (result) {
                 .yield => |next_suspension| {
-                    const suspension_result = closure_generator.fields.evaluation_state.suspension_result.?;
-                    closure_generator.fields.evaluation_state.suspension = next_suspension;
-                    closure_generator.fields.evaluation_state.suspension_result = null;
+                    const suspension_result = closure_gen.fields.evaluation_state.suspension_result.?;
+                    closure_gen.fields.evaluation_state.suspension = next_suspension;
+                    closure_gen.fields.evaluation_state.suspension_result = null;
                     return suspension_result.asObject();
                 },
                 .@"return" => |value| {
@@ -229,13 +229,13 @@ pub fn generatorStart(
                     //    running execution context.
                     _ = agent_.execution_context_stack.pop().?;
 
-                    // g. Set acGenerator.[[GeneratorState]] to completed.
-                    closure_generator.fields.generator_state = .completed;
+                    // g. Set acGen.[[GeneratorState]] to completed.
+                    closure_gen.fields.generator_state = .completed;
 
                     // h. NOTE: Once a generator enters the completed state it never leaves it and
                     //    its associated execution context is never resumed. Any execution state
-                    //    associated with acGenerator can be discarded at this point.
-                    closure_generator.fields.evaluation_state = undefined;
+                    //    associated with acGen can be discarded at this point.
+                    closure_gen.fields.evaluation_state = undefined;
 
                     // i. If result is a normal completion, then
                     //     i. Let resultValue be undefined.
@@ -255,33 +255,36 @@ pub fn generatorStart(
 
     // 5. Set the code evaluation state of genContext such that when evaluation is resumed for that
     //    execution context, closure will be called with no arguments.
-    generator.fields.evaluation_state = .{
+    gen.fields.evaluation_state = .{
         .closure = closure,
-        .generator_function = generator_function,
+        .gen_func = gen_func,
     };
 
-    generator.fields.evaluation_state.suspension = initial_suspension;
+    gen.fields.evaluation_state.suspension = initial_suspension;
 
-    // 6. Set generator.[[GeneratorContext]] to genContext.
-    generator.fields.generator_context = generator_context;
+    // 6. Set gen.[[GeneratorContext]] to genContext.
+    gen.fields.generator_context = gen_context;
 
     // 7. Return unused.
 }
 
-/// 27.5.3.2 GeneratorValidate ( generator, generatorBrand )
+/// 27.5.3.2 GeneratorValidate ( gen, genBrand )
 /// https://tc39.es/ecma262/#sec-generatorvalidate
-pub fn generatorValidate(agent: *Agent, generator_value: Value) Agent.Error!Generator.Fields.State {
-    // 1. Perform ? RequireInternalSlot(generator, [[GeneratorState]]).
-    // 2. Perform ? RequireInternalSlot(generator, [[GeneratorBrand]]).
-    const generator = try generator_value.requireInternalSlot(agent, Generator);
+pub fn generatorValidate(
+    agent: *Agent,
+    gen_value: Value,
+) Agent.Error!struct { *Generator, Generator.Fields.State } {
+    // 1. Perform ? RequireInternalSlot(gen, [[GeneratorState]]).
+    // 2. Perform ? RequireInternalSlot(gen, [[GeneratorBrand]]).
+    const gen = try gen_value.requireInternalSlot(agent, Generator);
 
-    // 3. If generator.[[GeneratorBrand]] is not generatorBrand, throw a TypeError exception.
+    // 3. If gen.[[GeneratorBrand]] is not genBrand, throw a TypeError exception.
     // NOTE: All iterators using [[GeneratorBrand]] in the spec are implemented without generators
     //       so this is currently not needed.
 
-    // 4. Assert: generator has a [[GeneratorContext]] internal slot.
-    // 5. Let state be generator.[[GeneratorState]].
-    const state = generator.fields.generator_state;
+    // 4. Assert: gen has a [[GeneratorContext]] internal slot.
+    // 5. Let state be gen.[[GeneratorState]].
+    const state = gen.fields.generator_state;
 
     // 6. If state is executing, throw a TypeError exception.
     if (state == .executing) {
@@ -289,14 +292,15 @@ pub fn generatorValidate(agent: *Agent, generator_value: Value) Agent.Error!Gene
     }
 
     // 7. Return state.
-    return state;
+    // NOTE: Returning the object here allows for direct assignment of the object at the call site.
+    return .{ gen, state };
 }
 
-/// 27.5.3.3 GeneratorResume ( generator, value, generatorBrand )
+/// 27.5.3.3 GeneratorResume ( gen, value, genBrand )
 /// https://tc39.es/ecma262/#sec-generatorresume
-pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agent.Error!*Object {
-    // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-    const state = try generatorValidate(agent, generator_value);
+pub fn generatorResume(agent: *Agent, gen_value: Value, value: Value) Agent.Error!*Object {
+    // 1. Let state be ? GeneratorValidate(gen, genBrand).
+    const gen, const state = try generatorValidate(agent, gen_value);
 
     // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
     if (state == .completed) return createIteratorResultObject(agent, .undefined, true);
@@ -304,47 +308,43 @@ pub fn generatorResume(agent: *Agent, generator_value: Value, value: Value) Agen
     // 3. Assert: state is either suspended-start or suspended-yield.
     std.debug.assert(state == .suspended_start or state == .suspended_yield);
 
-    const generator = generator_value.asObject().as(Generator);
+    // 4. Let genContext be gen.[[GeneratorContext]].
+    const gen_context = gen.fields.generator_context;
 
-    // 4. Let genContext be generator.[[GeneratorContext]].
-    const generator_context = generator.fields.generator_context;
-
-    // 5. Set generator.[[GeneratorState]] to executing.
-    generator.fields.generator_state = .executing;
+    // 5. Set gen.[[GeneratorState]] to executing.
+    gen.fields.generator_state = .executing;
 
     // 6. Return ? RunSuspendedContext(genContext, NormalCompletion(value)).
     const caller_context = agent.runningExecutionContext();
-    try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
-    const result = try generator.fields.evaluation_state.closure(
+    try agent.execution_context_stack.append(agent.gc_allocator, gen_context);
+    const result = try gen.fields.evaluation_state.closure(
         agent,
-        generator.fields.evaluation_state.generator_function,
+        gen.fields.evaluation_state.gen_func,
         .{ .normal = value },
     );
     std.debug.assert(caller_context == agent.runningExecutionContext());
     return result;
 }
 
-/// 27.5.3.4 GeneratorResumeAbrupt ( generator, abruptCompletion, generatorBrand )
+/// 27.5.3.4 GeneratorResumeAbrupt ( gen, abruptCompletion, genBrand )
 /// https://tc39.es/ecma262/#sec-generatorresumeabrupt
 pub fn generatorResumeAbrupt(
     agent: *Agent,
-    generator_value: Value,
+    gen_value: Value,
     abrupt_completion: Completion,
 ) Agent.Error!*Object {
-    // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
-    var state = try generatorValidate(agent, generator_value);
-
-    const generator = generator_value.asObject().as(Generator);
+    // 1. Let state be ? GeneratorValidate(gen, genBrand).
+    const gen, var state = try generatorValidate(agent, gen_value);
 
     // 2. If state is suspended-start, then
     if (state == .suspended_start) {
-        // a. Set generator.[[GeneratorState]] to completed.
-        generator.fields.generator_state = .completed;
+        // a. Set gen.[[GeneratorState]] to completed.
+        gen.fields.generator_state = .completed;
 
         // b. NOTE: Once a generator enters the completed state it never leaves it and its
-        //    associated execution context is never resumed. Any execution state associated with
-        //    generator can be discarded at this point.
-        generator.fields.evaluation_state = undefined;
+        //    associated execution context is never resumed. Any execution state associated with gen
+        //    can be discarded at this point.
+        gen.fields.evaluation_state = undefined;
 
         // c. Set state to completed.
         state = .completed;
@@ -375,18 +375,18 @@ pub fn generatorResumeAbrupt(
     // 4. Assert: state is suspended-yield.
     std.debug.assert(state == .suspended_yield);
 
-    // 5. Let genContext be generator.[[GeneratorContext]].
-    const generator_context = generator.fields.generator_context;
+    // 5. Let genContext be gen.[[GeneratorContext]].
+    const gen_context = gen.fields.generator_context;
 
-    // 6. Set generator.[[GeneratorState]] to executing.
-    generator.fields.generator_state = .executing;
+    // 6. Set gen.[[GeneratorState]] to executing.
+    gen.fields.generator_state = .executing;
 
     // 7. Return ? RunSuspendedContext(genContext, abruptCompletion).
     const caller_context = agent.runningExecutionContext();
-    try agent.execution_context_stack.append(agent.gc_allocator, generator_context);
-    const result = try generator.fields.evaluation_state.closure(
+    try agent.execution_context_stack.append(agent.gc_allocator, gen_context);
+    const result = try gen.fields.evaluation_state.closure(
         agent,
-        generator.fields.evaluation_state.generator_function,
+        gen.fields.evaluation_state.gen_func,
         abrupt_completion,
     );
     std.debug.assert(caller_context == agent.runningExecutionContext());
@@ -403,14 +403,14 @@ pub const GeneratorKind = enum {
 /// https://tc39.es/ecma262/#sec-getgeneratorkind
 pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
     // 1. Let genContext be the running execution context.
-    const generator_context = agent.runningExecutionContext();
+    const gen_context = agent.runningExecutionContext();
 
     // 2. If genContext does not have a Generator component, return non-generator.
-    // 3. Let generator be the Generator component of genContext.
-    return switch (generator_context.generator) {
+    // 3. Let gen be the Generator component of genContext.
+    return switch (gen_context.generator) {
         .unset => .non_generator,
 
-        // 4. If generator has an [[AsyncGeneratorState]] internal slot, return async.
+        // 4. If gen has an [[AsyncGeneratorState]] internal slot, return async.
         .async_generator => .async,
 
         // 5. Return sync.
@@ -422,17 +422,17 @@ pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
 /// https://tc39.es/ecma262/#sec-generatoryield
 pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Completion {
     // 1. Let genContext be the running execution context.
-    const generator_context = agent.runningExecutionContext();
+    const gen_context = agent.runningExecutionContext();
 
     // 2. Assert: genContext is the execution context of a generator.
-    std.debug.assert(generator_context.generator != .unset);
+    std.debug.assert(gen_context.generator != .unset);
 
-    // 3. Let generator be the value of the Generator component of genContext.
+    // 3. Let gen be the value of the Generator component of genContext.
     // 4. Assert: GetGeneratorKind() is sync.
-    const generator = generator_context.generator.generator;
+    const gen = gen_context.generator.generator;
 
-    // 5. Set generator.[[GeneratorState]] to suspended-yield.
-    generator.fields.generator_state = .suspended_yield;
+    // 5. Set gen.[[GeneratorState]] to suspended-yield.
+    gen.fields.generator_state = .suspended_yield;
 
     // 6. Remove genContext from the execution context stack and restore the execution context that
     //    is at the top of the execution context stack as the running execution context.
@@ -441,7 +441,7 @@ pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Compl
     // 7. Let callerContext be the running execution context.
     // 8. Resume callerContext passing NormalCompletion(iteratorResult). If genContext is ever
     //    resumed again, let resumptionValue be the Completion Record with which it is resumed.
-    generator.fields.evaluation_state.suspension_result = Value.from(iterator_result);
+    gen.fields.evaluation_state.suspension_result = Value.from(iterator_result);
 
     // TODO: 9. Assert: If control reaches here, then genContext is the running execution context
     //          again.
@@ -449,18 +449,18 @@ pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Compl
     return .{ .normal = .undefined };
 }
 
-/// 27.5.3.7 Yield ( value )
+/// 27.5.3.7 Yield ( arg )
 /// https://tc39.es/ecma262/#sec-yield
-pub fn yield(agent: *Agent, value: Value) Agent.Error!Completion {
-    // 1. Let generatorKind be GetGeneratorKind().
-    const generator_kind = getGeneratorKind(agent);
+pub fn yield(agent: *Agent, arg: Value) Agent.Error!Completion {
+    // 1. Let genKind be GetGeneratorKind().
+    const gen_kind = getGeneratorKind(agent);
 
-    switch (generator_kind) {
-        // 2. If generatorKind is async, return ? AsyncGeneratorYield(? Await(value)).
-        .async => return asyncGeneratorYield(agent, try await(agent, value)),
+    switch (gen_kind) {
+        // 2. If genKind is async, return ? AsyncGeneratorYield(? Await(arg)).
+        .async => return asyncGeneratorYield(agent, try await(agent, arg)),
 
-        // 3. Return ? GeneratorYield(CreateIteratorResultObject(value, false)).
-        .sync => return generatorYield(agent, try createIteratorResultObject(agent, value, false)),
+        // 3. Return ? GeneratorYield(CreateIteratorResultObject(arg, false)).
+        .sync => return generatorYield(agent, try createIteratorResultObject(agent, arg, false)),
 
         .non_generator => unreachable,
     }

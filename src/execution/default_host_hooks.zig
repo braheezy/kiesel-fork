@@ -25,7 +25,7 @@ const finishLoadingImportedModule = language.finishLoadingImportedModule;
 const ns_min_instant = @import("../builtins/temporal/instant.zig").ns_min_instant;
 const ns_max_instant = @import("../builtins/temporal/instant.zig").ns_max_instant;
 
-/// 7.3.29 HostEnsureCanAddPrivateElement ( O )
+/// 7.3.29 HostEnsureCanAddPrivateElement ( obj )
 /// https://tc39.es/ecma262/#sec-hostensurecanaddprivateelement
 pub fn hostEnsureCanAddPrivateElement(_: *Agent, _: *Object) Agent.Error!void {
     // The default implementation of HostEnsureCanAddPrivateElement is to return
@@ -39,19 +39,19 @@ pub fn hostMakeJobCallback(callback: *Object) Job.Callback {
     return .{ .callback = callback, .host_defined = null };
 }
 
-/// 9.5.3 HostCallJobCallback ( jobCallback, V, argumentsList )
+/// 9.5.3 HostCallJobCallback ( jobCallback, thisValue, argList )
 /// https://tc39.es/ecma262/#sec-hostcalljobcallback
 pub fn hostCallJobCallback(
     agent: *Agent,
     job_callback: Job.Callback,
     this_value: Value,
-    arguments_list: []const Value,
+    arg_list: []const Value,
 ) Agent.Error!Value {
     // 1. Assert: IsCallable(jobCallback.[[Callback]]) is true.
     std.debug.assert(Value.from(job_callback.callback).isCallable());
 
-    // 2. Return ? Call(jobCallback.[[Callback]], V, argumentsList).
-    return Value.from(job_callback.callback).callAssumeCallable(agent, this_value, arguments_list);
+    // 2. Return ? Call(jobCallback.[[Callback]], thisValue, argList).
+    return Value.from(job_callback.callback).callAssumeCallable(agent, this_value, arg_list);
 }
 
 /// 9.5.4 HostEnqueueGenericJob ( job, realm )
@@ -138,7 +138,7 @@ pub fn hostGetSupportedImportAttributes(
     return .empty;
 }
 
-/// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm, parameterStrings, bodyString, direct )
+/// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm, paramStrings, bodyString, direct )
 /// https://tc39.es/ecma262/#sec-hostensurecancompilestrings
 pub fn hostEnsureCanCompileStrings(
     _: *Realm,

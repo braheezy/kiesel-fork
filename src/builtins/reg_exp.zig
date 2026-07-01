@@ -157,14 +157,14 @@ fn compileRegexp(
     return re_bytecode;
 }
 
-/// 22.2.3.1 RegExpCreate ( P, F )
+/// 22.2.3.1 RegExpCreate ( pattern, flags )
 /// https://tc39.es/ecma262/#sec-regexpcreate
 pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!*RegExp {
     const realm = agent.currentRealm();
 
     // 1. Let obj be ! RegExpAlloc(%RegExp%).
     const shape, _ = try realm.shapes.regExpObject();
-    const reg_exp = try RegExp.createWithShape(agent, .{
+    const regexp = try RegExp.createWithShape(agent, .{
         .shape = shape,
         .fields = .{
             .original_source = undefined,
@@ -173,8 +173,8 @@ pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!*Re
         },
     });
 
-    // 2. Return ? RegExpInitialize(obj, P, F).
-    return regExpInitialize(agent, reg_exp, pattern, flags);
+    // 2. Return ? RegExpInitialize(obj, pattern, flags).
+    return regExpInitialize(agent, regexp, pattern, flags);
 }
 
 pub fn regExpCreateFast(
@@ -188,7 +188,7 @@ pub fn regExpCreateFast(
     const re_bytecode = try compileRegexp(agent, pattern, flags);
     const realm = agent.currentRealm();
     const shape, const offsets = try realm.shapes.regExpObject();
-    const reg_exp = try RegExp.createWithShape(agent, .{
+    const regexp = try RegExp.createWithShape(agent, .{
         .shape = shape,
         .fields = .{
             .original_source = pattern,
@@ -196,8 +196,8 @@ pub fn regExpCreateFast(
             .re_bytecode = re_bytecode,
         },
     });
-    reg_exp.object.setValueAtPropertyOffset(offsets.lastIndex, Value.from(0));
-    return reg_exp;
+    regexp.object.setValueAtPropertyOffset(offsets.lastIndex, Value.from(0));
+    return regexp;
 }
 
 /// 22.2.3.2 RegExpAlloc ( newTarget )
@@ -205,7 +205,7 @@ pub fn regExpCreateFast(
 fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
     // 1. Let obj be ? OrdinaryCreateFromConstructor(newTarget, "%RegExp.prototype%",
     //    « [[OriginalSource]], [[OriginalFlags]], [[RegExpRecord]], [[RegExpMatcher]] »).
-    const reg_exp = try ordinaryCreateFromConstructor(
+    const regexp = try ordinaryCreateFromConstructor(
         RegExp,
         agent,
         new_target,
@@ -219,7 +219,7 @@ fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
 
     // 2. Perform ! DefinePropertyOrThrow(obj, "lastIndex", PropertyDescriptor { [[Writable]]: true,
     //    [[Enumerable]]: false, [[Configurable]]: false }).
-    try reg_exp.object.definePropertyDirect(agent, PropertyKey.from("lastIndex"), .{
+    try regexp.object.definePropertyDirect(agent, PropertyKey.from("lastIndex"), .{
         .value_or_accessor = .{
             .value = .undefined,
         },
@@ -231,79 +231,80 @@ fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
     });
 
     // 3. Return obj.
-    return reg_exp;
+    return regexp;
 }
 
 /// 22.2.3.3 RegExpInitialize ( obj, pattern, flags )
 /// https://tc39.es/ecma262/#sec-regexpinitialize
 fn regExpInitialize(
     agent: *Agent,
-    reg_exp: *RegExp,
-    pattern: Value,
-    flags: Value,
+    regexp: *RegExp,
+    pattern_value: Value,
+    flags_value: Value,
 ) Agent.Error!*RegExp {
     if (!build_options.enable_libregexp) {
         return agent.throwException(.internal_error, "RegExp support is disabled", .{});
     }
 
-    // 1. If pattern is undefined, let P be the empty String.
-    // 2. Else, let P be ? ToString(pattern).
-    const p: *const String = if (pattern.isUndefined()) .empty else try pattern.toString(agent);
+    // 1. If pattern is undefined, set pattern to the empty String.
+    // 2. Else, set pattern to ? ToString(pattern).
+    const pattern: *const String = if (pattern_value.isUndefined()) .empty else try pattern_value.toString(agent);
 
-    // 3. If flags is undefined, let F be the empty String.
-    // 4. Else, let F be ? ToString(flags).
-    const f: *const String = if (flags.isUndefined()) .empty else try flags.toString(agent);
+    // 3. If flags is undefined, set flags to the empty String.
+    // 4. Else, set flags to ? ToString(flags).
+    const flags: *const String = if (flags_value.isUndefined()) .empty else try flags_value.toString(agent);
 
-    // 5. If F contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y", throw a
-    //    SyntaxError exception.
-    // 6. If F contains any code unit more than once, throw a SyntaxError exception.
-    // 7. If F contains "i", let i be true; else let i be false.
-    // 8. If F contains "m", let m be true; else let m be false.
-    // 9. If F contains "s", let s be true; else let s be false.
-    // 10. If F contains "u", let u be true; else let u be false.
-    // 11. If F contains "v", let v be true; else let v be false.
+    // 5. If flags contains any code unit other than "d", "g", "i", "m", "s", "u", "v", or "y",
+    //    throw a SyntaxError exception.
+    // 6. If flags contains any code unit more than once, throw a SyntaxError exception.
+    // 7. If flags contains "i", let i be true; else let i be false.
+    // 8. If flags contains "m", let m be true; else let m be false.
+    // 9. If flags contains "s", let s be true; else let s be false.
+    // 10. If flags contains "u", let u be true; else let u be false.
+    // 11. If flags contains "v", let v be true; else let v be false.
     // TODO: 12. If u is true or v is true, then
-    //     a. Let patternText be StringToCodePoints(P).
+    //     a. Let patternText be StringToCodePoints(pattern).
     // 13. Else,
-    //     a. Let patternText be the result of interpreting each of P's 16-bit elements as a Unicode
-    //        BMP code point. UTF-16 decoding is not applied to the elements.
+    //     a. Let patternText be the result of interpreting each of pattern's 16-bit elements as a
+    //        Unicode BMP code point. UTF-16 decoding is not applied to the elements.
     // 14. Let parseResult be ParsePattern(patternText, u, v).
     // 15. If parseResult is a non-empty List of SyntaxError objects, throw a SyntaxError exception.
     // 16. Assert: parseResult is a Pattern Parse Node.
-    const re_bytecode = try compileRegexp(agent, p, f);
+    const re_bytecode = try compileRegexp(agent, pattern, flags);
 
-    // 17. Set obj.[[OriginalSource]] to P.
-    reg_exp.fields.original_source = p;
+    // 17. Set obj.[[OriginalSource]] to pattern.
+    regexp.fields.original_source = pattern;
 
-    // 18. Set obj.[[OriginalFlags]] to F.
-    reg_exp.fields.original_flags = f;
+    // 18. Set obj.[[OriginalFlags]] to flags.
+    regexp.fields.original_flags = flags;
 
     // 19. Let capturingGroupsCount be CountLeftCapturingParensWithin(parseResult).
-    // 20. Let rer be the RegExp Record { [[IgnoreCase]]: i, [[Multiline]]: m, [[DotAll]]: s,
-    //     [[Unicode]]: u, [[UnicodeSets]]: v, [[CapturingGroupsCount]]: capturingGroupsCount }.
-    // 21. Set obj.[[RegExpRecord]] to rer.
-    // 22. Set obj.[[RegExpMatcher]] to CompilePattern of parseResult with argument rer.
-    reg_exp.fields.re_bytecode = re_bytecode;
+    // 20. Let regexpRecord be the RegExp Record { [[IgnoreCase]]: i, [[Multiline]]: m,
+    //     [[DotAll]]: s, [[Unicode]]: u, [[UnicodeSets]]: v,
+    //     [[CapturingGroupsCount]]: capturingGroupsCount }.
+    // 21. Set obj.[[RegExpRecord]] to regexpRecord.
+    // 22. Set obj.[[RegExpMatcher]] to CompilePattern of parseResult with argument regexpRecord.
+    regexp.fields.re_bytecode = re_bytecode;
 
     // 23. Perform ? Set(obj, "lastIndex", +0𝔽, true).
-    try reg_exp.object.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
+    try regexp.object.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
 
     // 24. Return obj.
-    return reg_exp;
+    return regexp;
 }
 
-/// 22.2.7.1 RegExpExec ( R, S )
+/// 22.2.7.1 RegExpExec ( regexp, string )
 /// https://tc39.es/ecma262/#sec-regexpexec
-pub fn regExpExec(agent: *Agent, reg_exp: *Object, string: *const String) Agent.Error!?*Object {
-    // 1. Let exec be ? Get(R, "exec").
-    const exec = try reg_exp.get(agent, PropertyKey.from("exec"));
+pub fn regExpExec(agent: *Agent, regexp: *Object, string: *const String) Agent.Error!?*Object {
+    // 1. Let exec be ? Get(regexp, "exec").
+    const exec = try regexp.get(agent, PropertyKey.from("exec"));
 
     // 2. If IsCallable(exec) is true, then
     if (exec.isCallable()) {
-        // a. Let result be ? Call(exec, R, « S »).
+        // a. Let result be ? Call(exec, regexp, « string »).
         const result = try exec.callAssumeCallable(
             agent,
-            Value.from(reg_exp),
+            Value.from(regexp),
             &.{Value.from(string)},
         );
 
@@ -320,11 +321,11 @@ pub fn regExpExec(agent: *Agent, reg_exp: *Object, string: *const String) Agent.
         return if (result.isObject()) result.asObject() else null;
     }
 
-    // 3. Perform ? RequireInternalSlot(R, [[RegExpMatcher]]).
-    // 4. Return ? RegExpBuiltinExec(R, S).
+    // 3. Perform ? RequireInternalSlot(regexp, [[RegExpMatcher]]).
+    // 4. Return ? RegExpBuiltinExec(regexp, string).
     return regExpBuiltinExec(
         agent,
-        try Value.from(reg_exp).requireInternalSlot(agent, RegExp),
+        try Value.from(regexp).requireInternalSlot(agent, RegExp),
         string,
     );
 }
@@ -337,23 +338,23 @@ fn getMatch(captures_list: []?*u8, string: [*]const u8, shift: bool, i: usize) ?
     return .{ .start_index = @intCast(start_index), .end_index = @intCast(end_index) };
 }
 
-/// 22.2.7.2 RegExpBuiltinExec ( R, S )
+/// 22.2.7.2 RegExpBuiltinExec ( regexp, string )
 /// https://tc39.es/ecma262/#sec-regexpbuiltinexec
-pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String) Agent.Error!?*Object {
+pub fn regExpBuiltinExec(agent: *Agent, regexp: *RegExp, string: *const String) Agent.Error!?*Object {
     if (!build_options.enable_libregexp) {
         return agent.throwException(.internal_error, "RegExp support is disabled", .{});
     }
 
     const gpa = agent.gpa;
 
-    // 1. Let length be the length of S.
+    // 1. Let length be the length of string.
     const length = string.length;
 
-    // 2. Let lastIndex be ℝ(? ToLength(! Get(R, "lastIndex"))).
-    const last_index_value = reg_exp.object.getPropertyValueDirect(PropertyKey.from("lastIndex"));
+    // 2. Let lastIndex be ℝ(? ToLength(! Get(regexp, "lastIndex"))).
+    const last_index_value = regexp.object.getPropertyValueDirect(PropertyKey.from("lastIndex"));
     var last_index = std.math.lossyCast(u32, try last_index_value.toLength(agent));
 
-    const re_bytecode = reg_exp.fields.re_bytecode;
+    const re_bytecode = regexp.fields.re_bytecode;
     const alloc_count: usize = @intCast(libregexp.c.lre_get_alloc_count(re_bytecode));
     const capture_count: usize = @intCast(libregexp.c.lre_get_capture_count(re_bytecode));
 
@@ -363,7 +364,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     const captures_list = try gpa.alloc(?*u8, alloc_count);
     defer gpa.free(captures_list);
 
-    // 3. Let flags be R.[[OriginalFlags]].
+    // 3. Let flags be regexp.[[OriginalFlags]].
     const re_flags = libregexp.c.lre_get_flags(re_bytecode);
 
     // 4. If flags contains "g", let global be true; else let global be false.
@@ -406,7 +407,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     }
     if (ret == 0) {
         if (last_index > length or (re_flags & (libregexp.c.LRE_FLAG_GLOBAL | libregexp.c.LRE_FLAG_STICKY)) != 0) {
-            try reg_exp.object.set(
+            try regexp.object.set(
                 agent,
                 PropertyKey.from("lastIndex"),
                 Value.from(0),
@@ -418,14 +419,14 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     var match = getMatch(captures_list, buf, shift, 0).?;
     last_index = match.start_index;
 
-    // 14. Let e be r.[[EndIndex]].
-    // 15. If fullUnicode is true, set e to GetStringIndex(S, e).
+    // 14. Let endIndex be result.[[EndIndex]].
+    // 15. If fullUnicode is true, set endIndex to GetStringIndex(string, endIndex).
     const end_index = match.end_index;
 
     // 16. If global is true or sticky is true, then
     if ((re_flags & (libregexp.c.LRE_FLAG_GLOBAL | libregexp.c.LRE_FLAG_STICKY)) != 0) {
-        // a. Perform ? Set(R, "lastIndex", 𝔽(e), true).
-        try reg_exp.object.set(
+        // a. Perform ? Set(regexp, "lastIndex", 𝔽(endIndex), true).
+        try regexp.object.set(
             agent,
             PropertyKey.from("lastIndex"),
             Value.from(end_index),
@@ -433,50 +434,50 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         );
     }
 
-    // 17. Let n be the number of elements in r.[[Captures]].
-    const n = capture_count - 1;
+    // 17. Let capturingGroupsCount be the number of elements in result.[[Captures]].
+    const capturing_groups_count = capture_count - 1;
 
-    // 18. Assert: n = R.[[RegExpRecord]].[[CapturingGroupsCount]].
-    // 19. Assert: n < 2**32 - 1.
-    std.debug.assert(n < std.math.maxInt(u32));
+    // 18. Assert: capturingGroupsCount = regexp.[[RegExpRecord]].[[CapturingGroupsCount]].
+    // 19. Assert: capturingGroupsCount < 2**32 - 1.
+    std.debug.assert(capturing_groups_count < std.math.maxInt(u32));
 
-    // 20. Let A be ! ArrayCreate(n + 1).
-    // 21. Assert: The mathematical value of A's "length" property is n + 1.
+    // 20. Let array be ! ArrayCreate(capturingGroupsCount + 1).
+    // 21. Assert: The mathematical value of array's "length" property is capturingGroupsCount + 1.
     const realm = agent.currentRealm();
     const array_shape, const array_offsets = try realm.shapes.regExpExecObject();
-    const array = try arrayCreateFastWithShape(agent, @intCast(n + 1), array_shape);
+    const array = try arrayCreateFastWithShape(agent, @intCast(capturing_groups_count + 1), array_shape);
     const array_indexed_properties = try array.object.ensureIndexedProperties(agent.gc_allocator);
 
-    // 22. Perform ! CreateDataPropertyOrThrow(A, "index", 𝔽(lastIndex)).
+    // 22. Perform ! CreateDataPropertyOrThrow(array, "index", 𝔽(lastIndex)).
     array.object.setValueAtPropertyOffset(array_offsets.index, Value.from(last_index));
 
-    // 23. Perform ! CreateDataPropertyOrThrow(A, "input", S).
+    // 23. Perform ! CreateDataPropertyOrThrow(array, "input", string).
     array.object.setValueAtPropertyOffset(array_offsets.input, Value.from(string));
 
-    // 24. Let match be the Match Record { [[StartIndex]]: lastIndex, [[EndIndex]]: e }.
+    // 24. Let match be the Match Record { [[StartIndex]]: lastIndex, [[EndIndex]]: endIndex }.
     match = .{ .start_index = last_index, .end_index = end_index };
 
     // 25. Let indices be a new empty List.
-    var indices: std.ArrayList(?Match) = try .initCapacity(gpa, n + 1);
+    var indices: std.ArrayList(?Match) = try .initCapacity(gpa, capturing_groups_count + 1);
     defer indices.deinit(gpa);
 
     // 26. Let groupNames be a new empty List.
-    var group_names: std.ArrayList(?[]const u8) = try .initCapacity(gpa, n + 1);
+    var group_names: std.ArrayList(?[]const u8) = try .initCapacity(gpa, capturing_groups_count + 1);
     defer group_names.deinit(gpa);
 
     // 27. Append match to indices.
     indices.appendAssumeCapacity(match);
 
-    // 28. Let matchedSubstr be GetMatchString(S, match).
-    const matched_substr = try getMatchString(agent, string, match);
+    // 28. Let matchedSubstring be GetMatchString(string, match).
+    const matched_substring = try getMatchString(agent, string, match);
 
-    // 29. Perform ! CreateDataPropertyOrThrow(A, "0", matchedSubstr).
+    // 29. Perform ! CreateDataPropertyOrThrow(array, "0", matchedSubstring).
     try array_indexed_properties.set(
         agent.gc_allocator,
         0,
         .{
             .value_or_accessor = .{
-                .value = Value.from(matched_substr),
+                .value = Value.from(matched_substring),
             },
             .attributes = .all,
         },
@@ -485,7 +486,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
     var group_name_ptr = libregexp.c.lre_get_groupnames(re_bytecode);
     const has_groups = group_name_ptr != null;
 
-    // 30. If R contains any GroupName, then
+    // 30. If regexp contains any GroupName, then
     const groups: Value = if (has_groups) blk: {
         // a. Let groups be OrdinaryObjectCreate(null).
         break :blk Value.from(try ordinaryObjectCreate(agent, null));
@@ -499,22 +500,22 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         // b. Let hasGroups be false.
     };
 
-    // 32. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
+    // 32. Perform ! CreateDataPropertyOrThrow(array, "groups", groups).
     array.object.setValueAtPropertyOffset(array_offsets.groups, groups);
 
     // 33. Let matchedGroupNames be a new empty List.
     var matched_group_names: std.StringHashMapUnmanaged(void) = .empty;
     defer matched_group_names.deinit(gpa);
 
-    // 34. For each integer i such that 1 ≤ i ≤ n, in ascending order, do
+    // 34. For each integer i such that 1 ≤ i ≤ capturingGroupsCount, in ascending order, do
     var i: usize = 1;
-    while (i <= n) : (i += 1) {
+    while (i <= capturing_groups_count) : (i += 1) {
         var captured_value: Value = undefined;
 
-        // a. Let captureI be ith element of r.[[Captures]].
+        // a. Let capture be ith element of result.[[Captures]].
         const capture_i = getMatch(captures_list, buf, shift, i);
 
-        // b. If captureI is undefined, then
+        // b. If capture is undefined, then
         if (capture_i == null) {
             // i. Let capturedValue be undefined.
             captured_value = .undefined;
@@ -523,23 +524,23 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             indices.appendAssumeCapacity(null);
         } else {
             // c. Else,
-            // i. Let captureStart be captureI.[[StartIndex]].
-            // ii. Let captureEnd be captureI.[[EndIndex]].
+            // i. Let captureStart be capture.[[StartIndex]].
+            // ii. Let captureEnd be capture.[[EndIndex]].
             // iii. If fullUnicode is true, then
-            //     1. Set captureStart to GetStringIndex(S, captureStart).
-            //     2. Set captureEnd to GetStringIndex(S, captureEnd).
-            // iv. Let capture be the Match Record { [[StartIndex]]: captureStart,
+            //     1. Set captureStart to GetStringIndex(string, captureStart).
+            //     2. Set captureEnd to GetStringIndex(string, captureEnd).
+            // iv. Let captureRecord be the Match Record { [[StartIndex]]: captureStart,
             //     [[EndIndex]]: captureEnd }.
             const capture = capture_i.?;
 
-            // v. Let capturedValue be GetMatchString(S, capture).
+            // v. Let capturedValue be GetMatchString(string, captureRecord).
             captured_value = Value.from(try getMatchString(agent, string, capture));
 
-            // vi. Append capture to indices.
+            // vi. Append captureRecord to indices.
             indices.appendAssumeCapacity(capture);
         }
 
-        // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), capturedValue).
+        // d. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(i)), capturedValue).
         // OPTIMIZATION: Because the array is created with the right length we can set indexed
         //               properties directly here.
         try array_indexed_properties.set(
@@ -553,13 +554,13 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             },
         );
 
-        // e. If the ith capture of R was defined with a GroupName, then
+        // e. If the ith capture of regexp was defined with a GroupName, then
         if (group_name_ptr != null and group_name_ptr.* != 0) {
-            // i. Let s be the CapturingGroupName of that GroupName.
+            // i. Let groupName be the CapturingGroupName of that GroupName.
             const group_name = std.mem.span(group_name_ptr);
             group_name_ptr += group_name.len + libregexp.c.LRE_GROUP_NAME_TRAILER_LEN;
 
-            // ii. If matchedGroupNames contains s, then
+            // ii. If matchedGroupNames contains groupName, then
             if (matched_group_names.contains(group_name)) {
                 // 1. Assert: capturedValue is undefined.
                 std.debug.assert(captured_value.isUndefined());
@@ -568,23 +569,23 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
                 group_names.appendAssumeCapacity(null);
             } else {
                 // iii. Else,
-                // 1. If capturedValue is not undefined, append s to matchedGroupNames.
+                // 1. If capturedValue is not undefined, append groupName to matchedGroupNames.
                 if (!captured_value.isUndefined()) {
                     try matched_group_names.put(gpa, group_name, {});
                 }
 
-                // 2. NOTE: If there are multiple groups named s, groups may already have an s
-                //    property at this point. However, because groups is an ordinary object whose
-                //    properties are all writable data properties, the call to
+                // 2. NOTE: If there are multiple groups named groupName, groups may already have an
+                //    groupName property at this point. However, because groups is an ordinary
+                //    object whose properties are all writable data properties, the call to
                 //    CreateDataPropertyOrThrow is nevertheless guaranteed to succeed.
 
-                // 3. Perform ! CreateDataPropertyOrThrow(groups, s, capturedValue).
+                // 3. Perform ! CreateDataPropertyOrThrow(groups, groupName, capturedValue).
                 const property_key = PropertyKey.from(
                     try String.fromUtf8(agent, group_name),
                 );
                 try groups.asObject().createDataPropertyDirect(agent, property_key, captured_value);
 
-                // 4. Append s to groupNames.
+                // 4. Append groupName to groupNames.
                 group_names.appendAssumeCapacity(group_name);
             }
         } else {
@@ -596,7 +597,8 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
 
     // 35. If hasIndices is true, then
     if ((re_flags & libregexp.c.LRE_FLAG_INDICES) != 0) {
-        // a. Let indicesArray be MakeMatchIndicesIndexPairArray(S, indices, groupNames, hasGroups).
+        // a. Let indicesArray be MakeMatchIndicesIndexPairArray(string, indices, groupNames,
+        //    hasGroups).
         const indices_array = try makeMatchIndicesIndexPairArray(
             agent,
             string,
@@ -605,7 +607,7 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
             has_groups,
         );
 
-        // b. Perform ! CreateDataPropertyOrThrow(A, "indices", indicesArray).
+        // b. Perform ! CreateDataPropertyOrThrow(array, "indices", indicesArray).
         try array.object.createDataPropertyDirect(
             agent,
             PropertyKey.from("indices"),
@@ -613,11 +615,11 @@ pub fn regExpBuiltinExec(agent: *Agent, reg_exp: *RegExp, string: *const String)
         );
     }
 
-    // 36. Return A.
+    // 36. Return array.
     return &array.object;
 }
 
-/// 22.2.7.3 AdvanceStringIndex ( S, index, unicode )
+/// 22.2.7.3 AdvanceStringIndex ( string, index, unicode )
 /// https://tc39.es/ecma262/#sec-advancestringindex
 pub fn advanceStringIndex(string: *const String, index_: u53, unicode: bool) u54 {
     // 1. Assert: index ≤ 2**53 - 1.
@@ -626,16 +628,16 @@ pub fn advanceStringIndex(string: *const String, index_: u53, unicode: bool) u54
     // 2. If unicode is false, return index + 1.
     if (!unicode) return index + 1;
 
-    // 3. Let length be the length of S.
+    // 3. Let length be the length of string.
     const length = string.length;
 
     // 4. If index + 1 ≥ length, return index + 1.
     if (index + 1 >= length) return index + 1;
 
-    // 5. Let cp be CodePointAt(S, index).
+    // 5. Let codePoint be CodePointAt(string, index).
     const code_point = string.codePointAt(@intCast(index));
 
-    // 6. Return index + cp.[[CodeUnitCount]].
+    // 6. Return index + codePoint.[[CodeUnitCount]].
     return index + code_point.code_unit_count;
 }
 
@@ -649,21 +651,21 @@ const Match = struct {
     end_index: u32,
 };
 
-/// 22.2.7.6 GetMatchString ( S, match )
+/// 22.2.7.6 GetMatchString ( string, match )
 /// https://tc39.es/ecma262/#sec-getmatchstring
 fn getMatchString(agent: *Agent, string: *const String, match: Match) std.mem.Allocator.Error!*const String {
-    // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
+    // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of string.
     std.debug.assert(match.start_index <= match.end_index);
     std.debug.assert(match.end_index <= string.length);
 
-    // 2. Return the substring of S from match.[[StartIndex]] to match.[[EndIndex]].
+    // 2. Return the substring of string from match.[[StartIndex]] to match.[[EndIndex]].
     return string.substring(agent, match.start_index, match.end_index);
 }
 
-/// 22.2.7.7 GetMatchIndexPair ( S, match )
+/// 22.2.7.7 GetMatchIndexPair ( string, match )
 /// https://tc39.es/ecma262/#sec-getmatchindexpair
 fn getMatchIndexPair(agent: *Agent, string: *const String, match: Match) std.mem.Allocator.Error!*builtins.Array {
-    // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of S.
+    // 1. Assert: match.[[StartIndex]] ≤ match.[[EndIndex]] ≤ the length of string.
     std.debug.assert(match.start_index <= match.end_index);
     std.debug.assert(match.end_index <= string.length);
 
@@ -674,7 +676,7 @@ fn getMatchIndexPair(agent: *Agent, string: *const String, match: Match) std.mem
     });
 }
 
-/// 22.2.7.8 MakeMatchIndicesIndexPairArray ( S, indices, groupNames, hasGroups )
+/// 22.2.7.8 MakeMatchIndicesIndexPairArray ( string, indices, groupNames, hasGroups )
 /// https://tc39.es/ecma262/#sec-makematchindicesindexpairarray
 fn makeMatchIndicesIndexPairArray(
     agent: *Agent,
@@ -694,7 +696,7 @@ fn makeMatchIndicesIndexPairArray(
     //    indices[1].
     std.debug.assert(group_names.len == n - 1);
 
-    // 5. Let A be ! ArrayCreate(n).
+    // 5. Let array be ! ArrayCreate(n).
     const array = try arrayCreateFast(agent, 0);
 
     // 6. If hasGroups is true, then
@@ -707,7 +709,7 @@ fn makeMatchIndicesIndexPairArray(
         break :blk .undefined;
     };
 
-    // 8. Perform ! CreateDataPropertyOrThrow(A, "groups", groups).
+    // 8. Perform ! CreateDataPropertyOrThrow(array, "groups", groups).
     try array.object.createDataPropertyDirect(agent, PropertyKey.from("groups"), groups);
 
     // 9. For each integer i such that 0 ≤ i < n, in ascending order, do
@@ -718,7 +720,7 @@ fn makeMatchIndicesIndexPairArray(
 
         // b. If matchIndices is not undefined, then
         const match_index_pair: Value = if (match_indices != null) blk: {
-            // i. Let matchIndexPair be GetMatchIndexPair(S, matchIndices).
+            // i. Let matchIndexPair be GetMatchIndexPair(string, matchIndices).
             const match_index_pair = try getMatchIndexPair(agent, string, match_indices.?);
             break :blk Value.from(&match_index_pair.object);
         } else blk: {
@@ -727,7 +729,7 @@ fn makeMatchIndicesIndexPairArray(
             break :blk .undefined;
         };
 
-        // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(i)), matchIndexPair).
+        // d. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(i)), matchIndexPair).
         try array.object.createDataPropertyDirect(
             agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i))),
@@ -736,18 +738,18 @@ fn makeMatchIndicesIndexPairArray(
 
         // e. If i > 0, then
         if (i > 0) {
-            // i. Let s be groupNames[i - 1].
-            // ii. If s is not undefined, then
+            // i. Let name be groupNames[i - 1].
+            // ii. If name is not undefined, then
             if (group_names[i - 1]) |group_name| {
                 // 1. Assert: groups is not undefined.
                 std.debug.assert(!groups.isUndefined());
 
-                // 2. NOTE: If there are multiple groups named s, groups may already have an s
+                // 2. NOTE: If there are multiple groups named name, groups may already have an name
                 //    property at this point. However, because groups is an ordinary object whose
                 //    properties are all writable data properties, the call to
                 //    CreateDataPropertyOrThrow is nevertheless guaranteed to succeed.
 
-                // 3. Perform ! CreateDataPropertyOrThrow(groups, s, matchIndexPair).
+                // 3. Perform ! CreateDataPropertyOrThrow(groups, name, matchIndexPair).
                 const property_key = PropertyKey.from(
                     try String.fromUtf8(agent, try agent.gc_allocator.dupe(u8, group_name)),
                 );
@@ -760,7 +762,7 @@ fn makeMatchIndicesIndexPairArray(
         }
     }
 
-    // 10. Return A.
+    // 10. Return array.
     return array;
 }
 
@@ -773,7 +775,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "RegExp",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -792,90 +794,81 @@ pub const constructor = struct {
         );
     }
 
-    /// 22.2.4.1 RegExp ( pattern, flags )
+    /// 22.2.4.1 RegExp ( patternOrRegexp, flags )
     /// https://tc39.es/ecma262/#sec-regexp-pattern-flags
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
-        const pattern = arguments.get(0);
-        const flags = arguments.get(1);
+    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?*Object) Agent.Error!Value {
+        const pattern_or_regexp = arguments.get(0);
+        var flags = arguments.get(1);
 
-        // 1. Let patternIsRegExp be ? IsRegExp(pattern).
-        const pattern_is_regexp = try pattern.isRegExp(agent);
-
-        var constructor_: *Object = undefined;
+        // 1. Let patternIsRegExp be ? IsRegExp(patternOrRegexp).
+        const pattern_is_regexp = try pattern_or_regexp.isRegExp(agent);
 
         // 2. If NewTarget is undefined, then
-        if (new_target == null) {
+        const new_target = maybe_new_target orelse blk: {
             // a. Let newTarget be the active function object.
-            constructor_ = agent.activeFunctionObject();
+            const active_func = agent.activeFunctionObject();
 
             // b. If patternIsRegExp is true and flags is undefined, then
             if (pattern_is_regexp and flags.isUndefined()) {
-                // i. Let patternConstructor be ? Get(pattern, "constructor").
-                const pattern_constructor = try pattern.asObject().get(agent, PropertyKey.from("constructor"));
+                // i. Let patternCtor be ? Get(patternOrRegexp, "constructor").
+                const pattern_ctor = try pattern_or_regexp.asObject().get(
+                    agent,
+                    PropertyKey.from("constructor"),
+                );
 
-                // ii. If SameValue(newTarget, patternConstructor) is true, return pattern.
-                if (sameValue(Value.from(constructor_), pattern_constructor)) return pattern;
+                // ii. If SameValue(newTarget, patternCtor) is true, return patternOrRegexp.
+                if (sameValue(Value.from(active_func), pattern_ctor)) return pattern_or_regexp;
             }
-        } else {
-            // 3. Else,
-            // a. Let newTarget be NewTarget.
-            constructor_ = new_target.?;
-        }
 
-        var p: Value = undefined;
-        var f: Value = undefined;
+            break :blk active_func;
+        };
 
-        // 4. If pattern is an Object and pattern has a [[RegExpMatcher]] internal slot, then
-        if (pattern.castObject(RegExp)) |reg_exp| {
-            // a. Let P be pattern.[[OriginalSource]].
-            p = Value.from(reg_exp.fields.original_source);
+        // 3. Else,
+        //     a. Let newTarget be NewTarget.
 
-            // b. If flags is undefined, let F be pattern.[[OriginalFlags]].
+        var pattern: Value = undefined;
+
+        // 4. If patternOrRegexp is an Object and patternOrRegexp has a [[RegExpMatcher]] internal
+        //    slot, then
+        if (pattern_or_regexp.castObject(RegExp)) |obj| {
+            // a. Let patternSource be patternOrRegexp.[[OriginalSource]].
+            pattern = Value.from(obj.fields.original_source);
+
+            // b. If flags is undefined, set flags to patternOrRegexp.[[OriginalFlags]].
             if (flags.isUndefined()) {
-                f = Value.from(reg_exp.fields.original_flags);
-            }
-            // c. Else, let F be flags.
-            else {
-                f = flags;
+                flags = Value.from(obj.fields.original_flags);
             }
         }
         // 5. Else if patternIsRegExp is true, then
         else if (pattern_is_regexp) {
-            // a. Let P be ? Get(pattern, "source").
-            p = try pattern.asObject().get(agent, PropertyKey.from("source"));
+            // a. Let patternSource be ? Get(patternOrRegexp, "source").
+            pattern = try pattern_or_regexp.asObject().get(agent, PropertyKey.from("source"));
 
             // b. If flags is undefined, then
             if (flags.isUndefined()) {
-                // i. Let F be ? Get(pattern, "flags").
-                f = try pattern.asObject().get(agent, PropertyKey.from("flags"));
-            } else {
-                // c. Else,
-                // i. Let F be flags.
-                f = flags;
+                // i. Set flags to ? Get(patternOrRegexp, "flags").
+                flags = try pattern_or_regexp.asObject().get(agent, PropertyKey.from("flags"));
             }
         } else {
             // 6. Else,
-            // a. Let P be pattern.
-            p = pattern;
-
-            // b. Let F be flags.
-            f = flags;
+            // a. Let patternSource be patternOrRegexp.
+            pattern = pattern_or_regexp;
         }
 
-        // 7. Let O be ? RegExpAlloc(newTarget).
-        const reg_exp = try regExpAlloc(agent, constructor_);
+        // 7. Let obj be ? RegExpAlloc(newTarget).
+        const regexp = try regExpAlloc(agent, new_target);
 
-        // 8. Return ? RegExpInitialize(O, P, F).
-        _ = try regExpInitialize(agent, reg_exp, p, f);
-        return Value.from(&reg_exp.object);
+        // 8. Return ? RegExpInitialize(obj, patternSource, flags).
+        _ = try regExpInitialize(agent, regexp, pattern, flags);
+        return Value.from(&regexp.object);
     }
 
-    /// 22.2.5.1 RegExp.escape ( S )
+    /// 22.2.5.1 RegExp.escape ( string )
     /// https://tc39.es/ecma262/#sec-regexp.escape
     fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
-        // 1. If S is not a String, throw a TypeError exception.
+        // 1. If string is not a String, throw a TypeError exception.
         if (!string_value.isString()) {
             return agent.throwException(.type_error, "{f} is not a string", .{string_value});
         }
@@ -885,22 +878,22 @@ pub const constructor = struct {
         var escaped: String.Builder = .empty;
         defer escaped.deinit(agent.gc_allocator);
 
-        // 3. Let cpList be StringToCodePoints(S).
-        // 4. For each code point cp of cpList, do
+        // 3. Let codePointList be StringToCodePoints(string).
+        // 4. For each code point codePoint of codePointList, do
         var position: u32 = 0;
         while (position < string.length) {
-            const cp = string.codePointAt(position);
-            defer position += cp.code_unit_count;
+            const code_point = string.codePointAt(position);
+            defer position += code_point.code_unit_count;
 
-            // a. If escaped is the empty String and cp is matched by either DecimalDigit or
+            // a. If escaped is the empty String and codePoint is matched by either DecimalDigit or
             //    AsciiLetter, then
-            if (position == 0 and std.ascii.isAlphanumeric(std.math.cast(u8, cp.code_point) orelse 0)) {
+            if (position == 0 and std.ascii.isAlphanumeric(std.math.cast(u8, code_point.code_point) orelse 0)) {
                 // i. NOTE: Escaping a leading digit ensures that output corresponds with pattern
-                //    text which may be used after a \0 character escape or a DecimalEscape such as
-                //    \1 and still match S rather than be interpreted as an extension of the
-                //    preceding escape sequence. Escaping a leading ASCII letter does the same for
-                //    the context after \c.
-                // ii. Let numericValue be the numeric value of cp.
+                //    text which may be used after a `\0` character escape or a DecimalEscape such
+                //    as `\1` and still match string rather than be interpreted as an extension of
+                //    the preceding escape sequence. Escaping a leading ASCII letter does the same
+                //    for the context after `\c`.
+                // ii. Let numericValue be the numeric value of codePoint.
                 // iii. Let hex be Number::toString(𝔽(numericValue), 16).
                 // iv. Assert: The length of hex is 2.
                 // v. Set escaped to the string-concatenation of the code unit 0x005C (REVERSE
@@ -909,14 +902,14 @@ pub const constructor = struct {
                     agent.gc_allocator,
                     try String.fromAscii(
                         agent,
-                        try std.fmt.allocPrint(agent.gc_allocator, "\\x{x}", .{cp.code_point}),
+                        try std.fmt.allocPrint(agent.gc_allocator, "\\x{x}", .{code_point.code_point}),
                     ),
                 );
             } else {
                 // b. Else,
                 // i. Set escaped to the string-concatenation of escaped and EncodeForRegExpEscape(
-                //    cp).
-                try encodeForRegExpEscape(agent.gc_allocator, &escaped, cp);
+                //    codePoint).
+                try encodeForRegExpEscape(agent.gc_allocator, &escaped, code_point);
             }
         }
 
@@ -924,32 +917,33 @@ pub const constructor = struct {
         return Value.from(try escaped.build(agent));
     }
 
-    /// 22.2.5.1.1 EncodeForRegExpEscape ( cp )
+    /// 22.2.5.1.1 EncodeForRegExpEscape ( codePoint )
     /// https://tc39.es/ecma262/#sec-encodeforregexpescape
     fn encodeForRegExpEscape(
         allocator: std.mem.Allocator,
         escaped: *String.Builder,
-        cp: String.CodePoint,
+        code_point: String.CodePoint,
     ) std.mem.Allocator.Error!void {
         var hex_escape = false;
-        switch (cp.code_point) {
-            // 1. If cp is matched by SyntaxCharacter or cp is U+002F (SOLIDUS), then
+        switch (code_point.code_point) {
+            // 1. If codePoint is matched by SyntaxCharacter or codePoint is U+002F (SOLIDUS), then
             '^', '$', '\\', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '|', '/' => {
                 // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and
-                //    UTF16EncodeCodePoint(cp).
+                //    UTF16EncodeCodePoint(codePoint).
                 try escaped.appendChar(allocator, '\\');
-                try escaped.appendChar(allocator, @intCast(cp.code_point));
+                try escaped.appendChar(allocator, @intCast(code_point.code_point));
                 return;
             },
 
-            // 2. If cp is a code point listed in the “Code Point” column of Table 62, then
+            // 2. If codePoint is a code point listed in the “Code Point” column of Table 62, then
             '\t'...'\r' => {
                 // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and the string in
-                //    the “ControlEscape” column of the row whose “Code Point” column contains cp.
+                //    the “ControlEscape” column of the row whose “Code Point” column contains
+                //    codePoint.
                 try escaped.appendChar(allocator, '\\');
                 try escaped.appendChar(
                     allocator,
-                    ([5]u8{ 't', 'n', 'v', 'f', 'r' })[cp.code_point - 0x09],
+                    ([5]u8{ 't', 'n', 'v', 'f', 'r' })[code_point.code_point - 0x09],
                 );
                 return;
             },
@@ -964,41 +958,42 @@ pub const constructor = struct {
             else => {},
         }
 
-        // 5. If toEscape contains cp, cp is matched by either WhiteSpace or LineTerminator, or cp
-        //    has the same numeric value as a leading surrogate or trailing surrogate, then
+        // 5. If toEscape contains codePoint, codePoint is matched by either WhiteSpace or
+        //    LineTerminator, or codePoint has the same numeric value as a leading surrogate or
+        //    trailing surrogate, then
         if (hex_escape or
-            std.mem.findScalar(u21, &String.whitespace_code_points, cp.code_point) != null or
-            cp.is_unpaired_surrogate)
+            std.mem.findScalar(u21, &String.whitespace_code_points, code_point.code_point) != null or
+            code_point.is_unpaired_surrogate)
         {
-            // a. Let cpNum be the numeric value of cp.
-            // b. If cpNum ≤ 0xFF, then
-            if (cp.code_point <= 0xff) {
-                // i. Let hex be Number::toString(𝔽(cpNum), 16).
+            // a. Let codePointNumber be the numeric value of codePoint.
+            // b. If codePointNumber ≤ 0xFF, then
+            if (code_point.code_point <= 0xff) {
+                // i. Let hex be Number::toString(𝔽(codePointNumber), 16).
                 // ii. Return the string-concatenation of the code unit 0x005C (REVERSE SOLIDUS),
                 //     "x", and StringPad(hex, 2, "0", start).
-                const str = try std.fmt.allocPrint(allocator, "\\x{x:0>2}", .{cp.code_point});
+                const hex = try std.fmt.allocPrint(allocator, "\\x{x:0>2}", .{code_point.code_point});
                 // TODO: Support appending an ASCII slice to String.Builder
-                for (str) |c| {
+                for (hex) |c| {
                     try escaped.appendChar(allocator, c);
                 }
                 return;
             }
 
             // c. Let escaped be the empty String.
-            // d. Let codeUnits be UTF16EncodeCodePoint(cp).
-            // e. For each code unit cu of codeUnits, do
-            // i. Set escaped to the string-concatenation of escaped and UnicodeEscape(cu).
+            // d. Let codeUnits be UTF16EncodeCodePoint(codePoint).
+            // e. For each code unit codeUnit of codeUnits, do
+            // i. Set escaped to the string-concatenation of escaped and UnicodeEscape(codeUnit).
             // f. Return escaped.
-            const str = try std.fmt.allocPrint(allocator, "\\u{x:0>4}", .{cp.code_point});
+            const hex = try std.fmt.allocPrint(allocator, "\\u{x:0>4}", .{code_point.code_point});
             // TODO: Support appending an ASCII slice to String.Builder
-            for (str) |c| {
+            for (hex) |c| {
                 try escaped.appendChar(allocator, c);
             }
             return;
         }
 
-        // 6. Return UTF16EncodeCodePoint(cp).
-        try escaped.appendCodePoint(allocator, cp.code_point);
+        // 6. Return UTF16EncodeCodePoint(codePoint).
+        try escaped.appendCodePoint(allocator, code_point.code_point);
     }
 
     /// 22.2.5.3 get RegExp [ %Symbol.species% ]
@@ -1054,15 +1049,15 @@ pub const prototype = struct {
     /// 22.2.6.2 RegExp.prototype.exec ( string )
     /// https://tc39.es/ecma262/#sec-regexp.prototype.exec
     fn exec(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Perform ? RequireInternalSlot(R, [[RegExpMatcher]]).
-        const reg_exp = try this_value.requireInternalSlot(agent, RegExp);
+        // 1. Let regexp be the this value.
+        // 2. Perform ? RequireInternalSlot(regexp, [[RegExpMatcher]]).
+        const regexp = try this_value.requireInternalSlot(agent, RegExp);
 
-        // 3. Let S be ? ToString(string).
+        // 3. Set string to ? ToString(string).
         const string = try arguments.get(0).toString(agent);
 
-        // 4. Return ? RegExpBuiltinExec(R, S).
-        return if (try regExpBuiltinExec(agent, reg_exp, string)) |object|
+        // 4. Return ? RegExpBuiltinExec(regexp, string).
+        return if (try regExpBuiltinExec(agent, regexp, string)) |object|
             Value.from(object)
         else
             .null;
@@ -1071,74 +1066,74 @@ pub const prototype = struct {
     /// 22.2.6.3 get RegExp.prototype.dotAll
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.dotAll
     fn dotAll(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Let cu be the code unit 0x0073 (LATIN SMALL LETTER S).
-        // 3. Return ? RegExpHasFlag(R, cu).
+        // 1. Let regexp be the this value.
+        // 2. Let codeUnit be the code unit 0x0073 (LATIN SMALL LETTER S).
+        // 3. Return ? RegExpHasFlag(regexp, codeUnit).
         return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_DOTALL);
     }
 
     /// 22.2.6.4 get RegExp.prototype.flags
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.flags
     fn flags(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. If R is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
+        const regexp = this_value.asObject();
 
         // 3. Let codeUnits be a new empty List.
         var code_units = try std.ArrayList(u8).initCapacity(agent.gc_allocator, 8);
 
-        // 4. Let hasIndices be ToBoolean(? Get(R, "hasIndices")).
+        // 4. Let hasIndices be ToBoolean(? Get(regexp, "hasIndices")).
         // 5. If hasIndices is true, append the code unit 0x0064 (LATIN SMALL LETTER D) to
         //    codeUnits.
-        if ((try reg_exp.get(agent, PropertyKey.from("hasIndices"))).toBoolean()) {
+        if ((try regexp.get(agent, PropertyKey.from("hasIndices"))).toBoolean()) {
             code_units.appendAssumeCapacity('d');
         }
 
-        // 6. Let global be ToBoolean(? Get(R, "global")).
+        // 6. Let global be ToBoolean(? Get(regexp, "global")).
         // 7. If global is true, append the code unit 0x0067 (LATIN SMALL LETTER G) to codeUnits.
-        if ((try reg_exp.get(agent, PropertyKey.from("global"))).toBoolean()) {
+        if ((try regexp.get(agent, PropertyKey.from("global"))).toBoolean()) {
             code_units.appendAssumeCapacity('g');
         }
 
-        // 8. Let ignoreCase be ToBoolean(? Get(R, "ignoreCase")).
+        // 8. Let ignoreCase be ToBoolean(? Get(regexp, "ignoreCase")).
         // 9. If ignoreCase is true, append the code unit 0x0069 (LATIN SMALL LETTER I) to
         //    codeUnits.
-        if ((try reg_exp.get(agent, PropertyKey.from("ignoreCase"))).toBoolean()) {
+        if ((try regexp.get(agent, PropertyKey.from("ignoreCase"))).toBoolean()) {
             code_units.appendAssumeCapacity('i');
         }
 
-        // 10. Let multiline be ToBoolean(? Get(R, "multiline")).
+        // 10. Let multiline be ToBoolean(? Get(regexp, "multiline")).
         // 11. If multiline is true, append the code unit 0x006D (LATIN SMALL LETTER M) to
         //     codeUnits.
-        if ((try reg_exp.get(agent, PropertyKey.from("multiline"))).toBoolean()) {
+        if ((try regexp.get(agent, PropertyKey.from("multiline"))).toBoolean()) {
             code_units.appendAssumeCapacity('m');
         }
 
-        // 12. Let dotAll be ToBoolean(? Get(R, "dotAll")).
+        // 12. Let dotAll be ToBoolean(? Get(regexp, "dotAll")).
         // 13. If dotAll is true, append the code unit 0x0073 (LATIN SMALL LETTER S) to codeUnits.
-        if ((try reg_exp.get(agent, PropertyKey.from("dotAll"))).toBoolean()) {
+        if ((try regexp.get(agent, PropertyKey.from("dotAll"))).toBoolean()) {
             code_units.appendAssumeCapacity('s');
         }
 
-        // 14. Let unicode be ToBoolean(? Get(R, "unicode")).
+        // 14. Let unicode be ToBoolean(? Get(regexp, "unicode")).
         // 15. If unicode is true, append the code unit 0x0075 (LATIN SMALL LETTER U) to codeUnits.
-        if ((try reg_exp.get(agent, PropertyKey.from("unicode"))).toBoolean()) {
+        if ((try regexp.get(agent, PropertyKey.from("unicode"))).toBoolean()) {
             code_units.appendAssumeCapacity('u');
         }
 
-        // 16. Let unicodeSets be ToBoolean(? Get(R, "unicodeSets")).
+        // 16. Let unicodeSets be ToBoolean(? Get(regexp, "unicodeSets")).
         // 17. If unicodeSets is true, append the code unit 0x0076 (LATIN SMALL LETTER V) to
         //     codeUnits.
-        if ((try reg_exp.get(agent, PropertyKey.from("unicodeSets"))).toBoolean()) {
+        if ((try regexp.get(agent, PropertyKey.from("unicodeSets"))).toBoolean()) {
             code_units.appendAssumeCapacity('v');
         }
 
-        // 18. Let sticky be ToBoolean(? Get(R, "sticky")).
+        // 18. Let sticky be ToBoolean(? Get(regexp, "sticky")).
         // 19. If sticky is true, append the code unit 0x0079 (LATIN SMALL LETTER Y) to codeUnits.
-        if ((try reg_exp.get(agent, PropertyKey.from("sticky"))).toBoolean()) {
+        if ((try regexp.get(agent, PropertyKey.from("sticky"))).toBoolean()) {
             code_units.appendAssumeCapacity('y');
         }
 
@@ -1152,20 +1147,20 @@ pub const prototype = struct {
         );
     }
 
-    /// 22.2.6.4.1 RegExpHasFlag ( R, codeUnit )
+    /// 22.2.6.4.1 RegExpHasFlag ( regexp, codeUnit )
     /// https://tc39.es/ecma262/#sec-regexphasflag
-    fn regExpHasFlag(agent: *Agent, reg_exp_value: Value, flag: c_int) Agent.Error!Value {
-        // 1. If R is not an Object, throw a TypeError exception.
-        if (!reg_exp_value.isObject()) {
-            return agent.throwException(.type_error, "{f} is not an Object", .{reg_exp_value});
+    fn regExpHasFlag(agent: *Agent, regexp_value: Value, code_unit: c_int) Agent.Error!Value {
+        // 1. If regexp is not an Object, throw a TypeError exception.
+        if (!regexp_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{regexp_value});
         }
 
-        // 2. If R does not have an [[OriginalFlags]] internal slot, then
-        const reg_exp = reg_exp_value.asObject().cast(RegExp) orelse {
+        // 2. If regexp does not have an [[OriginalFlags]] internal slot, then
+        const regexp = regexp_value.asObject().cast(RegExp) orelse {
             const realm = agent.currentRealm();
 
-            // a. If SameValue(R, %RegExp.prototype%) is true, return undefined.
-            if (reg_exp_value.asObject() == try realm.intrinsics.@"%RegExp.prototype%"()) {
+            // a. If SameValue(regexp, %RegExp.prototype%) is true, return undefined.
+            if (regexp_value.asObject() == try realm.intrinsics.@"%RegExp.prototype%"()) {
                 return .undefined;
             }
 
@@ -1173,39 +1168,39 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "This value must be a RegExp object", .{});
         };
 
-        // 3. Let flags be R.[[OriginalFlags]].
-        const re_bytecode = reg_exp.fields.re_bytecode;
+        // 3. Let flags be regexp.[[OriginalFlags]].
+        const re_bytecode = regexp.fields.re_bytecode;
         const re_flags = libregexp.c.lre_get_flags(re_bytecode);
 
         // 4. If flags contains codeUnit, return true.
         // 5. Return false.
-        return Value.from((re_flags & flag) != 0);
+        return Value.from((re_flags & code_unit) != 0);
     }
 
     /// 22.2.6.5 get RegExp.prototype.global
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.global
     fn global(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Let cu be the code unit 0x0067 (LATIN SMALL LETTER G).
-        // 3. Return ? RegExpHasFlag(R, cu).
+        // 1. Let regexp be the this value.
+        // 2. Let codeUnit be the code unit 0x0067 (LATIN SMALL LETTER G).
+        // 3. Return ? RegExpHasFlag(regexp, codeUnit).
         return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_GLOBAL);
     }
 
     /// 22.2.6.6 get RegExp.prototype.hasIndices
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.hasIndices
     fn hasIndices(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Let cu be the code unit 0x0064 (LATIN SMALL LETTER D).
-        // 3. Return ? RegExpHasFlag(R, cu).
+        // 1. Let regexp be the this value.
+        // 2. Let codeUnit be the code unit 0x0064 (LATIN SMALL LETTER D).
+        // 3. Return ? RegExpHasFlag(regexp, codeUnit).
         return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_INDICES);
     }
 
     /// 22.2.6.7 get RegExp.prototype.ignoreCase
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.ignorecase
     fn ignoreCase(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Let cu be the code unit 0x0069 (LATIN SMALL LETTER I).
-        // 3. Return ? RegExpHasFlag(R, cu).
+        // 1. Let regexp be the this value.
+        // 2. Let codeUnit be the code unit 0x0069 (LATIN SMALL LETTER I).
+        // 3. Return ? RegExpHasFlag(regexp, codeUnit).
         return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_IGNORECASE);
     }
 
@@ -1214,22 +1209,22 @@ pub const prototype = struct {
     fn @"%Symbol.match%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
-        // 1. Let rx be the this value.
-        // 2. If rx is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
+        const regexp = this_value.asObject();
 
-        // 3. Let S be ? ToString(string).
+        // 3. Set string to ? ToString(string).
         const string = try string_value.toString(agent);
 
-        // 4. Let flags be ? ToString(? Get(rx, "flags")).
-        const flags_ = try (try reg_exp.get(agent, PropertyKey.from("flags"))).toString(agent);
+        // 4. Let flags be ? ToString(? Get(regexp, "flags")).
+        const flags_ = try (try regexp.get(agent, PropertyKey.from("flags"))).toString(agent);
 
-        // 5. If flags does not contain "g", return ? RegExpExec(rx, S).
+        // 5. If flags does not contain "g", return ? RegExpExec(regexp, string).
         if (flags_.indexOf(String.fromLiteral("g"), 0) == null) {
-            return if (try regExpExec(agent, reg_exp, string)) |object|
+            return if (try regExpExec(agent, regexp, string)) |object|
                 Value.from(object)
             else
                 .null;
@@ -1240,52 +1235,53 @@ pub const prototype = struct {
         const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
             flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
-        // 7. Perform ? Set(rx, "lastIndex", +0𝔽, true).
-        try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
+        // 7. Perform ? Set(regexp, "lastIndex", +0𝔽, true).
+        try regexp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
 
-        // 8. Let A be ! ArrayCreate(0).
+        // 8. Let array be ! ArrayCreate(0).
         const array = try arrayCreateFast(agent, 0);
 
-        // 9. Let n be 0.
-        var n: u53 = 0;
+        // 9. Let matchCount be 0.
+        var match_count: u53 = 0;
 
         // 10. Repeat,
-        while (true) : (n += 1) {
-            // a. Let result be ? RegExpExec(rx, S).
-            const result = try regExpExec(agent, reg_exp, string);
+        while (true) : (match_count += 1) {
+            // a. Let result be ? RegExpExec(regexp, string).
+            const result = try regExpExec(agent, regexp, string);
 
             // b. If result is null, then
             if (result == null) {
-                // i. If n = 0, return null.
-                if (n == 0) return .null;
+                // i. If matchCount = 0, return null.
+                if (match_count == 0) return .null;
 
-                // ii. Return A.
+                // ii. Return array.
                 return Value.from(&array.object);
             }
 
-            // c. Let matchStr be ? ToString(? Get(result, "0")).
-            const match_str = try (try result.?.get(agent, PropertyKey.from(0))).toString(agent);
+            // c. Let matchString be ? ToString(? Get(result, "0")).
+            const match_string = try (try result.?.get(agent, PropertyKey.from(0))).toString(agent);
 
-            // d. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(n)), matchStr).
+            // d. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(matchCount)),
+            //    matchString).
             try array.object.createDataPropertyDirect(
                 agent,
-                PropertyKey.from(n),
-                Value.from(match_str),
+                PropertyKey.from(match_count),
+                Value.from(match_string),
             );
 
-            // e. If matchStr is the empty String, then
-            if (match_str.isEmpty()) {
-                // i. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
-                const this_index = try (try reg_exp.get(
+            // e. If matchString is the empty String, then
+            if (match_string.isEmpty()) {
+                // i. Let thisIndex be ℝ(? ToLength(? Get(regexp, "lastIndex"))).
+                const this_index = try (try regexp.get(
                     agent,
                     PropertyKey.from("lastIndex"),
                 )).toLength(agent);
 
-                // ii. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
+                // ii. Let nextIndex be AdvanceStringIndex(string, thisIndex, fullUnicode).
                 const next_index = advanceStringIndex(string, this_index, full_unicode);
 
-                // iii. Perform ? Set(rx, "lastIndex", 𝔽(nextIndex), true).
-                try reg_exp.set(
+                // iii. Perform ? Set(regexp, "lastIndex", 𝔽(nextIndex), true).
+                try regexp.set(
                     agent,
                     PropertyKey.from("lastIndex"),
                     Value.from(@as(f64, @floatFromInt(next_index))),
@@ -1293,7 +1289,7 @@ pub const prototype = struct {
                 );
             }
 
-            // f. Set n to n + 1.
+            // f. Set matchCount to matchCount + 1.
         }
     }
 
@@ -1303,34 +1299,34 @@ pub const prototype = struct {
         const string_value = arguments.get(0);
         const realm = agent.currentRealm();
 
-        // 1. Let R be the this value.
-        // 2. If R is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
+        const regexp = this_value.asObject();
 
-        // 3. Let S be ? ToString(string).
+        // 3. Set string to ? ToString(string).
         const string = try string_value.toString(agent);
 
-        // 4. Let C be ? SpeciesConstructor(R, %RegExp%).
-        const constructor_ = try reg_exp.speciesConstructor(
+        // 4. Let speciesCtor be ? SpeciesConstructor(regexp, %RegExp%).
+        const species_ctor = try regexp.speciesConstructor(
             agent,
             try realm.intrinsics.@"%RegExp%"(),
         );
 
-        // 5. Let flags be ? ToString(? Get(R, "flags")).
-        const flags_ = try (try reg_exp.get(agent, PropertyKey.from("flags"))).toString(agent);
+        // 5. Let flags be ? ToString(? Get(regexp, "flags")).
+        const flags_ = try (try regexp.get(agent, PropertyKey.from("flags"))).toString(agent);
 
-        // 6. Let matcher be ? Construct(C, « R, flags »).
-        const matcher = try constructor_.construct(
+        // 6. Let matcher be ? Construct(speciesCtor, « regexp, flags »).
+        const matcher = try species_ctor.construct(
             agent,
-            &.{ Value.from(reg_exp), Value.from(flags_) },
+            &.{ Value.from(regexp), Value.from(flags_) },
             null,
         );
 
-        // 7. Let lastIndex be ? ToLength(? Get(R, "lastIndex")).
-        const last_index = try (try reg_exp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
+        // 7. Let lastIndex be ? ToLength(? Get(regexp, "lastIndex")).
+        const last_index = try (try regexp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
 
         // 8. Perform ? Set(matcher, "lastIndex", lastIndex, true).
         try matcher.set(agent, PropertyKey.from("lastIndex"), Value.from(last_index), .throw);
@@ -1344,23 +1340,23 @@ pub const prototype = struct {
         const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
             flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
-        // 13. Return CreateRegExpStringIterator(matcher, S, global, fullUnicode).
-        const reg_exp_string_iterator = try createRegExpStringIterator(
+        // 13. Return CreateRegExpStringIterator(matcher, string, global, fullUnicode).
+        const regexp_string_iterator = try createRegExpStringIterator(
             agent,
             matcher,
             string,
             global_,
             full_unicode,
         );
-        return Value.from(&reg_exp_string_iterator.object);
+        return Value.from(&regexp_string_iterator.object);
     }
 
     /// 22.2.6.10 get RegExp.prototype.multiline
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.multiline
     fn multiline(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Let cu be the code unit 0x006D (LATIN SMALL LETTER M).
-        // 3. Return ? RegExpHasFlag(R, cu).
+        // 1. Let regexp be the this value.
+        // 2. Let codeUnit be the code unit 0x006D (LATIN SMALL LETTER M).
+        // 3. Return ? RegExpHasFlag(regexp, codeUnit).
         return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_MULTILINE);
     }
 
@@ -1370,17 +1366,17 @@ pub const prototype = struct {
         const string_value = arguments.get(0);
         var replace_value = arguments.get(1);
 
-        // 1. Let rx be the this value.
-        // 2. If rx is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
+        const regexp = this_value.asObject();
 
-        // 3. Let S be ? ToString(string).
+        // 3. Set string to ? ToString(string).
         const string = try string_value.toString(agent);
 
-        // 4. Let lengthS be the length of S.
+        // 4. Let stringLength be the length of string.
         const string_length = string.length;
 
         // 5. Let functionalReplace be IsCallable(replaceValue).
@@ -1392,16 +1388,16 @@ pub const prototype = struct {
             replace_value = Value.from(try replace_value.toString(agent));
         }
 
-        // 7. Let flags be ? ToString(? Get(rx, "flags")).
-        const flags_ = try (try reg_exp.get(agent, PropertyKey.from("flags"))).toString(agent);
+        // 7. Let flags be ? ToString(? Get(regexp, "flags")).
+        const flags_ = try (try regexp.get(agent, PropertyKey.from("flags"))).toString(agent);
 
         // 8. If flags contains "g", let global be true; else let global be false.
         const global_ = flags_.indexOf(String.fromLiteral("g"), 0) != null;
 
         // 9. If global is true, then
         if (global_) {
-            // a. Perform ? Set(rx, "lastIndex", +0𝔽, true).
-            try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
+            // a. Perform ? Set(regexp, "lastIndex", +0𝔽, true).
+            try regexp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
         }
 
         // 10. Let results be a new empty List.
@@ -1411,8 +1407,8 @@ pub const prototype = struct {
         // 11. Let done be false.
         // 12. Repeat, while done is false,
         while (true) {
-            // a. Let result be ? RegExpExec(rx, S).
-            const result = try regExpExec(agent, reg_exp, string) orelse {
+            // a. Let result be ? RegExpExec(regexp, string).
+            const result = try regExpExec(agent, regexp, string) orelse {
                 // b. If result is null, then
                 //     i. Set done to true.
                 break;
@@ -1429,24 +1425,24 @@ pub const prototype = struct {
             }
 
             // iii. Else,
-            // 1. Let matchStr be ? ToString(? Get(result, "0")).
-            const match_str = try (try result.get(agent, PropertyKey.from(0))).toString(agent);
+            // 1. Let matchString be ? ToString(? Get(result, "0")).
+            const match_string = try (try result.get(agent, PropertyKey.from(0))).toString(agent);
 
-            // 2. If matchStr is the empty String, then
-            if (match_str.isEmpty()) {
-                // a. Let thisIndex be ℝ(? ToLength(? Get(rx, "lastIndex"))).
-                const this_index = try (try reg_exp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
+            // 2. If matchString is the empty String, then
+            if (match_string.isEmpty()) {
+                // a. Let thisIndex be ℝ(? ToLength(? Get(regexp, "lastIndex"))).
+                const this_index = try (try regexp.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
 
                 // b. If flags contains "u" or flags contains "v", let fullUnicode be true; else let
                 //    fullUnicode be false.
                 const full_unicode = flags_.indexOf(String.fromLiteral("u"), 0) != null or
                     flags_.indexOf(String.fromLiteral("v"), 0) != null;
 
-                // c. Let nextIndex be AdvanceStringIndex(S, thisIndex, fullUnicode).
+                // c. Let nextIndex be AdvanceStringIndex(string, thisIndex, fullUnicode).
                 const next_index = advanceStringIndex(string, this_index, full_unicode);
 
-                // d. Perform ? Set(rx, "lastIndex", 𝔽(nextIndex), true).
-                try reg_exp.set(
+                // d. Perform ? Set(regexp, "lastIndex", 𝔽(nextIndex), true).
+                try regexp.set(
                     agent,
                     PropertyKey.from("lastIndex"),
                     Value.from(@as(f64, @floatFromInt(next_index))),
@@ -1467,8 +1463,8 @@ pub const prototype = struct {
             // a. Let resultLength be ? LengthOfArrayLike(result).
             const result_length = try result.lengthOfArrayLike(agent);
 
-            // b. Let nCaptures be max(resultLength - 1, 0).
-            const n_captures = result_length -| 1;
+            // b. Let capturesCount be max(resultLength - 1, 0).
+            const captures_count = result_length -| 1;
 
             // c. Let matched be ? ToString(? Get(result, "0")).
             const matched = try (try result.get(agent, PropertyKey.from(0))).toString(agent);
@@ -1479,7 +1475,7 @@ pub const prototype = struct {
             // e. Let position be ? ToIntegerOrInfinity(? Get(result, "index")).
             const position_f64 = try (try result.get(agent, PropertyKey.from("index"))).toIntegerOrInfinity(agent);
 
-            // f. Set position to the result of clamping position between 0 and lengthS.
+            // f. Set position to the result of clamping position between 0 and stringLength.
             const position = std.math.clamp(
                 std.math.lossyCast(u32, position_f64),
                 0,
@@ -1489,34 +1485,35 @@ pub const prototype = struct {
             // g. Let captures be a new empty List.
             var captures = try std.ArrayList(?*const String).initCapacity(
                 agent.gc_allocator,
-                @intCast(n_captures),
+                @intCast(captures_count),
             );
             defer captures.deinit(agent.gc_allocator);
 
-            // h. Let n be 1.
-            var n: u53 = 1;
+            // h. Let captureNumber be 1.
+            var capture_number: u53 = 1;
 
-            // i. Repeat, while n ≤ nCaptures,
-            while (n <= n_captures) : (n += 1) {
-                var capture_n_string: ?*const String = null;
+            // i. Repeat, while captureNumber ≤ capturesCount,
+            while (capture_number <= captures_count) : (capture_number += 1) {
+                var capture_string: ?*const String = null;
 
-                // i. Let capN be ? Get(result, ! ToString(𝔽(n))).
-                var capture_n = try result.get(agent, PropertyKey.from(n));
+                // i. Let capture be ? Get(result, ! ToString(𝔽(captureNumber))).
+                var capture = try result.get(agent, PropertyKey.from(capture_number));
 
-                // ii. If capN is not undefined, then
-                if (!capture_n.isUndefined()) {
-                    // 1. Set capN to ? ToString(capN).
-                    capture_n_string = try capture_n.toString(agent);
+                // ii. If capture is not undefined, then
+                if (!capture.isUndefined()) {
+                    // 1. Set capture to ? ToString(capture).
+                    capture_string = try capture.toString(agent);
                 }
 
-                // iii. Append capN to captures.
-                captures.appendAssumeCapacity(capture_n_string);
+                // iii. Append capture to captures.
+                captures.appendAssumeCapacity(capture_string);
 
-                // iv. NOTE: When n = 1, the preceding step puts the first element into captures (at
-                //     index 0). More generally, the nth capture (the characters captured by the nth
-                //     set of capturing parentheses) is at captures[n - 1].
+                // iv. NOTE: When captureNumber = 1, the preceding step puts the first element into
+                //     captures (at index 0). More generally, the captureNumberth capture (the
+                //     characters captured by the captureNumberth set of capturing parentheses) is
+                //     at captures[captureNumber - 1].
 
-                // v. Set n to n + 1.
+                // v. Set captureNumber to captureNumber + 1.
             }
 
             // j. Let namedCaptures be ? Get(result, "groups").
@@ -1525,7 +1522,7 @@ pub const prototype = struct {
             // k. If functionalReplace is true, then
             const replacement_string = if (functional_replace) blk: {
                 // i. Let replacerArgs be the list-concatenation of « matched », captures, and
-                //    « 𝔽(position), S ».
+                //    « 𝔽(position), string ».
                 var replacer_args = try std.ArrayList(Value).initCapacity(
                     agent.gc_allocator,
                     captures.items.len + 3 + @intFromBool(!named_captures.isUndefined()),
@@ -1560,8 +1557,8 @@ pub const prototype = struct {
                     break :blk_obj try named_captures.toObject(agent);
                 } else null;
 
-                // ii. Let replacementString be ? GetSubstitution(matched, S, position, captures,
-                //     namedCaptures, replaceValue).
+                // ii. Let replacementString be ? GetSubstitution(matched, string, position,
+                //     captures, namedCaptures, replaceValue).
                 break :blk try getSubstitution(
                     agent,
                     matched,
@@ -1577,11 +1574,12 @@ pub const prototype = struct {
             if (position >= next_source_position) {
                 // i. NOTE: position should not normally move backwards. If it does, it is an
                 //    indication of an ill-behaving RegExp subclass or use of an access triggered
-                //    side-effect to change the global flag or other characteristics of rx. In such
-                //    cases, the corresponding substitution is ignored.
+                //    side-effect to change the global flag or other characteristics of regexp. In
+                //    such cases, the corresponding substitution is ignored.
 
                 // ii. Set accumulatedResult to the string-concatenation of accumulatedResult, the
-                //     substring of S from nextSourcePosition to position, and replacementString.
+                //     substring of string from nextSourcePosition to position, and
+                //     replacementString.
                 try accumulated_result.appendString(
                     agent.gc_allocator,
                     try string.substring(agent, next_source_position, position),
@@ -1593,8 +1591,8 @@ pub const prototype = struct {
             }
         }
 
-        // 16. If nextSourcePosition ≥ lengthS, return accumulatedResult.
-        // 17. Return the string-concatenation of accumulatedResult and the substring of S from
+        // 16. If nextSourcePosition ≥ stringLength, return accumulatedResult.
+        // 17. Return the string-concatenation of accumulatedResult and the substring of string from
         //     nextSourcePosition.
         if (next_source_position < string_length) {
             try accumulated_result.appendString(
@@ -1610,35 +1608,35 @@ pub const prototype = struct {
     fn @"%Symbol.search%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
-        // 1. Let rx be the this value.
-        // 2. If rx is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
+        const regexp = this_value.asObject();
 
-        // 3. Let S be ? ToString(string).
+        // 3. Set string to ? ToString(string).
         const string = try string_value.toString(agent);
 
-        // 4. Let previousLastIndex be ? Get(rx, "lastIndex").
-        const previous_last_index = try reg_exp.get(agent, PropertyKey.from("lastIndex"));
+        // 4. Let previousLastIndex be ? Get(regexp, "lastIndex").
+        const previous_last_index = try regexp.get(agent, PropertyKey.from("lastIndex"));
 
         // 5. If previousLastIndex is not +0𝔽, then
         if (!sameValue(previous_last_index, Value.from(0))) {
-            // a. Perform ? Set(rx, "lastIndex", +0𝔽, true).
-            try reg_exp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
+            // a. Perform ? Set(regexp, "lastIndex", +0𝔽, true).
+            try regexp.set(agent, PropertyKey.from("lastIndex"), Value.from(0), .throw);
         }
 
-        // 6. Let result be ? RegExpExec(rx, S).
-        const result = try regExpExec(agent, reg_exp, string);
+        // 6. Let result be ? RegExpExec(regexp, string).
+        const result = try regExpExec(agent, regexp, string);
 
-        // 7. Let currentLastIndex be ? Get(rx, "lastIndex").
-        const current_last_index = try reg_exp.get(agent, PropertyKey.from("lastIndex"));
+        // 7. Let currentLastIndex be ? Get(regexp, "lastIndex").
+        const current_last_index = try regexp.get(agent, PropertyKey.from("lastIndex"));
 
         // 8. If SameValue(currentLastIndex, previousLastIndex) is false, then
         if (!sameValue(current_last_index, previous_last_index)) {
-            // a. Perform ? Set(rx, "lastIndex", previousLastIndex, true).
-            try reg_exp.set(agent, PropertyKey.from("lastIndex"), previous_last_index, .throw);
+            // a. Perform ? Set(regexp, "lastIndex", previousLastIndex, true).
+            try regexp.set(agent, PropertyKey.from("lastIndex"), previous_last_index, .throw);
         }
 
         // 9. If result is null, return -1𝔽.
@@ -1651,16 +1649,16 @@ pub const prototype = struct {
     /// 22.2.6.13 get RegExp.prototype.source
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.source
     fn source(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // Let R be the this value.
-        // 2. If R is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        // 3. If R does not have an [[OriginalSource]] internal slot, then
-        const reg_exp = this_value.asObject().cast(RegExp) orelse {
+        // 3. If regexp does not have an [[OriginalSource]] internal slot, then
+        const regexp = this_value.asObject().cast(RegExp) orelse {
             const realm = agent.currentRealm();
 
-            // a. If SameValue(R, %RegExp.prototype%) is true, return "(?:)".
+            // a. If SameValue(regexp, %RegExp.prototype%) is true, return "(?:)".
             if (this_value.asObject() == try realm.intrinsics.@"%RegExp.prototype%"()) {
                 return Value.from("(?:)");
             }
@@ -1669,19 +1667,19 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "This value must be a RegExp object", .{});
         };
 
-        // 4. Assert: R has an [[OriginalFlags]] internal slot.
-        // 5. Let src be R.[[OriginalSource]].
-        const src = reg_exp.fields.original_source;
+        // 4. Assert: regexp has an [[OriginalFlags]] internal slot.
+        // 5. Let source be regexp.[[OriginalSource]].
+        const source_ = regexp.fields.original_source;
 
-        // 6. Let flags be R.[[OriginalFlags]].
-        const re_bytecode = reg_exp.fields.re_bytecode;
+        // 6. Let flags be regexp.[[OriginalFlags]].
+        const re_bytecode = regexp.fields.re_bytecode;
         const re_flags = libregexp.c.lre_get_flags(re_bytecode);
 
-        // 7. Return EscapeRegExpPattern(src, flags).
-        return Value.from(try escapeRegExpPattern(agent, src, re_flags));
+        // 7. Return EscapeRegExpPattern(source, flags).
+        return Value.from(try escapeRegExpPattern(agent, source_, re_flags));
     }
 
-    /// 22.2.6.13.1 EscapeRegExpPattern ( P, F )
+    /// 22.2.6.13.1 EscapeRegExpPattern ( pattern, flags )
     /// https://tc39.es/ecma262/#sec-escaperegexppattern
     fn escapeRegExpPattern(
         agent: *Agent,
@@ -1690,21 +1688,22 @@ pub const prototype = struct {
     ) std.mem.Allocator.Error!*const String {
         // TODO: 1-4.
         // 5. The code points `/` or any LineTerminator occurring in the pattern shall be escaped in
-        //    S as necessary to ensure that the string-concatenation of "/", S, "/", and F can be
-        //    parsed (in an appropriate lexical context) as a RegularExpressionLiteral that behaves
-        //    identically to the constructed regular expression. For example, if P is "/", then S
-        //    could be "\/" or "\u002F", among other possibilities, but not "/", because `///`
-        //    followed by F would be parsed as a SingleLineComment rather than a
-        //    RegularExpressionLiteral. If P is the empty String, this specification can be met by
-        //    letting S be "(?:)".
-        // 6. Return S.
+        //    escapedPattern as necessary to ensure that the string-concatenation of "/",
+        //    escapedPattern, "/", and flags can be parsed (in an appropriate lexical context) as a
+        //    RegularExpressionLiteral that behaves identically to the constructed regular
+        //    expression. For example, if pattern is "/", then escapedPattern could be "\/" or
+        //    "\u002F", among other possibilities, but not "/", because `///` followed by flags
+        //    would be parsed as a SingleLineComment rather than a RegularExpressionLiteral. If
+        //    pattern is the empty String, this specification can be met by letting escapedPattern
+        //    be "(?:)".
+        // 6. Return escapedPattern.
         if (pattern.isEmpty()) return String.fromLiteral("(?:)");
-        var escaped = pattern;
-        escaped = try escaped.replace(agent, "/", "\\/");
-        escaped = try escaped.replace(agent, "\r", "\\r");
-        escaped = try escaped.replace(agent, "\n", "\\n");
+        var escaped_pattern: *const String = pattern;
+        escaped_pattern = try escaped_pattern.replace(agent, "/", "\\/");
+        escaped_pattern = try escaped_pattern.replace(agent, "\r", "\\r");
+        escaped_pattern = try escaped_pattern.replace(agent, "\n", "\\n");
         // TODO: Handle LS and PS line terminators
-        return escaped;
+        return escaped_pattern;
     }
 
     /// 22.2.6.14 RegExp.prototype [ %Symbol.split% ] ( string, limit )
@@ -1714,24 +1713,24 @@ pub const prototype = struct {
         const string_value = arguments.get(0);
         const limit_value = arguments.get(1);
 
-        // 1. Let rx be the this value.
-        // 2. If rx is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
+        const regexp = this_value.asObject();
 
-        // 3. Let S be ? ToString(string).
+        // 3. Set string to ? ToString(string).
         const string = try string_value.toString(agent);
 
-        // 4. Let C be ? SpeciesConstructor(rx, %RegExp%).
-        const constructor_ = try reg_exp.speciesConstructor(
+        // 4. Let speciesCtor be ? SpeciesConstructor(regexp, %RegExp%).
+        const species_ctor = try regexp.speciesConstructor(
             agent,
             try realm.intrinsics.@"%RegExp%"(),
         );
 
-        // 5. Let flags be ? ToString(? Get(rx, "flags")).
-        const flags_ = try (try reg_exp.get(agent, PropertyKey.from("flags"))).toString(agent);
+        // 5. Let flags be ? ToString(? Get(regexp, "flags")).
+        const flags_ = try (try regexp.get(agent, PropertyKey.from("flags"))).toString(agent);
 
         // 6. If flags contains "u" or flags contains "v", let unicodeMatching be true.
         // 7. Else, let unicodeMatching be false.
@@ -1745,14 +1744,14 @@ pub const prototype = struct {
         else
             try String.concat(agent, &.{ flags_, String.fromLiteral("y") });
 
-        // 10. Let splitter be ? Construct(C, « rx, newFlags »).
-        const splitter = try constructor_.construct(
+        // 10. Let splitter be ? Construct(speciesCtor, « regexp, newFlags »).
+        const splitter = try species_ctor.construct(
             agent,
-            &.{ Value.from(reg_exp), Value.from(new_flags) },
+            &.{ Value.from(regexp), Value.from(new_flags) },
             null,
         );
 
-        // 11. Let A be ! ArrayCreate(0).
+        // 11. Let array be ! ArrayCreate(0).
         const array = try arrayCreateFast(agent, 0);
 
         // 12. Let lengthA be 0.
@@ -1764,99 +1763,101 @@ pub const prototype = struct {
         else
             try limit_value.toUint32(agent);
 
-        // 14. If lim = 0, return A.
+        // 14. If lim = 0, return array.
         if (limit == 0) return Value.from(&array.object);
 
-        // 15. If S is the empty String, then
+        // 15. If string is the empty String, then
         if (string.isEmpty()) {
-            // a. Let z be ? RegExpExec(splitter, S).
-            const z = try regExpExec(agent, splitter, string);
+            // a. Let matchResult be ? RegExpExec(splitter, string).
+            const match_result = try regExpExec(agent, splitter, string);
 
-            // b. If z is not null, return A.
-            if (z != null) return Value.from(&array.object);
+            // b. If matchResult is not null, return array.
+            if (match_result != null) return Value.from(&array.object);
 
-            // c. Perform ! CreateDataPropertyOrThrow(A, "0", S).
+            // c. Perform ! CreateDataPropertyOrThrow(array, "0", string).
             try array.object.createDataPropertyDirect(agent, PropertyKey.from(0), Value.from(string));
 
-            // d. Return A.
+            // d. Return array.
             return Value.from(&array.object);
         }
 
-        // 16. Let size be the length of S.
+        // 16. Let size be the length of string.
         const size = string.length;
 
-        // 17. Let p be 0.
-        var p: u53 = 0;
+        // 17. Let lastMatchEnd be 0.
+        var last_match_end: u53 = 0;
 
-        // 18. Let q be p.
-        var q: u53 = p;
+        // 18. Let searchIndex be lastMatchEnd.
+        var search_index: u53 = last_match_end;
 
-        // 19. Repeat, while q < size,
-        while (q < size) {
-            // a. Perform ? Set(splitter, "lastIndex", 𝔽(q), true).
-            try splitter.set(agent, PropertyKey.from("lastIndex"), Value.from(q), .throw);
+        // 19. Repeat, while searchIndex < size,
+        while (search_index < size) {
+            // a. Perform ? Set(splitter, "lastIndex", 𝔽(searchIndex), true).
+            try splitter.set(agent, PropertyKey.from("lastIndex"), Value.from(search_index), .throw);
 
-            // b. Let z be ? RegExpExec(splitter, S).
-            const z = try regExpExec(agent, splitter, string);
+            // b. Let matchResult be ? RegExpExec(splitter, string).
+            const match_result = try regExpExec(agent, splitter, string);
 
-            // c. If z is null, then
-            if (z == null) {
-                // i. Set q to AdvanceStringIndex(S, q, unicodeMatching).
-                q = std.math.cast(
+            // c. If matchResult is null, then
+            if (match_result == null) {
+                // i. Set searchIndex to AdvanceStringIndex(string, searchIndex, unicodeMatching).
+                search_index = std.math.cast(
                     u53,
-                    advanceStringIndex(string, q, unicode_matching),
+                    advanceStringIndex(string, search_index, unicode_matching),
                 ) orelse break;
             } else {
                 // d. Else,
-                // i. Let e be ℝ(? ToLength(? Get(splitter, "lastIndex"))).
-                var e = try (try splitter.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
+                // i. Let matchEnd be ℝ(? ToLength(? Get(splitter, "lastIndex"))).
+                var match_end = try (try splitter.get(agent, PropertyKey.from("lastIndex"))).toLength(agent);
 
-                // ii. Set e to min(e, size).
-                e = @min(e, size);
+                // ii. Set matchEnd to min(matchEnd, size).
+                match_end = @min(match_end, size);
 
-                // iii. If e = p, then
-                if (e == p) {
-                    // 1. Set q to AdvanceStringIndex(S, q, unicodeMatching).
-                    q = std.math.cast(
+                // iii. If matchEnd = lastMatchEnd, then
+                if (match_end == last_match_end) {
+                    // 1. Set searchIndex to AdvanceStringIndex(string, searchIndex,
+                    //    unicodeMatching).
+                    search_index = std.math.cast(
                         u53,
-                        advanceStringIndex(string, q, unicode_matching),
+                        advanceStringIndex(string, search_index, unicode_matching),
                     ) orelse break;
                 } else {
                     // iv. Else,
-                    // 1. Let T be the substring of S from p to q.
-                    const tail = try string.substring(agent, @intCast(p), @intCast(q));
+                    // 1. Let substring be the substring of string from lastMatchEnd to searchIndex.
+                    const substring = try string.substring(agent, @intCast(last_match_end), @intCast(search_index));
 
-                    // 2. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
+                    // 2. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(lengthA)),
+                    //    substring).
                     try array.object.createDataPropertyDirect(
                         agent,
                         PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
-                        Value.from(tail),
+                        Value.from(substring),
                     );
 
                     // 3. Set lengthA to lengthA + 1.
                     length_array += 1;
 
-                    // 4. If lengthA = lim, return A.
+                    // 4. If lengthA = lim, return array.
                     if (length_array == limit) return Value.from(&array.object);
 
-                    // 5. Set p to e.
-                    p = e;
+                    // 5. Set lastMatchEnd to matchEnd.
+                    last_match_end = match_end;
 
-                    // 6. Let numberOfCaptures be ? LengthOfArrayLike(z).
-                    var number_of_captures = try z.?.lengthOfArrayLike(agent);
+                    // 6. Let numberOfCaptures be ? LengthOfArrayLike(matchResult).
+                    var number_of_captures = try match_result.?.lengthOfArrayLike(agent);
 
                     // 7. Set numberOfCaptures to max(numberOfCaptures - 1, 0).
                     if (number_of_captures > 0) number_of_captures -= 1;
 
-                    // 8. Let i be 1.
-                    var i: u53 = 1;
+                    // 8. Let captureIndex be 1.
+                    var capture_index: u53 = 1;
 
-                    // 9. Repeat, while i ≤ numberOfCaptures,
-                    while (i <= number_of_captures) : (i += 1) {
-                        // a. Let nextCapture be ? Get(z, ! ToString(𝔽(i))).
-                        const next_capture = try z.?.get(agent, PropertyKey.from(i));
+                    // 9. Repeat, while captureIndex ≤ numberOfCaptures,
+                    while (capture_index <= number_of_captures) : (capture_index += 1) {
+                        // a. Let nextCapture be ? Get(matchResult, ! ToString(𝔽(captureIndex))).
+                        const next_capture = try match_result.?.get(agent, PropertyKey.from(capture_index));
 
-                        // b. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)),
+                        // b. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(lengthA)),
                         //    nextCapture).
                         try array.object.createDataPropertyDirect(
                             agent,
@@ -1864,59 +1865,59 @@ pub const prototype = struct {
                             next_capture,
                         );
 
-                        // c. Set i to i + 1.
+                        // c. Set captureIndex to captureIndex + 1.
 
                         // d. Set lengthA to lengthA + 1.
                         length_array += 1;
 
-                        // e. If lengthA = lim, return A.
+                        // e. If lengthA = lim, return array.
                         if (length_array == limit) return Value.from(&array.object);
                     }
 
-                    // 10. Set q to p.
-                    q = p;
+                    // 10. Set searchIndex to lastMatchEnd.
+                    search_index = last_match_end;
                 }
             }
         }
 
-        // 20. Let T be the substring of S from p to size.
-        const tail = try string.substring(agent, @intCast(p), size);
+        // 20. Let substring be the substring of string from lastMatchEnd to size.
+        const substring = try string.substring(agent, @intCast(last_match_end), size);
 
-        // 21. Perform ! CreateDataPropertyOrThrow(A, ! ToString(𝔽(lengthA)), T).
+        // 21. Perform ! CreateDataPropertyOrThrow(array, ! ToString(𝔽(lengthA)), substring).
         try array.object.createDataPropertyDirect(
             agent,
             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(length_array))),
-            Value.from(tail),
+            Value.from(substring),
         );
 
-        // 22. Return A.
+        // 22. Return array.
         return Value.from(&array.object);
     }
 
     /// 22.2.6.15 get RegExp.prototype.sticky
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.sticky
     fn sticky(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Let cu be the code unit 0x0079 (LATIN SMALL LETTER Y).
-        // 3. Return ? RegExpHasFlag(R, cu).
+        // 1. Let regexp be the this value.
+        // 2. Let codeUnit be the code unit 0x0079 (LATIN SMALL LETTER Y).
+        // 3. Return ? RegExpHasFlag(regexp, codeUnit).
         return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_STICKY);
     }
 
-    /// 22.2.6.16 RegExp.prototype.test ( S )
+    /// 22.2.6.16 RegExp.prototype.test ( string )
     /// https://tc39.es/ecma262/#sec-regexp.prototype.test
     fn @"test"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. If R is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
+        const regexp = this_value.asObject();
 
-        // 3. Let string be ? ToString(S).
+        // 3. Set string to ? ToString(string).
         const string = try arguments.get(0).toString(agent);
 
-        // 4. Let match be ? RegExpExec(R, string).
-        const match = try regExpExec(agent, reg_exp, string);
+        // 4. Let match be ? RegExpExec(regexp, string).
+        const match = try regExpExec(agent, regexp, string);
 
         // 5. If match is null, return false.
         // 6. Return true.
@@ -1926,18 +1927,18 @@ pub const prototype = struct {
     /// 22.2.6.17 RegExp.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-regexp.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. If R is not an Object, throw a TypeError exception.
+        // 1. Let regexp be the this value.
+        // 2. If regexp is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
-        const reg_exp = this_value.asObject();
+        const regexp = this_value.asObject();
 
-        // 3. Let pattern be ? ToString(? Get(R, "source")).
-        const pattern = try (try reg_exp.get(agent, PropertyKey.from("source"))).toString(agent);
+        // 3. Let pattern be ? ToString(? Get(regexp, "source")).
+        const pattern = try (try regexp.get(agent, PropertyKey.from("source"))).toString(agent);
 
-        // 4. Let flags be ? ToString(? Get(R, "flags")).
-        const flags_ = try (try reg_exp.get(agent, PropertyKey.from("flags"))).toString(agent);
+        // 4. Let flags be ? ToString(? Get(regexp, "flags")).
+        const flags_ = try (try regexp.get(agent, PropertyKey.from("flags"))).toString(agent);
 
         // 5. Let result be the string-concatenation of "/", pattern, "/", and flags.
         const result = try String.concat(agent, &.{
@@ -1954,36 +1955,33 @@ pub const prototype = struct {
     /// 22.2.6.18 get RegExp.prototype.unicode
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.unicode
     fn unicode(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Let cu be the code unit 0x0075 (LATIN SMALL LETTER U).
-        // 3. Return ? RegExpHasFlag(R, cu).
+        // 1. Let regexp be the this value.
+        // 2. Let codeUnit be the code unit 0x0075 (LATIN SMALL LETTER U).
+        // 3. Return ? RegExpHasFlag(regexp, codeUnit).
         return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_UNICODE);
     }
 
     /// 22.2.6.19 get RegExp.prototype.unicodeSets
     /// https://tc39.es/ecma262/#sec-get-regexp.prototype.unicodesets
     fn unicodeSets(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let R be the this value.
-        // 2. Let cu be the code unit 0x0076 (LATIN SMALL LETTER V).
-        // 3. Return ? RegExpHasFlag(R, cu).
+        // 1. Let regexp be the this value.
+        // 2. Let codeUnit be the code unit 0x0076 (LATIN SMALL LETTER V).
+        // 3. Return ? RegExpHasFlag(regexp, codeUnit).
         return regExpHasFlag(agent, this_value, libregexp.c.LRE_FLAG_UNICODE_SETS);
     }
 
     /// B.2.4.1 RegExp.prototype.compile ( pattern, flags )
     /// https://tc39.es/ecma262/#sec-regexp.prototype.compile
     fn compile(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const pattern = arguments.get(0);
-        const flags_ = arguments.get(1);
+        var pattern = arguments.get(0);
+        var flags_ = arguments.get(1);
 
-        // 1. Let O be the this value.
-        // 2. Perform ? RequireInternalSlot(O, [[RegExpMatcher]]).
-        const reg_exp = try this_value.requireInternalSlot(agent, RegExp);
-
-        var p: Value = undefined;
-        var f: Value = undefined;
+        // 1. Let obj be the this value.
+        // 2. Perform ? RequireInternalSlot(obj, [[RegExpMatcher]]).
+        const regexp = try this_value.requireInternalSlot(agent, RegExp);
 
         // 3. If pattern is an Object and pattern has a [[RegExpMatcher]] internal slot, then
-        if (pattern.castObject(RegExp)) |pattern_reg_exp| {
+        if (pattern.castObject(RegExp)) |pattern_regexp| {
             // a. If flags is not undefined, throw a TypeError exception.
             if (!flags_.isUndefined()) {
                 return agent.throwException(
@@ -1993,23 +1991,16 @@ pub const prototype = struct {
                 );
             }
 
-            // b. Let P be pattern.[[OriginalSource]].
-            p = Value.from(pattern_reg_exp.fields.original_source);
+            // c. Set pattern to pattern.[[OriginalSource]].
+            pattern = Value.from(pattern_regexp.fields.original_source);
 
-            // c. Let F be pattern.[[OriginalFlags]].
-            f = Value.from(pattern_reg_exp.fields.original_flags);
-        } else {
-            // 4. Else,
-            // a. Let P be pattern.
-            p = pattern;
-
-            // b. Let F be flags.
-            f = flags_;
+            // b. Set flags to pattern.[[OriginalFlags]].
+            flags_ = Value.from(pattern_regexp.fields.original_flags);
         }
 
-        // 5. Return ? RegExpInitialize(O, P, F).
-        _ = try regExpInitialize(agent, reg_exp, p, f);
-        return Value.from(&reg_exp.object);
+        // 4. Return ? RegExpInitialize(obj, pattern, flags).
+        _ = try regExpInitialize(agent, regexp, pattern, flags_);
+        return Value.from(&regexp.object);
     }
 };
 

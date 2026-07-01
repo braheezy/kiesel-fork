@@ -222,40 +222,39 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
 
     // 3. If locales is a String or locales is an Object and locales has an [[InitializedLocale]]
     //    internal slot, then
-    const object = if (locales.isString() or
+    const locales_obj = if (locales.isString() or
         (locales.isObject() and locales.asObject().is(builtins.intl.Locale)))
     blk: {
-        // a. Let O be CreateArrayFromList(« locales »).
+        // a. Let localesObj be CreateArrayFromList(« locales »).
         const array = try createArrayFromList(agent, &.{locales});
         break :blk &array.object;
     } else blk: {
         // 4. Else,
-        // a. Let O be ? ToObject(locales).
+        // a. Let localesObj be ? ToObject(locales).
         break :blk try locales.toObject(agent);
     };
 
-    // 5. Let len be ? LengthOfArrayLike(O).
-    const len = try object.lengthOfArrayLike(agent);
+    // 5. Let length be ? LengthOfArrayLike(localesObj).
+    const length = try locales_obj.lengthOfArrayLike(agent);
 
     // 6. Let k be 0.
     var k: u53 = 0;
 
-    // 7. Repeat, while k < len,
-    while (k < len) : (k += 1) {
-        // a. Let Pk be ! ToString(𝔽(k)).
+    // 7. Repeat, while k < length,
+    while (k < length) : (k += 1) {
+        // a. Let propertyKey be ! ToString(𝔽(k)).
         const property_key = PropertyKey.from(k);
 
-        // b. Let kPresent be ? HasProperty(O, Pk).
-        const k_present = try object.hasProperty(agent, property_key);
+        // b. Let exists be ? HasProperty(localesObj, propertyKey).
+        const exists = try locales_obj.hasProperty(agent, property_key);
 
-        // c. If kPresent is true, then
-        if (k_present) {
-            // i. Let kValue be ? Get(O, Pk).
-            const k_value = try object.get(agent, property_key);
+        // c. If exists is true, then
+        if (exists) {
+            // i. Let element be ? Get(localesObj, propertyKey).
+            const element = try locales_obj.get(agent, property_key);
 
-            // ii. If kValue is not a String and kValue is not an Object, throw a TypeError
-            //     exception.
-            if (!k_value.isString() and !k_value.isObject()) {
+            // ii. If element is neither a String nor an Object, throw a TypeError exception.
+            if (!element.isString() and !element.isObject()) {
                 return agent.throwException(
                     .type_error,
                     "Locale list items must be strings or objects",
@@ -263,18 +262,18 @@ pub fn canonicalizeLocaleList(agent: *Agent, locales: Value) Agent.Error!LocaleL
                 );
             }
 
-            // iii. If kValue is an Object and kValue has an [[InitializedLocale]] internal slot,
+            // iii. If element is an Object and element has an [[InitializedLocale]] internal slot,
             //      then
-            const tag = if (k_value.castObject(builtins.intl.Locale)) |locale| blk: {
-                // 1. Let tag be kValue.[[Locale]].
+            const tag = if (element.castObject(builtins.intl.Locale)) |locale| blk: {
+                // 1. Let tag be element.[[Locale]].
                 break :blk try String.fromAscii(
                     agent,
                     try locale.fields.locale.toString(agent.gc_allocator),
                 );
             } else blk: {
                 // iv. Else,
-                // 1. Let tag be ? ToString(kValue).
-                break :blk try k_value.toString(agent);
+                // 1. Let tag be ? ToString(element).
+                break :blk try element.toString(agent);
             };
 
             // v. If IsWellFormedLanguageTag(tag) is false, throw a RangeError exception.
@@ -352,7 +351,7 @@ fn resolveLocale(
     };
 }
 
-/// 9.2.8 ResolveOptions ( constructor, localeData, locales, options [ , specialBehaviours [ , modifyResolutionOptions ] ] )
+/// 9.2.8 ResolveOptions ( ctor, localeData, locales, options [ , specialBehaviours [ , modifyResolutionOptions ] ] )
 /// https://tc39.es/ecma402/#sec-resolveoptions
 pub fn resolveOptions(
     agent: *Agent,
@@ -399,8 +398,7 @@ pub fn resolveOptions(
     // 5. Let opt be the Record { [[localeMatcher]]: matcher }.
     var resolution_options: ResolutionOptions(resolution_option_descriptors) = undefined;
 
-    // 6. For each Resolution Option Descriptor desc of constructor.[[ResolutionOptionDescriptors]],
-    //    do
+    // 6. For each Resolution Option Descriptor desc of ctor.[[ResolutionOptionDescriptors]], do
     inline for (resolution_option_descriptors) |desc| {
         const Desc = @TypeOf(desc);
 
@@ -440,8 +438,8 @@ pub fn resolveOptions(
 
     // TODO: 7. If modifyResolutionOptions is present, perform ! modifyResolutionOptions(opt).
 
-    // 8. Let resolution be ResolveLocale(constructor.[[AvailableLocales]], requestedLocales, opt,
-    //    constructor.[[RelevantExtensionKeys]], localeData).
+    // 8. Let resolution be ResolveLocale(ctor.[[AvailableLocales]], requestedLocales, opt,
+    //    ctor.[[RelevantExtensionKeys]], localeData).
     const resolution = resolveLocale(
         agent,
         requested_locales.items,
@@ -454,20 +452,20 @@ pub fn resolveOptions(
     return .{ .options = options, .resolved_locale = resolution };
 }
 
-/// 9.2.12 GetBooleanOrStringNumberFormatOption ( options, property, stringValues, fallback )
+/// 9.2.12 GetBooleanOrStringNumberFormatOption ( options, propertyKey, stringValues, fallback )
 /// https://tc39.es/ecma402/#sec-getbooleanorstringnumberformatoption
 pub fn getBooleanOrStringNumberFormatOption(
     agent: *Agent,
     options: *Object,
-    comptime property: []const u8,
+    comptime property_key: []const u8,
     string_values: []const *const String,
     fallback: *const String,
 ) Agent.Error!union(enum) {
     bool: bool,
     string: *const String,
 } {
-    // 1. Let value be ? Get(options, property).
-    const value = try options.get(agent, PropertyKey.from(property));
+    // 1. Let value be ? Get(options, propertyKey).
+    const value = try options.get(agent, PropertyKey.from(property_key));
 
     // 2. If value is undefined, return fallback.
     if (value.isUndefined()) return .{ .string = fallback };
@@ -485,7 +483,7 @@ pub fn getBooleanOrStringNumberFormatOption(
     for (string_values) |allowed_string_value| {
         if (string_value.eql(allowed_string_value)) break;
     } else {
-        return agent.throwException(.range_error, "Invalid value for option '{s}'", .{property});
+        return agent.throwException(.range_error, "Invalid value for option '{s}'", .{property_key});
     }
 
     // 7. Return value.
@@ -525,19 +523,19 @@ pub fn defaultNumberOption(
     return @intFromFloat(@floor(number.asFloat()));
 }
 
-/// 9.2.14 GetNumberOption ( options, property, minimum, maximum, fallback )
+/// 9.2.14 GetNumberOption ( options, propertyKey, minimum, maximum, fallback )
 /// https://tc39.es/ecma402/#sec-getnumberoption
 pub fn getNumberOption(
     agent: *Agent,
     options: *Object,
-    comptime property: []const u8,
+    comptime property_key: []const u8,
     minimum: i32,
     maximum: i32,
     fallback: ?i32,
 ) Agent.Error!?i32 {
-    // 1. Let value be ? Get(options, property).
-    const value = try options.get(agent, PropertyKey.from(property));
+    // 1. Let value be ? Get(options, propertyKey).
+    const value = try options.get(agent, PropertyKey.from(property_key));
 
     // 2. Return ? DefaultNumberOption(value, minimum, maximum, fallback).
-    return defaultNumberOption(agent, value, property, minimum, maximum, fallback);
+    return defaultNumberOption(agent, value, property_key, minimum, maximum, fallback);
 }

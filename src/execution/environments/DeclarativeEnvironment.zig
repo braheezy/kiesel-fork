@@ -38,15 +38,15 @@ comptime {
     }
 }
 
-/// 9.1.1.1.1 HasBinding ( N )
+/// 9.1.1.1.1 HasBinding ( name )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-hasbinding-n
 pub fn hasBinding(self: *const DeclarativeEnvironment, name: *const String) bool {
-    // 1. If envRec has a binding for N, return true.
+    // 1. If envRecord has a binding for name, return true.
     // 2. Return false.
     return self.bindings.contains(name);
 }
 
-/// 9.1.1.1.2 CreateMutableBinding ( N, D )
+/// 9.1.1.1.2 CreateMutableBinding ( name, deletable )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-createmutablebinding-n-d
 pub fn createMutableBinding(
     self: *DeclarativeEnvironment,
@@ -54,10 +54,10 @@ pub fn createMutableBinding(
     name: *const String,
     deletable: bool,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: envRec does not already have a binding for N.
-    // 2. Create a mutable binding in envRec for N and record that it is uninitialized. If D is
-    //    true, record that the newly created binding may be deleted by a subsequent DeleteBinding
-    //    call.
+    // 1. Assert: envRecord does not already have a binding for name.
+    // 2. Create a mutable binding in envRecord for name and record that it is uninitialized. If
+    //    deletable is true, record that the newly created binding may be deleted by a subsequent
+    //    DeleteBinding call.
     try self.bindings.putNoClobber(agent.gc_allocator, name, .{
         .value = undefined,
         .initialized = false,
@@ -69,7 +69,7 @@ pub fn createMutableBinding(
     // 3. Return unused.
 }
 
-/// 9.1.1.1.3 CreateImmutableBinding ( N, S )
+/// 9.1.1.1.3 CreateImmutableBinding ( name, strict )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-createimmutablebinding-n-s
 pub fn createImmutableBinding(
     self: *DeclarativeEnvironment,
@@ -77,9 +77,9 @@ pub fn createImmutableBinding(
     name: *const String,
     strict: bool,
 ) std.mem.Allocator.Error!void {
-    // 1. Assert: envRec does not already have a binding for N.
-    // 2. Create an immutable binding in envRec for N and record that it is uninitialized. If S is
-    //    true, record that the newly created binding is a strict binding.
+    // 1. Assert: envRecord does not already have a binding for name.
+    // 2. Create an immutable binding in envRecord for name and record that it is uninitialized. If
+    //    strict is true, record that the newly created binding is a strict binding.
     try self.bindings.putNoClobber(agent.gc_allocator, name, .{
         .value = undefined,
         .initialized = false,
@@ -91,7 +91,7 @@ pub fn createImmutableBinding(
     // 3. Return unused.
 }
 
-/// 9.1.1.1.4 InitializeBinding ( N, V )
+/// 9.1.1.1.4 InitializeBinding ( name, value )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-initializebinding-n-v
 pub fn initializeBinding(
     self: *const DeclarativeEnvironment,
@@ -100,19 +100,19 @@ pub fn initializeBinding(
 ) void {
     var binding = self.bindings.getPtr(name).?;
 
-    // 1. Assert: envRec must have an uninitialized binding for N.
+    // 1. Assert: envRecord must have an uninitialized binding for name.
     std.debug.assert(binding.initialized == false);
 
-    // 2. Set the bound value for N in envRec to V.
+    // 2. Set the bound value for name in envRecord to value.
     binding.value = value;
 
-    // 3. Record that the binding for N in envRec has been initialized.
+    // 3. Record that the binding for name in envRecord has been initialized.
     binding.initialized = true;
 
     // 4. Return unused.
 }
 
-/// 9.1.1.1.5 SetMutableBinding ( N, V, S )
+/// 9.1.1.1.5 SetMutableBinding ( name, value, strict )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-setmutablebinding-n-v-s
 pub fn setMutableBinding(
     self: *DeclarativeEnvironment,
@@ -123,10 +123,10 @@ pub fn setMutableBinding(
 ) Agent.Error!void {
     const maybe_binding = self.bindings.getPtr(name);
 
-    // 1. If envRec does not have a binding for N, then
+    // 1. If envRecord does not have a binding for name, then
     const binding = maybe_binding orelse {
         @branchHint(.unlikely);
-        // a. If S is true, throw a ReferenceError exception.
+        // a. If strict is true, throw a ReferenceError exception.
         if (strict) {
             return agent.throwException(
                 .reference_error,
@@ -135,20 +135,20 @@ pub fn setMutableBinding(
             );
         }
 
-        // b. Perform ! envRec.CreateMutableBinding(N, true).
+        // b. Perform ! envRecord.CreateMutableBinding(name, true).
         try self.createMutableBinding(agent, name, true);
 
-        // c. Perform ! envRec.InitializeBinding(N, V).
+        // c. Perform ! envRecord.InitializeBinding(name, value).
         self.initializeBinding(name, value);
 
         // d. Return unused.
         return;
     };
 
-    // 2. If the binding for N in envRec is a strict binding, set S to true.
+    // 2. If the binding for name in envRecord is a strict binding, set strict to true.
     const final_strict = binding.strict or strict;
 
-    // 3. If the binding for N in envRec has not yet been initialized, then
+    // 3. If the binding for name in envRecord has not yet been initialized, then
     if (!binding.initialized) {
         @branchHint(.unlikely);
         // a. Throw a ReferenceError exception.
@@ -159,15 +159,15 @@ pub fn setMutableBinding(
         );
     }
 
-    // 4. Else if the binding for N in envRec is a mutable binding, then
+    // 4. Else if the binding for name in envRecord is a mutable binding, then
     if (binding.mutable) {
         @branchHint(.likely);
-        // a. Change its bound value to V.
+        // a. Change its bound value to value.
         binding.value = value;
     } else {
         // 5. Else,
         // a. Assert: This is an attempt to change the value of an immutable binding.
-        // b. If S is true, throw a TypeError exception.
+        // b. If strict is true, throw a TypeError exception.
         if (final_strict) {
             return agent.throwException(
                 .type_error,
@@ -180,7 +180,7 @@ pub fn setMutableBinding(
     // 6. Return unused.
 }
 
-/// 9.1.1.1.6 GetBindingValue ( N, S )
+/// 9.1.1.1.6 GetBindingValue ( name, strict )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-getbindingvalue-n-s
 pub fn getBindingValue(
     self: *const DeclarativeEnvironment,
@@ -188,10 +188,10 @@ pub fn getBindingValue(
     name: *const String,
     _: bool,
 ) error{ExceptionThrown}!Value {
-    // 1. Assert: envRec has a binding for N.
+    // 1. Assert: envRecord has a binding for name.
     const binding = self.bindings.get(name).?;
 
-    // 2. If the binding for N in envRec is an uninitialized binding, throw a ReferenceError
+    // 2. If the binding for name in envRecord is an uninitialized binding, throw a ReferenceError
     //    exception.
     if (!binding.initialized) {
         @branchHint(.unlikely);
@@ -202,23 +202,23 @@ pub fn getBindingValue(
         );
     }
 
-    // 3. Return the value currently bound to N in envRec.
+    // 3. Return the value currently bound to name in envRecord.
     return binding.value;
 }
 
-/// 9.1.1.1.7 DeleteBinding ( N )
+/// 9.1.1.1.7 DeleteBinding ( name )
 /// https://tc39.es/ecma262/#sec-declarative-environment-records-deletebinding-n
 pub fn deleteBinding(self: *DeclarativeEnvironment, name: *const String) bool {
-    // 1. Assert: envRec has a binding for N.
+    // 1. Assert: envRecord has a binding for name.
     const binding = self.bindings.get(name).?;
 
-    // 2. If the binding for N in envRec cannot be deleted, return false.
+    // 2. If the binding for name in envRecord cannot be deleted, return false.
     if (!binding.deletable) {
         @branchHint(.unlikely);
         return false;
     }
 
-    // 3. Remove the binding for N from envRec.
+    // 3. Remove the binding for name from envRecord.
     _ = self.bindings.remove(name);
 
     // 4. Return true.

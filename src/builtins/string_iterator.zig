@@ -45,11 +45,11 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-%stringiteratorprototype%.next
     fn next(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? GeneratorResume(this value, empty, "%StringIteratorPrototype%").
-        // NOTE: In the absence of generators this implements one loop iteration of the
-        //       CreateStringIterator closure. State is kept track of through the ArrayIterator
+        // NOTE: Instead of using generators this implements one loop iteration of the
+        //       CreateStringIterator closure. State is kept track of through the StringIterator
         //       instance instead of as local variables. This should not be observable.
 
-        // 1. Let state be ? GeneratorValidate(generator, generatorBrand).
+        // 1. Let state be ? GeneratorValidate(gen, genBrand).
         const string_iterator = try this_value.requireInternalSlot(agent, StringIterator);
 
         // 2. If state is completed, return CreateIteratorResultObject(undefined, true).
@@ -60,19 +60,19 @@ pub const prototype = struct {
         const string = string_iterator.fields.state.string;
         const position = string_iterator.fields.state.position;
 
-        // a. Let len be the length of s.
-        const len = string.length;
+        // a. Let length be the length of string.
+        const length = string.length;
 
         // b. Let position be 0.
-        // c. Repeat, while position < len,
-        if (position < len) {
-            // i. Let cp be CodePointAt(s, position).
+        // c. Repeat, while position < length,
+        if (position < length) {
+            // i. Let codePoint be CodePointAt(string, position).
             const code_point = string.codePointAt(position);
 
-            // ii. Let nextIndex be position + cp.[[CodeUnitCount]].
+            // ii. Let nextIndex be position + codePoint.[[CodeUnitCount]].
             const next_index = position + code_point.code_unit_count;
 
-            // iii. Let resultString be the substring of s from position to nextIndex.
+            // iii. Let resultString be the substring of string from position to nextIndex.
             const result_string = try string.substring(agent, position, next_index);
 
             // iv. Set position to nextIndex.

@@ -26,26 +26,29 @@ pub const ModuleRequest = struct {
     specifier: *const String,
     attributes: []const ImportAttribute,
 
-    /// 16.2.1.3.1 ModuleRequestsEqual ( left, right )
+    /// 16.2.1.3.1 ModuleRequestsEqual ( x, y )
     /// https://tc39.es/ecma262/#sec-ModuleRequestsEqual
-    pub fn eql(left: ModuleRequest, right: ModuleRequest) bool {
-        // 1. If left.[[Specifier]] is not right.[[Specifier]], return false.
-        if (!left.specifier.eql(right.specifier)) return false;
+    pub fn eql(x: ModuleRequest, y: ModuleRequest) bool {
+        // 1. If x.[[Specifier]] is not y.[[Specifier]], return false.
+        if (!x.specifier.eql(y.specifier)) return false;
 
-        // 2. Let leftAttrs be left.[[Attributes]].
-        // 3. Let rightAttrs be right.[[Attributes]].
+        // 2. Let xAttrs be x.[[Attributes]].
+        const x_attrs = x.attributes;
 
-        // 4. Let leftAttrsCount be the number of elements in leftAttrs.
-        // 5. Let rightAttrsCount be the number of elements in rightAttrs.
-        // 6. If leftAttrsCount ≠ rightAttrsCount, return false.
-        if (left.attributes.len != right.attributes.len) return false;
+        // 3. Let yAttrs be y.[[Attributes]].
+        const y_attrs = y.attributes;
 
-        // 7. For each ImportAttribute Record l of leftAttrs, do
-        for (left.attributes) |l| {
-            // a. If rightAttrs does not contain an ImportAttribute Record r such that l.[[Key]] is
-            //    r.[[Key]] and l.[[Value]] is r.[[Value]], return false.
-            for (right.attributes) |r| {
-                if (l.key.eql(r.key) and l.value.eql(r.value)) break;
+        // 4. Let xAttrsCount be the number of elements in xAttrs.
+        // 5. Let yAttrsCount be the number of elements in yAttrs.
+        // 6. If xAttrsCount ≠ yAttrsCount, return false.
+        if (x_attrs.len != y_attrs.len) return false;
+
+        // 7. For each ImportAttribute Record xAttr of xAttrs, do
+        for (x_attrs) |x_attr| {
+            // a. If yAttrs does not contain an ImportAttribute Record yAttr such that xAttr.[[Key]]
+            //    is yAttr.[[Key]] and xAttr.[[Value]] is yAttr.[[Value]], return false.
+            for (y_attrs) |y_attr| {
+                if (x_attr.key.eql(y_attr.key) and x_attr.value.eql(y_attr.value)) break;
             } else return false;
         }
 
@@ -501,19 +504,19 @@ pub fn finishLoadingImportedModule(
     // 4. Return unused.
 }
 
-/// 16.2.1.12 AllImportAttributesSupported ( attributes )
+/// 16.2.1.12 AllImportAttributesSupported ( attrs )
 /// https://tc39.es/ecma262/#sec-AllImportAttributesSupported
 pub fn allImportAttributesSupported(
     agent: *Agent,
-    attributes: []const ImportAttribute,
+    attrs: []const ImportAttribute,
 ) std.mem.Allocator.Error!?*const String {
     // 1. Let supported be HostGetSupportedImportAttributes().
     const supported = try agent.host_hooks.hostGetSupportedImportAttributes(agent);
 
-    // 2. For each ImportAttribute Record attribute of attributes, do
-    for (attributes) |attribute| {
-        // a. If supported does not contain attribute.[[Key]], return false.
-        if (!supported.contains(attribute.key)) return attribute.key;
+    // 2. For each ImportAttribute Record attr of attrs, do
+    for (attrs) |attr| {
+        // a. If supported does not contain attr.[[Key]], return false.
+        if (!supported.contains(attr.key)) return attr.key;
     }
 
     // 3. Return true.

@@ -26,7 +26,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Symbol",
-            .{ .realm = realm, .prototype = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
         );
         return &builtin_function.object;
     }
@@ -193,8 +193,8 @@ pub const constructor = struct {
         // 1. Let stringKey be ? ToString(key).
         const string_key = try key.toString(agent);
 
-        // 2. For each element e of the GlobalSymbolRegistry List, do
-        //     a. If e.[[Key]] is stringKey, return e.[[Symbol]].
+        // 2. For each element element of the GlobalSymbolRegistry List, do
+        //     a. If element.[[Key]] is stringKey, return element.[[Symbol]].
         const gop = try agent.global_symbol_registry.getOrPut(agent.gc_allocator, string_key);
         if (gop.found_existing) return Value.from(gop.value_ptr.*);
 
@@ -212,17 +212,17 @@ pub const constructor = struct {
         return Value.from(new_symbol);
     }
 
-    /// 20.4.2.6 Symbol.keyFor ( sym )
+    /// 20.4.2.6 Symbol.keyFor ( symbol )
     /// https://tc39.es/ecma262/#sec-symbol.keyfor
     fn keyFor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const symbol = arguments.get(0);
 
-        // 1. If sym is not a Symbol, throw a TypeError exception.
+        // 1. If symbol is not a Symbol, throw a TypeError exception.
         if (!symbol.isSymbol()) {
             return agent.throwException(.type_error, "{f} is not a Symbol", .{symbol});
         }
 
-        // 2. Return KeyForSymbol(sym).
+        // 2. Return KeyForSymbol(symbol).
         return Value.from(keyForSymbol(agent, symbol.asSymbol()) orelse return .undefined);
     }
 };
@@ -273,17 +273,17 @@ pub const prototype = struct {
         );
     }
 
-    /// 20.4.3.4.1 ThisSymbolValue ( value )
+    /// 20.4.3.4.1 ThisSymbolValue ( arg )
     /// https://tc39.es/ecma262/#sec-thissymbolvalue
-    fn thisSymbolValue(agent: *Agent, value: Value) error{ExceptionThrown}!*const types.Symbol {
-        // 1. If value is a Symbol, return value.
-        if (value.isSymbol()) return value.asSymbol();
+    fn thisSymbolValue(agent: *Agent, arg: Value) error{ExceptionThrown}!*const types.Symbol {
+        // 1. If arg is a Symbol, return arg.
+        if (arg.isSymbol()) return arg.asSymbol();
 
-        // 2. If value is an Object and value has a [[SymbolData]] internal slot, then
-        if (value.castObject(Symbol)) |symbol| {
-            // a. Let s be value.[[SymbolData]].
-            // b. Assert: s is a Symbol.
-            // c. Return s.
+        // 2. If arg is an Object and arg has a [[SymbolData]] internal slot, then
+        if (arg.castObject(Symbol)) |symbol| {
+            // a. Let symbol be arg.[[SymbolData]].
+            // b. Assert: symbol is a Symbol.
+            // c. Return symbol.
             return symbol.fields.symbol_data;
         }
 
@@ -298,21 +298,20 @@ pub const prototype = struct {
     /// 20.4.3.2 get Symbol.prototype.description
     /// https://tc39.es/ecma262/#sec-symbol.prototype.description
     fn description(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let s be the this value.
-        // 2. Let sym be ? ThisSymbolValue(s).
+        // 1. Let symbol be ? ThisSymbolValue(this value).
         const symbol = try thisSymbolValue(agent, this_value);
 
-        // 3. Return sym.[[Description]].
+        // 2. Return symbol.[[Description]].
         return Value.from(symbol.description orelse return .undefined);
     }
 
     /// 20.4.3.3 Symbol.prototype.toString ( )
     /// https://tc39.es/ecma262/#sec-symbol.prototype.tostring
     fn toString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let sym be ? ThisSymbolValue(this value).
+        // 1. Let symbol be ? ThisSymbolValue(this value).
         const symbol = try thisSymbolValue(agent, this_value);
 
-        // 2. Return SymbolDescriptiveString(sym).
+        // 2. Return SymbolDescriptiveString(symbol).
         return Value.from(try symbol.descriptiveString(agent));
     }
 
@@ -343,17 +342,17 @@ pub const Symbol = MakeObject(.{
     .display_name = "Symbol",
 });
 
-/// 20.4.5.1 KeyForSymbol ( sym )
+/// 20.4.5.1 KeyForSymbol ( symbol )
 /// https://tc39.es/ecma262/#sec-keyforsymbol
 pub fn keyForSymbol(agent: *Agent, symbol: *const types.Symbol) ?*const String {
-    // 1. For each element e of the GlobalSymbolRegistry List, do
+    // 1. For each element element of the GlobalSymbolRegistry List, do
     var it = agent.global_symbol_registry.iterator();
     while (it.next()) |entry| {
-        // a. If SameValue(e.[[Symbol]], sym) is true, return e.[[Key]].
+        // a. If SameValue(element.[[Symbol]], symbol) is true, return element.[[Key]].
         if (entry.value_ptr.* == symbol) return entry.key_ptr.*;
     }
 
-    // 2. Assert: The GlobalSymbolRegistry List does not currently contain an entry for sym.
+    // 2. Assert: The GlobalSymbolRegistry List does not currently contain an entry for symbol.
     // 3. Return undefined.
     return null;
 }
