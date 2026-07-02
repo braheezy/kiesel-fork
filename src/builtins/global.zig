@@ -410,56 +410,54 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 1. Let inputString be ? ToString(string).
     const input_string = try string_value.toString(agent);
 
-    // 2. Let trimmedString be ! TrimString(inputString, start).
+    // 2. Let radixMV be ℝ(? ToInt32(radix)).
+    var radix = try radix_value.toInt32(agent);
+
+    // 3. If radixMV ≠ 0 and radixMV is not in the inclusive interval from 2 to 36, return NaN.
+    if (radix != 0 and (radix < 2 or radix > 36)) return .nan;
+
+    // 4. Let trimmedString be ! TrimString(inputString, start).
     const trimmed_string_alloc = try (try input_string.trimStart(agent)).toUtf8(gpa);
     defer gpa.free(trimmed_string_alloc);
     var trimmed_string: []const u8 = trimmed_string_alloc;
 
-    // 3. Let sign be 1.
+    // 5. If trimmedString is the empty String, return NaN.
+    if (trimmed_string.len == 0) return .nan;
+
+    // 6. Let sign be 1.
     var sign: f64 = 1;
 
-    // 4. If trimmedString is not empty and the first code unit of trimmedString is the code unit
-    //    0x002D (HYPHEN-MINUS), set sign to -1.
-    if (std.mem.startsWith(u8, trimmed_string, "-")) sign = -1;
+    // 7. If the first code unit of trimmedString is the code unit 0x002D (HYPHEN-MINUS), then
+    if (trimmed_string[0] == '-') {
+        // a. Set sign to -1.
+        sign = -1;
 
-    // 5. If trimmedString is not empty and the first code unit of trimmedString is either the code
-    //    unit 0x002B (PLUS SIGN) or the code unit 0x002D (HYPHEN-MINUS), set trimmedString to the
-    //    substring of trimmedString from index 1.
-    if (std.mem.startsWith(u8, trimmed_string, "+") or std.mem.startsWith(u8, trimmed_string, "-")) {
+        // b. Set trimmedString to the substring of trimmedString from 1.
+        trimmed_string = trimmed_string[1..];
+    }
+    // 8. Else if the first code unit of trimmedString is the code unit 0x002B (PLUS SIGN), then
+    else if (trimmed_string[0] == '+') {
+        // a. Set trimmedString to the substring of trimmedString from 1.
         trimmed_string = trimmed_string[1..];
     }
 
-    // 6. Let radixMV be ℝ(? ToInt32(radix)).
-    var radix = try radix_value.toInt32(agent);
-
-    // 7. Let stripPrefix be true.
-    var strip_prefix = true;
-
-    // 8. If radixMV ≠ 0, then
-    if (radix != 0) {
-        // a. If radixMV < 2 or radixMV > 36, return NaN.
-        if (radix < 2 or radix > 36) return .nan;
-
-        // b. If radixMV ≠ 16, set stripPrefix to false.
-        if (radix != 16) strip_prefix = false;
-    } else {
-        // 9. Else,
-        // a. Set radixMV to 10.
-        radix = 10;
-    }
-
-    // 10. If stripPrefix is true, then
-    if (strip_prefix) {
-        // a. If the length of trimmedString ≥ 2 and the first two code units of trimmedString are
+    // 9. If radixMV = 0 or radixMV = 16, then
+    if (radix == 0 or radix == 16) {
+        // a. If the length of trimmedString ≥ 2 and the substring of trimmedString from 0 to 2 is
         //    either "0x" or "0X", then
-        if (std.mem.startsWith(u8, trimmed_string, "0x") or std.mem.startsWith(u8, trimmed_string, "0X")) {
-            // i. Set trimmedString to the substring of trimmedString from index 2.
+        if (std.mem.startsWith(u8, trimmed_string, "0x") or
+            std.mem.startsWith(u8, trimmed_string, "0X"))
+        {
+            // i. Set trimmedString to the substring of trimmedString from 2.
             trimmed_string = trimmed_string[2..];
 
             // ii. Set radixMV to 16.
             radix = 16;
         }
     }
+
+    // 10. If radixMV = 0, set radixMV to 10.
+    if (radix == 0) radix = 10;
 
     // 11. If trimmedString contains a code unit that is not a radix-radixMV digit, let end be the
     //     index within trimmedString of the first such code unit; else let end be the length of
@@ -483,9 +481,9 @@ fn parseInt(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
 
     if (math_int == null) return .nan;
 
-    // 15. If mathInt = 0, then
-    //     a. If sign = -1, return -0𝔽.
-    //     b. Return +0𝔽.
+    // 15. If sign = -1 and mathInt = 0, return -0𝔽.
+    if (sign == -1 and math_int.? == 0) return Value.from(-0.0);
+
     // 16. Return 𝔽(sign × mathInt).
     return Value.from(sign * math_int.?);
 }
