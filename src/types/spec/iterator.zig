@@ -195,7 +195,7 @@ pub const Iterator = struct {
         return new_completion;
     }
 
-    /// 7.4.14 AsyncIteratorClose ( iteratorRecord, completion )
+    /// 7.4.15 AsyncIteratorClose ( iteratorRecord, completion )
     /// https://tc39.es/ecma262/#sec-asynciteratorclose
     pub fn closeAsync(self: *const Iterator, agent: *Agent, completion: anytype) @TypeOf(completion) {
         const completion_exception = agent.exception;
@@ -246,7 +246,7 @@ pub const Iterator = struct {
         return completion;
     }
 
-    /// 7.4.18 IteratorToList ( iteratorRecord )
+    /// 7.4.19 IteratorToList ( iteratorRecord )
     /// https://tc39.es/ecma262/#sec-iteratortolist
     pub fn toList(self: *Iterator, agent: *Agent) Agent.Error![]const Value {
         // 1. Let values be a new empty List.
@@ -408,7 +408,7 @@ pub fn getIteratorFlattenable(
     return getIteratorDirect(agent, iterator.asObject());
 }
 
-/// 7.4.16 CreateIteratorResultObject ( value, done )
+/// 7.4.17 CreateIteratorResultObject ( value, done )
 /// https://tc39.es/ecma262/#sec-createiterresultobject
 pub fn createIteratorResultObject(
     agent: *Agent,
