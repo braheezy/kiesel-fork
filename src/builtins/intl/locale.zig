@@ -424,8 +424,7 @@ pub const constructor = struct {
             // 41. If localeExtensionKeys contains "kf", then
             //     a. Set locale.[[CaseFirst]] to localeRecord.[[kf]].
             // 42. If localeExtensionKeys contains "kn", then
-            //     a. If SameValue(localeRecord.[[kn]], "true") is true or localeRecord.[[kn]] is
-            //        the empty String, then
+            //     a. If localeRecord.[[kn]] is either "true" or the empty String, then
             //         i. Set locale.[[Numeric]] to true.
             //     b. Else,
             //         i. Set locale.[[Numeric]] to false.
@@ -634,7 +633,7 @@ pub const prototype = struct {
         var maximal = locale.fields.locale.clone();
         _ = locale_expander.maximize(&maximal);
 
-        // 4. Return ! Construct(%Intl.Locale%, maximal).
+        // 4. Return ! Construct(%Intl.Locale%, « maximal »).
         const new_locale = ordinaryCreateFromConstructor(
             Locale,
             agent,
@@ -661,7 +660,7 @@ pub const prototype = struct {
         var minimal = locale.fields.locale.clone();
         _ = locale_expander.minimize(&minimal);
 
-        // 4. Return ! Construct(%Intl.Locale%, minimal).
+        // 4. Return ! Construct(%Intl.Locale%, « minimal »).
         const new_locale = ordinaryCreateFromConstructor(
             Locale,
             agent,

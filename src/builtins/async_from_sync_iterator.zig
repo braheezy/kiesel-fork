@@ -420,7 +420,7 @@ fn asyncFromSyncIteratorContinuation(
 
     // 11. NOTE: onFulfilled is used when processing the "value" property of an IteratorResult
     //     object in order to wait for its value if it is a promise and re-package the result in a
-    //     new "unwrapped" IteratorResult object.
+    //     new “unwrapped” IteratorResult object.
 
     // 12. If done is true or closeOnRejection is false, then
     const maybe_on_rejected = if (done or !close_on_rejection) blk: {

@@ -845,7 +845,7 @@ pub const namespace = struct {
         while (try iterator.stepValue(agent)) |next| {
             // i. If count ≥ 2**53 - 1, then
             //     1. NOTE: This step is not expected to be reached in practice and is included only
-            //        so that implementations may rely on inputs being "reasonably sized" without
+            //        so that implementations may rely on inputs being “reasonably sized” without
             //        violating this specification.
             //     2. Let error be ThrowCompletion(a newly created RangeError object).
             //     3. Return ? IteratorClose(iteratorRecord, error).

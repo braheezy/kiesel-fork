@@ -177,7 +177,7 @@ fn getViewValue(
     // 9. Let viewSize be GetViewByteLength(viewRecord).
     const view_size = getViewByteLength(view);
 
-    // 10. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
+    // 10. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 11. If getIndex + elementSize > viewSize, throw a RangeError exception.
@@ -252,7 +252,7 @@ fn setViewValue(
     // 11. Let viewSize be GetViewByteLength(viewRecord).
     const view_size = getViewByteLength(view);
 
-    // 12. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
+    // 12. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 13. If getIndex + elementSize > viewSize, throw a RangeError exception.

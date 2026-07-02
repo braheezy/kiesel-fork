@@ -22,7 +22,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "%Symbol.asyncIterator%", @"%Symbol.asyncIterator%", 0, realm);
     }
 
-    /// 27.1.4.1 %AsyncIteratorPrototype% [ %Symbol.asyncIterator% ] ( )
+    /// 27.1.4.2 %AsyncIteratorPrototype% [ %Symbol.asyncIterator% ] ( )
     /// https://tc39.es/ecma262/#sec-%asynciteratorprototype%-%symbol.asynciterator%
     fn @"%Symbol.asyncIterator%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.

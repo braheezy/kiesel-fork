@@ -615,7 +615,7 @@ fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!
     // 2. For each code point codePoint of StringToCodePoints(value), do
     var it = value.codeUnitIterator();
     while (it.next()) |code_point| {
-        // a. If codePoint is listed in the “Code Point” column of Table 77, then
+        // a. If codePoint is listed in the “Code Point” column of Table 78, then
         if (code_point == 0x08 or
             code_point == 0x09 or
             code_point == 0x0A or

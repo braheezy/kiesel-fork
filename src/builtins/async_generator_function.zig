@@ -1,4 +1,4 @@
-//! 27.4 AsyncGeneratorFunction Objects
+//! 27.7 AsyncGeneratorFunction Objects
 //! https://tc39.es/ecma262/#sec-asyncgeneratorfunction-objects
 
 const std = @import("std");
@@ -16,7 +16,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 27.4.2 Properties of the AsyncGeneratorFunction Constructor
+/// 27.7.2 Properties of the AsyncGeneratorFunction Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -31,7 +31,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 27.4.2.1 AsyncGeneratorFunction.prototype
+        // 27.7.2.1 AsyncGeneratorFunction.prototype
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -41,7 +41,7 @@ pub const constructor = struct {
         );
     }
 
-    /// 27.4.1.1 AsyncGeneratorFunction ( ...paramArgs, bodyArg )
+    /// 27.7.1.1 AsyncGeneratorFunction ( ...paramArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-asyncgeneratorfunction
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const param_args = arguments.values[0..arguments.count() -| 1];
@@ -67,7 +67,7 @@ pub const constructor = struct {
     }
 };
 
-/// 27.4.3 Properties of the AsyncGeneratorFunction Prototype Object
+/// 27.7.3 Properties of the AsyncGeneratorFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction-prototype
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -75,7 +75,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 27.4.3.1 AsyncGeneratorFunction.prototype.constructor
+        // 27.7.3.1 AsyncGeneratorFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-constructor
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -88,7 +88,7 @@ pub const prototype = struct {
             },
         );
 
-        // 27.4.3.2 AsyncGeneratorFunction.prototype.prototype
+        // 27.7.3.2 AsyncGeneratorFunction.prototype.prototype
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -101,7 +101,7 @@ pub const prototype = struct {
             },
         );
 
-        // 27.4.3.3 AsyncGeneratorFunction.prototype [ %Symbol.toStringTag% ]
+        // 27.7.3.3 AsyncGeneratorFunction.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,

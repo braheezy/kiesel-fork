@@ -667,7 +667,7 @@ pub fn ordinaryFunctionCreate(
     // 7. Let strict be IsStrict(body).
     const strict = body.strict;
 
-    // 1. Let internalSlotsList be the internal slots listed in Table 25.
+    // 1. Let internalSlotsList be the internal slots listed in Table 26.
     // 2. Let func be OrdinaryObjectCreate(proto, internalSlotsList).
     const func = try ECMAScriptFunction.create(agent, .{
         // 3. Set func.[[Call]] to the definition specified in 10.2.1.
@@ -1025,9 +1025,9 @@ pub fn setFunctionName(
 
     // 5. If prefix is present, then
     if (prefix != null) {
-        // a. Set name to the string-concatenation of prefix, the code unit 0x0020 (SPACE), and
-        //    name.
-        name = try String.concat(agent, &.{
+        // a. Let prefixedName be the string-concatenation of prefix, the code unit 0x0020 (SPACE),
+        //    and name.
+        const prefixed_name = try String.concat(agent, &.{
             try String.fromAscii(agent, prefix.?),
             String.fromLiteral(" "),
             name,
@@ -1037,9 +1037,13 @@ pub fn setFunctionName(
         if (func.cast(BuiltinFunction)) |builtin_function| {
             // i. NOTE: The choice in the following step is made independently each time this
             //    Abstract Operation is invoked.
-            // ii. Optionally, set func.[[InitialName]] to name.
-            builtin_function.fields.initial_name = name;
+            // ii. Set func.[[InitialName]] to an implementation-defined choice of either name or
+            //     prefixedName.
+            builtin_function.fields.initial_name = prefixed_name;
         }
+
+        // c. Set name to prefixedName.
+        name = prefixed_name;
     }
 
     // 6. Perform ! DefinePropertyOrThrow(func, "name", PropertyDescriptor { [[Value]]: name,

@@ -3231,7 +3231,7 @@ fn typedArrayCreateSameType(
     const realm = agent.currentRealm();
 
     // 1. Let ctor be the intrinsic object associated with the constructor name
-    //    exemplar.[[TypedArrayName]] in Table 70.
+    //    exemplar.[[TypedArrayName]] in Table 71.
     const ctor = switch (exemplar.fields.element_type) {
         inline else => |element_type| blk: {
             const name = element_type.typedArrayName();
@@ -3264,7 +3264,7 @@ fn typedArraySpeciesCreate(
     const realm = agent.currentRealm();
 
     // 1. Let defaultCtor be the intrinsic object associated with the constructor name
-    //    exemplar.[[TypedArrayName]] in Table 70.
+    //    exemplar.[[TypedArrayName]] in Table 71.
     const default_ctor = switch (exemplar.fields.element_type) {
         inline else => |element_type| blk: {
             const name = element_type.typedArrayName();
@@ -3320,7 +3320,7 @@ pub fn validateTypedArray(
 /// 23.2.4.5 TypedArrayElementSize ( obj )
 /// https://tc39.es/ecma262/#sec-typedarrayelementsize
 pub fn typedArrayElementSize(typed_array: *const TypedArray) u4 {
-    // 1. Return the Element Size value specified in Table 70 for obj.[[TypedArrayName]].
+    // 1. Return the Element Size value specified in Table 71 for obj.[[TypedArrayName]].
     return typed_array.fields.element_type.elementSize();
 }
 
@@ -4187,7 +4187,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
 
             // 2. Let ctorName be the String value of the Constructor Name value specified in Table
-            //    70 for this TypedArray constructor.
+            //    71 for this TypedArray constructor.
 
             // 3. Let proto be `"%TypedArray.prototype%"`.
             const proto = "%" ++ name ++ ".prototype%";

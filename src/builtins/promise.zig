@@ -1,4 +1,4 @@
-//! 27.2 Promise Objects
+//! 27.5 Promise Objects
 //! https://tc39.es/ecma262/#sec-promise-objects
 
 const std = @import("std");
@@ -23,7 +23,7 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
 
-/// 27.2.1.1 PromiseCapability Records
+/// 27.5.1.1 PromiseCapability Records
 /// https://tc39.es/ecma262/#sec-promisecapability-records
 pub const PromiseCapability = struct {
     /// [[Promise]]
@@ -35,7 +35,7 @@ pub const PromiseCapability = struct {
     /// [[Reject]]
     reject: *Object,
 
-    /// 27.2.1.1.1 IfAbruptRejectPromise ( value, capability )
+    /// 27.5.1.1.1 IfAbruptRejectPromise ( value, capability )
     /// https://tc39.es/ecma262/#sec-ifabruptrejectpromise
     pub fn rejectPromise(self: @This(), agent: *Agent, err: Agent.Error) Agent.Error!*Object {
         // 1. Assert: value is a Completion Record.
@@ -63,7 +63,7 @@ pub const PromiseCapability = struct {
     }
 };
 
-/// 27.2.1.2 PromiseReaction Records
+/// 27.5.1.2 PromiseReaction Records
 /// https://tc39.es/ecma262/#sec-promisereaction-records
 const PromiseReaction = struct {
     /// [[Capability]]
@@ -81,7 +81,7 @@ const ResolvingFunctions = struct {
     reject: *builtins.BuiltinFunction,
 };
 
-/// 27.2.1.3 CreateResolvingFunctions ( toResolve )
+/// 27.5.1.3 CreateResolvingFunctions ( toResolve )
 /// https://tc39.es/ecma262/#sec-createresolvingfunctions
 pub fn createResolvingFunctions(
     agent: *Agent,
@@ -235,7 +235,7 @@ pub fn createResolvingFunctions(
     return .{ .resolve = resolve, .reject = reject };
 }
 
-/// 27.2.1.4 FulfillPromise ( promise, value )
+/// 27.5.1.4 FulfillPromise ( promise, value )
 /// https://tc39.es/ecma262/#sec-fulfillpromise
 pub fn fulfillPromise(
     agent: *Agent,
@@ -266,7 +266,7 @@ pub fn fulfillPromise(
     // 8. Return unused.
 }
 
-/// 27.2.1.5 NewPromiseCapability ( ctor )
+/// 27.5.1.5 NewPromiseCapability ( ctor )
 /// https://tc39.es/ecma262/#sec-newpromisecapability
 pub fn newPromiseCapability(agent: *Agent, ctor: Value) Agent.Error!PromiseCapability {
     // 1. If IsConstructor(ctor) is false, throw a TypeError exception.
@@ -275,7 +275,7 @@ pub fn newPromiseCapability(agent: *Agent, ctor: Value) Agent.Error!PromiseCapab
     }
 
     // 2. NOTE: ctor is assumed to be a constructor function that supports the parameter conventions
-    //    of the Promise constructor (see 27.2.3.1).
+    //    of the Promise constructor (see 27.5.3.1).
 
     // 3. Let resolvingFuncs be the Record { [[Resolve]]: undefined, [[Reject]]: undefined }.
     // NOTE: This is created later.
@@ -371,7 +371,7 @@ pub fn newPromiseCapability(agent: *Agent, ctor: Value) Agent.Error!PromiseCapab
     };
 }
 
-/// 27.2.1.7 RejectPromise ( promise, reason )
+/// 27.5.1.7 RejectPromise ( promise, reason )
 /// https://tc39.es/ecma262/#sec-rejectpromise
 pub fn rejectPromise(
     agent: *Agent,
@@ -408,7 +408,7 @@ pub fn rejectPromise(
     // 9. Return unused.
 }
 
-/// 27.2.1.8 TriggerPromiseReactions ( reactions, arg )
+/// 27.5.1.8 TriggerPromiseReactions ( reactions, arg )
 /// https://tc39.es/ecma262/#sec-triggerpromisereactions
 pub fn triggerPromiseReactions(
     agent: *Agent,
@@ -427,7 +427,7 @@ pub fn triggerPromiseReactions(
     // 2. Return unused.
 }
 
-/// 27.2.4.7.1 PromiseResolve ( ctor, resolution )
+/// 27.5.4.7.1 PromiseResolve ( ctor, resolution )
 /// https://tc39.es/ecma262/#sec-promise-resolve
 pub fn promiseResolve(agent: *Agent, ctor: *Object, resolution: Value) Agent.Error!*Object {
     // 1. If IsPromise(resolution) is true, then
@@ -449,7 +449,7 @@ pub fn promiseResolve(agent: *Agent, ctor: *Object, resolution: Value) Agent.Err
     return promise_capability.promise;
 }
 
-/// 27.2.2.1 NewPromiseReactionJob ( reaction, arg )
+/// 27.5.2.1 NewPromiseReactionJob ( reaction, arg )
 /// https://tc39.es/ecma262/#sec-newpromisereactionjob
 pub fn newPromiseReactionJob(
     agent: *Agent,
@@ -586,7 +586,7 @@ pub fn newPromiseReactionJob(
     return .{ .job = job, .realm = handler_realm };
 }
 
-/// 27.2.2.2 NewPromiseResolveThenableJob ( promiseToResolve, thenable, then )
+/// 27.5.2.2 NewPromiseResolveThenableJob ( promiseToResolve, thenable, then )
 /// https://tc39.es/ecma262/#sec-newpromiseresolvethenablejob
 pub fn newPromiseResolveThenableJob(
     agent: *Agent,
@@ -691,7 +691,7 @@ const RemainingElements = struct {
     value: usize,
 };
 
-/// 27.2.4.1.2 PerformPromiseAll ( iteratorRecord, ctor, resultCapability, promiseResolve )
+/// 27.5.4.1.2 PerformPromiseAll ( iteratorRecord, ctor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiseall
 fn performPromiseAll(
     agent: *Agent,
@@ -849,7 +849,7 @@ fn performPromiseAll(
     }
 }
 
-/// 27.2.4.2.1 PerformPromiseAllSettled ( iteratorRecord, ctor, resultCapability, promiseResolve )
+/// 27.5.4.2.1 PerformPromiseAllSettled ( iteratorRecord, ctor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiseallsettled
 fn performPromiseAllSettled(
     agent: *Agent,
@@ -1119,7 +1119,7 @@ fn performPromiseAllSettled(
     }
 }
 
-/// 27.2.4.3.1 PerformPromiseAny ( iteratorRecord, ctor, resultCapability, promiseResolve )
+/// 27.5.4.3.1 PerformPromiseAny ( iteratorRecord, ctor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiseany
 fn performPromiseAny(
     agent: *Agent,
@@ -1307,7 +1307,7 @@ fn performPromiseAny(
     }
 }
 
-/// 27.2.4.5.1 PerformPromiseRace ( iteratorRecord, ctor, resultCapability, promiseResolve )
+/// 27.5.4.5.1 PerformPromiseRace ( iteratorRecord, ctor, resultCapability, promiseResolve )
 /// https://tc39.es/ecma262/#sec-performpromiserace
 fn performPromiseRace(
     agent: *Agent,
@@ -1342,7 +1342,7 @@ fn performPromiseRace(
     }
 }
 
-/// 27.2.5.4.1 PerformPromiseThen ( promise, onFulfilled, onRejected [ , resultCapability ] )
+/// 27.5.5.4.1 PerformPromiseThen ( promise, onFulfilled, onRejected [ , resultCapability ] )
 /// https://tc39.es/ecma262/#sec-performpromisethen
 pub fn performPromiseThen(
     agent: *Agent,
@@ -1448,7 +1448,7 @@ pub fn performPromiseThen(
     return (result_capability orelse return null).promise;
 }
 
-/// 27.2.4 Properties of the Promise Constructor
+/// 27.5.4 Properties of the Promise Constructor
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -1473,7 +1473,7 @@ pub const constructor = struct {
         try object.defineBuiltinFunction(agent, "withResolvers", withResolvers, 0, realm);
         try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
 
-        // 27.2.4.4 Promise.prototype
+        // 27.5.4.4 Promise.prototype
         // https://tc39.es/ecma262/#sec-promise.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -1483,7 +1483,7 @@ pub const constructor = struct {
         );
     }
 
-    /// 27.2.3.1 Promise ( executor )
+    /// 27.5.3.1 Promise ( executor )
     /// https://tc39.es/ecma262/#sec-promise-executor
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const executor = arguments.get(0);
@@ -1561,7 +1561,7 @@ pub const constructor = struct {
         return Value.from(&promise.object);
     }
 
-    /// 27.2.4.1 Promise.all ( iterable )
+    /// 27.5.4.1 Promise.all ( iterable )
     /// https://tc39.es/ecma262/#sec-promise.all
     fn all(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
@@ -1610,7 +1610,7 @@ pub const constructor = struct {
         return Value.from(result catch unreachable);
     }
 
-    /// 27.2.4.2 Promise.allSettled ( iterable )
+    /// 27.5.4.2 Promise.allSettled ( iterable )
     /// https://tc39.es/ecma262/#sec-promise.allsettled
     fn allSettled(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
@@ -1659,7 +1659,7 @@ pub const constructor = struct {
         return Value.from(result catch unreachable);
     }
 
-    /// 27.2.4.3 Promise.any ( iterable )
+    /// 27.5.4.3 Promise.any ( iterable )
     /// https://tc39.es/ecma262/#sec-promise.any
     fn any(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
@@ -1708,7 +1708,7 @@ pub const constructor = struct {
         return Value.from(result catch unreachable);
     }
 
-    /// 27.2.4.5 Promise.race ( iterable )
+    /// 27.5.4.5 Promise.race ( iterable )
     /// https://tc39.es/ecma262/#sec-promise.race
     fn race(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const iterable = arguments.get(0);
@@ -1757,7 +1757,7 @@ pub const constructor = struct {
         return Value.from(result catch unreachable);
     }
 
-    /// 27.2.4.6 Promise.reject ( reason )
+    /// 27.5.4.6 Promise.reject ( reason )
     /// https://tc39.es/ecma262/#sec-promise.reject
     fn reject(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const reason = arguments.get(0);
@@ -1775,7 +1775,7 @@ pub const constructor = struct {
         return Value.from(promise_capability.promise);
     }
 
-    /// 27.2.4.7 Promise.resolve ( resolution )
+    /// 27.5.4.7 Promise.resolve ( resolution )
     /// https://tc39.es/ecma262/#sec-promise.resolve
     fn resolve(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const resolution = arguments.get(0);
@@ -1792,7 +1792,7 @@ pub const constructor = struct {
         return Value.from(try promiseResolve(agent, ctor.asObject(), resolution));
     }
 
-    /// 27.2.4.8 Promise.try ( callback, ...args )
+    /// 27.5.4.8 Promise.try ( callback, ...args )
     /// https://tc39.es/ecma262/#sec-promise.try
     fn @"try"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const callback = arguments.get(0);
@@ -1838,7 +1838,7 @@ pub const constructor = struct {
         return Value.from(promise_capability.promise);
     }
 
-    /// 27.2.4.9 Promise.withResolvers ( )
+    /// 27.5.4.9 Promise.withResolvers ( )
     /// https://tc39.es/ecma262/#sec-promise.withResolvers
     fn withResolvers(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -1880,7 +1880,7 @@ pub const constructor = struct {
         return Value.from(obj);
     }
 
-    /// 27.2.4.10 get Promise [ %Symbol.species% ]
+    /// 27.5.4.10 get Promise [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-promise-%symbol.species%
     fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
@@ -1888,7 +1888,7 @@ pub const constructor = struct {
     }
 };
 
-/// 27.2.5 Properties of the Promise Prototype Object
+/// 27.5.5 Properties of the Promise Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -1900,7 +1900,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "finally", finally, 1, realm);
         try object.defineBuiltinFunction(agent, "then", then, 2, realm);
 
-        // 27.2.5.2 Promise.prototype.constructor
+        // 27.5.5.2 Promise.prototype.constructor
         // https://tc39.es/ecma262/#sec-promise.prototype.constructor
         try object.defineBuiltinProperty(
             agent,
@@ -1908,7 +1908,7 @@ pub const prototype = struct {
             Value.from(try realm.intrinsics.@"%Promise%"()),
         );
 
-        // 27.2.5.5 Promise.prototype [ %Symbol.toStringTag% ]
+        // 27.5.5.5 Promise.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-promise.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -1922,7 +1922,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 27.2.5.1 Promise.prototype.catch ( onRejected )
+    /// 27.5.5.1 Promise.prototype.catch ( onRejected )
     /// https://tc39.es/ecma262/#sec-promise.prototype.catch
     fn @"catch"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const on_rejected = arguments.get(0);
@@ -1934,7 +1934,7 @@ pub const prototype = struct {
         return promise.invoke(agent, PropertyKey.from("then"), &.{ .undefined, on_rejected });
     }
 
-    /// 27.2.5.3 Promise.prototype.finally ( onFinally )
+    /// 27.5.5.3 Promise.prototype.finally ( onFinally )
     /// https://tc39.es/ecma262/#sec-promise.prototype.finally
     fn finally(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -2103,7 +2103,7 @@ pub const prototype = struct {
         return promise.invoke(agent, PropertyKey.from("then"), &.{ then_finally, catch_finally });
     }
 
-    /// 27.2.5.4 Promise.prototype.then ( onFulfilled, onRejected )
+    /// 27.5.5.4 Promise.prototype.then ( onFulfilled, onRejected )
     /// https://tc39.es/ecma262/#sec-promise.prototype.then
     fn then(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -2140,7 +2140,7 @@ pub const prototype = struct {
     }
 };
 
-/// 27.2.6 Properties of Promise Instances
+/// 27.5.6 Properties of Promise Instances
 /// https://tc39.es/ecma262/#sec-properties-of-promise-instances
 pub const Promise = MakeObject(.{
     .Fields = struct {

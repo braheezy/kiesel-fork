@@ -730,10 +730,10 @@ pub fn fmtDateString(time_value: f64) std.fmt.Alt(f64, formatDateString) {
 /// 21.4.4.41.2 DateString ( tv )
 /// https://tc39.es/ecma262/#sec-datestring
 fn formatDateString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    // 1. Let weekday be the Name of the entry in Table 60 with the Number WeekDay(tv).
+    // 1. Let weekday be the Name of the entry in Table 61 with the Number WeekDay(tv).
     const weekday = week_day_names[weekDay(time_value)];
 
-    // 2. Let month be the Name of the entry in Table 61 with the Number MonthFromTime(tv).
+    // 2. Let month be the Name of the entry in Table 62 with the Number MonthFromTime(tv).
     const month = month_names[monthFromTime(time_value)];
 
     // 3. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).
@@ -2471,10 +2471,10 @@ pub const prototype = struct {
         // 4. If tv is NaN, return "Invalid Date".
         if (std.math.isNan(tv)) return Value.from("Invalid Date");
 
-        // 5. Let weekday be the Name of the entry in Table 60 with the Number WeekDay(tv).
+        // 5. Let weekday be the Name of the entry in Table 61 with the Number WeekDay(tv).
         const weekday = week_day_names[weekDay(tv)];
 
-        // 6. Let month be the Name of the entry in Table 61 with the Number MonthFromTime(tv).
+        // 6. Let month be the Name of the entry in Table 62 with the Number MonthFromTime(tv).
         const month = month_names[monthFromTime(tv)];
 
         // 7. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).

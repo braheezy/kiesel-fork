@@ -329,7 +329,7 @@ pub fn rawBytesToNumeric(
     raw_bytes: []const u8,
     is_little_endian: bool,
 ) @"type".type() {
-    // 1. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
+    // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
     var bytes: [element_size]u8 = undefined;
@@ -351,7 +351,7 @@ pub fn getRawBytesFromSharedBlock(
     is_typed_array: bool,
     order: Order,
 ) [@sizeOf(@"type".type())]u8 {
-    // 1. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
+    // 1. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
     // TODO: 2-11.
@@ -381,7 +381,7 @@ pub fn getValueFromBuffer(
     // 3. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.data_block.?;
 
-    // 4. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
+    // 4. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 5. If IsSharedArrayBuffer(arrayBuffer) is true, then
@@ -466,10 +466,10 @@ pub fn numericToRawBytes(
         },
         // 4. Else,
         else => blk: {
-            // a. Let n be the Element Size value specified in Table 70 for Element Type type.
+            // a. Let n be the Element Size value specified in Table 71 for Element Type type.
 
             // b. Let conversionOperation be the abstract operation named in the “Conversion
-            //    Operation” column of Table 70 for Element Type type.
+            //    Operation” column of Table 71 for Element Type type.
             const conversionOperation = element_type.conversationOperation();
 
             // c. Let intValue be ℝ(! conversionOperation(value)).
@@ -517,7 +517,7 @@ pub fn setValueInBuffer(
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.data_block.?;
 
-    // 5. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
+    // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 6. Let agentRecord be the Agent Record of the surrounding agent.
@@ -574,7 +574,7 @@ pub fn getModifySetValueInBuffer(
     // 4. Let block be arrayBuffer.[[ArrayBufferData]].
     const block = array_buffer.fields.data_block.?;
 
-    // 5. Let elementSize be the Element Size value specified in Table 70 for Element Type type.
+    // 5. Let elementSize be the Element Size value specified in Table 71 for Element Type type.
     const element_size = @"type".elementSize();
 
     // 6. Let agentRecord be the Agent Record of the surrounding agent.

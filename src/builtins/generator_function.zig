@@ -1,4 +1,4 @@
-//! 27.3 GeneratorFunction Objects
+//! 27.6 GeneratorFunction Objects
 //! https://tc39.es/ecma262/#sec-generatorfunction-objects
 
 const std = @import("std");
@@ -16,7 +16,7 @@ const createBuiltinFunction = builtins.createBuiltinFunction;
 const createDynamicFunction = builtins.createDynamicFunction;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 27.3.1 The GeneratorFunction Constructor
+/// 27.6.1 The GeneratorFunction Constructor
 /// https://tc39.es/ecma262/#sec-generatorfunction-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -31,7 +31,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 27.3.2.1 GeneratorFunction.prototype
+        // 27.6.2.1 GeneratorFunction.prototype
         // https://tc39.es/ecma262/#sec-generatorfunction.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -41,7 +41,7 @@ pub const constructor = struct {
         );
     }
 
-    /// 27.3.1.1 GeneratorFunction ( ...paramArgs, bodyArg )
+    /// 27.6.1.1 GeneratorFunction ( ...paramArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-generatorfunction
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const param_args = arguments.values[0..arguments.count() -| 1];
@@ -66,7 +66,7 @@ pub const constructor = struct {
     }
 };
 
-/// 27.3.3 Properties of the GeneratorFunction Prototype Object
+/// 27.6.3 Properties of the GeneratorFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-properties-of-the-generatorfunction-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -74,7 +74,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 27.3.3.1 GeneratorFunction.prototype.constructor
+        // 27.6.3.1 GeneratorFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-generatorfunction.prototype.constructor
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -87,7 +87,7 @@ pub const prototype = struct {
             },
         );
 
-        // 27.3.3.2 GeneratorFunction.prototype.prototype
+        // 27.6.3.2 GeneratorFunction.prototype.prototype
         // https://tc39.es/ecma262/#sec-generatorfunction.prototype.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -100,7 +100,7 @@ pub const prototype = struct {
             },
         );
 
-        // 27.3.3.3 GeneratorFunction.prototype [ %Symbol.toStringTag% ]
+        // 27.6.3.3 GeneratorFunction.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-generatorfunction.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,

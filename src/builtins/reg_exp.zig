@@ -935,7 +935,7 @@ pub const constructor = struct {
                 return;
             },
 
-            // 2. If codePoint is a code point listed in the “Code Point” column of Table 62, then
+            // 2. If codePoint is a code point listed in the “Code Point” column of Table 63, then
             '\t'...'\r' => {
                 // a. Return the string-concatenation of 0x005C (REVERSE SOLIDUS) and the string in
                 //    the “ControlEscape” column of the row whose “Code Point” column contains

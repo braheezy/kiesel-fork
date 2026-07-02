@@ -1880,7 +1880,7 @@ pub fn canonicalizeKeyedCollectionKey(key: Value) Value {
     return key;
 }
 
-/// 27.2.1.6 IsPromise ( arg )
+/// 27.5.1.6 IsPromise ( arg )
 /// https://tc39.es/ecma262/#sec-ispromise
 pub fn isPromise(arg: Value) bool {
     // 1. If arg is not an Object, return false.
@@ -2198,6 +2198,7 @@ pub fn isLessThan(
         (ny == .number and ny.number.isNegativeInf())) return false;
 
     // 14. If ℝ(nx) < ℝ(ny), return true.
+    // 15. Return false.
     const gpa = agent.gpa;
     return switch (nx) {
         .number => (try ny.big_int.orderWithFloat(gpa, nx.number.asFloat(), .floor)) == .gt,

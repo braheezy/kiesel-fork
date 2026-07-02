@@ -1,4 +1,4 @@
-//! 27.6 AsyncGenerator Objects
+//! 27.9 AsyncGenerator Objects
 //! https://tc39.es/ecma262/#sec-asyncgenerator-objects
 
 const std = @import("std");
@@ -27,7 +27,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performPromiseThen = builtins.performPromiseThen;
 const promiseResolve = builtins.promiseResolve;
 
-/// 27.6.1 The %AsyncGeneratorPrototype% Object
+/// 27.9.1 The %AsyncGeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -39,7 +39,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "return", @"return", 1, realm);
         try object.defineBuiltinFunction(agent, "throw", throw, 1, realm);
 
-        // 27.6.1.1 %AsyncGeneratorPrototype%.constructor
+        // 27.9.1.1 %AsyncGeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-constructor
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -52,7 +52,7 @@ pub const prototype = struct {
             },
         );
 
-        // 27.6.1.5 %AsyncGeneratorPrototype% [ %Symbol.toStringTag% ]
+        // 27.9.1.5 %AsyncGeneratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -66,7 +66,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 27.6.1.2 %AsyncGeneratorPrototype%.next ( value )
+    /// 27.9.1.2 %AsyncGeneratorPrototype%.next ( value )
     /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-next
     fn next(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -126,7 +126,7 @@ pub const prototype = struct {
         return Value.from(promise_capability.promise);
     }
 
-    /// 27.6.1.3 %AsyncGeneratorPrototype%.return ( value )
+    /// 27.9.1.3 %AsyncGeneratorPrototype%.return ( value )
     /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-return
     fn @"return"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -178,7 +178,7 @@ pub const prototype = struct {
         return Value.from(promise_capability.promise);
     }
 
-    /// 27.6.1.4 %AsyncGeneratorPrototype%.throw ( exception )
+    /// 27.9.1.4 %AsyncGeneratorPrototype%.throw ( exception )
     /// https://tc39.es/ecma262/#sec-asyncgenerator-prototype-throw
     fn throw(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -245,7 +245,7 @@ pub const prototype = struct {
     }
 };
 
-/// 27.6.2 Properties of AsyncGenerator Instances
+/// 27.9.2 Properties of AsyncGenerator Instances
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-intances
 pub const AsyncGenerator = MakeObject(.{
     .Fields = struct {
@@ -278,7 +278,7 @@ pub const AsyncGenerator = MakeObject(.{
     .display_name = "AsyncGenerator",
 });
 
-/// 27.6.3.1 AsyncGeneratorRequest Records
+/// 27.9.3.1 AsyncGeneratorRequest Records
 /// https://tc39.es/ecma262/#sec-asyncgeneratorrequest-records
 pub const AsyncGeneratorRequest = struct {
     /// [[Completion]]
@@ -288,7 +288,7 @@ pub const AsyncGeneratorRequest = struct {
     capability: PromiseCapability,
 };
 
-/// 27.6.3.2 AsyncGeneratorStart ( gen, genBody )
+/// 27.9.3.2 AsyncGeneratorStart ( gen, genBody )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorstart
 pub fn asyncGeneratorStart(
     agent: *Agent,
@@ -434,7 +434,7 @@ pub fn asyncGeneratorStart(
     // 8. Return unused.
 }
 
-/// 27.6.3.3 AsyncGeneratorValidate ( gen, genBrand )
+/// 27.9.3.3 AsyncGeneratorValidate ( gen, genBrand )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorvalidate
 pub fn asyncGeneratorValidate(agent: *Agent, gen_value: Value) error{ExceptionThrown}!*AsyncGenerator {
     // 1. Perform ? RequireInternalSlot(gen, [[AsyncGeneratorContext]]).
@@ -451,7 +451,7 @@ pub fn asyncGeneratorValidate(agent: *Agent, gen_value: Value) error{ExceptionTh
     return gen;
 }
 
-/// 27.6.3.4 AsyncGeneratorEnqueue ( gen, completion, promiseCapability )
+/// 27.9.3.4 AsyncGeneratorEnqueue ( gen, completion, promiseCapability )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorenqueue
 pub fn asyncGeneratorEnqueue(
     agent: *Agent,
@@ -472,7 +472,7 @@ pub fn asyncGeneratorEnqueue(
     // 3. Return unused.
 }
 
-/// 27.6.3.5 AsyncGeneratorCompleteStep ( gen, completion, done [ , realm ] )
+/// 27.9.3.5 AsyncGeneratorCompleteStep ( gen, completion, done [ , realm ] )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorcompletestep
 pub fn asyncGeneratorCompleteStep(
     agent: *Agent,
@@ -537,7 +537,7 @@ pub fn asyncGeneratorCompleteStep(
     // 8. Return unused.
 }
 
-/// 27.6.3.6 AsyncGeneratorResume ( gen, completion )
+/// 27.9.3.6 AsyncGeneratorResume ( gen, completion )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorresume
 pub fn asyncGeneratorResume(
     agent: *Agent,
@@ -567,7 +567,7 @@ pub fn asyncGeneratorResume(
     // 5. Return unused.
 }
 
-/// 27.6.3.7 AsyncGeneratorUnwrapYieldResumption ( resumptionValue )
+/// 27.9.3.7 AsyncGeneratorUnwrapYieldResumption ( resumptionValue )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorunwrapyieldresumption
 pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Completion) Agent.Error!Completion {
     // 1. If resumptionValue is not a return completion, return ? resumptionValue.
@@ -592,7 +592,7 @@ pub fn asyncGeneratorUnwrapYieldResumption(agent: *Agent, resumption_value: Comp
     return .{ .@"return" = awaited };
 }
 
-/// 27.6.3.8 AsyncGeneratorYield ( arg )
+/// 27.9.3.8 AsyncGeneratorYield ( arg )
 /// https://tc39.es/ecma262/#sec-asyncgeneratoryield
 pub fn asyncGeneratorYield(agent: *Agent, arg: Value) Agent.Error!Completion {
     // 1. Let genContext be the running execution context.
@@ -637,22 +637,14 @@ pub fn asyncGeneratorYield(agent: *Agent, arg: Value) Agent.Error!Completion {
     // 12. Set gen.[[AsyncGeneratorState]] to suspended-yield.
     gen.fields.async_generator_state = .suspended_yield;
 
-    // 13. Remove genContext from the execution context stack and restore the execution context that
-    //     is at the top of the execution context stack as the running execution context.
+    // 13. Let resumptionValue be Completion(RunCallerContext(undefined)).
+    // 14. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
     _ = agent.execution_context_stack.pop().?;
-
-    // 14. Let callerContext be the running execution context.
-    // 15. Resume callerContext passing undefined. If genContext is ever resumed again, let
-    //     resumptionValue be the Completion Record with which it is resumed.
     gen.fields.evaluation_state.suspension_result = .undefined;
-
-    // TODO: 16. Assert: If control reaches here, then genContext is the running execution context
-    //           again.
-    // TODO: 17. Return ? AsyncGeneratorUnwrapYieldResumption(resumptionValue).
     return .{ .normal = .undefined };
 }
 
-/// 27.6.3.10 AsyncGeneratorDrainQueue ( gen )
+/// 27.9.3.10 AsyncGeneratorDrainQueue ( gen )
 /// https://tc39.es/ecma262/#sec-asyncgeneratordrainqueue
 pub fn asyncGeneratorDrainQueue(
     agent: *Agent,
@@ -697,7 +689,7 @@ pub fn asyncGeneratorDrainQueue(
     // 5. Return unused.
 }
 
-/// 27.6.3.9 AsyncGeneratorAwaitReturn ( gen )
+/// 27.9.3.9 AsyncGeneratorAwaitReturn ( gen )
 /// https://tc39.es/ecma262/#sec-asyncgeneratorawaitreturn
 pub fn asyncGeneratorAwaitReturn(
     agent: *Agent,

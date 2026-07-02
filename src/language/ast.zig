@@ -934,7 +934,7 @@ pub const Statement = union(enum) {
         };
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: Statement,
@@ -975,7 +975,7 @@ pub const Statement = union(enum) {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: Statement,
@@ -1102,7 +1102,7 @@ pub const StatementList = struct {
         return false;
     }
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: StatementList,
@@ -1118,7 +1118,7 @@ pub const StatementList = struct {
         }
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: StatementList,
@@ -1134,7 +1134,7 @@ pub const StatementList = struct {
         }
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: StatementList,
@@ -1152,7 +1152,7 @@ pub const StatementList = struct {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: StatementList,
@@ -1170,7 +1170,7 @@ pub const StatementList = struct {
         }
     }
 
-    /// 8.2.8 Static Semantics: TopLevelLexicallyDeclaredNames
+    /// 8.2.10 Static Semantics: TopLevelLexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallydeclarednames
     pub fn collectTopLevelLexicallyDeclaredNames(
         self: StatementList,
@@ -1186,7 +1186,7 @@ pub const StatementList = struct {
         }
     }
 
-    /// 8.2.9 Static Semantics: TopLevelLexicallyScopedDeclarations
+    /// 8.2.11 Static Semantics: TopLevelLexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallyscopeddeclarations
     pub fn collectTopLevelLexicallyScopedDeclarations(
         self: StatementList,
@@ -1202,7 +1202,7 @@ pub const StatementList = struct {
         }
     }
 
-    /// 8.2.10 Static Semantics: TopLevelVarDeclaredNames
+    /// 8.2.12 Static Semantics: TopLevelVarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvardeclarednames
     pub fn collectTopLevelVarDeclaredNames(
         self: StatementList,
@@ -1242,7 +1242,7 @@ pub const StatementList = struct {
         };
     }
 
-    /// 8.2.11 Static Semantics: TopLevelVarScopedDeclarations
+    /// 8.2.13 Static Semantics: TopLevelVarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
     pub fn collectTopLevelVarScopedDeclarations(
         self: StatementList,
@@ -1311,7 +1311,7 @@ pub const StatementListItem = union(enum) {
         };
     }
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: StatementListItem,
@@ -1339,7 +1339,7 @@ pub const StatementListItem = union(enum) {
         }
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: StatementListItem,
@@ -1369,7 +1369,7 @@ pub const StatementListItem = union(enum) {
         }
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: StatementListItem,
@@ -1382,7 +1382,7 @@ pub const StatementListItem = union(enum) {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: StatementListItem,
@@ -1395,7 +1395,7 @@ pub const StatementListItem = union(enum) {
         }
     }
 
-    /// 8.2.8 Static Semantics: TopLevelLexicallyDeclaredNames
+    /// 8.2.10 Static Semantics: TopLevelLexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallydeclarednames
     pub fn collectTopLevelLexicallyDeclaredNames(
         self: StatementListItem,
@@ -1422,7 +1422,7 @@ pub const StatementListItem = union(enum) {
         }
     }
 
-    /// 8.2.9 Static Semantics: TopLevelLexicallyScopedDeclarations
+    /// 8.2.11 Static Semantics: TopLevelLexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevellexicallyscopeddeclarations
     pub fn collectTopLevelLexicallyScopedDeclarations(
         self: StatementListItem,
@@ -1561,7 +1561,7 @@ pub const VariableStatement = struct {
 pub const VariableDeclarationList = struct {
     items: []const VariableDeclaration,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: VariableDeclarationList,
@@ -1591,7 +1591,7 @@ pub const VariableDeclarationList = struct {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: VariableDeclarationList,
@@ -1879,7 +1879,7 @@ pub const IfStatement = struct {
     consequent_statement: *Statement,
     alternate_statement: ?*Statement,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: IfStatement,
@@ -1898,7 +1898,7 @@ pub const IfStatement = struct {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: IfStatement,
@@ -1931,7 +1931,7 @@ pub const DoWhileStatement = struct {
     test_expression: Expression,
     consequent_statement: *Statement,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: DoWhileStatement,
@@ -1943,7 +1943,7 @@ pub const DoWhileStatement = struct {
         try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: DoWhileStatement,
@@ -1961,7 +1961,7 @@ pub const WhileStatement = struct {
     test_expression: Expression,
     consequent_statement: *Statement,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: WhileStatement,
@@ -1973,7 +1973,7 @@ pub const WhileStatement = struct {
         try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: WhileStatement,
@@ -1999,7 +1999,7 @@ pub const ForStatement = struct {
     increment_expression: ?Expression,
     consequent_statement: *Statement,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ForStatement,
@@ -2023,7 +2023,7 @@ pub const ForStatement = struct {
         try self.consequent_statement.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: ForStatement,
@@ -2067,7 +2067,7 @@ pub const ForInOfStatement = struct {
     expression: Expression,
     consequent_statement: *Statement,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ForInOfStatement,
@@ -2098,7 +2098,7 @@ pub const ForInOfStatement = struct {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: ForInOfStatement,
@@ -2190,7 +2190,7 @@ pub const WithStatement = struct {
     expression: Expression,
     statement: *Statement,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: WithStatement,
@@ -2202,7 +2202,7 @@ pub const WithStatement = struct {
         try self.statement.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: WithStatement,
@@ -2220,7 +2220,7 @@ pub const SwitchStatement = struct {
     expression: Expression,
     case_block: CaseBlock,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: SwitchStatement,
@@ -2232,7 +2232,7 @@ pub const SwitchStatement = struct {
         try self.case_block.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: SwitchStatement,
@@ -2254,7 +2254,7 @@ pub const CaseBlock = struct {
 
     items: []const Item,
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: CaseBlock,
@@ -2281,7 +2281,7 @@ pub const CaseBlock = struct {
         };
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: CaseBlock,
@@ -2308,7 +2308,7 @@ pub const CaseBlock = struct {
         };
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: CaseBlock,
@@ -2335,7 +2335,7 @@ pub const CaseBlock = struct {
         };
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: CaseBlock,
@@ -2368,7 +2368,7 @@ pub const CaseClause = struct {
     expression: Expression,
     statement_list: StatementList,
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: CaseClause,
@@ -2381,7 +2381,7 @@ pub const CaseClause = struct {
         try self.statement_list.collectLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: CaseClause,
@@ -2395,7 +2395,7 @@ pub const CaseClause = struct {
         try self.statement_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: CaseClause,
@@ -2408,7 +2408,7 @@ pub const CaseClause = struct {
         try self.statement_list.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: CaseClause,
@@ -2426,7 +2426,7 @@ pub const CaseClause = struct {
 pub const DefaultClause = struct {
     statement_list: StatementList,
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: DefaultClause,
@@ -2439,7 +2439,7 @@ pub const DefaultClause = struct {
         try self.statement_list.collectLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: DefaultClause,
@@ -2453,7 +2453,7 @@ pub const DefaultClause = struct {
         try self.statement_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: DefaultClause,
@@ -2466,7 +2466,7 @@ pub const DefaultClause = struct {
         try self.statement_list.collectVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: DefaultClause,
@@ -2497,7 +2497,7 @@ pub const LabelledStatement = struct {
         };
     }
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: LabelledStatement,
@@ -2520,7 +2520,7 @@ pub const LabelledStatement = struct {
         }
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: LabelledStatement,
@@ -2545,7 +2545,7 @@ pub const LabelledStatement = struct {
         }
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: LabelledStatement,
@@ -2566,7 +2566,7 @@ pub const LabelledStatement = struct {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: LabelledStatement,
@@ -2587,7 +2587,7 @@ pub const LabelledStatement = struct {
         }
     }
 
-    /// 8.2.10 Static Semantics: TopLevelVarDeclaredNames
+    /// 8.2.12 Static Semantics: TopLevelVarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvardeclarednames
     pub fn collectTopLevelVarDeclaredNames(
         self: LabelledStatement,
@@ -2618,7 +2618,7 @@ pub const LabelledStatement = struct {
         }
     }
 
-    /// 8.2.11 Static Semantics: TopLevelVarScopedDeclarations
+    /// 8.2.13 Static Semantics: TopLevelVarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-toplevelvarscopeddeclarations
     pub fn collectTopLevelVarScopedDeclarations(
         self: LabelledStatement,
@@ -2664,7 +2664,7 @@ pub const TryStatement = struct {
     catch_block: ?Block,
     finally_block: ?Block,
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: TryStatement,
@@ -2695,7 +2695,7 @@ pub const TryStatement = struct {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: TryStatement,
@@ -2904,7 +2904,7 @@ pub const FunctionBody = struct {
     strict: bool,
     arguments_object_needed: bool,
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: FunctionBody,
@@ -2918,7 +2918,7 @@ pub const FunctionBody = struct {
         try self.statement_list.collectTopLevelLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: FunctionBody,
@@ -2932,7 +2932,7 @@ pub const FunctionBody = struct {
         try self.statement_list.collectTopLevelLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: FunctionBody,
@@ -2946,7 +2946,7 @@ pub const FunctionBody = struct {
         try self.statement_list.collectTopLevelVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: FunctionBody,
@@ -3356,7 +3356,7 @@ pub const ClassElementName = union(enum) {
 pub const ClassStaticBlock = struct {
     statement_list: StatementList,
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: ClassStaticBlock,
@@ -3370,7 +3370,7 @@ pub const ClassStaticBlock = struct {
         try self.statement_list.collectTopLevelLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ClassStaticBlock,
@@ -3441,7 +3441,7 @@ pub const AsyncArrowFunction = struct {
 pub const Script = struct {
     statement_list: StatementList,
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: Script,
@@ -3455,7 +3455,7 @@ pub const Script = struct {
         try self.statement_list.collectTopLevelLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: Script,
@@ -3469,7 +3469,7 @@ pub const Script = struct {
         try self.statement_list.collectTopLevelLexicallyDeclaredNames(allocator, lexically_declared_names);
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: Script,
@@ -3483,7 +3483,7 @@ pub const Script = struct {
         try self.statement_list.collectTopLevelVarDeclaredNames(allocator, var_declared_names);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: Script,
@@ -3522,7 +3522,7 @@ pub const Module = struct {
         } else false;
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: Module,
@@ -3538,7 +3538,7 @@ pub const Module = struct {
         try self.module_item_list.collectLexicallyScopedDeclarations(allocator, lexically_scoped_declarations);
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: Module,
@@ -3799,7 +3799,7 @@ pub const Module = struct {
 pub const ModuleItemList = struct {
     items: []const ModuleItem,
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: ModuleItemList,
@@ -3815,7 +3815,7 @@ pub const ModuleItemList = struct {
         }
     }
 
-    /// 8.2.5 Static Semantics: LexicallyScopedDeclarations
+    /// 8.2.7 Static Semantics: LexicallyScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallyscopeddeclarations
     pub fn collectLexicallyScopedDeclarations(
         self: ModuleItemList,
@@ -3873,7 +3873,7 @@ pub const ModuleItemList = struct {
         };
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ModuleItemList,
@@ -3889,7 +3889,7 @@ pub const ModuleItemList = struct {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: ModuleItemList,
@@ -3912,7 +3912,7 @@ pub const ModuleItem = union(enum) {
     export_declaration: ExportDeclaration,
     statement_list_item: StatementListItem,
 
-    /// 8.2.4 Static Semantics: LexicallyDeclaredNames
+    /// 8.2.6 Static Semantics: LexicallyDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-lexicallydeclarednames
     pub fn collectLexicallyDeclaredNames(
         self: ModuleItem,
@@ -3943,7 +3943,7 @@ pub const ModuleItem = union(enum) {
         }
     }
 
-    /// 8.2.6 Static Semantics: VarDeclaredNames
+    /// 8.2.8 Static Semantics: VarDeclaredNames
     /// https://tc39.es/ecma262/#sec-static-semantics-vardeclarednames
     pub fn collectVarDeclaredNames(
         self: ModuleItem,
@@ -3974,7 +3974,7 @@ pub const ModuleItem = union(enum) {
         }
     }
 
-    /// 8.2.7 Static Semantics: VarScopedDeclarations
+    /// 8.2.9 Static Semantics: VarScopedDeclarations
     /// https://tc39.es/ecma262/#sec-static-semantics-varscopeddeclarations
     pub fn collectVarScopedDeclarations(
         self: ModuleItem,

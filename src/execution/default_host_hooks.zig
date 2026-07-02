@@ -177,7 +177,7 @@ pub fn hostGrowSharedArrayBuffer(
     return .unhandled;
 }
 
-/// 27.2.1.9 HostPromiseRejectionTracker ( promise, operation )
+/// 27.5.1.9 HostPromiseRejectionTracker ( promise, operation )
 /// https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
 pub fn hostPromiseRejectionTracker(
     _: *Agent,

@@ -184,7 +184,7 @@ pub fn createSegmentDataObject(
     // 9. Let granularity be segmenter.[[SegmenterGranularity]].
     const granularity = segmenter.fields.segmenter_granularity;
 
-    // 10. If granularity is `"word"`, then
+    // 10. If granularity is "word", then
     if (granularity == .word) {
         // a. Let isWordLike be a Boolean value indicating whether the segment in string is
         //    "word-like" according to locale segmenter.[[Locale]].

@@ -370,7 +370,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             //    newTarget be NewTarget.
             const new_target_ = new_target orelse agent.activeFunctionObject();
 
-            // 2. Let obj be ? OrdinaryCreateFromConstructor(newTarget, `"%NativeError.prototype%"`,
+            // 2. Let obj be ? OrdinaryCreateFromConstructor(newTarget, "%NativeError.prototype%",
             //    « [[ErrorData]] »).
             const @"error" = try ordinaryCreateFromConstructor(
                 T,
@@ -466,7 +466,7 @@ fn MakeNativeError(comptime name: []const u8) type {
     });
 }
 
-/// 20.5.8.1 InstallErrorCause ( obj, options )
+/// 20.5.9.1 InstallErrorCause ( obj, options )
 /// https://tc39.es/ecma262/#sec-installerrorcause
 pub fn installErrorCause(agent: *Agent, obj: *Object, options: Value) Agent.Error!void {
     // 1. If options is an Object and ? HasProperty(options, "cause") is true, then

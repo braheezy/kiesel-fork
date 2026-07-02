@@ -3102,7 +3102,7 @@ pub const prototype = struct {
             // b. Let element be ? Get(array, ! ToString(𝔽(k))).
             const element = try array.get(agent, PropertyKey.from(k));
 
-            // c. If element is not undefined or null, then
+            // c. If element is neither undefined nor null, then
             if (!element.isUndefined() and !element.isNull()) {
                 // i. Let elementString be ? ToString(? Invoke(element, "toLocaleString", « locales,
                 //    options »)).

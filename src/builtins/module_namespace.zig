@@ -299,7 +299,7 @@ pub fn moduleNamespaceCreate(
         }
     }.lessThanFn);
 
-    // 2. Let internalSlotsList be the internal slots listed in Table 28.
+    // 2. Let internalSlotsList be the internal slots listed in Table 29.
     // 3. Let namespace be MakeBasicObject(internalSlotsList).
     const namespace = try ModuleNamespace.create(agent, .{
         .prototype = null,

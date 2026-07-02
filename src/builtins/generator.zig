@@ -1,4 +1,4 @@
-//! 27.5 Generator Objects
+//! 27.8 Generator Objects
 //! https://tc39.es/ecma262/#sec-generator-objects
 
 const std = @import("std");
@@ -20,7 +20,7 @@ const await = builtins.await;
 const createIteratorResultObject = types.createIteratorResultObject;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
-/// 27.5.1 The %GeneratorPrototype% Object
+/// 27.8.1 The %GeneratorPrototype% Object
 /// https://tc39.es/ecma262/#sec-properties-of-generator-prototype
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -32,7 +32,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "return", @"return", 1, realm);
         try object.defineBuiltinFunction(agent, "throw", throw, 1, realm);
 
-        // 27.5.1.1 %GeneratorPrototype%.constructor
+        // 27.8.1.1 %GeneratorPrototype%.constructor
         // https://tc39.es/ecma262/#sec-generator.prototype.constructor
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -45,7 +45,7 @@ pub const prototype = struct {
             },
         );
 
-        // 27.5.1.5 %GeneratorPrototype% [ %Symbol.toStringTag% ]
+        // 27.8.1.5 %GeneratorPrototype% [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-generator.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -59,7 +59,7 @@ pub const prototype = struct {
         );
     }
 
-    /// 27.5.1.2 %GeneratorPrototype%.next ( value )
+    /// 27.8.1.2 %GeneratorPrototype%.next ( value )
     /// https://tc39.es/ecma262/#sec-generator.prototype.next
     fn next(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
@@ -68,7 +68,7 @@ pub const prototype = struct {
         return Value.from(try generatorResume(agent, this_value, value));
     }
 
-    /// 27.5.1.3 %GeneratorPrototype%.return ( value )
+    /// 27.8.1.3 %GeneratorPrototype%.return ( value )
     /// https://tc39.es/ecma262/#sec-generator.prototype.return
     fn @"return"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
@@ -83,7 +83,7 @@ pub const prototype = struct {
         return Value.from(try generatorResumeAbrupt(agent, gen, completion));
     }
 
-    /// 27.5.1.4 %GeneratorPrototype%.throw ( exception )
+    /// 27.8.1.4 %GeneratorPrototype%.throw ( exception )
     /// https://tc39.es/ecma262/#sec-generator.prototype.throw
     fn throw(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const exception = arguments.get(0);
@@ -99,7 +99,7 @@ pub const prototype = struct {
     }
 };
 
-/// 27.5.2 Properties of Generator Instances
+/// 27.8.2 Properties of Generator Instances
 /// https://tc39.es/ecma262/#sec-properties-of-generator-instances
 pub const Generator = MakeObject(.{
     .Fields = struct {
@@ -134,7 +134,7 @@ pub const Completion = union(enum) {
     throw: Value,
 };
 
-/// 27.5.3.1 GeneratorStart ( gen, genBody )
+/// 27.8.3.1 GeneratorStart ( gen, genBody )
 /// https://tc39.es/ecma262/#sec-generatorstart
 pub fn generatorStart(
     agent: *Agent,
@@ -268,7 +268,7 @@ pub fn generatorStart(
     // 7. Return unused.
 }
 
-/// 27.5.3.2 GeneratorValidate ( gen, genBrand )
+/// 27.8.3.2 GeneratorValidate ( gen, genBrand )
 /// https://tc39.es/ecma262/#sec-generatorvalidate
 pub fn generatorValidate(
     agent: *Agent,
@@ -296,7 +296,7 @@ pub fn generatorValidate(
     return .{ gen, state };
 }
 
-/// 27.5.3.3 GeneratorResume ( gen, value, genBrand )
+/// 27.8.3.3 GeneratorResume ( gen, value, genBrand )
 /// https://tc39.es/ecma262/#sec-generatorresume
 pub fn generatorResume(agent: *Agent, gen_value: Value, value: Value) Agent.Error!*Object {
     // 1. Let state be ? GeneratorValidate(gen, genBrand).
@@ -326,7 +326,7 @@ pub fn generatorResume(agent: *Agent, gen_value: Value, value: Value) Agent.Erro
     return result;
 }
 
-/// 27.5.3.4 GeneratorResumeAbrupt ( gen, abruptCompletion, genBrand )
+/// 27.8.3.4 GeneratorResumeAbrupt ( gen, abruptCompletion, genBrand )
 /// https://tc39.es/ecma262/#sec-generatorresumeabrupt
 pub fn generatorResumeAbrupt(
     agent: *Agent,
@@ -399,7 +399,7 @@ pub const GeneratorKind = enum {
     async,
 };
 
-/// 27.5.3.5 GetGeneratorKind ( )
+/// 27.8.3.5 GetGeneratorKind ( )
 /// https://tc39.es/ecma262/#sec-getgeneratorkind
 pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
     // 1. Let genContext be the running execution context.
@@ -418,7 +418,7 @@ pub fn getGeneratorKind(agent: *Agent) GeneratorKind {
     };
 }
 
-/// 27.5.3.6 GeneratorYield ( iteratorResult )
+/// 27.8.3.6 GeneratorYield ( iteratorResult )
 /// https://tc39.es/ecma262/#sec-generatoryield
 pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Completion {
     // 1. Let genContext be the running execution context.
@@ -434,22 +434,13 @@ pub fn generatorYield(agent: *Agent, iterator_result: *Object) Agent.Error!Compl
     // 5. Set gen.[[GeneratorState]] to suspended-yield.
     gen.fields.generator_state = .suspended_yield;
 
-    // 6. Remove genContext from the execution context stack and restore the execution context that
-    //    is at the top of the execution context stack as the running execution context.
+    // 6. Return ? RunCallerContext(iteratorResult).
     _ = agent.execution_context_stack.pop().?;
-
-    // 7. Let callerContext be the running execution context.
-    // 8. Resume callerContext passing NormalCompletion(iteratorResult). If genContext is ever
-    //    resumed again, let resumptionValue be the Completion Record with which it is resumed.
     gen.fields.evaluation_state.suspension_result = Value.from(iterator_result);
-
-    // TODO: 9. Assert: If control reaches here, then genContext is the running execution context
-    //          again.
-    // TODO: 10. Return resumptionValue.
     return .{ .normal = .undefined };
 }
 
-/// 27.5.3.7 Yield ( arg )
+/// 27.8.3.7 Yield ( arg )
 /// https://tc39.es/ecma262/#sec-yield
 pub fn yield(agent: *Agent, arg: Value) Agent.Error!Completion {
     // 1. Let genKind be GetGeneratorKind().

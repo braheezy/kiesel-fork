@@ -1,4 +1,4 @@
-//! 27.7 AsyncFunction Objects
+//! 27.10 AsyncFunction Objects
 //! https://tc39.es/ecma262/#sec-async-function-objects
 
 const std = @import("std");
@@ -24,7 +24,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const performPromiseThen = builtins.performPromiseThen;
 const promiseResolve = builtins.promiseResolve;
 
-/// 27.7.2 Properties of the AsyncFunction Constructor
+/// 27.10.2 Properties of the AsyncFunction Constructor
 /// https://tc39.es/ecma262/#sec-async-function-constructor-properties
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -39,7 +39,7 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 27.7.2.1 AsyncFunction.prototype
+        // 27.10.2.1 AsyncFunction.prototype
         // https://tc39.es/ecma262/#sec-async-function-constructor-prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -49,7 +49,7 @@ pub const constructor = struct {
         );
     }
 
-    /// 27.7.1.1 AsyncFunction ( ...paramArgs, bodyArg )
+    /// 27.10.1.1 AsyncFunction ( ...paramArgs, bodyArg )
     /// https://tc39.es/ecma262/#sec-async-function-constructor-arguments
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
         const param_args = arguments.values[0..arguments.count() -| 1];
@@ -74,7 +74,7 @@ pub const constructor = struct {
     }
 };
 
-/// 27.7.3 Properties of the AsyncFunction Prototype Object
+/// 27.10.3 Properties of the AsyncFunction Prototype Object
 /// https://tc39.es/ecma262/#sec-async-function-prototype-properties
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
@@ -82,7 +82,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 27.7.3.1 AsyncFunction.prototype.constructor
+        // 27.10.3.1 AsyncFunction.prototype.constructor
         // https://tc39.es/ecma262/#sec-async-function-prototype-properties-constructor
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -95,7 +95,7 @@ pub const prototype = struct {
             },
         );
 
-        // 27.7.3.2 AsyncFunction.prototype [ %Symbol.toStringTag% ]
+        // 27.10.3.2 AsyncFunction.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-async-function-prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -110,7 +110,7 @@ pub const prototype = struct {
     }
 };
 
-/// 27.7.5.1 AsyncFunctionStart ( promiseCapability, asyncFuncBody )
+/// 27.10.5.1 AsyncFunctionStart ( promiseCapability, asyncFuncBody )
 /// https://tc39.es/ecma262/#sec-async-functions-abstract-operations-async-function-start
 pub fn asyncFunctionStart(
     agent: *Agent,
@@ -149,7 +149,7 @@ const AsyncBody = union(enum) {
     module: ast.Module,
 };
 
-/// 27.7.5.2 AsyncBlockStart ( promiseCapability, asyncBody, asyncContext )
+/// 27.10.5.2 AsyncBlockStart ( promiseCapability, asyncBody, asyncContext )
 /// https://tc39.es/ecma262/#sec-asyncblockstart
 pub fn asyncBlockStart(
     agent: *Agent,
@@ -262,7 +262,7 @@ pub fn asyncBlockStart(
     // 6. Return unused.
 }
 
-/// 27.7.5.3 Await ( arg )
+/// 27.10.5.3 Await ( arg )
 /// https://tc39.es/ecma262/#await
 pub fn await(agent: *Agent, arg: Value) Agent.Error!Value {
     const realm = agent.currentRealm();
@@ -347,7 +347,7 @@ pub fn await(agent: *Agent, arg: Value) Agent.Error!Value {
         null,
     );
 
-    // TODO: 8-12.
+    // 8. Return ? RunCallerContext(empty).
     agent.drainJobQueue();
     switch (promise.fields.promise_state) {
         .pending => return Value.from(&promise.object), // `await properAwait()` :)
