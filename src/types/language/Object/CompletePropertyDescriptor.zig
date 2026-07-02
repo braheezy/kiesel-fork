@@ -26,8 +26,8 @@ pub fn toPropertyDescriptor(self: *const CompletePropertyDescriptor) PropertyDes
             .configurable = self.attributes.configurable,
         },
         .accessor => |accessor| .{
-            .get = if (accessor.get) |object| object else @as(?*Object, null),
-            .set = if (accessor.set) |object| object else @as(?*Object, null),
+            .getter = if (accessor.getter) |object| object else @as(?*Object, null),
+            .setter = if (accessor.setter) |object| object else @as(?*Object, null),
             .enumerable = self.attributes.enumerable,
             .configurable = self.attributes.configurable,
         },

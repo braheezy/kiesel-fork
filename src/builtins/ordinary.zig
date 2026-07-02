@@ -159,8 +159,8 @@ pub fn ordinaryGetOwnProperty(
     //     b. Set propertyDesc.[[Writable]] to the value of ownProperty's [[Writable]] attribute.
     // 5. Else,
     //     a. Assert: ownProperty is an accessor property.
-    //     b. Set propertyDesc.[[Get]] to the value of ownProperty's [[Get]] attribute.
-    //     c. Set propertyDesc.[[Set]] to the value of ownProperty's [[Set]] attribute.
+    //     b. Set propertyDesc.[[Getter]] to the value of ownProperty's [[Getter]] attribute.
+    //     c. Set propertyDesc.[[Setter]] to the value of ownProperty's [[Setter]] attribute.
     // 6. Set propertyDesc.[[Enumerable]] to the value of ownProperty's [[Enumerable]] attribute.
     // 7. Set propertyDesc.[[Configurable]] to the value of ownProperty's [[Configurable]]
     //    attribute.
@@ -257,14 +257,14 @@ fn validateAndApplyPropertyDescriptor(
 
         // c. If IsAccessorDescriptor(propertyDesc) is true, then
         const complete_property_desc: Object.CompletePropertyDescriptor = if (property_desc.isAccessorDescriptor()) blk: {
-            // i. Create an own accessor property named propertyKey of object obj whose [[Get]],
-            //    [[Set]], [[Enumerable]], and [[Configurable]] attributes are set to the value of
-            //    the corresponding field in propertyDesc if propertyDesc has that field, or to the
-            //    attribute's default value otherwise.
+            // i. Create an own accessor property named propertyKey of object obj whose [[Getter]],
+            //    [[Setter]], [[Enumerable]], and [[Configurable]] attributes are set to the value
+            //    of the corresponding field in propertyDesc if propertyDesc has that field, or to
+            //    the attribute's default value otherwise.
             break :blk .{
                 .value_or_accessor = .{ .accessor = .{
-                    .get = property_desc.get orelse @as(?*Object, null),
-                    .set = property_desc.set orelse @as(?*Object, null),
+                    .getter = property_desc.getter orelse @as(?*Object, null),
+                    .setter = property_desc.setter orelse @as(?*Object, null),
                 } },
                 .attributes = .{
                     .writable = false,
@@ -317,19 +317,19 @@ fn validateAndApplyPropertyDescriptor(
 
         // d. If IsAccessorDescriptor(current) is true, then
         if (current.isAccessorDescriptor()) {
-            // i. If propertyDesc has a [[Get]] field and SameValue(propertyDesc.[[Get]],
-            //    current.[[Get]]) is false, return false.
-            if (property_desc.get != null and !(blk: {
-                if (property_desc.get.? == null and current.get.? == null) break :blk true;
-                if (property_desc.get.?) |a| if (current.get.?) |b| break :blk a == b;
+            // i. If propertyDesc has a [[Getter]] field and SameValue(propertyDesc.[[Getter]],
+            //    current.[[Getter]]) is false, return false.
+            if (property_desc.getter != null and !(blk: {
+                if (property_desc.getter.? == null and current.getter.? == null) break :blk true;
+                if (property_desc.getter.?) |a| if (current.getter.?) |b| break :blk a == b;
                 break :blk false;
             })) return false;
 
-            // ii. If propertyDesc has a [[Set]] field and SameValue(propertyDesc.[[Set]],
-            //     current.[[Set]]) is false, return false.
-            if (property_desc.set != null and !(blk: {
-                if (property_desc.set.? == null and current.set.? == null) break :blk true;
-                if (property_desc.set.?) |a| if (current.set.?) |b| break :blk a == b;
+            // ii. If propertyDesc has a [[Setter]] field and SameValue(propertyDesc.[[Setter]],
+            //     current.[[Setter]]) is false, return false.
+            if (property_desc.setter != null and !(blk: {
+                if (property_desc.setter.? == null and current.setter.? == null) break :blk true;
+                if (property_desc.setter.?) |a| if (current.setter.?) |b| break :blk a == b;
                 break :blk false;
             })) return false;
         }
@@ -363,13 +363,13 @@ fn validateAndApplyPropertyDescriptor(
 
             // iii. Replace the property named propertyKey of object obj with an accessor property
             //      whose [[Configurable]] and [[Enumerable]] attributes are set to configurable and
-            //      enumerable, respectively, and whose [[Get]] and [[Set]] attributes are set to
-            //      the value of the corresponding field in propertyDesc if propertyDesc has that
+            //      enumerable, respectively, and whose [[Getter]] and [[Setter]] attributes are set
+            //      to the value of the corresponding field in propertyDesc if propertyDesc has that
             //      field, or to the attribute's default value otherwise.
             break :blk .{
                 .value_or_accessor = .{ .accessor = .{
-                    .get = property_desc.get orelse @as(?*Object, null),
-                    .set = property_desc.set orelse @as(?*Object, null),
+                    .getter = property_desc.getter orelse @as(?*Object, null),
+                    .setter = property_desc.setter orelse @as(?*Object, null),
                 } },
                 .attributes = .{
                     .writable = false,
@@ -419,8 +419,8 @@ fn validateAndApplyPropertyDescriptor(
                 std.debug.assert(current.isAccessorDescriptor());
                 break :blk .{
                     .value_or_accessor = .{ .accessor = .{
-                        .get = property_desc.get orelse current.get.?,
-                        .set = property_desc.set orelse current.set.?,
+                        .getter = property_desc.getter orelse current.getter.?,
+                        .setter = property_desc.setter orelse current.setter.?,
                     } },
                     .attributes = .{
                         .writable = false,
@@ -534,7 +534,7 @@ pub fn ordinaryGet(
         switch (property_desc.value_or_accessor) {
             .value => |value| return value,
             .accessor => |accessor| {
-                const getter = accessor.get orelse return .undefined;
+                const getter = accessor.getter orelse return .undefined;
                 return Value.from(getter).callAssumeCallable(agent, receiver, &.{});
             },
         }
@@ -562,9 +562,9 @@ pub fn ordinaryGet(
     // 4. Assert: IsAccessorDescriptor(propertyDesc) is true.
     std.debug.assert(property_desc.isAccessorDescriptor());
 
-    // 5. Let getter be propertyDesc.[[Get]].
+    // 5. Let getter be propertyDesc.[[Getter]].
     // 6. If getter is undefined, return undefined.
-    const getter = property_desc.get.? orelse return .undefined;
+    const getter = property_desc.getter.? orelse return .undefined;
 
     // 7. Return ? Call(getter, receiver).
     return Value.from(getter).callAssumeCallable(agent, receiver, &.{});
@@ -743,9 +743,9 @@ pub fn ordinarySetWithOwnDescriptor(
     // 3. Assert: IsAccessorDescriptor(ownDesc) is true.
     std.debug.assert(own_desc.isAccessorDescriptor());
 
-    // 4. Let setter be ownDesc.[[Set]].
+    // 4. Let setter be ownDesc.[[Setter]].
     // 5. If setter is undefined, return false.
-    const setter = own_desc.set.? orelse return false;
+    const setter = own_desc.setter.? orelse return false;
 
     // 6. Perform ? Call(setter, receiver, « value »).
     _ = try Value.from(setter).callAssumeCallable(agent, receiver_value, &.{value});

@@ -956,10 +956,10 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{getter});
         }
 
-        // 3. Let propertyDesc be PropertyDescriptor { [[Get]]: getter, [[Enumerable]]: true,
+        // 3. Let propertyDesc be PropertyDescriptor { [[Getter]]: getter, [[Enumerable]]: true,
         //    [[Configurable]]: true }.
         const property_desc: PropertyDescriptor = .{
-            .get = getter.asObject(),
+            .getter = getter.asObject(),
             .enumerable = true,
             .configurable = true,
         };
@@ -988,10 +988,10 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{setter});
         }
 
-        // 3. Let propertyDesc be PropertyDescriptor { [[Set]]: setter, [[Enumerable]]: true,
+        // 3. Let propertyDesc be PropertyDescriptor { [[Setter]]: setter, [[Enumerable]]: true,
         //    [[Configurable]]: true }.
         const property_desc: PropertyDescriptor = .{
-            .set = setter.asObject(),
+            .setter = setter.asObject(),
             .enumerable = true,
             .configurable = true,
         };
@@ -1026,9 +1026,9 @@ pub const prototype = struct {
                 obj,
                 property_key,
             )) |property_desc| {
-                // i. If IsAccessorDescriptor(propertyDesc) is true, return propertyDesc.[[Get]].
+                // i. If IsAccessorDescriptor(propertyDesc) is true, return propertyDesc.[[Getter]].
                 if (property_desc.isAccessorDescriptor()) {
-                    return Value.from(property_desc.get.? orelse return .undefined);
+                    return Value.from(property_desc.getter.? orelse return .undefined);
                 }
 
                 // ii. Return undefined.
@@ -1063,9 +1063,9 @@ pub const prototype = struct {
                 obj,
                 property_key,
             )) |property_desc| {
-                // i. If IsAccessorDescriptor(propertyDesc) is true, return propertyDesc.[[Set]].
+                // i. If IsAccessorDescriptor(propertyDesc) is true, return propertyDesc.[[Setter]].
                 if (property_desc.isAccessorDescriptor()) {
-                    return Value.from(property_desc.set.? orelse return .undefined);
+                    return Value.from(property_desc.setter.? orelse return .undefined);
                 }
 
                 // ii. Return undefined.

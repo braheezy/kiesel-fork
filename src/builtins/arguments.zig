@@ -257,11 +257,11 @@ pub fn createUnmappedArgumentsObject(
     );
 
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
-    //    [[Get]]: %ThrowTypeError%, [[Set]]: %ThrowTypeError%, [[Enumerable]]: false,
+    //    [[Getter]]: %ThrowTypeError%, [[Setter]]: %ThrowTypeError%, [[Enumerable]]: false,
     //    [[Configurable]]: false }).
     arguments.object.setAccessorAtPropertyOffset(offsets.callee, .{
-        .get = try realm.intrinsics.@"%ThrowTypeError%"(),
-        .set = try realm.intrinsics.@"%ThrowTypeError%"(),
+        .getter = try realm.intrinsics.@"%ThrowTypeError%"(),
+        .setter = try realm.intrinsics.@"%ThrowTypeError%"(),
     });
 
     // 9. Return obj.
@@ -364,7 +364,7 @@ pub fn createMappedArgumentsObject(
                 // 1. Let getter be MakeArgGetter(name, envRecord).
                 // 2. Let setter be MakeArgSetter(name, envRecord).
                 // 3. Perform ! map.[[DefineOwnProperty]](! ToString(𝔽(index)), PropertyDescriptor {
-                //    [[Set]]: setter, [[Get]]: getter, [[Enumerable]]: false,
+                //    [[Setter]]: setter, [[Getter]]: getter, [[Enumerable]]: false,
                 //    [[Configurable]]: true }).
                 // NOTE: The getter and setter are implemented via the ParameterMap methods.
                 map.items[index] = name;

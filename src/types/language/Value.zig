@@ -678,8 +678,8 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
             return agent.throwException(.type_error, "{f} is not callable", .{getter});
         }
 
-        // c. Set propertyDesc.[[Get]] to getter.
-        property_desc.get = if (!getter.isUndefined()) getter.asObject() else @as(?*Object, null);
+        // c. Set propertyDesc.[[Getter]] to getter.
+        property_desc.getter = if (!getter.isUndefined()) getter.asObject() else @as(?*Object, null);
     }
 
     // 13. Let hasSet be ? HasProperty(obj, "set").
@@ -696,12 +696,12 @@ pub fn toPropertyDescriptor(self: Value, agent: *Agent) Agent.Error!PropertyDesc
             return agent.throwException(.type_error, "{f} is not callable", .{setter});
         }
 
-        // c. Set propertyDesc.[[Set]] to setter.
-        property_desc.set = if (!setter.isUndefined()) setter.asObject() else @as(?*Object, null);
+        // c. Set propertyDesc.[[Setter]] to setter.
+        property_desc.setter = if (!setter.isUndefined()) setter.asObject() else @as(?*Object, null);
     }
 
-    // 15. If propertyDesc has a [[Get]] field or propertyDesc has a [[Set]] field, then
-    if (property_desc.get != null or property_desc.set != null) {
+    // 15. If propertyDesc has a [[Getter]] field or propertyDesc has a [[Setter]] field, then
+    if (property_desc.getter != null or property_desc.setter != null) {
         // a. If propertyDesc has a [[Value]] field or propertyDesc has a [[Writable]] field, throw
         //    a TypeError exception.
         if (property_desc.value != null or property_desc.writable != null) {

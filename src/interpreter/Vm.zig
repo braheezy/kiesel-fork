@@ -666,28 +666,28 @@ fn executeObjectSetGetter(vm: *Vm, object_reg: Bytecode.Reg, key_index: Bytecode
     const object = vm.store(object_reg).asObject();
     const property_key = PropertyKey.from(try vm.getString(key_index));
     const function = vm.store(func_reg).asObject();
-    try object.definePropertyOrThrow(vm.agent, property_key, .{ .get = function, .enumerable = true, .configurable = true });
+    try object.definePropertyOrThrow(vm.agent, property_key, .{ .getter = function, .enumerable = true, .configurable = true });
 }
 
 fn executeObjectSetGetterComputed(vm: *Vm, object_reg: Bytecode.Reg, key_reg: Bytecode.Reg, func_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = try vm.store(key_reg).toPropertyKey(vm.agent);
     const function = vm.store(func_reg).asObject();
-    try object.definePropertyOrThrow(vm.agent, property_key, .{ .get = function, .enumerable = true, .configurable = true });
+    try object.definePropertyOrThrow(vm.agent, property_key, .{ .getter = function, .enumerable = true, .configurable = true });
 }
 
 fn executeObjectSetSetter(vm: *Vm, object_reg: Bytecode.Reg, key_index: Bytecode.StringIndex, func_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = PropertyKey.from(try vm.getString(key_index));
     const function = vm.store(func_reg).asObject();
-    try object.definePropertyOrThrow(vm.agent, property_key, .{ .set = function, .enumerable = true, .configurable = true });
+    try object.definePropertyOrThrow(vm.agent, property_key, .{ .setter = function, .enumerable = true, .configurable = true });
 }
 
 fn executeObjectSetSetterComputed(vm: *Vm, object_reg: Bytecode.Reg, key_reg: Bytecode.Reg, func_reg: Bytecode.Reg) Agent.Error!void {
     const object = vm.store(object_reg).asObject();
     const property_key = try vm.store(key_reg).toPropertyKey(vm.agent);
     const function = vm.store(func_reg).asObject();
-    try object.definePropertyOrThrow(vm.agent, property_key, .{ .set = function, .enumerable = true, .configurable = true });
+    try object.definePropertyOrThrow(vm.agent, property_key, .{ .setter = function, .enumerable = true, .configurable = true });
 }
 
 fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Reg, value_reg: Bytecode.Reg) std.mem.Allocator.Error!void {

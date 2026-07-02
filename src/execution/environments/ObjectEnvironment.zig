@@ -239,7 +239,7 @@ pub fn getBindingValueIfExists(
         switch (property_desc.value_or_accessor) {
             .value => |value| return value,
             .accessor => |accessor| {
-                const getter = accessor.get orelse return .undefined;
+                const getter = accessor.getter orelse return .undefined;
                 return try Value.from(getter).callAssumeCallable(agent, Value.from(object), &.{});
             },
         }

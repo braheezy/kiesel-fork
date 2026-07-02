@@ -915,17 +915,17 @@ pub fn methodDefinitionEvaluation(
                 // 9. If propertyKey is a Private Name, then
                 .private_name => |private_name| {
                     // a. Return PrivateElement { [[Key]]: propertyKey, [[Kind]]: accessor,
-                    //    [[Get]]: closure, [[Set]]: undefined }.
+                    //    [[Getter]]: closure, [[Setter]]: undefined }.
                     const private_element: PrivateElement = .{
-                        .accessor = .{ .get = &closure.object, .set = null },
+                        .accessor = .{ .getter = &closure.object, .setter = null },
                     };
                     return .{ .private_name = private_name, .private_element = private_element };
                 },
                 .property_key => |property_key| {
-                    // 10. Let propertyDesc be the PropertyDescriptor { [[Get]]: closure,
+                    // 10. Let propertyDesc be the PropertyDescriptor { [[Getter]]: closure,
                     //     [[Enumerable]]: enumerable, [[Configurable]]: true }.
                     const property_desc: PropertyDescriptor = .{
-                        .get = &closure.object,
+                        .getter = &closure.object,
                         .enumerable = enumerable,
                         .configurable = true,
                     };
@@ -984,17 +984,17 @@ pub fn methodDefinitionEvaluation(
                 // 8. If propertyKey is a Private Name, then
                 .private_name => |private_name| {
                     // a. Return PrivateElement { [[Key]]: propertyKey, [[Kind]]: accessor,
-                    //    [[Get]]: undefined, [[Set]]: closure }.
+                    //    [[Getter]]: undefined, [[Setter]]: closure }.
                     const private_element: PrivateElement = .{
-                        .accessor = .{ .get = null, .set = &closure.object },
+                        .accessor = .{ .getter = null, .setter = &closure.object },
                     };
                     return .{ .private_name = private_name, .private_element = private_element };
                 },
                 .property_key => |property_key| {
-                    // 9. Let propertyDesc be the PropertyDescriptor { [[Set]]: closure,
+                    // 9. Let propertyDesc be the PropertyDescriptor { [[Setter]]: closure,
                     //    [[Enumerable]]: enumerable, [[Configurable]]: true }.
                     const property_desc: PropertyDescriptor = .{
-                        .set = &closure.object,
+                        .setter = &closure.object,
                         .enumerable = enumerable,
                         .configurable = true,
                     };
@@ -2492,18 +2492,18 @@ pub fn classDefinitionEvaluation(
 
                     var combined = private_method_definition;
 
-                    // 2. If element.[[Get]] is undefined, then
-                    if (private_method_definition.private_element.accessor.get == null) {
+                    // 2. If element.[[Getter]] is undefined, then
+                    if (private_method_definition.private_element.accessor.getter == null) {
                         // a. Let combined be PrivateElement { [[Key]]: element.[[Key]],
-                        //    [[Kind]]: accessor, [[Get]]: existingElement.[[Get]],
-                        //    [[Set]]: element.[[Set]] }.
-                        combined.private_element.accessor.get = found.private_element.accessor.get;
+                        //    [[Kind]]: accessor, [[Getter]]: existingElement.[[Getter]],
+                        //    [[Setter]]: element.[[Setter]] }.
+                        combined.private_element.accessor.getter = found.private_element.accessor.getter;
                     } else {
                         // 3. Else,
                         // a. Let combined be PrivateElement { [[Key]]: element.[[Key]],
-                        //    [[Kind]]: accessor, [[Get]]: element.[[Get]],
-                        //    [[Set]]: existingElement.[[Set]] }.
-                        combined.private_element.accessor.set = found.private_element.accessor.set;
+                        //    [[Kind]]: accessor, [[Getter]]: element.[[Getter]],
+                        //    [[Setter]]: existingElement.[[Setter]] }.
+                        combined.private_element.accessor.setter = found.private_element.accessor.setter;
                     }
 
                     // 4. Replace existingElement in container with combined.

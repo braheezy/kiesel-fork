@@ -66,8 +66,8 @@ pub const LazyProperty = struct {
 };
 
 pub const Accessor = struct {
-    get: ?*Object,
-    set: ?*Object,
+    getter: ?*Object,
+    setter: ?*Object,
 };
 
 pub const Tag = enum(u16) {
@@ -305,13 +305,13 @@ pub fn getPropertyCreateLazyIfNeeded(
                 const realm = lazy_property.realm;
                 const agent = realm.agent;
                 const accessor = try lazy_property.initializer.accessor(agent, realm);
-                getter_value.* = if (accessor.get) |getter| Value.from(getter) else .null;
-                setter_value.* = if (accessor.set) |setter| Value.from(setter) else .null;
+                getter_value.* = if (accessor.getter) |getter| Value.from(getter) else .null;
+                setter_value.* = if (accessor.setter) |setter| Value.from(setter) else .null;
             }
             return .{
                 .value_or_accessor = .{ .accessor = .{
-                    .get = if (getter_value.isObject()) getter_value.asObject() else null,
-                    .set = if (setter_value.isObject()) setter_value.asObject() else null,
+                    .getter = if (getter_value.isObject()) getter_value.asObject() else null,
+                    .setter = if (setter_value.isObject()) setter_value.asObject() else null,
                 } },
                 .attributes = property.attributes,
             };
@@ -442,8 +442,8 @@ pub fn setAccessorAtPropertyOffset(
     offset: Shape.Property.Offset,
     accessor: Accessor,
 ) void {
-    const getter_value: Value = if (accessor.get) |getter| Value.from(getter) else .null;
-    const setter_value: Value = if (accessor.set) |setter| Value.from(setter) else .null;
+    const getter_value: Value = if (accessor.getter) |getter| Value.from(getter) else .null;
+    const setter_value: Value = if (accessor.setter) |setter| Value.from(setter) else .null;
     self.propertyPtr(offset).* = getter_value;
     self.propertyPtr(@enumFromInt(@intFromEnum(offset) + 1)).* = setter_value;
 }
@@ -670,8 +670,8 @@ pub fn defineBuiltinAccessorWithAttributes(
     );
     try self.ensureProperties(agent.gc_allocator, @intFromEnum(offset) + 2);
     self.setAccessorAtPropertyOffset(offset, .{
-        .get = if (@TypeOf(getter_function) != void) &getter_function.object else null,
-        .set = if (@TypeOf(setter_function) != void) &setter_function.object else null,
+        .getter = if (@TypeOf(getter_function) != void) &getter_function.object else null,
+        .setter = if (@TypeOf(setter_function) != void) &setter_function.object else null,
     });
 }
 
@@ -1460,10 +1460,10 @@ pub fn privateGet(obj: *Object, agent: *Agent, private_name: PrivateName) Agent.
         .method => |object| return Value.from(object),
 
         // 4. Assert: entry.[[Kind]] is accessor.
-        .accessor => |get_and_set| {
-            // 5. If entry.[[Get]] is undefined, throw a TypeError exception.
-            // 6. Let getter be entry.[[Get]].
-            const getter = get_and_set.get orelse {
+        .accessor => |accessor| {
+            // 5. If entry.[[Getter]] is undefined, throw a TypeError exception.
+            // 6. Let getter be entry.[[Getter]].
+            const getter = accessor.getter orelse {
                 return agent.throwException(
                     .type_error,
                     "Private element '{f}' has no getter",
@@ -1508,10 +1508,10 @@ pub fn privateSet(obj: *Object, agent: *Agent, private_name: PrivateName, value:
 
         // 5. Else,
         //     a. Assert: entry.[[Kind]] is accessor.
-        .accessor => |get_and_set| {
-            // c. Let setter be entry.[[Set]].
-            // b. If entry.[[Set]] is undefined, throw a TypeError exception.
-            const setter = get_and_set.set orelse {
+        .accessor => |accessor| {
+            // c. Let setter be entry.[[Setter]].
+            // b. If entry.[[Setter]] is undefined, throw a TypeError exception.
+            const setter = accessor.setter orelse {
                 return agent.throwException(
                     .type_error,
                     "Private element '{f}' has no setter",

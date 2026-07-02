@@ -21,11 +21,11 @@ value: ?Value = null,
 /// [[Writable]]
 writable: ?bool = null,
 
-/// [[Get]]
-get: ??*Object = null,
+/// [[Getter]]
+getter: ??*Object = null,
 
-/// [[Set]]
-set: ??*Object = null,
+/// [[Setter]]
+setter: ??*Object = null,
 
 /// [[Enumerable]]
 enumerable: ?bool = null,
@@ -36,10 +36,10 @@ configurable: ?bool = null,
 /// 6.2.6.1 IsAccessorDescriptor ( propertyDesc )
 /// https://tc39.es/ecma262/#sec-isaccessordescriptor
 pub fn isAccessorDescriptor(property_desc: *const PropertyDescriptor) bool {
-    // 1. If propertyDesc has a [[Get]] field, return true.
-    // 2. If propertyDesc has a [[Set]] field, return true.
+    // 1. If propertyDesc has a [[Getter]] field, return true.
+    // 2. If propertyDesc has a [[Setter]] field, return true.
     // 3. Return false.
-    return property_desc.get != null or property_desc.set != null;
+    return property_desc.getter != null or property_desc.setter != null;
 }
 
 /// 6.2.6.2 IsDataDescriptor ( propertyDesc )
@@ -94,23 +94,23 @@ pub fn fromPropertyDescriptor(
         );
     }
 
-    // 6. If propertyDesc has a [[Get]] field, then
-    if (property_desc.get) |get| {
-        // a. Perform ! CreateDataPropertyOrThrow(obj, "get", propertyDesc.[[Get]]).
+    // 6. If propertyDesc has a [[Getter]] field, then
+    if (property_desc.getter) |getter| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, "get", propertyDesc.[[Getter]]).
         try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("get"),
-            if (get) |o| Value.from(o) else .undefined,
+            if (getter) |o| Value.from(o) else .undefined,
         );
     }
 
-    // 7. If propertyDesc has a [[Set]] field, then
-    if (property_desc.set) |set| {
-        // a. Perform ! CreateDataPropertyOrThrow(obj, "set", propertyDesc.[[Set]]).
+    // 7. If propertyDesc has a [[Setter]] field, then
+    if (property_desc.setter) |setter| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, "set", propertyDesc.[[Setter]]).
         try obj.createDataPropertyDirect(
             agent,
             PropertyKey.from("set"),
-            if (set) |o| Value.from(o) else .undefined,
+            if (setter) |o| Value.from(o) else .undefined,
         );
     }
 
@@ -142,8 +142,8 @@ pub fn fromPropertyDescriptor(
 /// 6.2.6.6 CompletePropertyDescriptor ( propertyDesc )
 /// https://tc39.es/ecma262/#sec-completepropertydescriptor
 pub fn completePropertyDescriptor(property_desc: *PropertyDescriptor) void {
-    // 1. Let like be the Record { [[Value]]: undefined, [[Writable]]: false, [[Get]]: undefined,
-    //    [[Set]]: undefined, [[Enumerable]]: false, [[Configurable]]: false }.
+    // 1. Let like be the Record { [[Value]]: undefined, [[Writable]]: false, [[Getter]]: undefined,
+    //    [[Setter]]: undefined, [[Enumerable]]: false, [[Configurable]]: false }.
     const like: PropertyDescriptor = .{
         .value = .undefined,
         .writable = false,
@@ -163,10 +163,10 @@ pub fn completePropertyDescriptor(property_desc: *PropertyDescriptor) void {
         if (property_desc.writable == null) property_desc.writable = like.writable;
     } else {
         // 3. Else,
-        // a. If propertyDesc does not have a [[Get]] field, set propertyDesc.[[Get]] to
-        //    like.[[Get]].
-        // b. If propertyDesc does not have a [[Set]] field, set propertyDesc.[[Set]] to
-        //    like.[[Set]].
+        // a. If propertyDesc does not have a [[Getter]] field, set propertyDesc.[[Getter]] to
+        //    like.[[Getter]].
+        // b. If propertyDesc does not have a [[Setter]] field, set propertyDesc.[[Setter]] to
+        //    like.[[Setter]].
         // NOTE: These are no-ops, the fields can't be missing.
     }
 
@@ -183,7 +183,7 @@ pub fn completePropertyDescriptor(property_desc: *PropertyDescriptor) void {
 
 pub fn isFullyPopulated(property_desc: *const PropertyDescriptor) bool {
     return ((property_desc.value != null and property_desc.writable != null) or
-        (property_desc.get != null or property_desc.set != null)) and
+        (property_desc.getter != null or property_desc.setter != null)) and
         property_desc.enumerable != null and
         property_desc.configurable != null;
 }
@@ -191,8 +191,8 @@ pub fn isFullyPopulated(property_desc: *const PropertyDescriptor) bool {
 pub fn hasFields(property_desc: *const PropertyDescriptor) bool {
     return property_desc.value != null or
         property_desc.writable != null or
-        property_desc.get != null or
-        property_desc.set != null or
+        property_desc.getter != null or
+        property_desc.setter != null or
         property_desc.enumerable != null or
         property_desc.configurable != null;
 }
@@ -208,9 +208,9 @@ test isAccessorDescriptor {
     defer agent.deinit();
     const getter = try ordinaryObjectCreate(&agent, null);
     const setter = try ordinaryObjectCreate(&agent, null);
-    try std.testing.expect((PropertyDescriptor{ .get = getter }).isAccessorDescriptor());
-    try std.testing.expect((PropertyDescriptor{ .set = setter }).isAccessorDescriptor());
-    try std.testing.expect((PropertyDescriptor{ .get = getter, .set = setter }).isAccessorDescriptor());
+    try std.testing.expect((PropertyDescriptor{ .getter = getter }).isAccessorDescriptor());
+    try std.testing.expect((PropertyDescriptor{ .setter = setter }).isAccessorDescriptor());
+    try std.testing.expect((PropertyDescriptor{ .getter = getter, .setter = setter }).isAccessorDescriptor());
     try std.testing.expect(!(PropertyDescriptor{ .value = .undefined }).isAccessorDescriptor());
     try std.testing.expect(!(PropertyDescriptor{}).isAccessorDescriptor());
 }
@@ -233,6 +233,6 @@ test isGenericDescriptor {
     defer agent.deinit();
     const setter = try ordinaryObjectCreate(&agent, null);
     try std.testing.expect((PropertyDescriptor{ .writable = null }).isGenericDescriptor());
-    try std.testing.expect(!(PropertyDescriptor{ .set = setter }).isGenericDescriptor());
+    try std.testing.expect(!(PropertyDescriptor{ .setter = setter }).isGenericDescriptor());
     try std.testing.expect((PropertyDescriptor{}).isGenericDescriptor());
 }

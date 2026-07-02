@@ -10,7 +10,7 @@ pub const PrivateElement = union(enum) {
     field: Value,
     method: *Object,
     accessor: struct {
-        get: ?*Object,
-        set: ?*Object,
+        getter: ?*Object,
+        setter: ?*Object,
     },
 };

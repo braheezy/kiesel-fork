@@ -795,23 +795,24 @@ pub fn addRestrictedFunctionProperties(
     const property_desc: Object.CompletePropertyDescriptor = .{
         .value_or_accessor = .{
             .accessor = .{
-                .get = thrower,
-                .set = thrower,
+                .getter = thrower,
+                .setter = thrower,
             },
         },
         .attributes = .builtin_default,
     };
 
-    // 3. Perform ! DefinePropertyOrThrow(func, "caller", PropertyDescriptor { [[Get]]: thrower,
-    //    [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true }).
+    // 3. Perform ! DefinePropertyOrThrow(func, "caller", PropertyDescriptor { [[Getter]]: thrower,
+    //    [[Setter]]: thrower, [[Enumerable]]: false, [[Configurable]]: true }).
     try func.definePropertyDirect(
         agent,
         PropertyKey.from("caller"),
         property_desc,
     );
 
-    // 4. Perform ! DefinePropertyOrThrow(func, "arguments", PropertyDescriptor { [[Get]]: thrower,
-    //    [[Set]]: thrower, [[Enumerable]]: false, [[Configurable]]: true }).
+    // 4. Perform ! DefinePropertyOrThrow(func, "arguments", PropertyDescriptor {
+    //    [[Getter]]: thrower, [[Setter]]: thrower, [[Enumerable]]: false,
+    //    [[Configurable]]: true }).
     try func.definePropertyDirect(
         agent,
         PropertyKey.from("arguments"),
