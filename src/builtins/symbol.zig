@@ -193,22 +193,25 @@ pub const constructor = struct {
         // 1. Let stringKey be ? ToString(key).
         const string_key = try key.toString(agent);
 
-        // 2. For each element element of the GlobalSymbolRegistry List, do
-        //     a. If element.[[Key]] is stringKey, return element.[[Symbol]].
+        // 2. Let agentRecord be the Agent Record of the surrounding agent.
+        // 3. Let globalSymbolRegistry be agentRecord.[[GlobalSymbolRegistry]].
+        // 4. For each element element of globalSymbolRegistry, do
         const gop = try agent.global_symbol_registry.getOrPut(agent.gc_allocator, string_key);
-        if (gop.found_existing) return Value.from(gop.value_ptr.*);
+        if (gop.found_existing) {
+            // a. If element.[[Key]] is stringKey, return element.[[Symbol]].
+            return Value.from(gop.value_ptr.*);
+        }
 
-        // 3. Assert: The GlobalSymbolRegistry List does not currently contain an entry for
-        //    stringKey.
+        // 5. Assert: globalSymbolRegistry does not currently contain an entry for stringKey.
 
-        // 4. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
+        // 6. Let newSymbol be a new Symbol whose [[Description]] is stringKey.
         const new_symbol = try types.Symbol.init(agent, string_key);
 
-        // 5. Append the GlobalSymbolRegistry Record { [[Key]]: stringKey, [[Symbol]]: newSymbol }
-        //    to the GlobalSymbolRegistry List.
+        // 7. Append the GlobalSymbolRegistry Record { [[Key]]: stringKey, [[Symbol]]: newSymbol }
+        //    to globalSymbolRegistry.
         gop.value_ptr.* = new_symbol;
 
-        // 6. Return newSymbol.
+        // 8. Return newSymbol.
         return Value.from(new_symbol);
     }
 
@@ -342,17 +345,19 @@ pub const Symbol = MakeObject(.{
     .display_name = "Symbol",
 });
 
-/// 20.4.5.1 KeyForSymbol ( symbol )
+/// 20.4.5.2 KeyForSymbol ( symbol )
 /// https://tc39.es/ecma262/#sec-keyforsymbol
 pub fn keyForSymbol(agent: *Agent, symbol: *const types.Symbol) ?*const String {
-    // 1. For each element element of the GlobalSymbolRegistry List, do
+    // 1. Let agentRecord be the Agent Record of the surrounding agent.
+    // 2. Let globalSymbolRegistry be agentRecord.[[GlobalSymbolRegistry]].
+    // 3. For each element element of globalSymbolRegistry, do
     var it = agent.global_symbol_registry.iterator();
     while (it.next()) |entry| {
         // a. If SameValue(element.[[Symbol]], symbol) is true, return element.[[Key]].
         if (entry.value_ptr.* == symbol) return entry.key_ptr.*;
     }
 
-    // 2. Assert: The GlobalSymbolRegistry List does not currently contain an entry for symbol.
-    // 3. Return undefined.
+    // 4. Assert: globalSymbolRegistry does not currently contain an entry for symbol.
+    // 5. Return undefined.
     return null;
 }
