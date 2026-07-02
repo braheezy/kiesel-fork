@@ -422,7 +422,7 @@ pub const namespace = struct {
         try object.defineBuiltinFunction(agent, "waitAsync", waitAsync, 4, realm);
         try object.defineBuiltinFunction(agent, "xor", xor, 3, realm);
 
-        // 25.4.17 Atomics [ %Symbol.toStringTag% ]
+        // 25.4.18 Atomics [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-atomics-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -663,7 +663,7 @@ pub const namespace = struct {
         }
     }
 
-    /// 25.4.15 Atomics.notify ( ta, index, count )
+    /// 25.4.10 Atomics.notify ( ta, index, count )
     /// https://tc39.es/ecma262/#sec-atomics.notify
     fn notify(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array_value = arguments.get(0);
@@ -710,7 +710,7 @@ pub const namespace = struct {
         return Value.from(waiters_count);
     }
 
-    /// 25.4.10 Atomics.or ( ta, index, value )
+    /// 25.4.11 Atomics.or ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.or
     fn @"or"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -724,36 +724,19 @@ pub const namespace = struct {
         return atomicReadModifyWrite(agent, typed_array, index, value, .Or);
     }
 
-    /// 1 Atomics.pause ( [ N ] )
-    /// https://tc39.es/proposal-atomics-microwait/#Atomics.pause
-    fn pause(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        const n = arguments.get(0);
-
-        // 1. If N is neither undefined nor an integral Number, throw a TypeError exception.
-        if (!n.isUndefined() and !(n.isNumber() and n.asNumber().isIntegral())) {
-            return agent.throwException(.type_error, "{f} is not an integral number", .{n});
-        }
-
-        // 2. If the execution environment of the ECMAScript implementation supports signaling to
+    /// 25.4.12 Atomics.pause ( )
+    /// https://tc39.es/ecma262/#sec-atomics.pause
+    fn pause(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+        // 1. If the execution environment of the ECMAScript implementation supports signaling to
         //    the operating system or CPU that the current executing code is in a spin-wait loop,
-        //    such as executing a pause CPU instruction, send that signal. When N is not undefined,
-        //    it determines the number of times that signal is sent. The number of times the signal
-        //    is sent for an integral Number N is less than or equal to the number times it is sent
-        //    for N + 1 if both N and N + 1 have the same sign.
-        const iterations = if (!n.isUndefined() and n.asNumber().asFloat() >= 1)
-            // Use u16 here to avoid freezing for large numbers (like MAX_SAFE_INTEGER).
-            std.math.lossyCast(u16, n.asNumber().asFloat())
-        else
-            1;
-        for (0..iterations) |_| {
-            std.atomic.spinLoopHint();
-        }
+        //    send that signal.
+        std.atomic.spinLoopHint();
 
-        // 3. Return undefined.
+        // 2. Return undefined.
         return .undefined;
     }
 
-    /// 25.4.11 Atomics.store ( ta, index, value )
+    /// 25.4.13 Atomics.store ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.store
     fn store(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array_value = arguments.get(0);
@@ -804,7 +787,7 @@ pub const namespace = struct {
         return coerced;
     }
 
-    /// 25.4.12 Atomics.sub ( ta, index, value )
+    /// 25.4.14 Atomics.sub ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.sub
     fn sub(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -818,7 +801,7 @@ pub const namespace = struct {
         return atomicReadModifyWrite(agent, typed_array, index, value, .Sub);
     }
 
-    /// 25.4.13 Atomics.wait ( ta, index, value, timeout )
+    /// 25.4.15 Atomics.wait ( ta, index, value, timeout )
     /// https://tc39.es/ecma262/#sec-atomics.wait
     fn wait(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -830,7 +813,7 @@ pub const namespace = struct {
         return doWait(agent, .sync, typed_array, index, value, timeout);
     }
 
-    /// 25.4.14 Atomics.waitAsync ( ta, index, value, timeout )
+    /// 25.4.16 Atomics.waitAsync ( ta, index, value, timeout )
     /// https://tc39.es/ecma262/#sec-atomics.waitasync
     fn waitAsync(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
@@ -842,7 +825,7 @@ pub const namespace = struct {
         return doWait(agent, .async, typed_array, index, value, timeout);
     }
 
-    /// 25.4.16 Atomics.xor ( ta, index, value )
+    /// 25.4.17 Atomics.xor ( ta, index, value )
     /// https://tc39.es/ecma262/#sec-atomics.xor
     fn xor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const typed_array = arguments.get(0);
