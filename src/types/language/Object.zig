@@ -1643,10 +1643,10 @@ pub fn getOption(
 
     // 2. If value is undefined, then
     if (value.isUndefined()) {
-        // a. If default is required, throw a RangeError exception.
+        // a. If default is required, throw a TypeError exception.
         if (@TypeOf(default) == @TypeOf(.required)) {
             return agent.throwException(
-                .range_error,
+                .type_error,
                 "Required option '{s}' must not be undefined",
                 .{property_key},
             );

@@ -121,7 +121,7 @@ pub const constructor = struct {
         display_names.fields.options.style = style;
 
         // 8. Let type be ? GetOption(options, "type", string, « "language", "region", "script",
-        //    "currency", "calendar", "dateTimeField" », undefined).
+        //    "currency", "calendar", "dateTimeField" », required).
         const type_string = try options.getOption(
             agent,
             "type",
@@ -134,11 +134,8 @@ pub const constructor = struct {
                 String.fromLiteral("calendar"),
                 String.fromLiteral("dateTimeField"),
             },
-            null,
-        ) orelse {
-            // 9. If type is undefined, throw a TypeError exception.
-            return agent.throwException(.type_error, "'type' option must not be undefined", .{});
-        };
+            .required,
+        );
 
         const @"type" = std.StaticStringMap(DisplayNames.Fields.Type).initComptime(&.{
             .{ "language", .language },
@@ -149,10 +146,10 @@ pub const constructor = struct {
             .{ "dateTimeField", .date_time_field },
         }).get(type_string.asAscii()).?;
 
-        // 10. Set displayNames.[[Type]] to type.
+        // 9. Set displayNames.[[Type]] to type.
         display_names.fields.type = @"type";
 
-        // 11. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
+        // 10. Let fallback be ? GetOption(options, "fallback", string, « "code", "none" », "code").
         const fallback_string = try options.getOption(
             agent,
             "fallback",
@@ -168,17 +165,17 @@ pub const constructor = struct {
             .{ "none", .none },
         }).get(fallback_string.asAscii()).?;
 
-        // 12. Set displayNames.[[Fallback]] to fallback.
+        // 11. Set displayNames.[[Fallback]] to fallback.
         display_names.fields.options.fallback = fallback;
 
-        // 13. Set displayNames.[[Locale]] to resolvedLocale.[[Locale]].
+        // 12. Set displayNames.[[Locale]] to resolvedLocale.[[Locale]].
         display_names.fields.locale = resolved_locale.locale;
 
-        // 14. Let resolvedLocaleData be resolvedLocale.[[LocaleData]].
-        // 15. Let types be resolvedLocaleData.[[types]].
-        // 16. Assert: types is a Record (see 12.2.3).
+        // 13. Let resolvedLocaleData be resolvedLocale.[[LocaleData]].
+        // 14. Let types be resolvedLocaleData.[[types]].
+        // 15. Assert: types is a Record (see 12.2.3).
 
-        // 17. Let languageDisplay be ? GetOption(options, "languageDisplay", string, « "dialect",
+        // 16. Let languageDisplay be ? GetOption(options, "languageDisplay", string, « "dialect",
         //     "standard" », "dialect").
         const language_display_string = try options.getOption(
             agent,
@@ -197,20 +194,20 @@ pub const constructor = struct {
             .{ "standard", .standard },
         }).get(language_display_string.asAscii()).?;
 
-        // 18. Let typeFields be types.[[<type>]].
-        // 19. Assert: typeFields is a Record (see 12.2.3).
-        // 20. If type is "language", then
+        // 17. Let typeFields be types.[[<type>]].
+        // 18. Assert: typeFields is a Record (see 12.2.3).
+        // 19. If type is "language", then
         //     a. Set displayNames.[[LanguageDisplay]] to languageDisplay.
         //     b. Set typeFields to typeFields.[[<languageDisplay>]].
         //     c. Assert: typeFields is a Record (see 12.2.3).
         // NOTE: We do this unconditionally as it's part of the options struct.
         display_names.fields.options.language_display = language_display;
 
-        // 21. Let styleFields be typeFields.[[<style>]].
-        // 22. Assert: styleFields is a Record (see 12.2.3).
-        // 23. Set displayNames.[[Fields]] to styleFields.
+        // 20. Let styleFields be typeFields.[[<style>]].
+        // 21. Assert: styleFields is a Record (see 12.2.3).
+        // 22. Set displayNames.[[Fields]] to styleFields.
 
-        // 24. Return displayNames.
+        // 23. Return displayNames.
         return Value.from(&display_names.object);
     }
 };
