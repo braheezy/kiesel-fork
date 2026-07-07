@@ -169,31 +169,26 @@ fn prettyPrintAsyncGenerator(
     try terminal.setColor(.reset);
     switch (async_gen.fields.async_generator_state) {
         .suspended_start => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.cyan);
             try terminal.writer.writeAll("<suspended-start>");
             try terminal.setColor(.reset);
         },
         .suspended_yield => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.cyan);
             try terminal.writer.writeAll("<suspended-yield>");
             try terminal.setColor(.reset);
         },
         .executing => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.green);
             try terminal.writer.writeAll("<executing>");
             try terminal.setColor(.reset);
         },
         .draining_queue => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.cyan);
             try terminal.writer.writeAll("<draining-queue>");
             try terminal.setColor(.reset);
         },
         .completed => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.dim);
             try terminal.writer.writeAll("<completed>");
             try terminal.setColor(.reset);
@@ -269,11 +264,17 @@ fn prettyPrintError(
 }
 
 fn prettyPrintFinalizationRegistry(
-    _: *const builtins.FinalizationRegistry,
+    finalization_registry: *const builtins.FinalizationRegistry,
     terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
     try terminal.setColor(.white);
-    try terminal.writer.writeAll("FinalizationRegistry()");
+    try terminal.writer.writeAll("FinalizationRegistry(");
+    try terminal.setColor(.reset);
+    try terminal.writer.print("{f}", .{
+        Value.from(finalization_registry.fields.cleanup_callback.callback).fmtPretty(terminal.mode),
+    });
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
     try terminal.setColor(.reset);
 }
 
@@ -286,25 +287,21 @@ fn prettyPrintGenerator(
     try terminal.setColor(.reset);
     switch (gen.fields.generator_state) {
         .suspended_start => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.cyan);
             try terminal.writer.writeAll("<suspended-start>");
             try terminal.setColor(.reset);
         },
         .suspended_yield => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.cyan);
             try terminal.writer.writeAll("<suspended-yield>");
             try terminal.setColor(.reset);
         },
         .executing => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.green);
             try terminal.writer.writeAll("<executing>");
             try terminal.setColor(.reset);
         },
         .completed => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.dim);
             try terminal.writer.writeAll("<completed>");
             try terminal.setColor(.reset);
@@ -335,7 +332,7 @@ fn prettyPrintIteratorHelper(
         .state => |state_| {
             for (state_.underlying_iterators, 0..) |iterator, i| {
                 if (i != 0) try terminal.writer.writeAll(", ");
-                try terminal.writer.print("{f}, ", .{Value.from(iterator.iterator).fmtPretty(terminal.mode)});
+                try terminal.writer.print("{f}", .{Value.from(iterator.iterator).fmtPretty(terminal.mode)});
             }
         },
         .completed => {
@@ -403,24 +400,21 @@ fn prettyPrintPromise(
     try terminal.setColor(.reset);
     switch (promise_state) {
         .pending => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.dim);
             try terminal.writer.writeAll("<pending>");
             try terminal.setColor(.reset);
         },
         .fulfilled => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.green);
             try terminal.writer.writeAll("<fulfilled>");
             try terminal.setColor(.reset);
-            try terminal.writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty(terminal.mode)});
+            try terminal.writer.print(" {f}", .{promise.fields.promise_result.fmtPretty(terminal.mode)});
         },
         .rejected => {
-            try terminal.writer.writeAll("state: ");
             try terminal.setColor(.red);
             try terminal.writer.writeAll("<rejected>");
             try terminal.setColor(.reset);
-            try terminal.writer.print(", result: {f}", .{promise.fields.promise_result.fmtPretty(terminal.mode)});
+            try terminal.writer.print(" {f}", .{promise.fields.promise_result.fmtPretty(terminal.mode)});
         },
     }
     try terminal.setColor(.white);
@@ -715,7 +709,7 @@ fn prettyPrintIntlDateTimeFormat(
     const resolved_options = intl_date_time_format.fields.resolvedOptions();
 
     try terminal.setColor(.white);
-    try terminal.writer.writeAll("Intl.DisplayNames(");
+    try terminal.writer.writeAll("Intl.DateTimeFormat(");
     try terminal.setColor(.reset);
     try terminal.writer.print("{f}, calendar: {f}, numberingSystem: {f}, timeZone: {f}", .{
         Value.from(asciiString(locale.toString(arena.allocator()) catch return)).fmtPretty(terminal.mode),
