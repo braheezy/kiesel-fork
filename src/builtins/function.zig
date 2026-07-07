@@ -47,7 +47,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Function",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -58,7 +58,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(realm.intrinsics.@"%Function.prototype%"() catch unreachable),
+            Value.from(realm.intrinsic(.function_prototype) catch unreachable),
             .none,
         );
     }
@@ -110,7 +110,7 @@ pub fn createDynamicFunction(
     const new_target = maybe_new_target orelse ctor;
 
     comptime var prefix: []const u8 = undefined;
-    comptime var fallback_prototype: []const u8 = undefined;
+    comptime var fallback_proto: Realm.Intrinsic = undefined;
     comptime var expr_grammar: GrammarSymbol(switch (kind) {
         .normal => ast.FunctionExpression,
         .generator => ast.GeneratorExpression,
@@ -148,7 +148,7 @@ pub fn createDynamicFunction(
             }.accept;
 
             // e. Let fallbackProto be "%Function.prototype%".
-            fallback_prototype = "%Function.prototype%";
+            fallback_proto = .function_prototype;
         },
 
         // 3. Else if kind is generator, then
@@ -178,7 +178,7 @@ pub fn createDynamicFunction(
             }.accept;
 
             // e. Let fallbackProto be "%GeneratorFunction.prototype%".
-            fallback_prototype = "%GeneratorFunction.prototype%";
+            fallback_proto = .generator_function_prototype;
         },
 
         // 4. Else if kind is async, then
@@ -208,7 +208,7 @@ pub fn createDynamicFunction(
             }.accept;
 
             // e. Let fallbackProto be "%AsyncFunction.prototype%".
-            fallback_prototype = "%AsyncFunction.prototype%";
+            fallback_proto = .async_function_prototype;
         },
 
         // 5. Else,
@@ -240,7 +240,7 @@ pub fn createDynamicFunction(
             }.accept;
 
             // f. Let fallbackProto be "%AsyncGeneratorFunction.prototype%".
-            fallback_prototype = "%AsyncGeneratorFunction.prototype%";
+            fallback_proto = .async_generator_function_prototype;
         },
     }
 
@@ -368,7 +368,7 @@ pub fn createDynamicFunction(
     };
 
     // 25. Let funcProto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
-    const func_proto = try getPrototypeFromConstructor(agent, new_target, fallback_prototype);
+    const func_proto = try getPrototypeFromConstructor(agent, new_target, fallback_proto);
 
     // 26. Let envRecord be currentRealm.[[GlobalEnv]].
     const env = current_realm.global_env;
@@ -399,7 +399,7 @@ pub fn createDynamicFunction(
             // a. Let protoProto be OrdinaryObjectCreate(%GeneratorPrototype%).
             const proto_proto = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%GeneratorPrototype%"(),
+                try realm.intrinsic(.generator_prototype),
             );
 
             // b. Perform ! DefinePropertyOrThrow(func, "prototype", PropertyDescriptor {
@@ -422,7 +422,7 @@ pub fn createDynamicFunction(
             // a. Let protoProto be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
             const proto_proto = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
+                try realm.intrinsic(.async_generator_prototype),
             );
 
             // b. Perform ! DefinePropertyOrThrow(func, "prototype", PropertyDescriptor {
@@ -464,7 +464,7 @@ pub const prototype = struct {
             .{ .function = function },
             0,
             "",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Object.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.object_prototype) },
         );
         return &builtin_function.object;
     }
@@ -476,8 +476,8 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
         try object.defineBuiltinFunctionWithAttributes(
             agent,
-            "%Symbol.hasInstance%",
-            @"%Symbol.hasInstance%",
+            "Symbol.hasInstance",
+            @"Symbol.hasInstance",
             1,
             realm,
             .none,
@@ -488,7 +488,7 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Function%"()),
+            Value.from(try realm.intrinsic(.function)),
         );
     }
 
@@ -660,7 +660,7 @@ pub const prototype = struct {
 
     /// 20.2.3.6 Function.prototype [ %Symbol.hasInstance% ] ( value )
     /// https://tc39.es/ecma262/#sec-function.prototype-%symbol.hasinstance%
-    fn @"%Symbol.hasInstance%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    fn @"Symbol.hasInstance"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const value = arguments.get(0);
 
         // 1. Let thisValue be the this value.

@@ -37,7 +37,7 @@ pub fn createAsyncFromSyncIterator(
     //    « [[SyncIteratorRecord]] »).
     // 2. Set asyncIterator.[[SyncIteratorRecord]] to syncIteratorRecord.
     const async_iterator = try AsyncFromSyncIterator.create(agent, .{
-        .prototype = try realm.intrinsics.@"%AsyncFromSyncIteratorPrototype%"(),
+        .prototype = try realm.intrinsic(.async_from_sync_iterator_prototype),
         .fields = .{
             .sync_iterator = sync_iterator,
         },
@@ -67,7 +67,7 @@ pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         return ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%AsyncIteratorPrototype%"(),
+            try realm.intrinsic(.async_iterator_prototype),
         );
     }
 
@@ -90,7 +90,7 @@ pub const prototype = struct {
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
             agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         ) catch |err| try noexcept(err);
 
         // 4. Let syncIteratorRecord be obj.[[SyncIteratorRecord]].
@@ -135,7 +135,7 @@ pub const prototype = struct {
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
             agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         ) catch |err| try noexcept(err);
 
         // 4. Let syncIteratorRecord be obj.[[SyncIteratorRecord]].
@@ -233,7 +233,7 @@ pub const prototype = struct {
         // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
             agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         ) catch |err| try noexcept(err);
 
         // 4. Let syncIteratorRecord be obj.[[SyncIteratorRecord]].
@@ -374,7 +374,7 @@ fn asyncFromSyncIteratorContinuation(
     };
 
     // 6. Let valueWrapper be Completion(PromiseResolve(%Promise%, value)).
-    const value_wrapper = promiseResolve(agent, try realm.intrinsics.@"%Promise%"(), value) catch |err| {
+    const value_wrapper = promiseResolve(agent, try realm.intrinsic(.promise), value) catch |err| {
         // 7. If valueWrapper is an abrupt completion, done is false, and closeOnRejection is true,
         //    then
         if (!done and close_on_rejection) {

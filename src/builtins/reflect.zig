@@ -18,7 +18,7 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -40,7 +40,7 @@ pub const namespace = struct {
         // https://tc39.es/ecma262/#sec-reflect-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Reflect"),
             .{
                 .writable = false,

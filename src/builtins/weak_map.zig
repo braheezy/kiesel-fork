@@ -30,7 +30,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "WeakMap",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -41,7 +41,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%WeakMap.prototype%"()),
+            Value.from(try realm.intrinsic(.weak_map_prototype)),
             .none,
         );
     }
@@ -66,7 +66,7 @@ pub const constructor = struct {
             WeakMap,
             agent,
             new_target,
-            "%WeakMap.prototype%",
+            .weak_map_prototype,
             .{
                 // 3. Set map.[[WeakMapData]] to a new empty List.
                 .weak_map_data = .empty,
@@ -99,7 +99,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-weakmap-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -115,14 +115,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%WeakMap%"()),
+            Value.from(try realm.intrinsic(.weak_map)),
         );
 
         // 24.3.3.8 WeakMap.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-weakmap.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("WeakMap"),
             .{
                 .writable = false,

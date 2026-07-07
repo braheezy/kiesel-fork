@@ -13,697 +13,391 @@ const Realm = execution.Realm;
 
 const Intrinsics = @This();
 
-realm: *Realm,
+aggregate_error: ?*Object,
+aggregate_error_prototype: ?*Object,
+array: ?*Object,
+array_prototype: ?*Object,
+array_prototype_to_string: ?*Object,
+array_prototype_values: ?*Object,
+array_buffer: ?*Object,
+array_buffer_prototype: ?*Object,
+array_iterator_prototype: ?*Object,
+async_from_sync_iterator_prototype: ?*Object,
+async_function: ?*Object,
+async_function_prototype: ?*Object,
+async_generator_function: ?*Object,
+async_generator_function_prototype: ?*Object,
+async_generator_prototype: ?*Object,
+async_iterator_prototype: ?*Object,
+atomics: ?*Object,
+big_int: ?*Object,
+big_int_prototype: ?*Object,
+big_int64_array: ?*Object,
+big_int64_array_prototype: ?*Object,
+big_uint64_array: ?*Object,
+big_uint64_array_prototype: ?*Object,
+boolean: ?*Object,
+boolean_prototype: ?*Object,
+data_view: ?*Object,
+data_view_prototype: ?*Object,
+date: ?*Object,
+date_prototype: ?*Object,
+decode_uri: ?*Object,
+decode_uri_component: ?*Object,
+encode_uri: ?*Object,
+encode_uri_component: ?*Object,
+@"error": ?*Object,
+error_prototype: ?*Object,
+escape: ?*Object,
+eval: ?*Object,
+eval_error: ?*Object,
+eval_error_prototype: ?*Object,
+finalization_registry: ?*Object,
+finalization_registry_prototype: ?*Object,
+float16_array: ?*Object,
+float16_array_prototype: ?*Object,
+float32_array: ?*Object,
+float32_array_prototype: ?*Object,
+float64_array: ?*Object,
+float64_array_prototype: ?*Object,
+for_in_iterator_prototype: ?*Object,
+function: ?*Object,
+function_prototype: ?*Object,
+generator_function: ?*Object,
+generator_function_prototype: ?*Object,
+generator_prototype: ?*Object,
+int8_array: ?*Object,
+int8_array_prototype: ?*Object,
+int16_array: ?*Object,
+int16_array_prototype: ?*Object,
+int32_array: ?*Object,
+int32_array_prototype: ?*Object,
+intl: ?*Object,
+intl_collator: ?*Object,
+intl_collator_prototype: ?*Object,
+intl_date_time_format: ?*Object,
+intl_date_time_format_prototype: ?*Object,
+intl_display_names: ?*Object,
+intl_display_names_prototype: ?*Object,
+intl_duration_format: ?*Object,
+intl_duration_format_prototype: ?*Object,
+intl_list_format: ?*Object,
+intl_list_format_prototype: ?*Object,
+intl_locale: ?*Object,
+intl_locale_prototype: ?*Object,
+intl_number_format: ?*Object,
+intl_number_format_prototype: ?*Object,
+intl_plural_rules: ?*Object,
+intl_plural_rules_prototype: ?*Object,
+intl_relative_time_format: ?*Object,
+intl_relative_time_format_prototype: ?*Object,
+intl_segmenter: ?*Object,
+intl_segmenter_prototype: ?*Object,
+intl_segments_prototype: ?*Object,
+intl_segment_iterator_prototype: ?*Object,
+is_finite: ?*Object,
+is_nan: ?*Object,
+iterator: ?*Object,
+iterator_helper_prototype: ?*Object,
+iterator_prototype: ?*Object,
+json: ?*Object,
+map: ?*Object,
+map_prototype: ?*Object,
+map_iterator_prototype: ?*Object,
+math: ?*Object,
+number: ?*Object,
+number_prototype: ?*Object,
+object: ?*Object,
+object_prototype: ?*Object,
+object_prototype_to_string: ?*Object,
+parse_float: ?*Object,
+parse_int: ?*Object,
+promise: ?*Object,
+promise_prototype: ?*Object,
+proxy: ?*Object,
+range_error: ?*Object,
+range_error_prototype: ?*Object,
+reference_error: ?*Object,
+reference_error_prototype: ?*Object,
+reflect: ?*Object,
+reg_exp: ?*Object,
+reg_exp_prototype: ?*Object,
+reg_exp_string_iterator_prototype: ?*Object,
+set: ?*Object,
+set_prototype: ?*Object,
+set_iterator_prototype: ?*Object,
+shared_array_buffer: ?*Object,
+shared_array_buffer_prototype: ?*Object,
+string: ?*Object,
+string_prototype: ?*Object,
+string_iterator_prototype: ?*Object,
+symbol: ?*Object,
+symbol_prototype: ?*Object,
+syntax_error: ?*Object,
+syntax_error_prototype: ?*Object,
+temporal: ?*Object,
+temporal_duration: ?*Object,
+temporal_duration_prototype: ?*Object,
+temporal_instant: ?*Object,
+temporal_instant_prototype: ?*Object,
+temporal_now: ?*Object,
+temporal_plain_date: ?*Object,
+temporal_plain_date_prototype: ?*Object,
+temporal_plain_date_time: ?*Object,
+temporal_plain_date_time_prototype: ?*Object,
+temporal_plain_month_day: ?*Object,
+temporal_plain_month_day_prototype: ?*Object,
+temporal_plain_time: ?*Object,
+temporal_plain_time_prototype: ?*Object,
+temporal_plain_year_month: ?*Object,
+temporal_plain_year_month_prototype: ?*Object,
+temporal_zoned_date_time: ?*Object,
+temporal_zoned_date_time_prototype: ?*Object,
+throw_type_error: ?*Object,
+typed_array: ?*Object,
+typed_array_prototype: ?*Object,
+type_error: ?*Object,
+type_error_prototype: ?*Object,
+uint8_array: ?*Object,
+uint8_array_prototype: ?*Object,
+uint8_clamped_array: ?*Object,
+uint8_clamped_array_prototype: ?*Object,
+uint16_array: ?*Object,
+uint16_array_prototype: ?*Object,
+uint32_array: ?*Object,
+uint32_array_prototype: ?*Object,
+unescape: ?*Object,
+uri_error: ?*Object,
+uri_error_prototype: ?*Object,
+weak_map: ?*Object,
+weak_map_prototype: ?*Object,
+weak_ref: ?*Object,
+weak_ref_prototype: ?*Object,
+weak_set: ?*Object,
+weak_set_prototype: ?*Object,
+wrap_for_valid_iterator_prototype: ?*Object,
 
-// Not stored as top-level properties so we can have methods of the same names
-lazy_intrinsics: struct {
-    @"%AggregateError%": ?*Object = null,
-    @"%AggregateError.prototype%": ?*Object = null,
-    @"%Array%": ?*Object = null,
-    @"%Array.prototype%": ?*Object = null,
-    @"%Array.prototype.toString%": ?*Object = null,
-    @"%Array.prototype.values%": ?*Object = null,
-    @"%ArrayBuffer%": ?*Object = null,
-    @"%ArrayBuffer.prototype%": ?*Object = null,
-    @"%ArrayIteratorPrototype%": ?*Object = null,
-    @"%AsyncFromSyncIteratorPrototype%": ?*Object = null,
-    @"%AsyncFunction%": ?*Object = null,
-    @"%AsyncFunction.prototype%": ?*Object = null,
-    @"%AsyncGeneratorFunction%": ?*Object = null,
-    @"%AsyncGeneratorFunction.prototype%": ?*Object = null,
-    @"%AsyncGeneratorPrototype%": ?*Object = null,
-    @"%AsyncIteratorPrototype%": ?*Object = null,
-    @"%Atomics%": ?*Object = null,
-    @"%BigInt%": ?*Object = null,
-    @"%BigInt.prototype%": ?*Object = null,
-    @"%BigInt64Array%": ?*Object = null,
-    @"%BigInt64Array.prototype%": ?*Object = null,
-    @"%BigUint64Array%": ?*Object = null,
-    @"%BigUint64Array.prototype%": ?*Object = null,
-    @"%Boolean%": ?*Object = null,
-    @"%Boolean.prototype%": ?*Object = null,
-    @"%DataView%": ?*Object = null,
-    @"%DataView.prototype%": ?*Object = null,
-    @"%Date%": ?*Object = null,
-    @"%Date.prototype%": ?*Object = null,
-    @"%decodeURI%": ?*Object = null,
-    @"%decodeURIComponent%": ?*Object = null,
-    @"%encodeURI%": ?*Object = null,
-    @"%encodeURIComponent%": ?*Object = null,
-    @"%Error%": ?*Object = null,
-    @"%Error.prototype%": ?*Object = null,
-    @"%escape%": ?*Object = null,
-    @"%eval%": ?*Object = null,
-    @"%EvalError%": ?*Object = null,
-    @"%EvalError.prototype%": ?*Object = null,
-    @"%FinalizationRegistry%": ?*Object = null,
-    @"%FinalizationRegistry.prototype%": ?*Object = null,
-    @"%Float16Array%": ?*Object = null,
-    @"%Float16Array.prototype%": ?*Object = null,
-    @"%Float32Array%": ?*Object = null,
-    @"%Float32Array.prototype%": ?*Object = null,
-    @"%Float64Array%": ?*Object = null,
-    @"%Float64Array.prototype%": ?*Object = null,
-    @"%ForInIteratorPrototype%": ?*Object = null,
-    @"%Function%": ?*Object = null,
-    @"%Function.prototype%": ?*Object = null,
-    @"%GeneratorFunction%": ?*Object = null,
-    @"%GeneratorFunction.prototype%": ?*Object = null,
-    @"%GeneratorPrototype%": ?*Object = null,
-    @"%Int8Array%": ?*Object = null,
-    @"%Int8Array.prototype%": ?*Object = null,
-    @"%Int16Array%": ?*Object = null,
-    @"%Int16Array.prototype%": ?*Object = null,
-    @"%Int32Array%": ?*Object = null,
-    @"%Int32Array.prototype%": ?*Object = null,
-    @"%Intl%": ?*Object = null,
-    @"%Intl.Collator%": ?*Object = null,
-    @"%Intl.Collator.prototype%": ?*Object = null,
-    @"%Intl.DateTimeFormat%": ?*Object = null,
-    @"%Intl.DateTimeFormat.prototype%": ?*Object = null,
-    @"%Intl.DisplayNames%": ?*Object = null,
-    @"%Intl.DisplayNames.prototype%": ?*Object = null,
-    @"%Intl.DurationFormat%": ?*Object = null,
-    @"%Intl.DurationFormat.prototype%": ?*Object = null,
-    @"%Intl.ListFormat%": ?*Object = null,
-    @"%Intl.ListFormat.prototype%": ?*Object = null,
-    @"%Intl.Locale%": ?*Object = null,
-    @"%Intl.Locale.prototype%": ?*Object = null,
-    @"%Intl.NumberFormat%": ?*Object = null,
-    @"%Intl.NumberFormat.prototype%": ?*Object = null,
-    @"%Intl.PluralRules%": ?*Object = null,
-    @"%Intl.PluralRules.prototype%": ?*Object = null,
-    @"%Intl.RelativeTimeFormat%": ?*Object = null,
-    @"%Intl.RelativeTimeFormat.prototype%": ?*Object = null,
-    @"%Intl.Segmenter%": ?*Object = null,
-    @"%Intl.Segmenter.prototype%": ?*Object = null,
-    @"%IntlSegmentsPrototype%": ?*Object = null,
-    @"%IntlSegmentIteratorPrototype%": ?*Object = null,
-    @"%isFinite%": ?*Object = null,
-    @"%isNaN%": ?*Object = null,
-    @"%Iterator%": ?*Object = null,
-    @"%IteratorHelperPrototype%": ?*Object = null,
-    @"%Iterator.prototype%": ?*Object = null,
-    @"%JSON%": ?*Object = null,
-    @"%Map%": ?*Object = null,
-    @"%Map.prototype%": ?*Object = null,
-    @"%MapIteratorPrototype%": ?*Object = null,
-    @"%Math%": ?*Object = null,
-    @"%Number%": ?*Object = null,
-    @"%Number.prototype%": ?*Object = null,
-    @"%Object%": ?*Object = null,
-    @"%Object.prototype%": ?*Object = null,
-    @"%Object.prototype.toString%": ?*Object = null,
-    @"%parseFloat%": ?*Object = null,
-    @"%parseInt%": ?*Object = null,
-    @"%Promise%": ?*Object = null,
-    @"%Promise.prototype%": ?*Object = null,
-    @"%Proxy%": ?*Object = null,
-    @"%RangeError%": ?*Object = null,
-    @"%RangeError.prototype%": ?*Object = null,
-    @"%ReferenceError%": ?*Object = null,
-    @"%ReferenceError.prototype%": ?*Object = null,
-    @"%Reflect%": ?*Object = null,
-    @"%RegExp%": ?*Object = null,
-    @"%RegExp.prototype%": ?*Object = null,
-    @"%RegExpStringIteratorPrototype%": ?*Object = null,
-    @"%Set%": ?*Object = null,
-    @"%Set.prototype%": ?*Object = null,
-    @"%SetIteratorPrototype%": ?*Object = null,
-    @"%SharedArrayBuffer%": ?*Object = null,
-    @"%SharedArrayBuffer.prototype%": ?*Object = null,
-    @"%String%": ?*Object = null,
-    @"%String.prototype%": ?*Object = null,
-    @"%StringIteratorPrototype%": ?*Object = null,
-    @"%Symbol%": ?*Object = null,
-    @"%Symbol.prototype%": ?*Object = null,
-    @"%SyntaxError%": ?*Object = null,
-    @"%SyntaxError.prototype%": ?*Object = null,
-    @"%Temporal%": ?*Object = null,
-    @"%Temporal.Duration%": ?*Object = null,
-    @"%Temporal.Duration.prototype%": ?*Object = null,
-    @"%Temporal.Instant%": ?*Object = null,
-    @"%Temporal.Instant.prototype%": ?*Object = null,
-    @"%Temporal.Now%": ?*Object = null,
-    @"%Temporal.PlainDate%": ?*Object = null,
-    @"%Temporal.PlainDate.prototype%": ?*Object = null,
-    @"%Temporal.PlainDateTime%": ?*Object = null,
-    @"%Temporal.PlainDateTime.prototype%": ?*Object = null,
-    @"%Temporal.PlainMonthDay%": ?*Object = null,
-    @"%Temporal.PlainMonthDay.prototype%": ?*Object = null,
-    @"%Temporal.PlainTime%": ?*Object = null,
-    @"%Temporal.PlainTime.prototype%": ?*Object = null,
-    @"%Temporal.PlainYearMonth%": ?*Object = null,
-    @"%Temporal.PlainYearMonth.prototype%": ?*Object = null,
-    @"%Temporal.ZonedDateTime%": ?*Object = null,
-    @"%Temporal.ZonedDateTime.prototype%": ?*Object = null,
-    @"%ThrowTypeError%": ?*Object = null,
-    @"%TypedArray%": ?*Object = null,
-    @"%TypedArray.prototype%": ?*Object = null,
-    @"%TypeError%": ?*Object = null,
-    @"%TypeError.prototype%": ?*Object = null,
-    @"%Uint8Array%": ?*Object = null,
-    @"%Uint8Array.prototype%": ?*Object = null,
-    @"%Uint8ClampedArray%": ?*Object = null,
-    @"%Uint8ClampedArray.prototype%": ?*Object = null,
-    @"%Uint16Array%": ?*Object = null,
-    @"%Uint16Array.prototype%": ?*Object = null,
-    @"%Uint32Array%": ?*Object = null,
-    @"%Uint32Array.prototype%": ?*Object = null,
-    @"%unescape%": ?*Object = null,
-    @"%URIError%": ?*Object = null,
-    @"%URIError.prototype%": ?*Object = null,
-    @"%WeakMap%": ?*Object = null,
-    @"%WeakMap.prototype%": ?*Object = null,
-    @"%WeakRef%": ?*Object = null,
-    @"%WeakRef.prototype%": ?*Object = null,
-    @"%WeakSet%": ?*Object = null,
-    @"%WeakSet.prototype%": ?*Object = null,
-    @"%WrapForValidIteratorPrototype%": ?*Object = null,
-} = .{},
+pub const init: Intrinsics = blk: {
+    var intrinsics: Intrinsics = undefined;
+    for (std.meta.fieldNames(Intrinsics)) |field_name| {
+        @field(intrinsics, field_name) = null;
+    }
+    break :blk intrinsics;
+};
 
-fn lazyIntrinsic(
-    self: *Intrinsics,
-    comptime name: []const u8,
-    comptime T: type,
+fn Type(comptime field: std.meta.FieldEnum(Intrinsics)) type {
+    return switch (field) {
+        .aggregate_error => builtins.aggregate_error.constructor,
+        .aggregate_error_prototype => builtins.aggregate_error.prototype,
+        .array => builtins.array.constructor,
+        .array_prototype => builtins.array.prototype,
+        .array_buffer => builtins.array_buffer.constructor,
+        .array_buffer_prototype => builtins.array_buffer.prototype,
+        .array_iterator_prototype => builtins.array_iterator.prototype,
+        .async_from_sync_iterator_prototype => builtins.async_from_sync_iterator.prototype,
+        .async_function => builtins.async_function.constructor,
+        .async_function_prototype => builtins.async_function.prototype,
+        .async_generator_function => builtins.async_generator_function.constructor,
+        .async_generator_function_prototype => builtins.async_generator_function.prototype,
+        .async_generator_prototype => builtins.async_generator.prototype,
+        .async_iterator_prototype => builtins.async_iterator.prototype,
+        .atomics => builtins.atomics.namespace,
+        .big_int => builtins.big_int.constructor,
+        .big_int_prototype => builtins.big_int.prototype,
+        .big_int64_array => builtins.typed_array.big_int64_array.constructor,
+        .big_int64_array_prototype => builtins.typed_array.big_int64_array.prototype,
+        .big_uint64_array => builtins.typed_array.big_uint64_array.constructor,
+        .big_uint64_array_prototype => builtins.typed_array.big_uint64_array.prototype,
+        .boolean => builtins.boolean.constructor,
+        .boolean_prototype => builtins.boolean.prototype,
+        .data_view => builtins.data_view.constructor,
+        .data_view_prototype => builtins.data_view.prototype,
+        .date => builtins.date.constructor,
+        .date_prototype => builtins.date.prototype,
+        .decode_uri => builtins.global.decode_uri_function,
+        .decode_uri_component => builtins.global.decode_uri_component_function,
+        .encode_uri => builtins.global.encode_uri_function,
+        .encode_uri_component => builtins.global.encode_uri_component_function,
+        .@"error" => builtins.@"error".constructor,
+        .error_prototype => builtins.@"error".prototype,
+        .escape => builtins.global.escape_function,
+        .eval => builtins.global.eval_function,
+        .eval_error => builtins.@"error".eval_error.constructor,
+        .eval_error_prototype => builtins.@"error".eval_error.prototype,
+        .finalization_registry => builtins.finalization_registry.constructor,
+        .finalization_registry_prototype => builtins.finalization_registry.prototype,
+        .float16_array => builtins.typed_array.float16_array.constructor,
+        .float16_array_prototype => builtins.typed_array.float16_array.prototype,
+        .float32_array => builtins.typed_array.float32_array.constructor,
+        .float32_array_prototype => builtins.typed_array.float32_array.prototype,
+        .float64_array => builtins.typed_array.float64_array.constructor,
+        .float64_array_prototype => builtins.typed_array.float64_array.prototype,
+        .for_in_iterator_prototype => builtins.for_in_iterator.prototype,
+        .function => builtins.function.constructor,
+        .function_prototype => builtins.function.prototype,
+        .generator_function => builtins.generator_function.constructor,
+        .generator_function_prototype => builtins.generator_function.prototype,
+        .generator_prototype => builtins.generator.prototype,
+        .int8_array => builtins.typed_array.int8_array.constructor,
+        .int8_array_prototype => builtins.typed_array.int8_array.prototype,
+        .int16_array => builtins.typed_array.int16_array.constructor,
+        .int16_array_prototype => builtins.typed_array.int16_array.prototype,
+        .int32_array => builtins.typed_array.int32_array.constructor,
+        .int32_array_prototype => builtins.typed_array.int32_array.prototype,
+        .intl => builtins.intl.namespace,
+        .intl_collator => builtins.intl.collator.constructor,
+        .intl_collator_prototype => builtins.intl.collator.prototype,
+        .intl_date_time_format => builtins.intl.date_time_format.constructor,
+        .intl_date_time_format_prototype => builtins.intl.date_time_format.prototype,
+        .intl_display_names => builtins.intl.display_names.constructor,
+        .intl_display_names_prototype => builtins.intl.display_names.prototype,
+        .intl_duration_format => builtins.intl.duration_format.constructor,
+        .intl_duration_format_prototype => builtins.intl.duration_format.prototype,
+        .intl_list_format => builtins.intl.list_format.constructor,
+        .intl_list_format_prototype => builtins.intl.list_format.prototype,
+        .intl_locale => builtins.intl.locale.constructor,
+        .intl_locale_prototype => builtins.intl.locale.prototype,
+        .intl_number_format => builtins.intl.number_format.constructor,
+        .intl_number_format_prototype => builtins.intl.number_format.prototype,
+        .intl_plural_rules => builtins.intl.plural_rules.constructor,
+        .intl_plural_rules_prototype => builtins.intl.plural_rules.prototype,
+        .intl_relative_time_format => builtins.intl.relative_time_format.constructor,
+        .intl_relative_time_format_prototype => builtins.intl.relative_time_format.prototype,
+        .intl_segmenter => builtins.intl.segmenter.constructor,
+        .intl_segmenter_prototype => builtins.intl.segmenter.prototype,
+        .intl_segments_prototype => builtins.intl.segments.prototype,
+        .intl_segment_iterator_prototype => builtins.intl.segment_iterator.prototype,
+        .is_finite => builtins.global.is_finite_function,
+        .is_nan => builtins.global.is_nan_function,
+        .iterator => builtins.iterator.constructor,
+        .iterator_helper_prototype => builtins.iterator_helper.prototype,
+        .iterator_prototype => builtins.iterator.prototype,
+        .json => builtins.json.namespace,
+        .map => builtins.map.constructor,
+        .map_prototype => builtins.map.prototype,
+        .map_iterator_prototype => builtins.map_iterator.prototype,
+        .math => builtins.math.namespace,
+        .number => builtins.number.constructor,
+        .number_prototype => builtins.number.prototype,
+        .object => builtins.object.constructor,
+        .object_prototype => builtins.object.prototype,
+        .parse_float => builtins.global.parse_float_function,
+        .parse_int => builtins.global.parse_int_function,
+        .promise => builtins.promise.constructor,
+        .promise_prototype => builtins.promise.prototype,
+        .proxy => builtins.proxy.constructor,
+        .range_error => builtins.@"error".range_error.constructor,
+        .range_error_prototype => builtins.@"error".range_error.prototype,
+        .reference_error => builtins.@"error".reference_error.constructor,
+        .reference_error_prototype => builtins.@"error".reference_error.prototype,
+        .reflect => builtins.reflect.namespace,
+        .reg_exp => builtins.reg_exp.constructor,
+        .reg_exp_prototype => builtins.reg_exp.prototype,
+        .reg_exp_string_iterator_prototype => builtins.reg_exp_string_iterator.prototype,
+        .set => builtins.set.constructor,
+        .set_prototype => builtins.set.prototype,
+        .set_iterator_prototype => builtins.set_iterator.prototype,
+        .shared_array_buffer => builtins.shared_array_buffer.constructor,
+        .shared_array_buffer_prototype => builtins.shared_array_buffer.prototype,
+        .string => builtins.string.constructor,
+        .string_prototype => builtins.string.prototype,
+        .string_iterator_prototype => builtins.string_iterator.prototype,
+        .symbol => builtins.symbol.constructor,
+        .symbol_prototype => builtins.symbol.prototype,
+        .syntax_error => builtins.@"error".syntax_error.constructor,
+        .syntax_error_prototype => builtins.@"error".syntax_error.prototype,
+        .temporal => builtins.temporal.namespace,
+        .temporal_duration => builtins.temporal.duration.constructor,
+        .temporal_duration_prototype => builtins.temporal.duration.prototype,
+        .temporal_instant => builtins.temporal.instant.constructor,
+        .temporal_instant_prototype => builtins.temporal.instant.prototype,
+        .temporal_now => builtins.temporal.now.namespace,
+        .temporal_plain_date => builtins.temporal.plain_date.constructor,
+        .temporal_plain_date_prototype => builtins.temporal.plain_date.prototype,
+        .temporal_plain_date_time => builtins.temporal.plain_date_time.constructor,
+        .temporal_plain_date_time_prototype => builtins.temporal.plain_date_time.prototype,
+        .temporal_plain_month_day => builtins.temporal.plain_month_day.constructor,
+        .temporal_plain_month_day_prototype => builtins.temporal.plain_month_day.prototype,
+        .temporal_plain_time => builtins.temporal.plain_time.constructor,
+        .temporal_plain_time_prototype => builtins.temporal.plain_time.prototype,
+        .temporal_plain_year_month => builtins.temporal.plain_year_month.constructor,
+        .temporal_plain_year_month_prototype => builtins.temporal.plain_year_month.prototype,
+        .temporal_zoned_date_time => builtins.temporal.zoned_date_time.constructor,
+        .temporal_zoned_date_time_prototype => builtins.temporal.zoned_date_time.prototype,
+        .throw_type_error => builtins.throw_type_error.function,
+        .typed_array => builtins.typed_array.constructor,
+        .typed_array_prototype => builtins.typed_array.prototype,
+        .type_error => builtins.@"error".type_error.constructor,
+        .type_error_prototype => builtins.@"error".type_error.prototype,
+        .uint8_array => builtins.typed_array.uint8_array.constructor,
+        .uint8_array_prototype => builtins.typed_array.uint8_array.prototype,
+        .uint8_clamped_array => builtins.typed_array.uint8_clamped_array.constructor,
+        .uint8_clamped_array_prototype => builtins.typed_array.uint8_clamped_array.prototype,
+        .uint16_array => builtins.typed_array.uint16_array.constructor,
+        .uint16_array_prototype => builtins.typed_array.uint16_array.prototype,
+        .uint32_array => builtins.typed_array.uint32_array.constructor,
+        .uint32_array_prototype => builtins.typed_array.uint32_array.prototype,
+        .unescape => builtins.global.unescape_function,
+        .uri_error => builtins.@"error".uri_error.constructor,
+        .uri_error_prototype => builtins.@"error".uri_error.prototype,
+        .weak_map => builtins.weak_map.constructor,
+        .weak_map_prototype => builtins.weak_map.prototype,
+        .weak_ref => builtins.weak_ref.constructor,
+        .weak_ref_prototype => builtins.weak_ref.prototype,
+        .weak_set => builtins.weak_set.constructor,
+        .weak_set_prototype => builtins.weak_set.prototype,
+        .wrap_for_valid_iterator_prototype => builtins.wrap_for_valid_iterator.prototype,
+
+        .array_prototype_to_string,
+        .array_prototype_values,
+        .object_prototype_to_string,
+        => unreachable,
+    };
+}
+
+pub fn getOrCreate(
+    intrinsics: *Intrinsics,
+    realm: *Realm,
+    comptime field: std.meta.FieldEnum(Intrinsics),
 ) std.mem.Allocator.Error!*Object {
-    const intrinsic = &@field(self.lazy_intrinsics, name);
-    if (intrinsic.* == null) {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const object = try T.create(agent, realm);
-        object.shape = try object.shape.makeUnique(agent.gc_allocator);
-        // Sanity check to ensure there is no dependency loop - creating the object must not
-        // (indirectly) rely on itself. If something within `create()` assigned the intrinsic it
-        // has been created twice and overwriting it would be a mistake.
-        std.debug.assert(intrinsic.* == null);
-        intrinsic.* = object;
-        try T.init(agent, realm, object);
-    }
-    return intrinsic.*.?;
+    return @field(intrinsics, @tagName(field)) orelse blk: {
+        const intrinsic = switch (field) {
+            .array_prototype_to_string => try createProperty(intrinsics, realm, .array_prototype, "toString"),
+            .array_prototype_values => try createProperty(intrinsics, realm, .array_prototype, "values"),
+            .object_prototype_to_string => try createProperty(intrinsics, realm, .object_prototype, "toString"),
+            else => try create(intrinsics, realm, field),
+        };
+        @field(intrinsics, @tagName(field)) = intrinsic;
+        break :blk intrinsic;
+    };
 }
 
-pub fn @"%AggregateError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AggregateError%", builtins.aggregate_error.constructor);
-}
-pub fn @"%AggregateError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AggregateError.prototype%", builtins.aggregate_error.prototype);
-}
-pub fn @"%Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Array%", builtins.array.constructor);
-}
-pub fn @"%Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Array.prototype%", builtins.array.prototype);
-}
-pub fn @"%Array.prototype.toString%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.toString%";
-    if (intrinsic.* == null) {
-        const array_prototype = try @"%Array.prototype%"(self);
-        intrinsic.* = array_prototype.getPropertyValueDirect(PropertyKey.from("toString")).asObject();
-    }
-    return intrinsic.*.?;
-}
-pub fn @"%Array.prototype.values%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    const intrinsic = &self.lazy_intrinsics.@"%Array.prototype.values%";
-    if (intrinsic.* == null) {
-        const array_prototype = try @"%Array.prototype%"(self);
-        intrinsic.* = array_prototype.getPropertyValueDirect(PropertyKey.from("values")).asObject();
-    }
-    return intrinsic.*.?;
-}
-pub fn @"%ArrayBuffer%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%ArrayBuffer%", builtins.array_buffer.constructor);
-}
-pub fn @"%ArrayBuffer.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%ArrayBuffer.prototype%", builtins.array_buffer.prototype);
-}
-pub fn @"%ArrayIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%ArrayIteratorPrototype%", builtins.array_iterator.prototype);
-}
-pub fn @"%AsyncFromSyncIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AsyncFromSyncIteratorPrototype%", builtins.async_from_sync_iterator.prototype);
-}
-pub fn @"%AsyncFunction%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AsyncFunction%", builtins.async_function.constructor);
-}
-pub fn @"%AsyncFunction.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AsyncFunction.prototype%", builtins.async_function.prototype);
-}
-pub fn @"%AsyncGeneratorFunction%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AsyncGeneratorFunction%", builtins.async_generator_function.constructor);
-}
-pub fn @"%AsyncGeneratorFunction.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AsyncGeneratorFunction.prototype%", builtins.async_generator_function.prototype);
-}
-pub fn @"%AsyncGeneratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AsyncGeneratorPrototype%", builtins.async_generator.prototype);
-}
-pub fn @"%AsyncIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%AsyncIteratorPrototype%", builtins.async_iterator.prototype);
-}
-pub fn @"%Atomics%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Atomics%", builtins.atomics.namespace);
-}
-pub fn @"%BigInt%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%BigInt%", builtins.big_int.constructor);
-}
-pub fn @"%BigInt.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%BigInt.prototype%", builtins.big_int.prototype);
-}
-pub fn @"%BigInt64Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%BigInt64Array%", builtins.typed_array.big_int64_array.constructor);
-}
-pub fn @"%BigInt64Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%BigInt64Array.prototype%", builtins.typed_array.big_int64_array.prototype);
-}
-pub fn @"%BigUint64Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%BigUint64Array%", builtins.typed_array.big_uint64_array.constructor);
-}
-pub fn @"%BigUint64Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%BigUint64Array.prototype%", builtins.typed_array.big_uint64_array.prototype);
-}
-pub fn @"%Boolean%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Boolean%", builtins.boolean.constructor);
-}
-pub fn @"%Boolean.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Boolean.prototype%", builtins.boolean.prototype);
-}
-pub fn @"%DataView%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%DataView%", builtins.data_view.constructor);
-}
-pub fn @"%DataView.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%DataView.prototype%", builtins.data_view.prototype);
-}
-pub fn @"%Date%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Date%", builtins.date.constructor);
-}
-pub fn @"%Date.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Date.prototype%", builtins.date.prototype);
-}
-pub fn @"%decodeURI%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%decodeURI%", builtins.global.decode_uri_function);
-}
-pub fn @"%decodeURIComponent%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%decodeURIComponent%", builtins.global.decode_uri_component_function);
-}
-pub fn @"%encodeURI%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%encodeURI%", builtins.global.encode_uri_function);
-}
-pub fn @"%encodeURIComponent%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%encodeURIComponent%", builtins.global.encode_uri_component_function);
-}
-pub fn @"%Error%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Error%", builtins.@"error".constructor);
-}
-pub fn @"%Error.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Error.prototype%", builtins.@"error".prototype);
-}
-pub fn @"%escape%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%escape%", builtins.global.escape_function);
-}
-pub fn @"%eval%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%eval%", builtins.global.eval_function);
-}
-pub fn @"%EvalError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%EvalError%", builtins.@"error".eval_error.constructor);
-}
-pub fn @"%EvalError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%EvalError.prototype%", builtins.@"error".eval_error.prototype);
-}
-pub fn @"%FinalizationRegistry%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%FinalizationRegistry%", builtins.finalization_registry.constructor);
-}
-pub fn @"%FinalizationRegistry.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%FinalizationRegistry.prototype%", builtins.finalization_registry.prototype);
-}
-pub fn @"%Float16Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Float16Array%", builtins.typed_array.float16_array.constructor);
-}
-pub fn @"%Float16Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Float16Array.prototype%", builtins.typed_array.float16_array.prototype);
-}
-pub fn @"%Float32Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Float32Array%", builtins.typed_array.float32_array.constructor);
-}
-pub fn @"%Float32Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Float32Array.prototype%", builtins.typed_array.float32_array.prototype);
-}
-pub fn @"%Float64Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Float64Array%", builtins.typed_array.float64_array.constructor);
-}
-pub fn @"%Float64Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Float64Array.prototype%", builtins.typed_array.float64_array.prototype);
-}
-pub fn @"%ForInIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%ForInIteratorPrototype%", builtins.for_in_iterator.prototype);
-}
-pub fn @"%Function%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Function%", builtins.function.constructor);
-}
-pub fn @"%Function.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Function.prototype%", builtins.function.prototype);
-}
-pub fn @"%GeneratorFunction%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%GeneratorFunction%", builtins.generator_function.constructor);
-}
-pub fn @"%GeneratorFunction.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%GeneratorFunction.prototype%", builtins.generator_function.prototype);
-}
-pub fn @"%GeneratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%GeneratorPrototype%", builtins.generator.prototype);
-}
-pub fn @"%Int8Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Int8Array%", builtins.typed_array.int8_array.constructor);
-}
-pub fn @"%Int8Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Int8Array.prototype%", builtins.typed_array.int8_array.prototype);
-}
-pub fn @"%Int16Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Int16Array%", builtins.typed_array.int16_array.constructor);
-}
-pub fn @"%Int16Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Int16Array.prototype%", builtins.typed_array.int16_array.prototype);
-}
-pub fn @"%Int32Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Int32Array%", builtins.typed_array.int32_array.constructor);
-}
-pub fn @"%Int32Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Int32Array.prototype%", builtins.typed_array.int32_array.prototype);
-}
-pub fn @"%Intl%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl%", builtins.intl.namespace);
-}
-pub fn @"%Intl.Collator%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.Collator%", builtins.intl.collator.constructor);
-}
-pub fn @"%Intl.Collator.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.Collator.prototype%", builtins.intl.collator.prototype);
-}
-pub fn @"%Intl.DateTimeFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.DateTimeFormat%", builtins.intl.date_time_format.constructor);
-}
-pub fn @"%Intl.DateTimeFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.DateTimeFormat.prototype%", builtins.intl.date_time_format.prototype);
-}
-pub fn @"%Intl.DisplayNames%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.DisplayNames%", builtins.intl.display_names.constructor);
-}
-pub fn @"%Intl.DisplayNames.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.DisplayNames.prototype%", builtins.intl.display_names.prototype);
-}
-pub fn @"%Intl.DurationFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.DurationFormat%", builtins.intl.duration_format.constructor);
-}
-pub fn @"%Intl.DurationFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.DurationFormat.prototype%", builtins.intl.duration_format.prototype);
-}
-pub fn @"%Intl.ListFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.ListFormat%", builtins.intl.list_format.constructor);
-}
-pub fn @"%Intl.ListFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.ListFormat.prototype%", builtins.intl.list_format.prototype);
-}
-pub fn @"%Intl.Locale%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.Locale%", builtins.intl.locale.constructor);
-}
-pub fn @"%Intl.Locale.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.Locale.prototype%", builtins.intl.locale.prototype);
-}
-pub fn @"%Intl.NumberFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.NumberFormat%", builtins.intl.number_format.constructor);
-}
-pub fn @"%Intl.NumberFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.NumberFormat.prototype%", builtins.intl.number_format.prototype);
-}
-pub fn @"%Intl.PluralRules%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.PluralRules%", builtins.intl.plural_rules.constructor);
-}
-pub fn @"%Intl.PluralRules.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.PluralRules.prototype%", builtins.intl.plural_rules.prototype);
-}
-pub fn @"%Intl.RelativeTimeFormat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.RelativeTimeFormat%", builtins.intl.relative_time_format.constructor);
-}
-pub fn @"%Intl.RelativeTimeFormat.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.RelativeTimeFormat.prototype%", builtins.intl.relative_time_format.prototype);
-}
-pub fn @"%Intl.Segmenter%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.Segmenter%", builtins.intl.segmenter.constructor);
-}
-pub fn @"%Intl.Segmenter.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Intl.Segmenter.prototype%", builtins.intl.segmenter.prototype);
-}
-pub fn @"%IntlSegmentsPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%IntlSegmentsPrototype%", builtins.intl.segments.prototype);
-}
-pub fn @"%IntlSegmentIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%IntlSegmentIteratorPrototype%", builtins.intl.segment_iterator.prototype);
-}
-pub fn @"%isFinite%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%isFinite%", builtins.global.is_finite_function);
-}
-pub fn @"%isNaN%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%isNaN%", builtins.global.is_nan_function);
-}
-pub fn @"%Iterator%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Iterator%", builtins.iterator.constructor);
-}
-pub fn @"%IteratorHelperPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%IteratorHelperPrototype%", builtins.iterator_helper.prototype);
-}
-pub fn @"%Iterator.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Iterator.prototype%", builtins.iterator.prototype);
-}
-pub fn @"%JSON%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%JSON%", builtins.json.namespace);
-}
-pub fn @"%Map%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Map%", builtins.map.constructor);
-}
-pub fn @"%Map.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Map.prototype%", builtins.map.prototype);
-}
-pub fn @"%MapIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%MapIteratorPrototype%", builtins.map_iterator.prototype);
-}
-pub fn @"%Math%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Math%", builtins.math.namespace);
-}
-pub fn @"%Number%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Number%", builtins.number.constructor);
-}
-pub fn @"%Number.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Number.prototype%", builtins.number.prototype);
-}
-pub fn @"%Object%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Object%", builtins.object.constructor);
-}
-pub fn @"%Object.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Object.prototype%", builtins.object.prototype);
-}
-pub fn @"%Object.prototype.toString%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    const intrinsic = &self.lazy_intrinsics.@"%Object.prototype.toString%";
-    if (intrinsic.* == null) {
-        const object_prototype = try @"%Object.prototype%"(self);
-        intrinsic.* = object_prototype.getPropertyValueDirect(PropertyKey.from("toString")).asObject();
-    }
-    return intrinsic.*.?;
-}
-pub fn @"%parseFloat%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%parseFloat%", builtins.global.parse_float_function);
-}
-pub fn @"%parseInt%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%parseInt%", builtins.global.parse_int_function);
-}
-pub fn @"%Promise%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Promise%", builtins.promise.constructor);
-}
-pub fn @"%Promise.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Promise.prototype%", builtins.promise.prototype);
-}
-pub fn @"%Proxy%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Proxy%", builtins.proxy.constructor);
-}
-pub fn @"%RangeError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%RangeError%", builtins.@"error".range_error.constructor);
-}
-pub fn @"%RangeError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%RangeError.prototype%", builtins.@"error".range_error.prototype);
-}
-pub fn @"%ReferenceError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%ReferenceError%", builtins.@"error".reference_error.constructor);
-}
-pub fn @"%ReferenceError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%ReferenceError.prototype%", builtins.@"error".reference_error.prototype);
-}
-pub fn @"%Reflect%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Reflect%", builtins.reflect.namespace);
-}
-pub fn @"%RegExp%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%RegExp%", builtins.reg_exp.constructor);
-}
-pub fn @"%RegExp.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%RegExp.prototype%", builtins.reg_exp.prototype);
-}
-pub fn @"%RegExpStringIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%RegExpStringIteratorPrototype%", builtins.reg_exp_string_iterator.prototype);
-}
-pub fn @"%Set%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Set%", builtins.set.constructor);
-}
-pub fn @"%Set.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Set.prototype%", builtins.set.prototype);
-}
-pub fn @"%SetIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%SetIteratorPrototype%", builtins.set_iterator.prototype);
-}
-pub fn @"%SharedArrayBuffer%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%SharedArrayBuffer%", builtins.shared_array_buffer.constructor);
-}
-pub fn @"%SharedArrayBuffer.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%SharedArrayBuffer.prototype%", builtins.shared_array_buffer.prototype);
-}
-pub fn @"%String%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%String%", builtins.string.constructor);
-}
-pub fn @"%String.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%String.prototype%", builtins.string.prototype);
-}
-pub fn @"%StringIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%StringIteratorPrototype%", builtins.string_iterator.prototype);
-}
-pub fn @"%Symbol%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Symbol%", builtins.symbol.constructor);
-}
-pub fn @"%Symbol.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Symbol.prototype%", builtins.symbol.prototype);
-}
-pub fn @"%SyntaxError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%SyntaxError%", builtins.@"error".syntax_error.constructor);
-}
-pub fn @"%SyntaxError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%SyntaxError.prototype%", builtins.@"error".syntax_error.prototype);
-}
-pub fn @"%Temporal%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal%", builtins.temporal.namespace);
-}
-pub fn @"%Temporal.Duration%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.Duration%", builtins.temporal.duration.constructor);
-}
-pub fn @"%Temporal.Duration.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.Duration.prototype%", builtins.temporal.duration.prototype);
-}
-pub fn @"%Temporal.Instant%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.Instant%", builtins.temporal.instant.constructor);
-}
-pub fn @"%Temporal.Instant.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.Instant.prototype%", builtins.temporal.instant.prototype);
-}
-pub fn @"%Temporal.Now%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.Now%", builtins.temporal.now.namespace);
-}
-pub fn @"%Temporal.PlainDate%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainDate%", builtins.temporal.plain_date.constructor);
-}
-pub fn @"%Temporal.PlainDate.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainDate.prototype%", builtins.temporal.plain_date.prototype);
-}
-pub fn @"%Temporal.PlainDateTime%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainDateTime%", builtins.temporal.plain_date_time.constructor);
-}
-pub fn @"%Temporal.PlainDateTime.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainDateTime.prototype%", builtins.temporal.plain_date_time.prototype);
-}
-pub fn @"%Temporal.PlainMonthDay%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainMonthDay%", builtins.temporal.plain_month_day.constructor);
-}
-pub fn @"%Temporal.PlainMonthDay.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainMonthDay.prototype%", builtins.temporal.plain_month_day.prototype);
-}
-pub fn @"%Temporal.PlainTime%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainTime%", builtins.temporal.plain_time.constructor);
-}
-pub fn @"%Temporal.PlainTime.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainTime.prototype%", builtins.temporal.plain_time.prototype);
-}
-pub fn @"%Temporal.PlainYearMonth%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainYearMonth%", builtins.temporal.plain_year_month.constructor);
-}
-pub fn @"%Temporal.PlainYearMonth.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.PlainYearMonth.prototype%", builtins.temporal.plain_year_month.prototype);
-}
-pub fn @"%Temporal.ZonedDateTime%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.ZonedDateTime%", builtins.temporal.zoned_date_time.constructor);
-}
-pub fn @"%Temporal.ZonedDateTime.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Temporal.ZonedDateTime.prototype%", builtins.temporal.zoned_date_time.prototype);
-}
-pub fn @"%ThrowTypeError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%ThrowTypeError%", builtins.throw_type_error.function);
-}
-pub fn @"%TypedArray%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%TypedArray%", builtins.typed_array.constructor);
-}
-pub fn @"%TypedArray.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%TypedArray.prototype%", builtins.typed_array.prototype);
-}
-pub fn @"%TypeError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%TypeError%", builtins.@"error".type_error.constructor);
-}
-pub fn @"%TypeError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%TypeError.prototype%", builtins.@"error".type_error.prototype);
-}
-pub fn @"%Uint8Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Uint8Array%", builtins.typed_array.uint8_array.constructor);
-}
-pub fn @"%Uint8Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Uint8Array.prototype%", builtins.typed_array.uint8_array.prototype);
-}
-pub fn @"%Uint8ClampedArray%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Uint8ClampedArray%", builtins.typed_array.uint8_clamped_array.constructor);
-}
-pub fn @"%Uint8ClampedArray.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Uint8ClampedArray.prototype%", builtins.typed_array.uint8_clamped_array.prototype);
-}
-pub fn @"%Uint16Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Uint16Array%", builtins.typed_array.uint16_array.constructor);
-}
-pub fn @"%Uint16Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Uint16Array.prototype%", builtins.typed_array.uint16_array.prototype);
-}
-pub fn @"%Uint32Array%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Uint32Array%", builtins.typed_array.uint32_array.constructor);
-}
-pub fn @"%Uint32Array.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%Uint32Array.prototype%", builtins.typed_array.uint32_array.prototype);
-}
-pub fn @"%unescape%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%unescape%", builtins.global.unescape_function);
-}
-pub fn @"%URIError%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%URIError%", builtins.@"error".uri_error.constructor);
-}
-pub fn @"%URIError.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%URIError.prototype%", builtins.@"error".uri_error.prototype);
-}
-pub fn @"%WeakMap%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%WeakMap%", builtins.weak_map.constructor);
-}
-pub fn @"%WeakMap.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%WeakMap.prototype%", builtins.weak_map.prototype);
-}
-pub fn @"%WeakRef%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%WeakRef%", builtins.weak_ref.constructor);
-}
-pub fn @"%WeakRef.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%WeakRef.prototype%", builtins.weak_ref.prototype);
-}
-pub fn @"%WeakSet%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%WeakSet%", builtins.weak_set.constructor);
-}
-pub fn @"%WeakSet.prototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%WeakSet.prototype%", builtins.weak_set.prototype);
-}
-pub fn @"%WrapForValidIteratorPrototype%"(self: *Intrinsics) std.mem.Allocator.Error!*Object {
-    return self.lazyIntrinsic("%WrapForValidIteratorPrototype%", builtins.wrap_for_valid_iterator.prototype);
+fn create(
+    intrinsics: *Intrinsics,
+    realm: *Realm,
+    comptime field: std.meta.FieldEnum(Intrinsics),
+) std.mem.Allocator.Error!*Object {
+    const T = Type(field);
+    const agent = realm.agent;
+    const object = try T.create(agent, realm);
+    object.shape = try object.shape.makeUnique(agent.gc_allocator);
+    // Sanity check to ensure there is no dependency loop - creating the object must not
+    // (indirectly) rely on itself. If something within `create()` assigned the intrinsic it
+    // has been created twice and overwriting it would be a mistake.
+    std.debug.assert(@field(intrinsics, @tagName(field)) == null);
+    // Once the object has been created, we assign and initialize it. This allows `init()` to have
+    // dependency loops, e.g. `Function.prototype` and `Object.prototype`.
+    @field(intrinsics, @tagName(field)) = object;
+    try T.init(agent, realm, object);
+    return object;
+}
+
+fn createProperty(
+    intrinsics: *Intrinsics,
+    realm: *Realm,
+    comptime parent_field: std.meta.FieldEnum(Intrinsics),
+    comptime key: []const u8,
+) std.mem.Allocator.Error!*Object {
+    const parent = try intrinsics.getOrCreate(realm, parent_field);
+    return parent.getPropertyValueDirect(PropertyKey.from(key)).asObject();
 }

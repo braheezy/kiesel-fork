@@ -33,7 +33,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "DurationFormat",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -44,7 +44,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Intl.DurationFormat.prototype%"()),
+            Value.from(try realm.intrinsic(.intl_duration_format_prototype)),
             .none,
         );
     }
@@ -74,7 +74,7 @@ pub const constructor = struct {
             DurationFormat,
             agent,
             new_target,
-            "%Intl.DurationFormat.prototype%",
+            .intl_duration_format_prototype,
             .{
                 .locale = undefined,
                 .numbering_system = undefined,
@@ -358,7 +358,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-durationformat-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -370,14 +370,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Intl.DurationFormat%"()),
+            Value.from(try realm.intrinsic(.intl_duration_format)),
         );
 
         // 13.3.5 Intl.DurationFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.DurationFormat.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Intl.DurationFormat"),
             .{
                 .writable = false,
@@ -399,7 +399,7 @@ pub const prototype = struct {
         // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
         const options = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 4. For each row of Table 21, except the header row, in table order, do

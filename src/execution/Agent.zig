@@ -21,7 +21,6 @@ const Realm = @import("Realm.zig");
 const String = types.String;
 const Symbol = types.Symbol;
 const Value = types.Value;
-const WellKnownSymbols = @import("Agent/WellKnownSymbols.zig");
 const noexcept = utils.noexcept;
 
 const Agent = @This();
@@ -51,6 +50,7 @@ module_async_evaluation_count: u32 = 0,
 
 pub const Exception = @import("Agent/Exception.zig");
 pub const Platform = @import("Agent/Platform.zig");
+pub const WellKnownSymbols = @import("Agent/WellKnownSymbols.zig");
 
 pub const Options = struct {
     debug: struct {
@@ -153,16 +153,16 @@ const ErrorType = enum {
         };
     }
 
-    fn intrinsicName(self: @This()) []const u8 {
+    fn intrinsic(self: @This()) Realm.Intrinsic {
         return switch (self) {
-            .aggregate_error => "%AggregateError%",
-            .eval_error => "%EvalError%",
-            .range_error => "%RangeError%",
-            .reference_error => "%ReferenceError%",
-            .syntax_error => "%SyntaxError%",
-            .type_error => "%TypeError%",
-            .uri_error => "%URIError%",
-            .internal_error => "%Error%",
+            .aggregate_error => .aggregate_error,
+            .eval_error => .eval_error,
+            .range_error => .range_error,
+            .reference_error => .reference_error,
+            .syntax_error => .syntax_error,
+            .type_error => .type_error,
+            .uri_error => .uri_error,
+            .internal_error => .@"error",
         };
     }
 };
@@ -174,10 +174,7 @@ pub fn createErrorObject(
     args: anytype,
 ) std.mem.Allocator.Error!*error_type.T() {
     const realm = self.currentRealm();
-    const constructor = try @field(
-        Realm.Intrinsics,
-        error_type.intrinsicName(),
-    )(&realm.intrinsics);
+    const constructor = try realm.intrinsic(error_type.intrinsic());
     const message = try std.fmt.allocPrint(self.gc_allocator, fmt, args);
     const error_object = constructor.construct(
         self,
@@ -382,6 +379,6 @@ test "well_known_symbols" {
     defer platform.deinit();
     var agent = try init(gpa, io, &platform, .{});
     defer agent.deinit();
-    const unscopables = agent.well_known_symbols.@"%Symbol.unscopables%";
+    const unscopables = agent.well_known_symbols.unscopables;
     try std.testing.expectEqualStrings(unscopables.description.?.asAscii(), "Symbol.unscopables");
 }

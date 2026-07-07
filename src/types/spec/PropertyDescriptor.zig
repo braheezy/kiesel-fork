@@ -72,7 +72,7 @@ pub fn fromPropertyDescriptor(
 
     // 2. Let obj be OrdinaryObjectCreate(%Object.prototype%).
     // 3. Assert: obj is an extensible ordinary object with no own properties.
-    const obj = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+    const obj = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
 
     // 4. If propertyDesc has a [[Value]] field, then
     if (property_desc.value) |value| {

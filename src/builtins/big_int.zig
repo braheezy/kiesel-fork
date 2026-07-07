@@ -26,7 +26,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "BigInt",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -40,7 +40,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%BigInt.prototype%"()),
+            Value.from(try realm.intrinsic(.big_int_prototype)),
             .none,
         );
     }
@@ -127,7 +127,7 @@ pub fn numberToBigInt(agent: *Agent, number: Number) Agent.Error!*const types.Bi
 /// https://tc39.es/ecma262/#sec-properties-of-the-bigint-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -140,14 +140,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%BigInt%"()),
+            Value.from(try realm.intrinsic(.big_int)),
         );
 
         // 21.2.3.5 BigInt.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-bigint.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("BigInt"),
             .{
                 .writable = false,

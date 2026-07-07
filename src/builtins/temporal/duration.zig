@@ -38,7 +38,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Duration",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -52,7 +52,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Temporal.Duration.prototype%"()),
+            Value.from(try realm.intrinsic(.temporal_duration_prototype)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -215,7 +215,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-duration-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -248,14 +248,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Temporal.Duration%"()),
+            Value.from(try realm.intrinsic(.temporal_duration)),
         );
 
         // 7.3.2 Temporal.Duration.prototype[ %Symbol.toStringTag% ]
         // https://tc39.es/proposal-temporal/#sec-temporal.duration.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Temporal.Duration"),
             .{
                 .writable = false,
@@ -1218,7 +1218,7 @@ pub fn createTemporalDuration(
     //    microseconds, nanoseconds) is false, throw a RangeError exception.
 
     // 2. If newTarget is not present, set newTarget to %Temporal.Duration%.
-    const new_target = maybe_new_target orelse try realm.intrinsics.@"%Temporal.Duration%"();
+    const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_duration);
 
     // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.Duration.prototype%",
     //    « [[InitializedTemporalDuration]], [[Years]], [[Months]], [[Weeks]], [[Days]], [[Hours]],
@@ -1238,7 +1238,7 @@ pub fn createTemporalDuration(
         Duration,
         agent,
         new_target,
-        "%Temporal.Duration.prototype%",
+        .temporal_duration_prototype,
         .{ .inner = inner },
     );
 }

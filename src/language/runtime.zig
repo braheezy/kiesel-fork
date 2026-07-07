@@ -260,7 +260,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
     // 7. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
         agent,
-        Value.from(try realm.intrinsics.@"%Promise%"()),
+        Value.from(try realm.intrinsic(.promise)),
     ) catch |err| try noexcept(err);
 
     // 8. Let specifierString be Completion(ToString(specifier)).
@@ -752,7 +752,7 @@ pub fn instantiateArrowFunctionExpression(
     //    ConciseBody, lexical-this, envRecord, privateEnv).
     const closure = try ordinaryFunctionCreate(
         agent,
-        try realm.intrinsics.@"%Function.prototype%"(),
+        try realm.intrinsic(.function_prototype),
         source_text,
         arrow_function.formal_parameters,
         arrow_function.function_body,
@@ -795,7 +795,7 @@ fn defineMethod(
     const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
 
     // 4. If proto is not present, set proto to %Function.prototype%.
-    const proto = maybe_proto orelse try realm.intrinsics.@"%Function.prototype%"();
+    const proto = maybe_proto orelse try realm.intrinsic(.function_prototype);
 
     // 5. Let sourceText be the source text matched by MethodDefinition.
     const source_text: SourceText = .{ .slice = .{
@@ -896,7 +896,7 @@ pub fn methodDefinitionEvaluation(
             //    formalParamList, FunctionBody, non-lexical-this, envRecord, privateEnv).
             const closure = try ordinaryFunctionCreate(
                 agent,
-                try realm.intrinsics.@"%Function.prototype%"(),
+                try realm.intrinsic(.function_prototype),
                 source_text,
                 formal_param_list,
                 function_expression.function_body,
@@ -965,7 +965,7 @@ pub fn methodDefinitionEvaluation(
             //    PropertySetParameterList, FunctionBody, non-lexical-this, envRecord, privateEnv).
             const closure = try ordinaryFunctionCreate(
                 agent,
-                try realm.intrinsics.@"%Function.prototype%"(),
+                try realm.intrinsic(.function_prototype),
                 source_text,
                 function_expression.formal_parameters,
                 function_expression.function_body,
@@ -1034,7 +1034,7 @@ pub fn methodDefinitionEvaluation(
             //    UniqueFormalParameters, GeneratorBody, non-lexical-this, envRecord, privateEnv).
             const closure = try ordinaryFunctionCreate(
                 agent,
-                try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+                try realm.intrinsic(.generator_function_prototype),
                 source_text,
                 generator_expression.formal_parameters,
                 generator_expression.function_body,
@@ -1052,7 +1052,7 @@ pub fn methodDefinitionEvaluation(
             // 8. Let proto be OrdinaryObjectCreate(%GeneratorPrototype%).
             const proto = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%GeneratorPrototype%"(),
+                try realm.intrinsic(.generator_prototype),
             );
 
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1106,7 +1106,7 @@ pub fn methodDefinitionEvaluation(
             //    envRecord, privateEnv).
             const closure = try ordinaryFunctionCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+                try realm.intrinsic(.async_generator_function_prototype),
                 source_text,
                 async_generator_expression.formal_parameters,
                 async_generator_expression.function_body,
@@ -1124,7 +1124,7 @@ pub fn methodDefinitionEvaluation(
             // 8. Let proto be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
             const proto = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
+                try realm.intrinsic(.async_generator_prototype),
             );
 
             // 9. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1178,7 +1178,7 @@ pub fn methodDefinitionEvaluation(
             //    privateEnv).
             const closure = try ordinaryFunctionCreate(
                 agent,
-                try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+                try realm.intrinsic(.async_function_prototype),
                 source_text,
                 async_function_expression.formal_parameters,
                 async_function_expression.function_body,
@@ -1231,7 +1231,7 @@ pub fn instantiateGeneratorFunctionObject(
         //    FormalParameters, GeneratorBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+            try realm.intrinsic(.generator_function_prototype),
             source_text,
             generator_declaration.formal_parameters,
             generator_declaration.function_body,
@@ -1246,7 +1246,7 @@ pub fn instantiateGeneratorFunctionObject(
         // 5. Let proto be OrdinaryObjectCreate(%GeneratorPrototype%).
         const proto = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorPrototype%"(),
+            try realm.intrinsic(.generator_prototype),
         );
 
         // 6. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1280,7 +1280,7 @@ pub fn instantiateGeneratorFunctionObject(
         //    FormalParameters, GeneratorBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+            try realm.intrinsic(.generator_function_prototype),
             source_text,
             generator_declaration.formal_parameters,
             generator_declaration.function_body,
@@ -1295,7 +1295,7 @@ pub fn instantiateGeneratorFunctionObject(
         // 4. Let proto be OrdinaryObjectCreate(%GeneratorPrototype%).
         const proto = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorPrototype%"(),
+            try realm.intrinsic(.generator_prototype),
         );
 
         // 5. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1357,7 +1357,7 @@ pub fn instantiateGeneratorFunctionExpression(
         //    FormalParameters, GeneratorBody, non-lexical-this, funcEnv, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+            try realm.intrinsic(.generator_function_prototype),
             source_text,
             generator_expression.formal_parameters,
             generator_expression.function_body,
@@ -1372,7 +1372,7 @@ pub fn instantiateGeneratorFunctionExpression(
         // 10. Let proto be OrdinaryObjectCreate(%GeneratorPrototype%).
         const proto = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorPrototype%"(),
+            try realm.intrinsic(.generator_prototype),
         );
 
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1419,7 +1419,7 @@ pub fn instantiateGeneratorFunctionExpression(
         //    FormalParameters, GeneratorBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorFunction.prototype%"(),
+            try realm.intrinsic(.generator_function_prototype),
             source_text,
             generator_expression.formal_parameters,
             generator_expression.function_body,
@@ -1434,7 +1434,7 @@ pub fn instantiateGeneratorFunctionExpression(
         // 7. Let proto be OrdinaryObjectCreate(%GeneratorPrototype%).
         const proto = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%GeneratorPrototype%"(),
+            try realm.intrinsic(.generator_prototype),
         );
 
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1706,7 +1706,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         //    FormalParameters, AsyncGeneratorBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+            try realm.intrinsic(.async_generator_function_prototype),
             source_text,
             async_generator_declaration.formal_parameters,
             async_generator_declaration.function_body,
@@ -1721,7 +1721,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 5. Let proto be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const proto = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
+            try realm.intrinsic(.async_generator_prototype),
         );
 
         // 6. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1754,7 +1754,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         //    FormalParameters, AsyncGeneratorBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+            try realm.intrinsic(.async_generator_function_prototype),
             source_text,
             async_generator_declaration.formal_parameters,
             async_generator_declaration.function_body,
@@ -1769,7 +1769,7 @@ pub fn instantiateAsyncGeneratorFunctionObject(
         // 4. Let proto be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const proto = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
+            try realm.intrinsic(.async_generator_prototype),
         );
 
         // 5. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1831,7 +1831,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         //    FormalParameters, AsyncGeneratorBody, non-lexical-this, funcEnv, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+            try realm.intrinsic(.async_generator_function_prototype),
             source_text,
             async_generator_expression.formal_parameters,
             async_generator_expression.function_body,
@@ -1846,7 +1846,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 10. Let prototype be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const proto = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
+            try realm.intrinsic(.async_generator_prototype),
         );
 
         // 11. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1893,7 +1893,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         //    FormalParameters, AsyncGeneratorBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"(),
+            try realm.intrinsic(.async_generator_function_prototype),
             source_text,
             async_generator_expression.formal_parameters,
             async_generator_expression.function_body,
@@ -1908,7 +1908,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         // 7. Let proto be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
         const proto = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%AsyncGeneratorPrototype%"(),
+            try realm.intrinsic(.async_generator_prototype),
         );
 
         // 8. Perform ! DefinePropertyOrThrow(closure, "prototype", PropertyDescriptor {
@@ -1983,7 +1983,7 @@ fn classFieldDefinitionEvaluation(
         };
         const initializer_function = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%Function.prototype%"(),
+            try realm.intrinsic(.function_prototype),
             source_text,
             formal_param_list,
             body,
@@ -2051,7 +2051,7 @@ fn classStaticBlockDefinitionEvaluation(
     };
     const body_func = try ordinaryFunctionCreate(
         agent,
-        try realm.intrinsics.@"%Function.prototype%"(),
+        try realm.intrinsic(.function_prototype),
         source_text,
         formal_parameter_list,
         body,
@@ -2192,10 +2192,10 @@ pub fn classDefinitionEvaluation(
     // 7. If ClassHeritage is not present, then
     if (class_tail.class_heritage == null) {
         // a. Let protoParent be %Object.prototype%.
-        proto_parent = try realm.intrinsics.@"%Object.prototype%"();
+        proto_parent = try realm.intrinsic(.object_prototype);
 
         // b. Let ctorParent be %Function.prototype%.
-        ctor_parent = try realm.intrinsics.@"%Function.prototype%"();
+        ctor_parent = try realm.intrinsic(.function_prototype);
     } else {
         // 8. Else,
         // a. Set the running execution context's LexicalEnvironment to classEnv.
@@ -2217,7 +2217,7 @@ pub fn classDefinitionEvaluation(
             proto_parent = null;
 
             // ii. Let ctorParent be %Function.prototype%.
-            ctor_parent = try realm.intrinsics.@"%Function.prototype%"();
+            ctor_parent = try realm.intrinsic(.function_prototype);
         }
         // g. Else if IsConstructor(superclass) is false, then
         else if (!superclass.isConstructor()) {
@@ -2319,7 +2319,7 @@ pub fn classDefinitionEvaluation(
                         builtins.Object,
                         agent_,
                         new_target.?,
-                        "%Object.prototype%",
+                        .object_prototype,
                         {},
                     );
                     break :blk &result.object;
@@ -2639,7 +2639,7 @@ pub fn instantiateAsyncFunctionObject(
         //    FormalParameters, AsyncFunctionBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+            try realm.intrinsic(.async_function_prototype),
             source_text,
             async_function_declaration.formal_parameters,
             async_function_declaration.function_body,
@@ -2666,7 +2666,7 @@ pub fn instantiateAsyncFunctionObject(
         //    FormalParameters, AsyncFunctionBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+            try realm.intrinsic(.async_function_prototype),
             source_text,
             async_function_declaration.formal_parameters,
             async_function_declaration.function_body,
@@ -2723,7 +2723,7 @@ pub fn instantiateAsyncFunctionExpression(
         //    FormalParameters, AsyncFunctionBody, non-lexical-this, funcEnv, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+            try realm.intrinsic(.async_function_prototype),
             source_text,
             async_function_expression.formal_parameters,
             async_function_expression.function_body,
@@ -2765,7 +2765,7 @@ pub fn instantiateAsyncFunctionExpression(
         //    FormalParameters, AsyncFunctionBody, non-lexical-this, envRecord, privateEnv).
         const closure = try ordinaryFunctionCreate(
             agent,
-            try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+            try realm.intrinsic(.async_function_prototype),
             source_text,
             async_function_expression.formal_parameters,
             async_function_expression.function_body,
@@ -2818,7 +2818,7 @@ pub fn instantiateAsyncArrowFunctionExpression(
     //    AsyncConciseBody, lexical-this, env, privateEnv).
     const closure = try ordinaryFunctionCreate(
         agent,
-        try realm.intrinsics.@"%AsyncFunction.prototype%"(),
+        try realm.intrinsic(.async_function_prototype),
         source_text,
         parameters,
         async_arrow_function.function_body,

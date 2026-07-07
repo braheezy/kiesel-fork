@@ -178,7 +178,7 @@ pub fn loadRequestedModules(
     // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
         agent,
-        Value.from(try realm.intrinsics.@"%Promise%"()),
+        Value.from(try realm.intrinsic(.promise)),
     ) catch |err| try noexcept(err);
 
     // 3. Let state be the GraphLoadingState Record { [[IsLoading]]: true,
@@ -680,7 +680,7 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
     // 6. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
         agent,
-        Value.from(try realm.intrinsics.@"%Promise%"()),
+        Value.from(try realm.intrinsic(.promise)),
     ) catch |err| try noexcept(err);
 
     // 7. Set module.[[TopLevelCapability]] to promiseCapability.
@@ -945,7 +945,7 @@ fn executeAsyncModule(agent: *Agent, module: *SourceTextModule) std.mem.Allocato
     // 3. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
         agent,
-        Value.from(try realm.intrinsics.@"%Promise%"()),
+        Value.from(try realm.intrinsic(.promise)),
     ) catch |err| try noexcept(err);
 
     const Captures = struct {

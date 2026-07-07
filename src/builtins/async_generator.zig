@@ -31,7 +31,7 @@ const promiseResolve = builtins.promiseResolve;
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgenerator-prototype
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%AsyncIteratorPrototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.async_iterator_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -44,7 +44,7 @@ pub const prototype = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"()),
+            Value.from(try realm.intrinsic(.async_generator_function_prototype)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -56,7 +56,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma262/#sec-asyncgenerator-prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("AsyncGenerator"),
             .{
                 .writable = false,
@@ -78,7 +78,7 @@ pub const prototype = struct {
         // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
             agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         ) catch |err| try noexcept(err);
 
         // 3. Let result be Completion(AsyncGeneratorValidate(gen, empty)).
@@ -138,7 +138,7 @@ pub const prototype = struct {
         // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
             agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         ) catch |err| try noexcept(err);
 
         // 3. Let result be Completion(AsyncGeneratorValidate(gen, empty)).
@@ -190,7 +190,7 @@ pub const prototype = struct {
         // 2. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
             agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         ) catch |err| try noexcept(err);
 
         // 3. Let result be Completion(AsyncGeneratorValidate(gen, empty)).
@@ -720,7 +720,7 @@ pub fn asyncGeneratorAwaitReturn(
     // 10. Let promise be promiseCompletion.[[Value]].
     const promise = promiseResolve(
         agent,
-        try realm.intrinsics.@"%Promise%"(),
+        try realm.intrinsic(.promise),
         completion.@"return",
     ) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,

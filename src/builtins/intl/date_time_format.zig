@@ -48,7 +48,7 @@ pub fn createDateTimeFormat(
         DateTimeFormat,
         agent,
         new_target,
-        "%Intl.DateTimeFormat.prototype%",
+        .intl_date_time_format_prototype,
         .{
             .locale = undefined,
             .calendar = undefined,
@@ -389,7 +389,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "DateTimeFormat",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -400,7 +400,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat.prototype%"()),
+            Value.from(try realm.intrinsic(.intl_date_time_format_prototype)),
             .none,
         );
     }
@@ -439,7 +439,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -452,14 +452,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
+            Value.from(try realm.intrinsic(.intl_date_time_format)),
         );
 
         // 11.3.7 Intl.DateTimeFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.datetimeformat.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Intl.DateTimeFormat"),
             .{
                 .writable = false,
@@ -484,7 +484,7 @@ pub const prototype = struct {
         // 4. Let options be OrdinaryObjectCreate(%Object.prototype%).
         const options = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 5. For each row of Table 15, except the header row, in table order, do

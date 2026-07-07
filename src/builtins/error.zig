@@ -28,7 +28,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Error",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -41,7 +41,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Error.prototype%"()),
+            Value.from(try realm.intrinsic(.error_prototype)),
             .none,
         );
     }
@@ -62,7 +62,7 @@ pub const constructor = struct {
             Error,
             agent,
             new_target_,
-            "%Error.prototype%",
+            .error_prototype,
             .{
                 // Non-standard
                 .name = String.fromLiteral("Error"),
@@ -138,7 +138,7 @@ pub fn internalSet(
 /// https://tc39.es/ecma262/#sec-properties-of-the-error-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -147,7 +147,7 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Error%"()),
+            Value.from(try realm.intrinsic(.@"error")),
         );
 
         // 20.5.3.2 Error.prototype.message
@@ -215,7 +215,7 @@ pub const prototype = struct {
         // 4. Perform ? SetterThatIgnoresPrototypeProperties(this value, %Error.prototype%, "stack", v).
         try this_value.setterThatIgnoresPrototypeProperties(
             agent,
-            try realm.intrinsics.@"%Error.prototype%"(),
+            try realm.intrinsic(.error_prototype),
             PropertyKey.from("stack"),
             value,
         );
@@ -325,6 +325,17 @@ pub const uri_error = struct {
 /// 20.5.6.2 Properties of the NativeError Constructors
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-constructors
 fn MakeNativeErrorConstructor(comptime name: []const u8) type {
+    const namespace, const proto_intrinsic = std.StaticStringMap(
+        struct { type, Realm.Intrinsic },
+    ).initComptime(.{
+        .{ "EvalError", .{ eval_error, .eval_error_prototype } },
+        .{ "RangeError", .{ range_error, .range_error_prototype } },
+        .{ "ReferenceError", .{ reference_error, .reference_error_prototype } },
+        .{ "SyntaxError", .{ syntax_error, .syntax_error_prototype } },
+        .{ "TypeError", .{ type_error, .type_error_prototype } },
+        .{ "URIError", .{ uri_error, .uri_error_prototype } },
+    }).get(name).?;
+
     return struct {
         pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
             const builtin_function = try createBuiltinFunction(
@@ -332,20 +343,18 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 .{ .constructor = impl },
                 1,
                 name,
-                .{ .realm = realm, .proto = try realm.intrinsics.@"%Error%"() },
+                .{ .realm = realm, .proto = try realm.intrinsic(.@"error") },
             );
             return &builtin_function.object;
         }
 
         pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-            const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
-
             // 20.5.6.2.1 NativeError.prototype
             // https://tc39.es/ecma262/#sec-nativeerror.prototype
             try object.defineBuiltinPropertyWithAttributes(
                 agent,
                 "prototype",
-                Value.from(try prototypeFn(&realm.intrinsics)),
+                Value.from(try realm.intrinsic(proto_intrinsic)),
                 .none,
             );
         }
@@ -356,14 +365,6 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
             const message = arguments.get(0);
             const options = arguments.get(1);
 
-            const namespace = std.StaticStringMap(type).initComptime(.{
-                .{ "EvalError", eval_error },
-                .{ "RangeError", range_error },
-                .{ "ReferenceError", reference_error },
-                .{ "SyntaxError", syntax_error },
-                .{ "TypeError", type_error },
-                .{ "URIError", uri_error },
-            }).get(name).?;
             const T = @field(namespace, name);
 
             // 1. If NewTarget is undefined, let newTarget be the active function object; else let
@@ -376,7 +377,7 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
                 T,
                 agent,
                 new_target_,
-                "%" ++ name ++ ".prototype%",
+                proto_intrinsic,
                 .{
                     // Non-standard
                     .name = String.fromLiteral(name),
@@ -418,20 +419,27 @@ fn MakeNativeErrorConstructor(comptime name: []const u8) type {
 /// 20.5.6.3 Properties of the NativeError Prototype Objects
 /// https://tc39.es/ecma262/#sec-properties-of-the-nativeerror-prototype-objects
 fn MakeNativeErrorPrototype(comptime name: []const u8) type {
+    const ctor_intrinsic = std.StaticStringMap(Realm.Intrinsic).initComptime(.{
+        .{ "EvalError", .eval_error },
+        .{ "RangeError", .range_error },
+        .{ "ReferenceError", .reference_error },
+        .{ "SyntaxError", .syntax_error },
+        .{ "TypeError", .type_error },
+        .{ "URIError", .uri_error },
+    }).get(name).?;
+
     return struct {
         pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-            return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Error.prototype%"());
+            return ordinaryObjectCreate(agent, try realm.intrinsic(.error_prototype));
         }
 
         pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-            const constructorFn = @field(Realm.Intrinsics, "%" ++ name ++ "%");
-
             // 20.5.6.3.1 NativeError.prototype.constructor
             // https://tc39.es/ecma262/#sec-nativeerror.prototype.constructor
             try object.defineBuiltinProperty(
                 agent,
                 "constructor",
-                Value.from(try constructorFn(&realm.intrinsics)),
+                Value.from(try realm.intrinsic(ctor_intrinsic)),
             );
 
             // 20.5.6.3.2 NativeError.prototype.message

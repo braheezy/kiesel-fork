@@ -734,7 +734,7 @@ fn toPrimitiveImpl(self: Value, agent: *Agent, preferred_type: ?PreferredType) A
         // a. Let exoticToPrimitive be ? GetMethod(input, %Symbol.toPrimitive%).
         const maybe_exotic_to_primitive = try self.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.toPrimitive%"),
+            PropertyKey.from(agent.well_known_symbols.to_primitive),
         );
 
         // b. If exoticToPrimitive is not undefined, then
@@ -1235,7 +1235,7 @@ fn toObjectImpl(arg: Value, agent: *Agent) Agent.Error!*Object {
         .boolean => {
             const boolean = try builtins.Boolean.create(agent, .{
                 .fields = .{ .boolean_data = arg.asBoolean() },
-                .prototype = try realm.intrinsics.@"%Boolean.prototype%"(),
+                .prototype = try realm.intrinsic(.boolean_prototype),
             });
             return &boolean.object;
         },
@@ -1245,7 +1245,7 @@ fn toObjectImpl(arg: Value, agent: *Agent) Agent.Error!*Object {
         .number => {
             const number = try builtins.Number.create(agent, .{
                 .fields = .{ .number_data = arg.asNumber() },
-                .prototype = try realm.intrinsics.@"%Number.prototype%"(),
+                .prototype = try realm.intrinsic(.number_prototype),
             });
             return &number.object;
         },
@@ -1256,7 +1256,7 @@ fn toObjectImpl(arg: Value, agent: *Agent) Agent.Error!*Object {
             const string = try stringCreate(
                 agent,
                 arg.asString(),
-                try realm.intrinsics.@"%String.prototype%"(),
+                try realm.intrinsic(.string_prototype),
             );
             return &string.object;
         },
@@ -1266,7 +1266,7 @@ fn toObjectImpl(arg: Value, agent: *Agent) Agent.Error!*Object {
         .symbol => {
             const symbol = try builtins.Symbol.create(agent, .{
                 .fields = .{ .symbol_data = arg.asSymbol() },
-                .prototype = try realm.intrinsics.@"%Symbol.prototype%"(),
+                .prototype = try realm.intrinsic(.symbol_prototype),
             });
             return &symbol.object;
         },
@@ -1276,7 +1276,7 @@ fn toObjectImpl(arg: Value, agent: *Agent) Agent.Error!*Object {
         .big_int => {
             const big_int = try builtins.BigInt.create(agent, .{
                 .fields = .{ .big_int_data = arg.asBigInt() },
-                .prototype = try realm.intrinsics.@"%BigInt.prototype%"(),
+                .prototype = try realm.intrinsic(.big_int_prototype),
             });
             return &big_int.object;
         },
@@ -1434,7 +1434,7 @@ pub fn isRegExp(arg: Value, agent: *Agent) Agent.Error!bool {
     // 2. Let matcher be ? Get(arg, %Symbol.match%).
     const matcher = try obj.get(
         agent,
-        PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
+        PropertyKey.from(agent.well_known_symbols.match),
     );
 
     // 3. If matcher is not undefined, return ToBoolean(matcher).
@@ -1852,7 +1852,7 @@ pub fn instanceofOperator(value: Value, agent: *Agent, target: Value) Agent.Erro
     // 2. Let instOfHandler be ? GetMethod(target, %Symbol.hasInstance%).
     const maybe_instanceof_handler = try target.getMethod(
         agent,
-        PropertyKey.from(agent.well_known_symbols.@"%Symbol.hasInstance%"),
+        PropertyKey.from(agent.well_known_symbols.has_instance),
     );
 
     // 3. If instOfHandler is not undefined, then
@@ -1899,11 +1899,11 @@ pub fn synthesizePrototype(self: Value, agent: *Agent) std.mem.Allocator.Error!?
 
     return switch (self.type()) {
         .null, .undefined => null,
-        .boolean => try realm.intrinsics.@"%Boolean.prototype%"(),
-        .string => try realm.intrinsics.@"%String.prototype%"(),
-        .symbol => try realm.intrinsics.@"%Symbol.prototype%"(),
-        .number => try realm.intrinsics.@"%Number.prototype%"(),
-        .big_int => try realm.intrinsics.@"%BigInt.prototype%"(),
+        .boolean => try realm.intrinsic(.boolean_prototype),
+        .string => try realm.intrinsic(.string_prototype),
+        .symbol => try realm.intrinsic(.symbol_prototype),
+        .number => try realm.intrinsic(.number_prototype),
+        .big_int => try realm.intrinsic(.big_int_prototype),
         .object => null,
     };
 }

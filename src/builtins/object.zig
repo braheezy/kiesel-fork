@@ -35,7 +35,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Object",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -70,7 +70,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Object.prototype%"()),
+            Value.from(try realm.intrinsic(.object_prototype)),
             .none,
         );
     }
@@ -88,7 +88,7 @@ pub const constructor = struct {
                 Object,
                 agent,
                 new_target.?,
-                "%Object.prototype%",
+                .object_prototype,
                 {},
             );
             return Value.from(&obj.object);
@@ -98,7 +98,7 @@ pub const constructor = struct {
         if (value.isUndefined() or value.isNull()) {
             return Value.from(try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%Object.prototype%"(),
+                try realm.intrinsic(.object_prototype),
             ));
         }
 
@@ -332,7 +332,7 @@ pub const constructor = struct {
         // 3. Assert: obj is an extensible ordinary object with no own properties.
         const obj = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         const Captures = struct {
@@ -413,7 +413,7 @@ pub const constructor = struct {
         // 3. Let descs be OrdinaryObjectCreate(%Object.prototype%).
         const descs = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 4. For each element key of ownKeys, do
@@ -733,7 +733,7 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Object%"()),
+            Value.from(try realm.intrinsic(.object)),
         );
 
         if (build_options.enable_legacy) {
@@ -744,8 +744,8 @@ pub const prototype = struct {
             try object.defineBuiltinFunction(agent, "__lookupSetter__", __lookupSetter__, 1, realm);
         }
 
-        // Ensure function intrinsics are set right after the object is created
-        _ = try realm.intrinsics.@"%Object.prototype.toString%"();
+        // Ensure property intrinsics are looked up right after the object is created
+        _ = try realm.intrinsic(.object_prototype_to_string);
     }
 
     /// 20.1.3.2 Object.prototype.hasOwnProperty ( value )
@@ -875,7 +875,7 @@ pub const prototype = struct {
         // zig fmt: on
 
         // 15. Let tag be ? Get(obj, %Symbol.toStringTag%).
-        const tag_value = try obj.get(agent, PropertyKey.from(agent.well_known_symbols.@"%Symbol.toStringTag%"));
+        const tag_value = try obj.get(agent, PropertyKey.from(agent.well_known_symbols.to_string_tag));
 
         // 16. If tag is not a String, set tag to builtinTag.
         const tag = if (tag_value.isString()) tag_value.asString() else builtin_tag;

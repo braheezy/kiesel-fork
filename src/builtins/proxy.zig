@@ -1112,7 +1112,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "Proxy",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -1196,7 +1196,7 @@ pub const constructor = struct {
         // 5. Let result be OrdinaryObjectCreate(%Object.prototype%).
         const result = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 6. Perform ! CreateDataPropertyOrThrow(result, "proxy", proxy).

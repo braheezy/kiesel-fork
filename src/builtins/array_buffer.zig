@@ -70,7 +70,7 @@ pub fn allocateArrayBuffer(
         ArrayBuffer,
         agent,
         ctor,
-        "%ArrayBuffer.prototype%",
+        .array_buffer_prototype,
         .{
             .data_block = undefined,
             .byte_length = undefined,
@@ -186,7 +186,7 @@ pub fn arrayBufferCopyAndDetach(
     // 9. Let newBuffer be ? AllocateArrayBuffer(%ArrayBuffer%, newByteLength, newMaxByteLength).
     const new_buffer = try allocateArrayBuffer(
         agent,
-        try realm.intrinsics.@"%ArrayBuffer%"(),
+        try realm.intrinsic(.array_buffer),
         new_byte_length,
         new_max_byte_length,
     );
@@ -271,7 +271,7 @@ pub fn cloneArrayBuffer(
     // 2. Let targetBuffer be ? AllocateArrayBuffer(%ArrayBuffer%, sourceLength).
     const target_buffer = try allocateArrayBuffer(
         agent,
-        try realm.intrinsics.@"%ArrayBuffer%"(),
+        try realm.intrinsic(.array_buffer),
         source_length,
         .none,
     );
@@ -647,21 +647,21 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "ArrayBuffer",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "isView", isView, 1, realm);
-        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.species", @"Symbol.species", null, realm);
 
         // 25.1.5.2 ArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%ArrayBuffer.prototype%"()),
+            Value.from(try realm.intrinsic(.array_buffer_prototype)),
             .none,
         );
     }
@@ -712,7 +712,7 @@ pub const constructor = struct {
 
     /// 25.1.5.3 get ArrayBuffer [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-arraybuffer-%symbol.species%
-    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -722,7 +722,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-arraybuffer-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -740,14 +740,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%ArrayBuffer%"()),
+            Value.from(try realm.intrinsic(.array_buffer)),
         );
 
         // 25.1.6.10 ArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-arraybuffer.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("ArrayBuffer"),
             .{
                 .writable = false,
@@ -991,7 +991,7 @@ pub const prototype = struct {
         // 15. Let ctor be ? SpeciesConstructor(obj, %ArrayBuffer%).
         const ctor = try array_buffer.object.speciesConstructor(
             agent,
-            try realm.intrinsics.@"%ArrayBuffer%"(),
+            try realm.intrinsic(.array_buffer),
         );
 
         // 16. Let new be ? Construct(ctor, « 𝔽(newLength) »).

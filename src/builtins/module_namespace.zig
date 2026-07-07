@@ -334,7 +334,7 @@ pub fn moduleNamespaceCreate(
         // https://tc39.es/ecma262/#sec-%symbol.tostringtag%
         try namespace.object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Module"),
             .none,
         );

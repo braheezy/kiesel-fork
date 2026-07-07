@@ -26,7 +26,7 @@ pub fn createForInIterator(agent: *Agent, obj: *Object) std.mem.Allocator.Error!
     //    [[ObjectWasVisited]], [[VisitedKeys]], [[RemainingKeys]] »).
     // 6. Return iterator.
     return ForInIterator.create(agent, .{
-        .prototype = try realm.intrinsics.@"%ForInIteratorPrototype%"(),
+        .prototype = try realm.intrinsic(.for_in_iterator_prototype),
         .fields = .{
             .state = .{
                 // 2. Set iterator.[[Object]] to obj.
@@ -49,7 +49,7 @@ pub fn createForInIterator(agent: *Agent, obj: *Object) std.mem.Allocator.Error!
 /// https://tc39.es/ecma262/#sec-%foriniteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.iterator_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {

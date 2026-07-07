@@ -26,7 +26,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Symbol",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -37,7 +37,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "asyncIterator",
-            Value.from(agent.well_known_symbols.@"%Symbol.asyncIterator%"),
+            Value.from(agent.well_known_symbols.async_iterator),
             .none,
         );
 
@@ -48,7 +48,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "hasInstance",
-            Value.from(agent.well_known_symbols.@"%Symbol.hasInstance%"),
+            Value.from(agent.well_known_symbols.has_instance),
             .none,
         );
 
@@ -57,7 +57,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "isConcatSpreadable",
-            Value.from(agent.well_known_symbols.@"%Symbol.isConcatSpreadable%"),
+            Value.from(agent.well_known_symbols.is_concat_spreadable),
             .none,
         );
 
@@ -66,7 +66,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "iterator",
-            Value.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+            Value.from(agent.well_known_symbols.iterator),
             .none,
         );
 
@@ -77,7 +77,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "match",
-            Value.from(agent.well_known_symbols.@"%Symbol.match%"),
+            Value.from(agent.well_known_symbols.match),
             .none,
         );
 
@@ -86,7 +86,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "matchAll",
-            Value.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
+            Value.from(agent.well_known_symbols.match_all),
             .none,
         );
 
@@ -95,7 +95,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Symbol.prototype%"()),
+            Value.from(try realm.intrinsic(.symbol_prototype)),
             .none,
         );
 
@@ -104,7 +104,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "replace",
-            Value.from(agent.well_known_symbols.@"%Symbol.replace%"),
+            Value.from(agent.well_known_symbols.replace),
             .none,
         );
 
@@ -113,7 +113,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "search",
-            Value.from(agent.well_known_symbols.@"%Symbol.search%"),
+            Value.from(agent.well_known_symbols.search),
             .none,
         );
 
@@ -122,7 +122,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "species",
-            Value.from(agent.well_known_symbols.@"%Symbol.species%"),
+            Value.from(agent.well_known_symbols.species),
             .none,
         );
 
@@ -131,7 +131,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "split",
-            Value.from(agent.well_known_symbols.@"%Symbol.split%"),
+            Value.from(agent.well_known_symbols.split),
             .none,
         );
 
@@ -140,7 +140,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "toPrimitive",
-            Value.from(agent.well_known_symbols.@"%Symbol.toPrimitive%"),
+            Value.from(agent.well_known_symbols.to_primitive),
             .none,
         );
 
@@ -149,7 +149,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "toStringTag",
-            Value.from(agent.well_known_symbols.@"%Symbol.toStringTag%"),
+            Value.from(agent.well_known_symbols.to_string_tag),
             .none,
         );
 
@@ -158,7 +158,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "unscopables",
-            Value.from(agent.well_known_symbols.@"%Symbol.unscopables%"),
+            Value.from(agent.well_known_symbols.unscopables),
             .none,
         );
     }
@@ -234,7 +234,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -243,8 +243,8 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinFunctionWithAttributes(
             agent,
-            "%Symbol.toPrimitive%",
-            @"%Symbol.toPrimitive%",
+            "Symbol.toPrimitive",
+            @"Symbol.toPrimitive",
             1,
             realm,
             .{
@@ -259,14 +259,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Symbol%"()),
+            Value.from(try realm.intrinsic(.symbol)),
         );
 
         // 20.4.3.6 Symbol.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-symbol.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Symbol"),
             .{
                 .writable = false,
@@ -327,7 +327,7 @@ pub const prototype = struct {
 
     /// 20.4.3.5 Symbol.prototype [ %Symbol.toPrimitive% ] ( hint )
     /// https://tc39.es/ecma262/#sec-symbol.prototype-%symbol.toprimitive%
-    fn @"%Symbol.toPrimitive%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.toPrimitive"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return ? ThisSymbolValue(this value).
         // NOTE: The argument is ignored.
         return Value.from(try thisSymbolValue(agent, this_value));

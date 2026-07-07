@@ -232,13 +232,13 @@ fn doWait(
         // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         promise_capability = newPromiseCapability(
             agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         ) catch |err| try noexcept(err);
 
         // b. Let resultObj be OrdinaryObjectCreate(%Object.prototype%).
         result_obj = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
     }
 
@@ -403,7 +403,7 @@ fn atomicReadModifyWrite(
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -426,7 +426,7 @@ pub const namespace = struct {
         // https://tc39.es/ecma262/#sec-atomics-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Atomics"),
             .{
                 .writable = false,

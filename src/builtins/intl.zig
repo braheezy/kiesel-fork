@@ -61,7 +61,7 @@ pub const findBoundary = segmenter.findBoundary;
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -72,7 +72,7 @@ pub const namespace = struct {
         // https://tc39.es/ecma402/#sec-intl-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Intl"),
             .{
                 .writable = false,
@@ -86,7 +86,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "Collator",
-            Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
+            Value.from(try realm.intrinsic(.intl_collator)),
         );
 
         // 8.2.2 Intl.DateTimeFormat ( . . . )
@@ -94,7 +94,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "DateTimeFormat",
-            Value.from(try realm.intrinsics.@"%Intl.DateTimeFormat%"()),
+            Value.from(try realm.intrinsic(.intl_date_time_format)),
         );
 
         // 8.2.3 Intl.DisplayNames ( . . . )
@@ -102,7 +102,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "DisplayNames",
-            Value.from(try realm.intrinsics.@"%Intl.DisplayNames%"()),
+            Value.from(try realm.intrinsic(.intl_display_names)),
         );
 
         // 8.2.4 Intl.DurationFormat ( . . . )
@@ -110,7 +110,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "DurationFormat",
-            Value.from(try realm.intrinsics.@"%Intl.DurationFormat%"()),
+            Value.from(try realm.intrinsic(.intl_duration_format)),
         );
 
         // 8.2.5 Intl.ListFormat ( . . . )
@@ -118,7 +118,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "ListFormat",
-            Value.from(try realm.intrinsics.@"%Intl.ListFormat%"()),
+            Value.from(try realm.intrinsic(.intl_list_format)),
         );
 
         // 8.2.6 Intl.Locale ( . . . )
@@ -126,7 +126,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "Locale",
-            Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
+            Value.from(try realm.intrinsic(.intl_locale)),
         );
 
         // 8.2.7 Intl.NumberFormat ( . . . )
@@ -134,7 +134,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "NumberFormat",
-            Value.from(try realm.intrinsics.@"%Intl.NumberFormat%"()),
+            Value.from(try realm.intrinsic(.intl_number_format)),
         );
 
         // 8.2.8 Intl.PluralRules ( . . . )
@@ -142,7 +142,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "PluralRules",
-            Value.from(try realm.intrinsics.@"%Intl.PluralRules%"()),
+            Value.from(try realm.intrinsic(.intl_plural_rules)),
         );
 
         // 8.2.9 Intl.RelativeTimeFormat ( . . . )
@@ -150,7 +150,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "RelativeTimeFormat",
-            Value.from(try realm.intrinsics.@"%Intl.RelativeTimeFormat%"()),
+            Value.from(try realm.intrinsic(.intl_relative_time_format)),
         );
 
         // 8.2.10 Intl.Segmenter ( . . . )
@@ -158,7 +158,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "Segmenter",
-            Value.from(try realm.intrinsics.@"%Intl.Segmenter%"()),
+            Value.from(try realm.intrinsic(.intl_segmenter)),
         );
     }
 

@@ -144,7 +144,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Locale",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -155,7 +155,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Intl.Locale.prototype%"()),
+            Value.from(try realm.intrinsic(.intl_locale_prototype)),
             .none,
         );
     }
@@ -189,7 +189,7 @@ pub const constructor = struct {
             Locale,
             agent,
             new_target.?,
-            "%Intl.Locale.prototype%",
+            .intl_locale_prototype,
             .{ .locale = undefined },
         );
 
@@ -441,7 +441,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -466,14 +466,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Intl.Locale%"()),
+            Value.from(try realm.intrinsic(.intl_locale)),
         );
 
         // 15.3.24 Intl.Locale.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.locale.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Intl.Locale"),
             .{
                 .writable = false,
@@ -637,8 +637,8 @@ pub const prototype = struct {
         const new_locale = ordinaryCreateFromConstructor(
             Locale,
             agent,
-            try realm.intrinsics.@"%Intl.Locale%"(),
-            "%Intl.Locale.prototype%",
+            try realm.intrinsic(.intl_locale),
+            .intl_locale_prototype,
             .{ .locale = maximal },
         ) catch |err| try noexcept(err);
         return Value.from(&new_locale.object);
@@ -664,8 +664,8 @@ pub const prototype = struct {
         const new_locale = ordinaryCreateFromConstructor(
             Locale,
             agent,
-            try realm.intrinsics.@"%Intl.Locale%"(),
-            "%Intl.Locale.prototype%",
+            try realm.intrinsic(.intl_locale),
+            .intl_locale_prototype,
             .{ .locale = minimal },
         ) catch |err| try noexcept(err);
         return Value.from(&new_locale.object);

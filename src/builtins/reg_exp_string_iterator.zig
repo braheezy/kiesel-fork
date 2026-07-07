@@ -34,7 +34,7 @@ pub fn createRegExpStringIterator(
     // 1. Let iterator be OrdinaryObjectCreate(%RegExpStringIteratorPrototype%,
     //    « [[IteratingRegExp]], [[IteratedString]], [[Global]], [[Unicode]], [[Done]] »).
     const iterator = try RegExpStringIterator.create(agent, .{
-        .prototype = try realm.intrinsics.@"%RegExpStringIteratorPrototype%"(),
+        .prototype = try realm.intrinsic(.reg_exp_string_iterator_prototype),
         .fields = .{
             .state = .{
                 // 2. Set iterator.[[IteratingRegExp]] to regexp.
@@ -62,7 +62,7 @@ pub fn createRegExpStringIterator(
 /// https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.iterator_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -72,7 +72,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma262/#sec-%regexpstringiteratorprototype%-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("RegExp String Iterator"),
             .{
                 .writable = false,

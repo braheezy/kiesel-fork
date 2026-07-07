@@ -163,7 +163,7 @@ pub fn regExpCreate(agent: *Agent, pattern: Value, flags: Value) Agent.Error!*Re
     const realm = agent.currentRealm();
 
     // 1. Let obj be ! RegExpAlloc(%RegExp%).
-    const shape, _ = try realm.shapes.regExpObject();
+    const shape, _ = try realm.shape(.reg_exp_object);
     const regexp = try RegExp.createWithShape(agent, .{
         .shape = shape,
         .fields = .{
@@ -187,7 +187,7 @@ pub fn regExpCreateFast(
     }
     const re_bytecode = try compileRegexp(agent, pattern, flags);
     const realm = agent.currentRealm();
-    const shape, const offsets = try realm.shapes.regExpObject();
+    const shape, const offsets = try realm.shape(.reg_exp_object);
     const regexp = try RegExp.createWithShape(agent, .{
         .shape = shape,
         .fields = .{
@@ -196,7 +196,7 @@ pub fn regExpCreateFast(
             .re_bytecode = re_bytecode,
         },
     });
-    regexp.object.setValueAtPropertyOffset(offsets.lastIndex, Value.from(0));
+    regexp.object.setValueAtPropertyOffset(offsets.last_index, Value.from(0));
     return regexp;
 }
 
@@ -209,7 +209,7 @@ fn regExpAlloc(agent: *Agent, new_target: *Object) Agent.Error!*RegExp {
         RegExp,
         agent,
         new_target,
-        "%RegExp.prototype%",
+        .reg_exp_prototype,
         .{
             .original_source = undefined,
             .original_flags = undefined,
@@ -444,7 +444,7 @@ pub fn regExpBuiltinExec(agent: *Agent, regexp: *RegExp, string: *const String) 
     // 20. Let array be ! ArrayCreate(capturingGroupsCount + 1).
     // 21. Assert: The mathematical value of array's "length" property is capturingGroupsCount + 1.
     const realm = agent.currentRealm();
-    const array_shape, const array_offsets = try realm.shapes.regExpExecObject();
+    const array_shape, const array_offsets = try realm.shape(.reg_exp_exec_object);
     const array = try arrayCreateFastWithShape(agent, @intCast(capturing_groups_count + 1), array_shape);
     const array_indexed_properties = try array.object.ensureIndexedProperties(agent.gc_allocator);
 
@@ -775,21 +775,21 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "RegExp",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "escape", escape, 1, realm);
-        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.species", @"Symbol.species", null, realm);
 
         // 22.2.5.2 RegExp.prototype
         // https://tc39.es/ecma262/#sec-regexp.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%RegExp.prototype%"()),
+            Value.from(try realm.intrinsic(.reg_exp_prototype)),
             .none,
         );
     }
@@ -998,7 +998,7 @@ pub const constructor = struct {
 
     /// 22.2.5.3 get RegExp [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-regexp-%symbol.species%
-    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -1008,7 +1008,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-regexp-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -1020,13 +1020,13 @@ pub const prototype = struct {
         try object.defineBuiltinAccessor(agent, "global", global, null, realm);
         try object.defineBuiltinAccessor(agent, "hasIndices", hasIndices, null, realm);
         try object.defineBuiltinAccessor(agent, "ignoreCase", ignoreCase, null, realm);
-        try object.defineBuiltinFunction(agent, "%Symbol.match%", @"%Symbol.match%", 1, realm);
-        try object.defineBuiltinFunction(agent, "%Symbol.matchAll%", @"%Symbol.matchAll%", 1, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.match", @"Symbol.match", 1, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.matchAll", @"Symbol.matchAll", 1, realm);
         try object.defineBuiltinAccessor(agent, "multiline", multiline, null, realm);
-        try object.defineBuiltinFunction(agent, "%Symbol.replace%", @"%Symbol.replace%", 2, realm);
-        try object.defineBuiltinFunction(agent, "%Symbol.search%", @"%Symbol.search%", 1, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.replace", @"Symbol.replace", 2, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.search", @"Symbol.search", 1, realm);
         try object.defineBuiltinAccessor(agent, "source", source, null, realm);
-        try object.defineBuiltinFunction(agent, "%Symbol.split%", @"%Symbol.split%", 2, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.split", @"Symbol.split", 2, realm);
         try object.defineBuiltinAccessor(agent, "sticky", sticky, null, realm);
         try object.defineBuiltinFunction(agent, "test", @"test", 1, realm);
         try object.defineBuiltinFunction(agent, "toString", toString, 0, realm);
@@ -1038,7 +1038,7 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%RegExp%"()),
+            Value.from(try realm.intrinsic(.reg_exp)),
         );
 
         if (build_options.enable_annex_b) {
@@ -1160,7 +1160,7 @@ pub const prototype = struct {
             const realm = agent.currentRealm();
 
             // a. If SameValue(regexp, %RegExp.prototype%) is true, return undefined.
-            if (regexp_value.asObject() == try realm.intrinsics.@"%RegExp.prototype%"()) {
+            if (regexp_value.asObject() == try realm.intrinsic(.reg_exp_prototype)) {
                 return .undefined;
             }
 
@@ -1206,7 +1206,7 @@ pub const prototype = struct {
 
     /// 22.2.6.8 RegExp.prototype [ %Symbol.match% ] ( string )
     /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.match%
-    fn @"%Symbol.match%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    fn @"Symbol.match"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
         // 1. Let regexp be the this value.
@@ -1295,7 +1295,7 @@ pub const prototype = struct {
 
     /// 22.2.6.9 RegExp.prototype [ %Symbol.matchAll% ] ( string )
     /// https://tc39.es/ecma262/#sec-regexp-prototype-%symbol.matchall%
-    fn @"%Symbol.matchAll%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    fn @"Symbol.matchAll"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
         const realm = agent.currentRealm();
 
@@ -1312,7 +1312,7 @@ pub const prototype = struct {
         // 4. Let speciesCtor be ? SpeciesConstructor(regexp, %RegExp%).
         const species_ctor = try regexp.speciesConstructor(
             agent,
-            try realm.intrinsics.@"%RegExp%"(),
+            try realm.intrinsic(.reg_exp),
         );
 
         // 5. Let flags be ? ToString(? Get(regexp, "flags")).
@@ -1362,7 +1362,7 @@ pub const prototype = struct {
 
     /// 22.2.6.11 RegExp.prototype [ %Symbol.replace% ] ( string, replaceValue )
     /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.replace%
-    fn @"%Symbol.replace%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    fn @"Symbol.replace"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
         var replace_value = arguments.get(1);
 
@@ -1605,7 +1605,7 @@ pub const prototype = struct {
 
     /// 22.2.6.12 RegExp.prototype [ %Symbol.search% ] ( string )
     /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.search%
-    fn @"%Symbol.search%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    fn @"Symbol.search"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const string_value = arguments.get(0);
 
         // 1. Let regexp be the this value.
@@ -1659,7 +1659,7 @@ pub const prototype = struct {
             const realm = agent.currentRealm();
 
             // a. If SameValue(regexp, %RegExp.prototype%) is true, return "(?:)".
-            if (this_value.asObject() == try realm.intrinsics.@"%RegExp.prototype%"()) {
+            if (this_value.asObject() == try realm.intrinsic(.reg_exp_prototype)) {
                 return Value.from("(?:)");
             }
 
@@ -1708,7 +1708,7 @@ pub const prototype = struct {
 
     /// 22.2.6.14 RegExp.prototype [ %Symbol.split% ] ( string, limit )
     /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.split%
-    fn @"%Symbol.split%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    fn @"Symbol.split"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const string_value = arguments.get(0);
         const limit_value = arguments.get(1);
@@ -1726,7 +1726,7 @@ pub const prototype = struct {
         // 4. Let speciesCtor be ? SpeciesConstructor(regexp, %RegExp%).
         const species_ctor = try regexp.speciesConstructor(
             agent,
-            try realm.intrinsics.@"%RegExp%"(),
+            try realm.intrinsic(.reg_exp),
         );
 
         // 5. Let flags be ? ToString(? Get(regexp, "flags")).

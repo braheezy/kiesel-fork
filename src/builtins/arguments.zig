@@ -221,7 +221,7 @@ pub fn createUnmappedArgumentsObject(
     const length = arg_list.len;
 
     // 2. Let obj be OrdinaryObjectCreate(%Object.prototype%, « [[ParameterMap]] »).
-    const shape, const offsets = try realm.shapes.unmappedArgumentsObject();
+    const shape, const offsets = try realm.shape(.unmapped_arguments_object);
     const arguments = try Arguments.createWithShape(agent, .{
         .shape = shape,
         .fields = .{
@@ -252,16 +252,16 @@ pub fn createUnmappedArgumentsObject(
     //    [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false,
     //    [[Configurable]]: true }).
     arguments.object.setValueAtPropertyOffset(
-        offsets.@"%Symbol.iterator%",
-        Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
+        offsets.symbol_iterator,
+        Value.from(try realm.intrinsic(.array_prototype_values)),
     );
 
     // 8. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor {
     //    [[Getter]]: %ThrowTypeError%, [[Setter]]: %ThrowTypeError%, [[Enumerable]]: false,
     //    [[Configurable]]: false }).
     arguments.object.setAccessorAtPropertyOffset(offsets.callee, .{
-        .getter = try realm.intrinsics.@"%ThrowTypeError%"(),
-        .setter = try realm.intrinsics.@"%ThrowTypeError%"(),
+        .getter = try realm.intrinsic(.throw_type_error),
+        .setter = try realm.intrinsic(.throw_type_error),
     });
 
     // 9. Return obj.
@@ -296,7 +296,7 @@ pub fn createMappedArgumentsObject(
     // 8. Set obj.[[Delete]] as specified in 10.4.4.5.
     // 9. Set obj.[[Prototype]] to %Object.prototype%.
     // NOTE: This is done via the shape.
-    const shape, const offsets = try realm.shapes.mappedArgumentsObject();
+    const shape, const offsets = try realm.shape(.mapped_arguments_object);
     const arguments = try Arguments.createWithShape(agent, .{
         .shape = shape,
         .fields = .{
@@ -378,8 +378,8 @@ pub fn createMappedArgumentsObject(
     //     [[Value]]: %Array.prototype.values%, [[Writable]]: true, [[Enumerable]]: false,
     //     [[Configurable]]: true }).
     arguments.object.setValueAtPropertyOffset(
-        offsets.@"%Symbol.iterator%",
-        Value.from(try realm.intrinsics.@"%Array.prototype.values%"()),
+        offsets.symbol_iterator,
+        Value.from(try realm.intrinsic(.array_prototype_values)),
     );
 
     // 21. Perform ! DefinePropertyOrThrow(obj, "callee", PropertyDescriptor { [[Value]]: func,

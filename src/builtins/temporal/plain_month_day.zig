@@ -39,7 +39,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "PlainMonthDay",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -52,7 +52,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainMonthDay.prototype%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_month_day_prototype)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -140,7 +140,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plainmonthday-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -160,14 +160,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainMonthDay%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_month_day)),
         );
 
         // 10.3.2 Temporal.PlainMonthDay.prototype[ %Symbol.toStringTag% ]
         // https://tc39.es/proposal-temporal/#sec-temporal.plainmonthday.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Temporal.PlainMonthDay"),
             .{
                 .writable = false,
@@ -571,7 +571,7 @@ pub fn createTemporalMonthDay(
     // 1. If ISODateWithinLimits(isoDate) is false, throw a RangeError exception.
 
     // 2. If newTarget is not present, set newTarget to %Temporal.PlainMonthDay%.
-    const new_target = maybe_new_target orelse try realm.intrinsics.@"%Temporal.PlainMonthDay%"();
+    const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_plain_month_day);
 
     // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.PlainMonthDay.prototype%",
     //    « [[InitializedTemporalMonthDay]], [[ISODate]], [[Calendar]] »).
@@ -582,7 +582,7 @@ pub fn createTemporalMonthDay(
         PlainMonthDay,
         agent,
         new_target,
-        "%Temporal.PlainMonthDay.prototype%",
+        .temporal_plain_month_day_prototype,
         .{ .inner = inner },
     );
 }

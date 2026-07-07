@@ -148,7 +148,7 @@ pub fn loadRequestedModules(
     // 2. Return ! PromiseResolve(%Promise%, undefined).
     const promise = promiseResolve(
         agent,
-        try realm.intrinsics.@"%Promise%"(),
+        try realm.intrinsic(.promise),
         .undefined,
     ) catch |err| try noexcept(err);
     return promise.as(builtins.Promise);
@@ -266,7 +266,7 @@ pub fn evaluate(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!*
     // 13. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
         agent,
-        Value.from(try realm.intrinsics.@"%Promise%"()),
+        Value.from(try realm.intrinsic(.promise)),
     ) catch |err| try noexcept(err);
 
     // 14. IfAbruptRejectPromise(result, promiseCapability).

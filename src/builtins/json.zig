@@ -52,7 +52,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
             const realm = agent.currentRealm();
             const obj = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%Object.prototype%"(),
+                try realm.intrinsic(.object_prototype),
             );
             var it = x.iterator();
             while (it.next()) |entry| {
@@ -312,7 +312,7 @@ fn internalizeJSONProperty(
     // 2. Let context be OrdinaryObjectCreate(%Object.prototype%).
     const context = try ordinaryObjectCreate(
         agent,
-        try realm.intrinsics.@"%Object.prototype%"(),
+        try realm.intrinsic(.object_prototype),
     );
 
     const records: union(enum) {
@@ -924,7 +924,7 @@ fn serializeJSONArray(
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -932,7 +932,7 @@ pub const namespace = struct {
         // https://tc39.es/ecma262/#sec-json-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("JSON"),
             .{
                 .writable = false,
@@ -979,7 +979,7 @@ pub const namespace = struct {
         // 5. Let root be OrdinaryObjectCreate(%Object.prototype%).
         const root = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 6. Let rootName be the empty String.
@@ -1183,7 +1183,7 @@ pub const namespace = struct {
         // 10. Let wrapper be OrdinaryObjectCreate(%Object.prototype%).
         const wrapper = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 11. Perform ! CreateDataPropertyOrThrow(wrapper, the empty String, value).

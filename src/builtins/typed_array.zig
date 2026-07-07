@@ -169,6 +169,40 @@ pub const ElementType = enum {
         };
     }
 
+    pub inline fn constructorIntrinsic(self: ElementType) Realm.Intrinsic {
+        return switch (self) {
+            .int8 => .int8_array,
+            .uint8 => .uint8_array,
+            .uint8_clamped => .uint8_clamped_array,
+            .int16 => .int16_array,
+            .uint16 => .uint16_array,
+            .int32 => .int32_array,
+            .uint32 => .uint32_array,
+            .bigint64 => .big_int64_array,
+            .biguint64 => .big_uint64_array,
+            .float16 => .float16_array,
+            .float32 => .float32_array,
+            .float64 => .float64_array,
+        };
+    }
+
+    pub inline fn prototypeIntrinsic(self: ElementType) Realm.Intrinsic {
+        return switch (self) {
+            .int8 => .int8_array_prototype,
+            .uint8 => .uint8_array_prototype,
+            .uint8_clamped => .uint8_clamped_array_prototype,
+            .int16 => .int16_array_prototype,
+            .uint16 => .uint16_array_prototype,
+            .int32 => .int32_array_prototype,
+            .uint32 => .uint32_array_prototype,
+            .bigint64 => .big_int64_array_prototype,
+            .biguint64 => .big_uint64_array_prototype,
+            .float16 => .float16_array_prototype,
+            .float32 => .float32_array_prototype,
+            .float64 => .float64_array_prototype,
+        };
+    }
+
     pub fn conversationOperation(
         comptime self: ElementType,
     ) fn (Value, *Agent) Agent.Error!self.type() {
@@ -732,7 +766,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "TypedArray",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -740,14 +774,14 @@ pub const constructor = struct {
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "from", from, 1, realm);
         try object.defineBuiltinFunction(agent, "of", of, 0, realm);
-        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.species", @"Symbol.species", null, realm);
 
         // 23.2.2.3 %TypedArray%.prototype
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%TypedArray.prototype%"()),
+            Value.from(try realm.intrinsic(.typed_array_prototype)),
             .none,
         );
     }
@@ -796,7 +830,7 @@ pub const constructor = struct {
         // 5. Let usingIterator be ? GetMethod(source, %Symbol.iterator%).
         const using_iterator = try source.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+            PropertyKey.from(agent.well_known_symbols.iterator),
         );
 
         // 6. If usingIterator is not undefined, then
@@ -942,7 +976,7 @@ pub const constructor = struct {
 
     /// 23.2.2.4 get %TypedArray% [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-%typedarray%-%symbol.species%
-    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -952,7 +986,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-%typedarrayprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -990,24 +1024,24 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "toSorted", toSorted, 1, realm);
         try object.defineBuiltinFunction(agent, "values", values, 0, realm);
         try object.defineBuiltinFunction(agent, "with", with, 2, realm);
-        try object.defineBuiltinAccessor(agent, "%Symbol.toStringTag%", @"%Symbol.toStringTag%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.toStringTag", @"Symbol.toStringTag", null, realm);
 
         // 23.2.3.5 %TypedArray%.prototype.constructor
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype.constructor
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%TypedArray%"()),
+            Value.from(try realm.intrinsic(.typed_array)),
         );
 
         // 23.2.3.34 %TypedArray%.prototype.toString ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype.tostring
-        try object.defineBuiltinProperty(agent, "toString", Value.from(try realm.intrinsics.@"%Array.prototype.toString%"()));
+        try object.defineBuiltinProperty(agent, "toString", Value.from(try realm.intrinsic(.array_prototype_to_string)));
 
         // 23.2.3.37 %TypedArray%.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-%typedarray%.prototype-%symbol.iterator%
-        const @"%TypedArray.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
-        try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%TypedArray.prototype.values%");
+        const typed_array_prototype_values = object.getPropertyValueDirect(PropertyKey.from("values"));
+        try object.defineBuiltinProperty(agent, "Symbol.iterator", typed_array_prototype_values);
     }
 
     /// 23.2.3.1 %TypedArray%.prototype.at ( index )
@@ -3166,7 +3200,7 @@ pub const prototype = struct {
 
     /// 23.2.3.38 get %TypedArray%.prototype [ %Symbol.toStringTag% ]
     /// https://tc39.es/ecma262/#sec-get-%typedarray%.prototype-%symbol.tostringtag%
-    fn @"%Symbol.toStringTag%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.toStringTag"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, return undefined.
         // 3. If obj does not have a [[TypedArrayName]] internal slot, return undefined.
@@ -3233,10 +3267,7 @@ fn typedArrayCreateSameType(
     // 1. Let ctor be the intrinsic object associated with the constructor name
     //    exemplar.[[TypedArrayName]] in Table 71.
     const ctor = switch (exemplar.fields.element_type) {
-        inline else => |element_type| blk: {
-            const name = element_type.typedArrayName();
-            break :blk try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
-        },
+        inline else => |element_type| try realm.intrinsic(element_type.constructorIntrinsic()),
     };
 
     // 2. Let result be ? TypedArrayCreateFromConstructor(ctor, « 𝔽(length) »).
@@ -3266,10 +3297,7 @@ fn typedArraySpeciesCreate(
     // 1. Let defaultCtor be the intrinsic object associated with the constructor name
     //    exemplar.[[TypedArrayName]] in Table 71.
     const default_ctor = switch (exemplar.fields.element_type) {
-        inline else => |element_type| blk: {
-            const name = element_type.typedArrayName();
-            break :blk try @field(Realm.Intrinsics, "%" ++ name ++ "%")(&realm.intrinsics);
-        },
+        inline else => |element_type| try realm.intrinsic(element_type.constructorIntrinsic()),
     };
 
     // 2. Let ctor be ? SpeciesConstructor(exemplar, defaultCtor).
@@ -3388,11 +3416,11 @@ pub fn allocateTypedArray(
     agent: *Agent,
     comptime element_type: ElementType,
     new_target: *Object,
-    comptime default_prototype: []const u8,
+    comptime default_proto: Realm.Intrinsic,
     maybe_length: OptionalArrayLength,
 ) Agent.Error!*TypedArray {
     // 1. Let proto be ? GetPrototypeFromConstructor(newTarget, defaultProto).
-    const proto = try getPrototypeFromConstructor(agent, new_target, default_prototype);
+    const proto = try getPrototypeFromConstructor(agent, new_target, default_proto);
 
     // 2. Let obj be TypedArrayCreate(proto).
     // 3. Assert: obj.[[ViewedArrayBuffer]] is undefined.
@@ -3535,7 +3563,7 @@ fn initializeTypedArrayFromTypedArray(
         // a. Let data be ? AllocateArrayBuffer(%ArrayBuffer%, byteLength).
         const array_buffer = try allocateArrayBuffer(
             agent,
-            try realm.intrinsics.@"%ArrayBuffer%"(),
+            try realm.intrinsic(.array_buffer),
             byte_length,
             .none,
         );
@@ -3844,7 +3872,7 @@ fn allocateTypedArrayBuffer(
     // 4. Let data be ? AllocateArrayBuffer(%ArrayBuffer%, byteLength).
     const array_buffer = try allocateArrayBuffer(
         agent,
-        try realm.intrinsics.@"%ArrayBuffer%"(),
+        try realm.intrinsic(.array_buffer),
         byte_length,
         .none,
     );
@@ -4135,6 +4163,7 @@ fn fromHexImpl(
 /// https://tc39.es/ecma262/#sec-properties-of-the-typedarray-constructors
 fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
     const name = element_type.typedArrayName();
+    const proto_intrinsic = element_type.prototypeIntrinsic();
     return struct {
         pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
             const builtin_function = try createBuiltinFunction(
@@ -4142,14 +4171,12 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 .{ .constructor = impl },
                 3,
                 name,
-                .{ .realm = realm, .proto = try realm.intrinsics.@"%TypedArray%"() },
+                .{ .realm = realm, .proto = try realm.intrinsic(.typed_array) },
             );
             return &builtin_function.object;
         }
 
         pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-            const prototypeFn = @field(Realm.Intrinsics, "%" ++ name ++ ".prototype%");
-
             // 23.2.6.1 TypedArray.BYTES_PER_ELEMENT
             // https://tc39.es/ecma262/#sec-typedarray.bytes_per_element
             try object.defineBuiltinPropertyWithAttributes(
@@ -4164,7 +4191,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             try object.defineBuiltinPropertyWithAttributes(
                 agent,
                 "prototype",
-                Value.from(try prototypeFn(&realm.intrinsics)),
+                Value.from(try realm.intrinsic(proto_intrinsic)),
                 .none,
             );
 
@@ -4188,9 +4215,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 
             // 2. Let ctorName be the String value of the Constructor Name value specified in Table
             //    71 for this TypedArray constructor.
-
             // 3. Let proto be `"%TypedArray.prototype%"`.
-            const proto = "%" ++ name ++ ".prototype%";
 
             // 4. Let numberOfArgs be the number of elements in args.
             const number_of_args = arguments.count();
@@ -4201,7 +4226,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     agent,
                     element_type,
                     new_target.?,
-                    proto,
+                    proto_intrinsic,
                     @enumFromInt(0),
                 );
                 return Value.from(&typed_array.object);
@@ -4217,7 +4242,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     agent,
                     element_type,
                     new_target.?,
-                    proto,
+                    proto_intrinsic,
                     .none,
                 );
 
@@ -4261,7 +4286,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     // ii. Let usingIterator be ? GetMethod(firstArg, %Symbol.iterator%).
                     const using_iterator = try first_arg.getMethod(
                         agent,
-                        PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+                        PropertyKey.from(agent.well_known_symbols.iterator),
                     );
 
                     // iii. If usingIterator is not undefined, then
@@ -4306,7 +4331,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 agent,
                 element_type,
                 new_target.?,
-                proto,
+                proto_intrinsic,
                 element_length.toOptional(),
             );
             return Value.from(&typed_array.object);
@@ -4383,8 +4408,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             const typed_array = try allocateTypedArray(
                 agent,
                 .uint8,
-                try realm.intrinsics.@"%Uint8Array%"(),
-                "%Uint8Array.prototype%",
+                try realm.intrinsic(.uint8_array),
+                .uint8_array_prototype,
                 result_length,
             );
 
@@ -4436,8 +4461,8 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             const typed_array = try allocateTypedArray(
                 agent,
                 .uint8,
-                try realm.intrinsics.@"%Uint8Array%"(),
-                "%Uint8Array.prototype%",
+                try realm.intrinsic(.uint8_array),
+                .uint8_array_prototype,
                 result_length,
             );
 
@@ -4461,10 +4486,10 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
 /// 23.2.7 Properties of the TypedArray Prototype Objects
 /// https://tc39.es/ecma262/#sec-properties-of-typedarray-prototype-objects
 fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
-    const name = element_type.typedArrayName();
+    const ctor_intrinsic = element_type.constructorIntrinsic();
     return struct {
         pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-            return ordinaryObjectCreate(agent, try realm.intrinsics.@"%TypedArray.prototype%"());
+            return ordinaryObjectCreate(agent, try realm.intrinsic(.typed_array_prototype));
         }
 
         pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -4477,14 +4502,12 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 .none,
             );
 
-            const constructorFn = @field(Realm.Intrinsics, "%" ++ name ++ "%");
-
             // 23.2.7.2 TypedArray.prototype.constructor
             // https://tc39.es/ecma262/#sec-typedarray.prototype.constructor
             try object.defineBuiltinProperty(
                 agent,
                 "constructor",
-                Value.from(try constructorFn(&realm.intrinsics)),
+                Value.from(try realm.intrinsic(ctor_intrinsic)),
             );
 
             if (element_type == .uint8) {
@@ -4597,7 +4620,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 21. Let resultObj be OrdinaryObjectCreate(%Object.prototype%).
             const result_obj = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%Object.prototype%"(),
+                try realm.intrinsic(.object_prototype),
             );
 
             // 22. Perform ! CreateDataPropertyOrThrow(resultObj, "read", 𝔽(result.[[Read]])).
@@ -4676,7 +4699,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 14. Let resultObj be OrdinaryObjectCreate(%Object.prototype%).
             const result_obj = try ordinaryObjectCreate(
                 agent,
-                try realm.intrinsics.@"%Object.prototype%"(),
+                try realm.intrinsic(.object_prototype),
             );
 
             // 15. Perform ! CreateDataPropertyOrThrow(resultObj, "read", 𝔽(result.[[Read]])).

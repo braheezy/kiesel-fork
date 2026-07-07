@@ -878,7 +878,7 @@ pub fn ordinaryObjectCreate(agent: *Agent, proto: ?*Object) std.mem.Allocator.Er
 
 pub fn ordinaryObjectCreateFast(agent: *Agent) std.mem.Allocator.Error!*Object {
     const realm = agent.currentRealm();
-    const shape = try realm.shapes.ordinaryObject();
+    const shape = try realm.shape(.ordinary_object);
     const object = try builtins.Object.createWithShape(agent, .{ .shape = shape });
     return &object.object;
 }
@@ -912,13 +912,12 @@ pub fn ordinaryCreateFromConstructor(
     comptime T: type,
     agent: *Agent,
     ctor: *Object,
-    comptime intrinsic_default_proto: []const u8,
+    comptime intrinsic_default_proto: Realm.Intrinsic,
     fields: T.Fields,
 ) Agent.Error!*T {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
     //    corresponding object must be an intrinsic that is intended to be used as the [[Prototype]]
     //    value of an object.
-    comptime std.debug.assert(@hasDecl(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? GetPrototypeFromConstructor(ctor, intrinsicDefaultProto).
     const proto = try getPrototypeFromConstructor(agent, ctor, intrinsic_default_proto);
@@ -934,12 +933,11 @@ pub fn ordinaryCreateFromConstructor(
 pub fn getPrototypeFromConstructor(
     agent: *Agent,
     ctor: *Object,
-    comptime intrinsic_default_proto: []const u8,
+    comptime intrinsic_default_proto: Realm.Intrinsic,
 ) Agent.Error!*Object {
     // 1. Assert: intrinsicDefaultProto is this specification's name of an intrinsic object. The
     //    corresponding object must be an intrinsic that is intended to be used as the [[Prototype]]
     //    value of an object.
-    comptime std.debug.assert(@hasDecl(Realm.Intrinsics, intrinsic_default_proto));
 
     // 2. Let proto be ? Get(ctor, "prototype").
     const proto_value = try ctor.get(agent, PropertyKey.from("prototype"));
@@ -953,7 +951,7 @@ pub fn getPrototypeFromConstructor(
             const realm = try ctor.getFunctionRealm(agent);
 
             // b. Set proto to realm's intrinsic object named intrinsicDefaultProto.
-            break :blk try @field(Realm.Intrinsics, intrinsic_default_proto)(&realm.intrinsics);
+            break :blk try realm.intrinsic(intrinsic_default_proto);
         },
     };
 

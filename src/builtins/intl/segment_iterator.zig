@@ -32,7 +32,7 @@ pub fn createSegmentIterator(
     //    [[IteratedStringNextSegmentCodeUnitIndex]] ».
     // 2. Let iterator be OrdinaryObjectCreate(%IntlSegmentIteratorPrototype%, internalSlotsList).
     const iterator = SegmentIterator.create(agent, .{
-        .prototype = try realm.intrinsics.@"%IntlSegmentIteratorPrototype%"(),
+        .prototype = try realm.intrinsic(.intl_segment_iterator_prototype),
         .fields = .{
             // 3. Set iterator.[[IteratingSegmenter]] to segmenter.
             .iterating_segmenter = segmenter,
@@ -53,7 +53,7 @@ pub fn createSegmentIterator(
 /// https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.iterator_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -63,7 +63,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma402/#sec-%intlsegmentiteratorprototype%.%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Segmenter String Iterator"),
             .{
                 .writable = false,
@@ -155,7 +155,7 @@ pub fn createSegmentDataObject(
     std.debug.assert(start_index < end_index);
 
     // 4. Let result be OrdinaryObjectCreate(%Object.prototype%).
-    const result = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+    const result = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
 
     // 5. Let segment be the substring of string from startIndex to endIndex.
     const segment = try string.substring(agent, start_index, end_index);

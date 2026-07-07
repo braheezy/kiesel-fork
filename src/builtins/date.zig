@@ -861,7 +861,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             7,
             "Date",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -876,7 +876,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Date.prototype%"()),
+            Value.from(try realm.intrinsic(.date_prototype)),
             .none,
         );
     }
@@ -983,7 +983,7 @@ pub const constructor = struct {
             Date,
             agent,
             new_target.?,
-            "%Date.prototype%",
+            .date_prototype,
             .{
                 // 7. Set obj.[[DateValue]] to dv.
                 .date_value = date_value,
@@ -1060,7 +1060,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-date-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -1109,8 +1109,8 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
         try object.defineBuiltinFunctionWithAttributes(
             agent,
-            "%Symbol.toPrimitive%",
-            @"%Symbol.toPrimitive%",
+            "Symbol.toPrimitive",
+            @"Symbol.toPrimitive",
             1,
             realm,
             .{
@@ -1125,7 +1125,7 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Date%"()),
+            Value.from(try realm.intrinsic(.date)),
         );
 
         if (build_options.enable_annex_b) {
@@ -1134,8 +1134,8 @@ pub const prototype = struct {
 
             // B.2.3.3 Date.prototype.toGMTString ( )
             // https://tc39.es/ecma262/#sec-date.prototype.togmtstring
-            const @"%Date.prototype.toUTCString%" = object.getPropertyValueDirect(PropertyKey.from("toUTCString"));
-            try object.defineBuiltinProperty(agent, "toGMTString", @"%Date.prototype.toUTCString%");
+            const date_prototype_to_utc_string = object.getPropertyValueDirect(PropertyKey.from("toUTCString"));
+            try object.defineBuiltinProperty(agent, "toGMTString", date_prototype_to_utc_string);
         }
 
         if (build_options.enable_temporal) {
@@ -2269,7 +2269,7 @@ pub const prototype = struct {
         //    date, date).
         const date_format = try builtins.intl.date_time_format.createDateTimeFormat(
             agent,
-            try realm.intrinsics.@"%Intl.DateTimeFormat%"(),
+            try realm.intrinsic(.intl_date_time_format),
             locales,
             options,
             .date,
@@ -2318,7 +2318,7 @@ pub const prototype = struct {
         //    all).
         const date_format = try builtins.intl.date_time_format.createDateTimeFormat(
             agent,
-            try realm.intrinsics.@"%Intl.DateTimeFormat%"(),
+            try realm.intrinsic(.intl_date_time_format),
             locales,
             options,
             .any,
@@ -2367,7 +2367,7 @@ pub const prototype = struct {
         //    time, time).
         const time_format = try builtins.intl.date_time_format.createDateTimeFormat(
             agent,
-            try realm.intrinsics.@"%Intl.DateTimeFormat%"(),
+            try realm.intrinsic(.intl_date_time_format),
             locales,
             options,
             .time,
@@ -2520,7 +2520,7 @@ pub const prototype = struct {
 
     /// 21.4.4.45 Date.prototype [ %Symbol.toPrimitive% ] ( hint )
     /// https://tc39.es/ecma262/#sec-date.prototype-%symbol.toprimitive%
-    fn @"%Symbol.toPrimitive%"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+    fn @"Symbol.toPrimitive"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const hint_value = arguments.get(0);
 
         // 1. Let obj be the this value.

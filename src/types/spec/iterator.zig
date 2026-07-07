@@ -313,7 +313,7 @@ pub fn getIterator(
         // a. Let method be ? GetMethod(obj, %Symbol.asyncIterator%).
         const method = try object.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.asyncIterator%"),
+            PropertyKey.from(agent.well_known_symbols.async_iterator),
         );
 
         // b. If method is undefined, then
@@ -321,7 +321,7 @@ pub fn getIterator(
             // i. Let syncMethod be ? GetMethod(obj, %Symbol.iterator%).
             const sync_method = try object.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+                PropertyKey.from(agent.well_known_symbols.iterator),
             ) orelse {
                 // ii. If syncMethod is undefined, throw a TypeError exception.
                 return agent.throwException(
@@ -344,7 +344,7 @@ pub fn getIterator(
         // a. Let method be ? GetMethod(obj, %Symbol.iterator%).
         break :blk try object.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+            PropertyKey.from(agent.well_known_symbols.iterator),
         );
     }) orelse {
         // 3. If method is undefined, throw a TypeError exception.
@@ -386,7 +386,7 @@ pub fn getIteratorFlattenable(
     // 2. Let method be ? GetMethod(obj, %Symbol.iterator%).
     const method = try object.getMethod(
         agent,
-        PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+        PropertyKey.from(agent.well_known_symbols.iterator),
     );
 
     // 3. If method is undefined, then
@@ -418,7 +418,7 @@ pub fn createIteratorResultObject(
     const realm = agent.currentRealm();
 
     // 1. Let obj be OrdinaryObjectCreate(%Object.prototype%).
-    const obj = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+    const obj = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
 
     // 2. Perform ! CreateDataPropertyOrThrow(obj, "value", value).
     try obj.createDataPropertyDirect(agent, PropertyKey.from("value"), value);

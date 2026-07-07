@@ -1819,7 +1819,7 @@ fn executeCallDirectEval(
     }
 
     const realm = vm.agent.currentRealm();
-    const eval = try realm.intrinsics.@"%eval%"();
+    const eval = try realm.intrinsic(.eval);
 
     const result = if (callee_value.sameValue(Value.from(eval)))
         try directEval(vm.agent, args_list.items, strict)

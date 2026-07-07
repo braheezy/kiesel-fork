@@ -28,7 +28,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Number",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -100,13 +100,13 @@ pub const constructor = struct {
         // 21.1.2.12 Number.parseFloat ( string )
         // https://tc39.es/ecma262/#sec-number.parsefloat
         try object.defineBuiltinProperty(agent, "parseFloat", Value.from(
-            try realm.intrinsics.@"%parseFloat%"(),
+            try realm.intrinsic(.parse_float),
         ));
 
         // 21.1.2.13 Number.parseInt ( string, radix )
         // https://tc39.es/ecma262/#sec-number.parseint
         try object.defineBuiltinProperty(agent, "parseInt", Value.from(
-            try realm.intrinsics.@"%parseInt%"(),
+            try realm.intrinsic(.parse_int),
         ));
 
         // 21.1.2.14 Number.POSITIVE_INFINITY
@@ -128,7 +128,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Number.prototype%"()),
+            Value.from(try realm.intrinsic(.number_prototype)),
             .none,
         );
     }
@@ -167,7 +167,7 @@ pub const constructor = struct {
             Number,
             agent,
             new_target.?,
-            "%Number.prototype%",
+            .number_prototype,
             .{
                 // 5. Set obj.[[NumberData]] to n.
                 .number_data = n,
@@ -246,7 +246,7 @@ pub const prototype = struct {
             .fields = .{
                 .number_data = types.Number.from(0),
             },
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+            .prototype = try realm.intrinsic(.object_prototype),
         });
         return &number.object;
     }
@@ -264,7 +264,7 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Number%"()),
+            Value.from(try realm.intrinsic(.number)),
         );
     }
 

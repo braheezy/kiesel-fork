@@ -61,7 +61,7 @@ pub fn extractResult(agent: *Agent, result: anytype) Agent.Error!temporal_rs.Suc
 
 pub const namespace = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -69,7 +69,7 @@ pub const namespace = struct {
         // https://tc39.es/proposal-temporal/#sec-temporal-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Temporal"),
             .{
                 .writable = false,
@@ -83,7 +83,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "Duration",
-            Value.from(try realm.intrinsics.@"%Temporal.Duration%"()),
+            Value.from(try realm.intrinsic(.temporal_duration)),
         );
 
         // 1.2.1 Temporal.Instant ( . . . )
@@ -91,7 +91,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "Instant",
-            Value.from(try realm.intrinsics.@"%Temporal.Instant%"()),
+            Value.from(try realm.intrinsic(.temporal_instant)),
         );
 
         // 1.2.3 Temporal.PlainDate ( . . . )
@@ -99,7 +99,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "PlainDate",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainDate%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_date)),
         );
 
         // 1.2.2 Temporal.PlainDateTime ( . . . )
@@ -107,7 +107,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "PlainDateTime",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainDateTime%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_date_time)),
         );
 
         // 1.2.6 Temporal.PlainMonthDay ( . . . )
@@ -115,7 +115,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "PlainMonthDay",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainMonthDay%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_month_day)),
         );
 
         // 1.2.4 Temporal.PlainTime ( . . . )
@@ -123,7 +123,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "PlainTime",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainTime%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_time)),
         );
 
         // 1.2.5 Temporal.PlainYearMonth ( . . . )
@@ -131,7 +131,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "PlainYearMonth",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainYearMonth%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_year_month)),
         );
 
         // 1.2.8 Temporal.ZonedDateTime ( . . . )
@@ -139,7 +139,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "ZonedDateTime",
-            Value.from(try realm.intrinsics.@"%Temporal.ZonedDateTime%"()),
+            Value.from(try realm.intrinsic(.temporal_zoned_date_time)),
         );
 
         // 1.3.1 Temporal.Now
@@ -147,7 +147,7 @@ pub const namespace = struct {
         try object.defineBuiltinProperty(
             agent,
             "Now",
-            Value.from(try realm.intrinsics.@"%Temporal.Now%"()),
+            Value.from(try realm.intrinsic(.temporal_now)),
         );
     }
 };

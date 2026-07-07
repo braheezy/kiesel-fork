@@ -55,7 +55,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             3,
             "PlainDateTime",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -69,7 +69,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainDateTime.prototype%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_date_time_prototype)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -212,7 +212,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plaindatetime-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -260,14 +260,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainDateTime%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_date_time)),
         );
 
         // 5.3.2 Temporal.PlainDateTime.prototype[ %Symbol.toStringTag% ]
         // https://tc39.es/proposal-temporal/#sec-temporal.plaindatetime.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Temporal.PlainDateTime"),
             .{
                 .writable = false,
@@ -1194,7 +1194,7 @@ pub fn createTemporalDateTime(
     //     a. Throw a RangeError exception.
 
     // 2. If newTarget is not present, set newTarget to %Temporal.PlainDateTime%.
-    const new_target = maybe_new_target orelse try realm.intrinsics.@"%Temporal.PlainDateTime%"();
+    const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_plain_date_time);
 
     // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.PlainDateTime.prototype%",
     //    « [[InitializedTemporalDateTime]], [[ISODateTime]], [[Calendar]] »).
@@ -1205,7 +1205,7 @@ pub fn createTemporalDateTime(
         PlainDateTime,
         agent,
         new_target,
-        "%Temporal.PlainDateTime.prototype%",
+        .temporal_plain_date_time_prototype,
         .{ .inner = inner },
     );
 }

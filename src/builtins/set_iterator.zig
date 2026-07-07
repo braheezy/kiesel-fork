@@ -36,7 +36,7 @@ pub fn createSetIterator(
     // 3. Return CreateIteratorFromClosure(closure, "%SetIteratorPrototype%",
     //    %SetIteratorPrototype%).
     return SetIterator.create(agent, .{
-        .prototype = try realm.intrinsics.@"%SetIteratorPrototype%"(),
+        .prototype = try realm.intrinsic(.set_iterator_prototype),
         .fields = .{ .state = .{ .set = set, .kind = kind, .index = 0 } },
     });
 }
@@ -45,7 +45,7 @@ pub fn createSetIterator(
 /// https://tc39.es/ecma262/#sec-%setiteratorprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Iterator.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.iterator_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -55,7 +55,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma262/#sec-%setiteratorprototype%-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Set Iterator"),
             .{
                 .writable = false,

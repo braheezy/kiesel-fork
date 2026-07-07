@@ -25,7 +25,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Boolean",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -36,7 +36,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Boolean.prototype%"()),
+            Value.from(try realm.intrinsic(.boolean_prototype)),
             .none,
         );
     }
@@ -58,7 +58,7 @@ pub const constructor = struct {
             Boolean,
             agent,
             new_target.?,
-            "%Boolean.prototype%",
+            .boolean_prototype,
             .{
                 // 4. Set obj.[[BooleanData]] to bool.
                 .boolean_data = @"bool",
@@ -78,7 +78,7 @@ pub const prototype = struct {
             .fields = .{
                 .boolean_data = false,
             },
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+            .prototype = try realm.intrinsic(.object_prototype),
         });
         return &boolean.object;
     }
@@ -92,7 +92,7 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Boolean%"()),
+            Value.from(try realm.intrinsic(.boolean)),
         );
     }
 

@@ -33,7 +33,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "RelativeTimeFormat",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -44,7 +44,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Intl.RelativeTimeFormat.prototype%"()),
+            Value.from(try realm.intrinsic(.intl_relative_time_format_prototype)),
             .none,
         );
     }
@@ -72,7 +72,7 @@ pub const constructor = struct {
             RelativeTimeFormat,
             agent,
             new_target,
-            "%Intl.RelativeTimeFormat.prototype%",
+            .intl_relative_time_format_prototype,
             .{
                 .locale = undefined,
                 .style = undefined,
@@ -172,7 +172,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-relativetimeformat-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -184,14 +184,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Intl.RelativeTimeFormat%"()),
+            Value.from(try realm.intrinsic(.intl_relative_time_format)),
         );
 
         // 18.3.5 Intl.RelativeTimeFormat.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-Intl.RelativeTimeFormat.prototype-toStringTag
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Intl.RelativeTimeFormat"),
             .{
                 .writable = false,
@@ -213,7 +213,7 @@ pub const prototype = struct {
         // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
         const options = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 4. For each row of Table 33, except the header row, in table order, do

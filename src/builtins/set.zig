@@ -186,20 +186,20 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Set",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.species", @"Symbol.species", null, realm);
 
         // 24.2.3.1 Set.prototype
         // https://tc39.es/ecma262/#sec-set.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Set.prototype%"()),
+            Value.from(try realm.intrinsic(.set_prototype)),
             .none,
         );
     }
@@ -220,7 +220,7 @@ pub const constructor = struct {
             Set,
             agent,
             new_target.?,
-            "%Set.prototype%",
+            .set_prototype,
             .{
                 // 3. Set set.[[SetData]] to a new empty List.
                 .set_data = .empty,
@@ -257,7 +257,7 @@ pub const constructor = struct {
 
     /// 24.2.3.2 get Set [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-set-%symbol.species%
-    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -267,7 +267,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-set-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -292,23 +292,23 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Set%"()),
+            Value.from(try realm.intrinsic(.set)),
         );
 
         // 24.2.4.13 Set.prototype.keys ( )
         // https://tc39.es/ecma262/#sec-set.prototype.keys
-        const @"%Set.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
-        try object.defineBuiltinProperty(agent, "keys", @"%Set.prototype.values%");
+        const set_prototype_values = object.getPropertyValueDirect(PropertyKey.from("values"));
+        try object.defineBuiltinProperty(agent, "keys", set_prototype_values);
 
         // 24.2.4.18 Set.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-set.prototype-%symbol.iterator%
-        try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%Set.prototype.values%");
+        try object.defineBuiltinProperty(agent, "Symbol.iterator", set_prototype_values);
 
         // 24.2.4.19 Set.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-set.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Set"),
             .{
                 .writable = false,
@@ -492,7 +492,7 @@ pub const prototype = struct {
         const result = try ordinaryObjectCreateWithType(
             Set,
             agent,
-            try agent.currentRealm().intrinsics.@"%Set.prototype%"(),
+            try agent.currentRealm().intrinsic(.set_prototype),
             .{
                 // 8. Set result.[[SetData]] to resultSetData.
                 .set_data = result_set_data,
@@ -678,7 +678,7 @@ pub const prototype = struct {
         const result = try ordinaryObjectCreateWithType(
             Set,
             agent,
-            try agent.currentRealm().intrinsics.@"%Set.prototype%"(),
+            try agent.currentRealm().intrinsic(.set_prototype),
             .{
                 // 8. Set result.[[SetData]] to resultSetData.
                 .set_data = result_set_data,
@@ -947,7 +947,7 @@ pub const prototype = struct {
         const result = try ordinaryObjectCreateWithType(
             Set,
             agent,
-            try agent.currentRealm().intrinsics.@"%Set.prototype%"(),
+            try agent.currentRealm().intrinsic(.set_prototype),
             .{
                 // 9. Set result.[[SetData]] to resultSetData.
                 .set_data = result_set_data,
@@ -999,7 +999,7 @@ pub const prototype = struct {
         const result = try ordinaryObjectCreateWithType(
             Set,
             agent,
-            try agent.currentRealm().intrinsics.@"%Set.prototype%"(),
+            try agent.currentRealm().intrinsic(.set_prototype),
             .{
                 // 9. Set result.[[SetData]] to resultSetData.
                 .set_data = result_set_data,

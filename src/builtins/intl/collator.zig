@@ -34,7 +34,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Collator",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -45,7 +45,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Intl.Collator.prototype%"()),
+            Value.from(try realm.intrinsic(.intl_collator_prototype)),
             .none,
         );
     }
@@ -69,7 +69,7 @@ pub const constructor = struct {
             Collator,
             agent,
             new_target_,
-            "%Intl.Collator.prototype%",
+            .intl_collator_prototype,
             .{
                 .locale = undefined,
                 .usage = undefined,
@@ -197,7 +197,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-the-intl-collator-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -209,14 +209,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Intl.Collator%"()),
+            Value.from(try realm.intrinsic(.intl_collator)),
         );
 
         // 10.3.4 Intl.Collator.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma402/#sec-intl.collator.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Intl.Collator"),
             .{
                 .writable = false,
@@ -238,7 +238,7 @@ pub const prototype = struct {
         // 3. Let options be OrdinaryObjectCreate(%Object.prototype%).
         const options = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 4. For each row of Table 3, except the header row, in table order, do

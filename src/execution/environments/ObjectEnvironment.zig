@@ -46,7 +46,7 @@ pub fn hasBinding(self: *const ObjectEnvironment, agent: *Agent, name: *const St
     // 5. Let unscopables be ? Get(bindingObj, %Symbol.unscopables%).
     const unscopables = try self.binding_object.get(
         agent,
-        PropertyKey.from(agent.well_known_symbols.@"%Symbol.unscopables%"),
+        PropertyKey.from(agent.well_known_symbols.unscopables),
     );
 
     // 6. If unscopables is an Object, then

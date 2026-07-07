@@ -122,7 +122,7 @@ fn initializeRealm(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!void {
 
 const Kiesel = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        const kiesel_object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        const kiesel_object = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
         if (kiesel.build_options.enable_annex_b) {
             try kiesel_object.defineBuiltinFunction(agent, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
         }
@@ -138,14 +138,14 @@ const Kiesel = struct {
         try kiesel_object.defineBuiltinFunction(agent, "sleep", sleep, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "writeFile", writeFile, 2, realm);
         if (kiesel.build_options.enable_libgc) {
-            const gc_object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+            const gc_object = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
             try gc_object.defineBuiltinFunction(agent, "collect", collect, 0, realm);
             try kiesel_object.defineBuiltinProperty(agent, "gc", Value.from(gc_object));
         }
         if (builtin.os.tag == .linux) {
             try kiesel_object.defineBuiltinFunction(agent, "asm", @"asm", 1, realm);
             try kiesel_object.defineBuiltinFunction(agent, "syscall", syscall, 1, realm);
-            const sysno_object = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+            const sysno_object = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
             inline for (std.meta.fields(std.os.linux.SYS)) |field| {
                 @setEvalBranchQuota(100_000);
                 const name: []const u8 = comptime blk: {
@@ -194,7 +194,7 @@ const Kiesel = struct {
     fn createIsHTMLDDA(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const is_htmldda = try kiesel.builtins.Object.create(agent, .{
-            .prototype = try realm.intrinsics.@"%Object.prototype%"(),
+            .prototype = try realm.intrinsic(.object_prototype),
             .is_htmldda = true,
             .internal_methods = .initComptime(.{
                 .call = struct {

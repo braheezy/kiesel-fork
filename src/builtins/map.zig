@@ -110,21 +110,21 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Map",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "groupBy", groupBy, 2, realm);
-        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.species", @"Symbol.species", null, realm);
 
         // 24.1.2.2 Map.prototype
         // https://tc39.es/ecma262/#sec-map.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Map.prototype%"()),
+            Value.from(try realm.intrinsic(.map_prototype)),
             .none,
         );
     }
@@ -145,7 +145,7 @@ pub const constructor = struct {
             Map,
             agent,
             new_target.?,
-            "%Map.prototype%",
+            .map_prototype,
             .{
                 // 3. Set map.[[MapData]] to a new empty List.
                 .map_data = .empty,
@@ -178,7 +178,7 @@ pub const constructor = struct {
         const groups = try items.groupBy(agent, callback, .collection);
 
         // 2. Let map be ! Construct(%Map%).
-        const map_object = (try realm.intrinsics.@"%Map%"()).construct(
+        const map_object = (try realm.intrinsic(.map)).construct(
             agent,
             &.{},
             null,
@@ -206,7 +206,7 @@ pub const constructor = struct {
 
     /// 24.1.2.3 get Map [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-map-%symbol.species%
-    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -216,7 +216,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-map-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -238,19 +238,19 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Map%"()),
+            Value.from(try realm.intrinsic(.map)),
         );
 
         // 24.1.3.14 Map.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.iterator%
-        const @"%Map.prototype.entries%" = object.getPropertyValueDirect(PropertyKey.from("entries"));
-        try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%Map.prototype.entries%");
+        const map_prototype_entries = object.getPropertyValueDirect(PropertyKey.from("entries"));
+        try object.defineBuiltinProperty(agent, "Symbol.iterator", map_prototype_entries);
 
         // 24.1.3.15 Map.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-map.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Map"),
             .{
                 .writable = false,

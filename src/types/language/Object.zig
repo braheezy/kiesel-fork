@@ -584,21 +584,38 @@ pub fn definePropertyDirect(
 // https://tc39.es/ecma262/#sec-ecmascript-standard-built-in-objects.
 
 fn getFunctionName(comptime name: []const u8) []const u8 {
-    if (comptime std.mem.startsWith(u8, name, "%Symbol.")) {
-        comptime std.debug.assert(std.mem.endsWith(u8, name, "%"));
-        return std.fmt.comptimePrint("[{s}]", .{name[1 .. name.len - 1]});
-    } else {
-        return name;
+    if (comptime std.mem.startsWith(u8, name, "Symbol.")) {
+        return std.fmt.comptimePrint("[{s}]", .{name});
     }
+    return name;
 }
 
 fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
-    if (comptime std.mem.startsWith(u8, name, "%Symbol.")) {
-        comptime std.debug.assert(std.mem.endsWith(u8, name, "%"));
-        return PropertyKey.from(@field(agent.well_known_symbols, name));
-    } else {
-        return PropertyKey.from(name);
+    if (comptime std.mem.startsWith(u8, name, "Symbol.")) {
+        const field = comptime std.StaticStringMap(
+            std.meta.FieldEnum(Agent.WellKnownSymbols),
+        ).initComptime(&.{
+            .{ "Symbol.asyncIterator", .async_iterator },
+            .{ "Symbol.hasInstance", .has_instance },
+            .{ "Symbol.isConcatSpreadable", .is_concat_spreadable },
+            .{ "Symbol.iterator", .iterator },
+            .{ "Symbol.match", .match },
+            .{ "Symbol.matchAll", .match_all },
+            .{ "Symbol.replace", .replace },
+            .{ "Symbol.search", .search },
+            .{ "Symbol.species", .species },
+            .{ "Symbol.split", .split },
+            .{ "Symbol.toPrimitive", .to_primitive },
+            .{ "Symbol.toStringTag", .to_string_tag },
+            .{ "Symbol.unscopables", .unscopables },
+        }).get(name).?;
+        return PropertyKey.from(@field(agent.well_known_symbols, @tagName(field)));
     }
+    comptime for (name) |c| switch (c) {
+        'a'...'z', 'A'...'Z', '0'...'9', '_' => {},
+        else => unreachable,
+    };
+    return PropertyKey.from(name);
 }
 
 pub fn defineBuiltinAccessor(
@@ -1196,7 +1213,7 @@ pub fn speciesConstructor(obj: *Object, agent: *Agent, default_ctor: *Object) Ag
     // 4. Let species be ? Get(ctor, %Symbol.species%).
     const species = try ctor.asObject().get(
         agent,
-        PropertyKey.from(agent.well_known_symbols.@"%Symbol.species%"),
+        PropertyKey.from(agent.well_known_symbols.species),
     );
 
     // 5. If species is either undefined or null, return defaultCtor.

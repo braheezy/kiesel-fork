@@ -293,7 +293,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "DataView",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -304,7 +304,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%DataView.prototype%"()),
+            Value.from(try realm.intrinsic(.data_view_prototype)),
             .none,
         );
     }
@@ -389,7 +389,7 @@ pub const constructor = struct {
             DataView,
             agent,
             new_target.?,
-            "%DataView.prototype%",
+            .data_view_prototype,
             .{
                 .viewed_array_buffer = undefined,
                 .byte_length = undefined,
@@ -448,7 +448,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-dataview-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -483,14 +483,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%DataView%"()),
+            Value.from(try realm.intrinsic(.data_view)),
         );
 
         // 25.3.4.27 DataView.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-dataview.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("DataView"),
             .{
                 .writable = false,

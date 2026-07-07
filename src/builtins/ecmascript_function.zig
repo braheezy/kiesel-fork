@@ -445,7 +445,7 @@ fn evaluateGeneratorBody(
         builtins.Generator,
         agent,
         &func.object,
-        "%GeneratorPrototype%",
+        .generator_prototype,
         .{
             // 3. Set gen.[[GeneratorBrand]] to empty.
             // 4. Set gen.[[GeneratorState]] to suspended-start.
@@ -499,7 +499,7 @@ fn evaluateAsyncGeneratorBody(
         builtins.AsyncGenerator,
         agent,
         &func.object,
-        "%AsyncGeneratorPrototype%",
+        .async_generator_prototype,
         .{
             // 3. Set gen.[[GeneratorBrand]] to empty.
             // 4. Set gen.[[AsyncGeneratorState]] to suspended-start.
@@ -530,7 +530,7 @@ fn evaluateAsyncFunctionBody(
     // 1. Let promiseCapability be ! NewPromiseCapability(%Promise%).
     const promise_capability = newPromiseCapability(
         agent,
-        Value.from(try realm.intrinsics.@"%Promise%"()),
+        Value.from(try realm.intrinsic(.promise)),
     ) catch |err| try noexcept(err);
 
     // 2. Let completion be Completion(FunctionDeclarationInstantiation(funcObj, argList)).
@@ -577,7 +577,7 @@ fn construct(
             builtins.Object,
             agent,
             new_target,
-            "%Object.prototype%",
+            .object_prototype,
             {},
         );
         this_arg = &this_arg_object.object;
@@ -747,8 +747,8 @@ pub fn ordinaryFunctionCreateFast(
     const strict = body.strict;
 
     const realm = agent.currentRealm();
-    const function_shape, const function_offsets = try realm.shapes.ordinaryFunction();
-    const prototype_shape, const prototype_offsets = try realm.shapes.ordinaryFunctionPrototype();
+    const function_shape, const function_offsets = try realm.shape(.ordinary_function);
+    const prototype_shape, const prototype_offsets = try realm.shape(.ordinary_function_prototype);
 
     const func = try ECMAScriptFunction.createWithShape(agent, .{
         .shape = function_shape,
@@ -790,7 +790,7 @@ pub fn addRestrictedFunctionProperties(
 ) std.mem.Allocator.Error!void {
     // 1. Assert: realm.[[Intrinsics]].[[%ThrowTypeError%]] exists and has been initialized.
     // 2. Let thrower be realm.[[Intrinsics]].[[%ThrowTypeError%]].
-    const thrower = try realm.intrinsics.@"%ThrowTypeError%"();
+    const thrower = try realm.intrinsic(.throw_type_error);
 
     const property_desc: Object.CompletePropertyDescriptor = .{
         .value_or_accessor = .{
@@ -874,7 +874,7 @@ pub fn makeConstructor(
     // 5. If proto is not present, then
     const proto = args.proto orelse blk: {
         // a. Set proto to OrdinaryObjectCreate(%Object.prototype%).
-        const proto = try ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        const proto = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
 
         // b. Perform ! DefinePropertyOrThrow(proto, "constructor", PropertyDescriptor {
         //    [[Value]]: func, [[Writable]]: writableProto, [[Enumerable]]: false,

@@ -42,7 +42,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "PlainYearMonth",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -56,7 +56,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainYearMonth.prototype%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_year_month_prototype)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -162,7 +162,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-plainyearmonth-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -193,14 +193,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Temporal.PlainYearMonth%"()),
+            Value.from(try realm.intrinsic(.temporal_plain_year_month)),
         );
 
         // 9.3.2 Temporal.PlainYearMonth.prototype[ %Symbol.toStringTag% ]
         // https://tc39.es/proposal-temporal/#sec-temporal.plainyearmonth.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Temporal.PlainYearMonth"),
             .{
                 .writable = false,
@@ -786,7 +786,7 @@ pub fn createTemporalYearMonth(
     // 1. If ISOYearMonthWithinLimits(isoDate) is false, throw a RangeError exception.
 
     // 2. If newTarget is not present, set newTarget to %Temporal.PlainYearMonth%.
-    const new_target = maybe_new_target orelse try realm.intrinsics.@"%Temporal.PlainYearMonth%"();
+    const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_plain_year_month);
 
     // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.PlainYearMonth.prototype%",
     //    « [[InitializedTemporalYearMonth]], [[ISODate]], [[Calendar]] »).
@@ -797,7 +797,7 @@ pub fn createTemporalYearMonth(
         PlainYearMonth,
         agent,
         new_target,
-        "%Temporal.PlainYearMonth.prototype%",
+        .temporal_plain_year_month_prototype,
         .{ .inner = inner },
     );
 }

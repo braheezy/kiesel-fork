@@ -951,7 +951,7 @@ fn performPromiseAllSettled(
                 // iv. Let obj be OrdinaryObjectCreate(%Object.prototype%).
                 const obj = try ordinaryObjectCreate(
                     agent_,
-                    try realm.intrinsics.@"%Object.prototype%"(),
+                    try realm.intrinsic(.object_prototype),
                 );
 
                 // v. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
@@ -1040,7 +1040,7 @@ fn performPromiseAllSettled(
                 // iv. Let obj be OrdinaryObjectCreate(%Object.prototype%).
                 const obj = try ordinaryObjectCreate(
                     agent_,
-                    try realm.intrinsics.@"%Object.prototype%"(),
+                    try realm.intrinsic(.object_prototype),
                 );
 
                 // v. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
@@ -1457,7 +1457,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Promise",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -1471,14 +1471,14 @@ pub const constructor = struct {
         try object.defineBuiltinFunction(agent, "resolve", resolve, 1, realm);
         try object.defineBuiltinFunction(agent, "try", @"try", 1, realm);
         try object.defineBuiltinFunction(agent, "withResolvers", withResolvers, 0, realm);
-        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.species", @"Symbol.species", null, realm);
 
         // 27.5.4.4 Promise.prototype
         // https://tc39.es/ecma262/#sec-promise.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Promise.prototype%"()),
+            Value.from(try realm.intrinsic(.promise_prototype)),
             .none,
         );
     }
@@ -1509,7 +1509,7 @@ pub const constructor = struct {
             Promise,
             agent,
             new_target.?,
-            "%Promise.prototype%",
+            .promise_prototype,
             .{
                 // 4. Set promise.[[PromiseState]] to pending.
                 .promise_state = .pending,
@@ -1852,7 +1852,7 @@ pub const constructor = struct {
         // 3. Let obj be OrdinaryObjectCreate(%Object.prototype%).
         const obj = try ordinaryObjectCreate(
             agent,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
 
         // 4. Perform ! CreateDataPropertyOrThrow(obj, "promise", promiseCapability.[[Promise]]).
@@ -1882,7 +1882,7 @@ pub const constructor = struct {
 
     /// 27.5.4.10 get Promise [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-promise-%symbol.species%
-    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -1892,7 +1892,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-promise-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -1905,14 +1905,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         );
 
         // 27.5.5.5 Promise.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-promise.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Promise"),
             .{
                 .writable = false,
@@ -1951,7 +1951,7 @@ pub const prototype = struct {
         // 3. Let ctor be ? SpeciesConstructor(promise, %Promise%).
         const ctor = try promise.asObject().speciesConstructor(
             agent,
-            try realm.intrinsics.@"%Promise%"(),
+            try realm.intrinsic(.promise),
         );
 
         // 4. Assert: IsConstructor(ctor) is true.
@@ -2121,7 +2121,7 @@ pub const prototype = struct {
         // 3. Let ctor be ? SpeciesConstructor(promise, %Promise%).
         const ctor = try promise.asObject().speciesConstructor(
             agent,
-            try realm.intrinsics.@"%Promise%"(),
+            try realm.intrinsic(.promise),
         );
 
         // 4. Let resultCapability be ? NewPromiseCapability(ctor).

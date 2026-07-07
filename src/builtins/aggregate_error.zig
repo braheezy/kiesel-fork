@@ -31,7 +31,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "AggregateError",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Error%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.@"error") },
         );
         return &builtin_function.object;
     }
@@ -42,7 +42,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%AggregateError.prototype%"()),
+            Value.from(try realm.intrinsic(.aggregate_error_prototype)),
             .none,
         );
     }
@@ -64,7 +64,7 @@ pub const constructor = struct {
             AggregateError,
             agent,
             new_target_,
-            "%AggregateError.prototype%",
+            .aggregate_error_prototype,
             .{
                 // Non-standard
                 .name = String.fromLiteral("AggregateError"),
@@ -126,7 +126,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-aggregate-error-prototype-objects
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Error.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.error_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -135,7 +135,7 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%AggregateError%"()),
+            Value.from(try realm.intrinsic(.aggregate_error)),
         );
 
         // 20.5.7.3.2 AggregateError.prototype.message

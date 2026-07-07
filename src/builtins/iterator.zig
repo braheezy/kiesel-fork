@@ -32,7 +32,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             0,
             "Iterator",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -48,7 +48,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Iterator.prototype%"()),
+            Value.from(try realm.intrinsic(.iterator_prototype)),
             .none,
         );
     }
@@ -71,7 +71,7 @@ pub const constructor = struct {
             Iterator,
             agent,
             new_target.?,
-            "%Iterator.prototype%",
+            .iterator_prototype,
             {},
         );
         return Value.from(&iterator.object);
@@ -104,7 +104,7 @@ pub const constructor = struct {
             // b. Let method be ? GetMethod(item, %Symbol.iterator%).
             const method = try item.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+                PropertyKey.from(agent.well_known_symbols.iterator),
             ) orelse {
                 // c. If method is undefined, throw a TypeError exception.
                 return agent.throwException(
@@ -203,7 +203,7 @@ pub const constructor = struct {
         // 4. Let gen be CreateIteratorFromClosure(closure, "Iterator Helper",
         //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const gen = try builtins.IteratorHelper.create(agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
                     // 5. Set gen.[[UnderlyingIterators]] to a new empty List.
@@ -231,7 +231,7 @@ pub const constructor = struct {
 
         // 2. Let hasInstance be ? OrdinaryHasInstance(%Iterator%, iteratorRecord.[[Iterator]]).
         const has_instance = try Value.from(
-            try realm.intrinsics.@"%Iterator%"(),
+            try realm.intrinsic(.iterator),
         ).ordinaryHasInstance(agent, Value.from(iterator.iterator));
 
         // 3. If hasInstance is true, then
@@ -243,7 +243,7 @@ pub const constructor = struct {
         // 4. Let wrapper be OrdinaryObjectCreate(%WrapForValidIteratorPrototype%,
         //    « [[Iterated]] »).
         const wrapper = try builtins.WrapForValidIterator.create(agent, .{
-            .prototype = try realm.intrinsics.@"%WrapForValidIteratorPrototype%"(),
+            .prototype = try realm.intrinsic(.wrap_for_valid_iterator_prototype),
             .fields = .{
                 // 5. Set wrapper.[[Iterated]] to iteratorRecord.
                 .iterated = iterator,
@@ -852,7 +852,7 @@ pub const constructor = struct {
         // 4. Let gen be CreateIteratorFromClosure(closure, "Iterator Helper",
         //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const gen = try builtins.IteratorHelper.create(agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
                     // 5. Set gen.[[UnderlyingIterators]] to openIters.
@@ -874,7 +874,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-%iterator.prototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -889,7 +889,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "some", some, 1, realm);
         try object.defineBuiltinFunction(agent, "take", take, 1, realm);
         try object.defineBuiltinFunction(agent, "toArray", toArray, 0, realm);
-        try object.defineBuiltinFunction(agent, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.iterator", @"Symbol.iterator", 0, realm);
 
         // 27.1.3.3.1 Iterator.prototype.constructor
         // https://tc39.es/ecma262/#sec-iterator.prototype.constructor
@@ -900,21 +900,24 @@ pub const prototype = struct {
                 /// 27.1.3.3.1.1 get Iterator.prototype.constructor
                 /// https://tc39.es/ecma262/#sec-get-iterator.prototype.constructor
                 fn get(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+                    const realm_ = agent_.currentRealm();
+
                     // 1. Return %Iterator%.
-                    return Value.from(try agent_.currentRealm().intrinsics.@"%Iterator%"());
+                    return Value.from(try realm_.intrinsic(.iterator));
                 }
             }.get,
             struct {
                 /// 27.1.3.3.1.2 set Iterator.prototype.constructor
                 /// https://tc39.es/ecma262/#sec-set-iterator.prototype.constructor
                 fn set(agent_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+                    const realm_ = agent_.currentRealm();
                     const value = arguments.get(0);
 
                     // 1. Perform ? SetterThatIgnoresPrototypeProperties(this value,
                     //    %Iterator.prototype%, "constructor", v).
                     try this_value.setterThatIgnoresPrototypeProperties(
                         agent_,
-                        try agent_.currentRealm().intrinsics.@"%Iterator.prototype%"(),
+                        try realm_.intrinsic(.iterator_prototype),
                         PropertyKey.from("constructor"),
                         value,
                     );
@@ -930,7 +933,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.tostringtag%
         try object.defineBuiltinAccessor(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             struct {
                 /// 27.1.3.3.15.1 get Iterator.prototype [ %Symbol.toStringTag% ]
                 /// https://tc39.es/ecma262/#sec-get-iterator.prototype-%symbol.tostringtag%
@@ -943,14 +946,15 @@ pub const prototype = struct {
                 /// 27.1.3.3.15.2 set Iterator.prototype [ %Symbol.toStringTag% ]
                 /// https://tc39.es/ecma262/#sec-set-iterator.prototype-%symbol.tostringtag%
                 fn set(agent_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+                    const realm_ = agent_.currentRealm();
                     const value = arguments.get(0);
 
                     // 1. Perform ? SetterThatIgnoresPrototypeProperties(this value,
                     //    %Iterator.prototype%, %Symbol.toStringTag%, v).
                     try this_value.setterThatIgnoresPrototypeProperties(
                         agent_,
-                        try agent_.currentRealm().intrinsics.@"%Iterator.prototype%"(),
-                        PropertyKey.from(agent_.well_known_symbols.@"%Symbol.toStringTag%"),
+                        try realm_.intrinsic(.iterator_prototype),
+                        PropertyKey.from(agent_.well_known_symbols.to_string_tag),
                         value,
                     );
 
@@ -1074,7 +1078,7 @@ pub const prototype = struct {
         // 11. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
         //     %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
                     // 12. Set result.[[UnderlyingIterators]] to « iterated ».
@@ -1250,7 +1254,7 @@ pub const prototype = struct {
         // 7. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
         //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
                     // 8. Set result.[[UnderlyingIterators]] to « iterated ».
@@ -1480,7 +1484,7 @@ pub const prototype = struct {
         // 7. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
         //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
                     // 8. Set result.[[UnderlyingIterators]] to « iterated ».
@@ -1647,7 +1651,7 @@ pub const prototype = struct {
         // 7. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
         //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
                     // 8. Set result.[[UnderlyingIterators]] to « iterated ».
@@ -1926,7 +1930,7 @@ pub const prototype = struct {
         // 11. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
         //     %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
-            .prototype = try realm.intrinsics.@"%IteratorHelperPrototype%"(),
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
                     // 12. Set result.[[UnderlyingIterators]] to « iterated ».
@@ -1972,7 +1976,7 @@ pub const prototype = struct {
 
     /// 27.1.3.3.14 Iterator.prototype [ %Symbol.iterator% ] ( )
     /// https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.iterator%
-    fn @"%Symbol.iterator%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.iterator"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }

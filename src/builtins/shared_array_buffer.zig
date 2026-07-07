@@ -62,7 +62,7 @@ pub fn allocateSharedArrayBuffer(
         builtins.ArrayBuffer,
         agent,
         ctor,
-        "%SharedArrayBuffer.prototype%",
+        .shared_array_buffer_prototype,
         .{
             .data_block = undefined,
             .byte_length = undefined,
@@ -131,20 +131,20 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "SharedArrayBuffer",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.species", @"Symbol.species", null, realm);
 
         // 25.2.4.1 SharedArrayBuffer.prototype
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%SharedArrayBuffer.prototype%"()),
+            Value.from(try realm.intrinsic(.shared_array_buffer_prototype)),
             .none,
         );
     }
@@ -182,7 +182,7 @@ pub const constructor = struct {
 
     /// 25.2.4.2 get SharedArrayBuffer [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-sharedarraybuffer-%symbol.species%
-    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -192,7 +192,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-sharedarraybuffer-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -207,14 +207,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%SharedArrayBuffer%"()),
+            Value.from(try realm.intrinsic(.shared_array_buffer)),
         );
 
         // 25.2.5.7 SharedArrayBuffer.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-sharedarraybuffer.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("SharedArrayBuffer"),
             .{
                 .writable = false,
@@ -439,7 +439,7 @@ pub const prototype = struct {
         // 14. Let ctor be ? SpeciesConstructor(obj, %SharedArrayBuffer%).
         const ctor = try array_buffer.object.speciesConstructor(
             agent,
-            try realm.intrinsics.@"%SharedArrayBuffer%"(),
+            try realm.intrinsic(.shared_array_buffer),
         );
 
         // 15. Let new be ? Construct(ctor, « 𝔽(newLength) »).

@@ -158,7 +158,7 @@ pub fn builtinCallOrConstruct(
         // a. Let promiseCapability be ! NewPromiseCapability(%Promise%).
         const promise_capability = newPromiseCapability(
             agent,
-            Value.from(try realm.intrinsics.@"%Promise%"()),
+            Value.from(try realm.intrinsic(.promise)),
         ) catch |err| try noexcept(err);
 
         const Captures = struct {
@@ -258,7 +258,7 @@ pub fn createBuiltinFunction(
     const realm = args.realm orelse agent.currentRealm();
 
     // 2. If proto is not present, set proto to realm.[[Intrinsics]].[[%Function.prototype%]].
-    const proto = args.proto orelse try realm.intrinsics.@"%Function.prototype%"();
+    const proto = args.proto orelse try realm.intrinsic(.function_prototype);
 
     // 3. If async is not present, set async to false.
 

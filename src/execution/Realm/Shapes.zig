@@ -12,307 +12,276 @@ const PropertyKey = types.PropertyKey;
 
 const Shapes = @This();
 
-realm: *Realm,
-lazy_shapes: struct {
-    array: ?*Object.Shape = null,
-    array_iterator: ?*Object.Shape = null,
-    ordinary_object: ?*Object.Shape = null,
-    ordinary_function: ?*Object.Shape = null,
-    ordinary_function_prototype: ?*Object.Shape = null,
-    unmapped_arguments_object: ?*Object.Shape = null,
-    mapped_arguments_object: ?*Object.Shape = null,
-    reg_exp_object: ?*Object.Shape = null,
-    reg_exp_exec_object: ?*Object.Shape = null,
-} = .{},
+array: ?*Object.Shape,
+array_iterator: ?*Object.Shape,
+ordinary_object: ?*Object.Shape,
+ordinary_function: ?*Object.Shape,
+ordinary_function_prototype: ?*Object.Shape,
+unmapped_arguments_object: ?*Object.Shape,
+mapped_arguments_object: ?*Object.Shape,
+reg_exp_object: ?*Object.Shape,
+reg_exp_exec_object: ?*Object.Shape,
 
-pub fn init(realm: *Realm) Shapes {
-    return .{ .realm = realm };
+pub const init: Shapes = blk: {
+    var shapes: Shapes = undefined;
+    for (std.meta.fieldNames(Shapes)) |field_name| {
+        @field(shapes, field_name) = null;
+    }
+    break :blk shapes;
+};
+
+pub fn Result(comptime field: std.meta.FieldEnum(Shapes)) type {
+    return switch (field) {
+        .array, .array_iterator, .ordinary_object => *Object.Shape,
+        .ordinary_function => struct { *Object.Shape, OrdinaryFunctionOffsets },
+        .ordinary_function_prototype => struct { *Object.Shape, OrdinaryFunctionPrototypeOffsets },
+        .unmapped_arguments_object => struct { *Object.Shape, UnmappedArgumentsObjectOffsets },
+        .mapped_arguments_object => struct { *Object.Shape, MappedArgumentsObjectOffsets },
+        .reg_exp_object => struct { *Object.Shape, RegExpObjectOffsets },
+        .reg_exp_exec_object => struct { *Object.Shape, RegExpExecObjectOffsets },
+    };
 }
 
-pub fn array(self: *Shapes) std.mem.Allocator.Error!*Object.Shape {
-    const shape = self.lazy_shapes.array orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setInternalMethodsWithoutTransition(builtins.array.internal_methods);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Array.prototype%"());
-        self.lazy_shapes.array = shape;
+pub fn getOrCreate(
+    self: *Shapes,
+    realm: *Realm,
+    comptime field: std.meta.FieldEnum(Shapes),
+) std.mem.Allocator.Error!Result(field) {
+    const shape = @field(self, @tagName(field)) orelse blk: {
+        const shape = switch (field) {
+            .array => try createArray(realm),
+            .array_iterator => try createArrayIterator(realm),
+            .ordinary_object => try createOrdinaryObject(realm),
+            .ordinary_function => try createOrdinaryFunction(realm),
+            .ordinary_function_prototype => try createOrdinaryFunctionPrototype(realm),
+            .unmapped_arguments_object => try createUnmappedArgumentsObject(realm),
+            .mapped_arguments_object => try createMappedArgumentsObject(realm),
+            .reg_exp_object => try createRegExpObject(realm),
+            .reg_exp_exec_object => try createRegExpExecObject(realm),
+        };
+        @field(self, @tagName(field)) = shape;
         break :blk shape;
     };
+    return switch (field) {
+        .array,
+        .array_iterator,
+        .ordinary_object,
+        => shape,
+        else => .{ shape, .init },
+    };
+}
+
+fn createArray(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setInternalMethodsWithoutTransition(builtins.array.internal_methods);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.array_prototype));
     return shape;
 }
 
-pub fn arrayIterator(self: *Shapes) std.mem.Allocator.Error!*Object.Shape {
-    const shape = self.lazy_shapes.array_iterator orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%ArrayIteratorPrototype%"());
-        self.lazy_shapes.array_iterator = shape;
-        break :blk shape;
-    };
+fn createArrayIterator(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.array_iterator_prototype));
     return shape;
 }
 
-pub fn ordinaryObject(self: *Shapes) std.mem.Allocator.Error!*Object.Shape {
-    const shape = self.lazy_shapes.ordinary_object orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Object.prototype%"());
-        self.lazy_shapes.ordinary_object = shape;
-        break :blk shape;
-    };
+fn createOrdinaryObject(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.object_prototype));
     return shape;
 }
 
-pub const OrdinaryFunctionOffsets = struct {
+const OrdinaryFunctionOffsets = struct {
     length: Object.Shape.Property.Offset,
     name: Object.Shape.Property.Offset,
     prototype: Object.Shape.Property.Offset,
-};
 
-pub fn ordinaryFunction(self: *Shapes) std.mem.Allocator.Error!struct {
-    *Object.Shape,
-    OrdinaryFunctionOffsets,
-} {
-    const shape = self.lazy_shapes.ordinary_function orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setInternalMethodsWithoutTransition(builtins.ecmascript_function.internal_methods_constructor);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Function.prototype%"());
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("length"),
-            .{
-                .writable = false,
-                .enumerable = false,
-                .configurable = true,
-            },
-            .value,
-        );
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("name"),
-            .{
-                .writable = false,
-                .enumerable = false,
-                .configurable = true,
-            },
-            .value,
-        );
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("prototype"),
-            .{
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
-            },
-            .value,
-        );
-        self.lazy_shapes.ordinary_function = shape;
-        break :blk shape;
-    };
-    const offsets: OrdinaryFunctionOffsets = .{
+    const init: OrdinaryFunctionOffsets = .{
         .length = @enumFromInt(0),
         .name = @enumFromInt(1),
         .prototype = @enumFromInt(2),
     };
-    return .{ shape, offsets };
-}
-
-pub const OrdinaryFunctionPrototypeOffsets = struct {
-    constructor: Object.Shape.Property.Offset,
 };
 
-pub fn ordinaryFunctionPrototype(self: *Shapes) std.mem.Allocator.Error!struct {
-    *Object.Shape,
-    OrdinaryFunctionPrototypeOffsets,
-} {
-    const shape = self.lazy_shapes.ordinary_function_prototype orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Object.prototype%"());
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("constructor"),
-            .builtin_default,
-            .value,
-        );
-        self.lazy_shapes.ordinary_function_prototype = shape;
-        break :blk shape;
-    };
-    const offsets: OrdinaryFunctionPrototypeOffsets = .{
+fn createOrdinaryFunction(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setInternalMethodsWithoutTransition(builtins.ecmascript_function.internal_methods_constructor);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.function_prototype));
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("length"),
+        .{ .writable = false, .enumerable = false, .configurable = true },
+        .value,
+    );
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("name"),
+        .{ .writable = false, .enumerable = false, .configurable = true },
+        .value,
+    );
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("prototype"),
+        .{ .writable = true, .enumerable = false, .configurable = false },
+        .value,
+    );
+    return shape;
+}
+
+const OrdinaryFunctionPrototypeOffsets = struct {
+    constructor: Object.Shape.Property.Offset,
+
+    pub const init: OrdinaryFunctionPrototypeOffsets = .{
         .constructor = @enumFromInt(0),
     };
-    return .{ shape, offsets };
-}
-
-pub const UnmappedArgumentsObjectOffsets = struct {
-    length: Object.Shape.Property.Offset,
-    @"%Symbol.iterator%": Object.Shape.Property.Offset,
-    callee: Object.Shape.Property.Offset,
 };
 
-pub fn unmappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
-    *Object.Shape,
-    UnmappedArgumentsObjectOffsets,
-} {
-    const shape = self.lazy_shapes.unmapped_arguments_object orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Object.prototype%"());
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("length"),
-            .builtin_default,
-            .value,
-        );
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
-            .builtin_default,
-            .value,
-        );
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("callee"),
-            .none,
-            .accessor,
-        );
-        self.lazy_shapes.unmapped_arguments_object = shape;
-        break :blk shape;
-    };
-    const offsets: UnmappedArgumentsObjectOffsets = .{
+fn createOrdinaryFunctionPrototype(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.object_prototype));
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("constructor"),
+        .builtin_default,
+        .value,
+    );
+    return shape;
+}
+
+const UnmappedArgumentsObjectOffsets = struct {
+    length: Object.Shape.Property.Offset,
+    symbol_iterator: Object.Shape.Property.Offset,
+    callee: Object.Shape.Property.Offset,
+
+    const init: UnmappedArgumentsObjectOffsets = .{
         .length = @enumFromInt(0),
-        .@"%Symbol.iterator%" = @enumFromInt(1),
+        .symbol_iterator = @enumFromInt(1),
         .callee = @enumFromInt(2),
     };
-    return .{ shape, offsets };
-}
-
-pub const MappedArgumentsObjectOffsets = struct {
-    length: Object.Shape.Property.Offset,
-    @"%Symbol.iterator%": Object.Shape.Property.Offset,
-    callee: Object.Shape.Property.Offset,
 };
 
-pub fn mappedArgumentsObject(self: *Shapes) std.mem.Allocator.Error!struct {
-    *Object.Shape,
-    MappedArgumentsObjectOffsets,
-} {
-    const shape = self.lazy_shapes.mapped_arguments_object orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setInternalMethodsWithoutTransition(builtins.arguments.internal_methods);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Object.prototype%"());
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("length"),
-            .builtin_default,
-            .value,
-        );
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
-            .builtin_default,
-            .value,
-        );
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("callee"),
-            .builtin_default,
-            .value,
-        );
-        self.lazy_shapes.mapped_arguments_object = shape;
-        break :blk shape;
-    };
-    const offsets: MappedArgumentsObjectOffsets = .{
+fn createUnmappedArgumentsObject(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.object_prototype));
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("length"),
+        .builtin_default,
+        .value,
+    );
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from(agent.well_known_symbols.iterator),
+        .builtin_default,
+        .value,
+    );
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("callee"),
+        .none,
+        .accessor,
+    );
+    return shape;
+}
+
+const MappedArgumentsObjectOffsets = struct {
+    length: Object.Shape.Property.Offset,
+    symbol_iterator: Object.Shape.Property.Offset,
+    callee: Object.Shape.Property.Offset,
+
+    const init: MappedArgumentsObjectOffsets = .{
         .length = @enumFromInt(0),
-        .@"%Symbol.iterator%" = @enumFromInt(1),
+        .symbol_iterator = @enumFromInt(1),
         .callee = @enumFromInt(2),
     };
-    return .{ shape, offsets };
-}
-
-pub const RegExpObjectOffsets = struct {
-    lastIndex: Object.Shape.Property.Offset,
 };
 
-pub fn regExpObject(self: *Shapes) std.mem.Allocator.Error!struct {
-    *Object.Shape,
-    RegExpObjectOffsets,
-} {
-    const shape = self.lazy_shapes.reg_exp_object orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%RegExp.prototype%"());
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("lastIndex"),
-            .{
-                .writable = true,
-                .enumerable = false,
-                .configurable = false,
-            },
-            .value,
-        );
-        self.lazy_shapes.reg_exp_object = shape;
-        break :blk shape;
-    };
-    const offsets: RegExpObjectOffsets = .{
-        .lastIndex = @enumFromInt(0),
-    };
-    return .{ shape, offsets };
+fn createMappedArgumentsObject(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setInternalMethodsWithoutTransition(builtins.arguments.internal_methods);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.object_prototype));
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("length"),
+        .builtin_default,
+        .value,
+    );
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from(agent.well_known_symbols.iterator),
+        .builtin_default,
+        .value,
+    );
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("callee"),
+        .builtin_default,
+        .value,
+    );
+    return shape;
 }
 
-pub const RegExpExecObjectOffsets = struct {
+const RegExpObjectOffsets = struct {
+    last_index: Object.Shape.Property.Offset,
+
+    const init: RegExpObjectOffsets = .{
+        .last_index = @enumFromInt(0),
+    };
+};
+
+fn createRegExpObject(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.reg_exp_prototype));
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("lastIndex"),
+        .{ .writable = true, .enumerable = false, .configurable = false },
+        .value,
+    );
+    return shape;
+}
+
+const RegExpExecObjectOffsets = struct {
     index: Object.Shape.Property.Offset,
     input: Object.Shape.Property.Offset,
     groups: Object.Shape.Property.Offset,
-};
 
-pub fn regExpExecObject(self: *Shapes) std.mem.Allocator.Error!struct {
-    *Object.Shape,
-    RegExpExecObjectOffsets,
-} {
-    const shape = self.lazy_shapes.reg_exp_exec_object orelse blk: {
-        const realm = self.realm;
-        const agent = realm.agent;
-        const shape = try Object.Shape.init(agent.gc_allocator);
-        shape.setInternalMethodsWithoutTransition(builtins.array.internal_methods);
-        shape.setPrototypeWithoutTransition(try realm.intrinsics.@"%Array.prototype%"());
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("index"),
-            .all,
-            .value,
-        );
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("input"),
-            .all,
-            .value,
-        );
-        try shape.setPropertyWithoutTransition(
-            agent.gc_allocator,
-            PropertyKey.from("groups"),
-            .all,
-            .value,
-        );
-        self.lazy_shapes.reg_exp_exec_object = shape;
-        break :blk shape;
-    };
-    const offsets: RegExpExecObjectOffsets = .{
+    const init: RegExpExecObjectOffsets = .{
         .index = @enumFromInt(0),
         .input = @enumFromInt(1),
         .groups = @enumFromInt(2),
     };
-    return .{ shape, offsets };
+};
+
+fn createRegExpExecObject(realm: *Realm) std.mem.Allocator.Error!*Object.Shape {
+    const agent = realm.agent;
+    const shape = try Object.Shape.init(agent.gc_allocator);
+    shape.setInternalMethodsWithoutTransition(builtins.array.internal_methods);
+    shape.setPrototypeWithoutTransition(try realm.intrinsic(.array_prototype));
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("index"),
+        .all,
+        .value,
+    );
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("input"),
+        .all,
+        .value,
+    );
+    try shape.setPropertyWithoutTransition(
+        agent.gc_allocator,
+        PropertyKey.from("groups"),
+        .all,
+        .value,
+    );
+    return shape;
 }

@@ -34,7 +34,7 @@ pub fn createSegmentsObject(
     const segments = try ordinaryObjectCreateWithType(
         Segments,
         agent,
-        try realm.intrinsics.@"%IntlSegmentsPrototype%"(),
+        try realm.intrinsic(.intl_segments_prototype),
         .{
             // 3. Set segments.[[SegmentsSegmenter]] to segmenter.
             .segments_segmenter = segmenter,
@@ -52,12 +52,12 @@ pub fn createSegmentsObject(
 /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "containing", containing, 1, realm);
-        try object.defineBuiltinFunction(agent, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.iterator", @"Symbol.iterator", 0, realm);
     }
 
     /// 19.5.2.1 %IntlSegmentsPrototype%.containing ( index )
@@ -108,7 +108,7 @@ pub const prototype = struct {
 
     /// 19.5.2.2 %IntlSegmentsPrototype% [ %Symbol.iterator% ] ( )
     /// https://tc39.es/ecma402/#sec-%intlsegmentsprototype%-%symbol.iterator%
-    fn @"%Symbol.iterator%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.iterator"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let segments be the this value.
         // 2. Perform ? RequireInternalSlot(segments, [[SegmentsSegmenter]]).
         const segments = try this_value.requireInternalSlot(agent, Segments);

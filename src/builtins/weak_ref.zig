@@ -28,7 +28,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "WeakRef",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -39,7 +39,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%WeakRef.prototype%"()),
+            Value.from(try realm.intrinsic(.weak_ref_prototype)),
             .none,
         );
     }
@@ -73,7 +73,7 @@ pub const constructor = struct {
             WeakRef,
             agent,
             new_target,
-            "%WeakRef.prototype%",
+            .weak_ref_prototype,
             .{
                 // 4. Perform AddToKeptObjects(target).
                 // NOTE: libgc tracks all used pointers
@@ -106,7 +106,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-the-weak-ref-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -117,14 +117,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%WeakRef%"()),
+            Value.from(try realm.intrinsic(.weak_ref)),
         );
 
         // 26.1.3.3 WeakRef.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-weak-ref.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("WeakRef"),
             .{
                 .writable = false,

@@ -25,7 +25,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "AsyncGeneratorFunction",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function) },
         );
         return &builtin_function.object;
     }
@@ -36,7 +36,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction.prototype%"()),
+            Value.from(try realm.intrinsic(.async_generator_function_prototype)),
             .none,
         );
     }
@@ -71,7 +71,7 @@ pub const constructor = struct {
 /// https://tc39.es/ecma262/#sec-properties-of-asyncgeneratorfunction-prototype
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Function.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.function_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -80,7 +80,7 @@ pub const prototype = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%AsyncGeneratorFunction%"()),
+            Value.from(try realm.intrinsic(.async_generator_function)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -93,7 +93,7 @@ pub const prototype = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%AsyncGeneratorPrototype%"()),
+            Value.from(try realm.intrinsic(.async_generator_prototype)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -105,7 +105,7 @@ pub const prototype = struct {
         // https://tc39.es/ecma262/#sec-asyncgeneratorfunction-prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("AsyncGeneratorFunction"),
             .{
                 .writable = false,

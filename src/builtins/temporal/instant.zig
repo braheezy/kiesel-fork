@@ -44,7 +44,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Instant",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -60,7 +60,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Temporal.Instant.prototype%"()),
+            Value.from(try realm.intrinsic(.temporal_instant_prototype)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -195,7 +195,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-instant-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -218,14 +218,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Temporal.Instant%"()),
+            Value.from(try realm.intrinsic(.temporal_instant)),
         );
 
         // 8.3.2 Temporal.Instant.prototype[ %Symbol.toStringTag% ]
         // https://tc39.es/proposal-temporal/#sec-temporal.instant.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Temporal.Instant"),
             .{
                 .writable = false,
@@ -655,7 +655,7 @@ pub fn createTemporalInstant(
     // 1. Assert: IsValidEpochNanoseconds(epochNanoseconds) is true.
 
     // 2. If newTarget is not present, set newTarget to %Temporal.Instant%.
-    const new_target = maybe_new_target orelse try realm.intrinsics.@"%Temporal.Instant%"();
+    const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_instant);
 
     // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.Instant.prototype%",
     //    « [[InitializedTemporalInstant]], [[EpochNanoseconds]] »).
@@ -665,7 +665,7 @@ pub fn createTemporalInstant(
         Instant,
         agent,
         new_target,
-        "%Temporal.Instant.prototype%",
+        .temporal_instant_prototype,
         .{ .inner = inner },
     );
 }

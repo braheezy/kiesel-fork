@@ -111,7 +111,7 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_proto: ?*Object) Agent.Erro
     // 2. If proto is not present, set proto to %Array.prototype%.
     const proto = maybe_proto orelse {
         // OPTIMIZATION: When no custom prototype is provided we can use the default array shape.
-        const shape = try realm.shapes.array();
+        const shape = try realm.shape(.array);
         return arrayCreateFastWithShape(agent, @intCast(length), shape);
     };
 
@@ -138,7 +138,7 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_proto: ?*Object) Agent.Erro
 
 pub fn arrayCreateFast(agent: *Agent, length: u32) std.mem.Allocator.Error!*Array {
     const realm = agent.currentRealm();
-    const shape = try realm.shapes.array();
+    const shape = try realm.shape(.array);
     return arrayCreateFastWithShape(agent, length, shape);
 }
 
@@ -183,7 +183,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) A
         if (this_realm != ctor_realm) {
             // i. If SameValue(ctor, ctorRealm.[[Intrinsics]].[[%Array%]]) is true, set ctor to
             //    undefined.
-            if (ctor.asObject() == try ctor_realm.intrinsics.@"%Array%"()) {
+            if (ctor.asObject() == try ctor_realm.intrinsic(.array)) {
                 ctor = .undefined;
             }
         }
@@ -194,7 +194,7 @@ pub fn arraySpeciesCreate(agent: *Agent, original_array: *Object, length: u53) A
         // a. Set ctor to ? Get(ctor, %Symbol.species%).
         ctor = try ctor.get(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.species%"),
+            PropertyKey.from(agent.well_known_symbols.species),
         );
 
         // b. If ctor is null, set ctor to undefined.
@@ -354,7 +354,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "Array",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -364,14 +364,14 @@ pub const constructor = struct {
         try object.defineBuiltinAsyncFunction(agent, "fromAsync", fromAsync, 1, realm);
         try object.defineBuiltinFunction(agent, "isArray", isArray, 1, realm);
         try object.defineBuiltinFunction(agent, "of", of, 0, realm);
-        try object.defineBuiltinAccessor(agent, "%Symbol.species%", @"%Symbol.species%", null, realm);
+        try object.defineBuiltinAccessor(agent, "Symbol.species", @"Symbol.species", null, realm);
 
         // 23.1.2.5 Array.prototype
         // https://tc39.es/ecma262/#sec-array.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Array.prototype%"()),
+            Value.from(try realm.intrinsic(.array_prototype)),
             .none,
         );
     }
@@ -387,7 +387,7 @@ pub const constructor = struct {
         const proto = try getPrototypeFromConstructor(
             agent,
             new_target_,
-            "%Array.prototype%",
+            .array_prototype,
         );
 
         // 3. Let numberOfArgs be the number of elements in values.
@@ -493,7 +493,7 @@ pub const constructor = struct {
         // 4. Let usingIterator be ? GetMethod(items, %Symbol.iterator%).
         const using_iterator = try items.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+            PropertyKey.from(agent.well_known_symbols.iterator),
         );
 
         // 5. If usingIterator is not undefined, then
@@ -657,7 +657,7 @@ pub const constructor = struct {
         // 5. Let usingAsyncIterator be ? GetMethod(items, %Symbol.asyncIterator%).
         const using_async_iterator = try items.getMethod(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.asyncIterator%"),
+            PropertyKey.from(agent.well_known_symbols.async_iterator),
         );
 
         // 6. If usingAsyncIterator is undefined, then
@@ -665,7 +665,7 @@ pub const constructor = struct {
             // a. Let usingSyncIterator be ? GetMethod(items, %Symbol.iterator%).
             const using_sync_iterator = try items.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.iterator%"),
+                PropertyKey.from(agent.well_known_symbols.iterator),
             );
 
             // b. If usingSyncIterator is not undefined, then
@@ -922,7 +922,7 @@ pub const constructor = struct {
 
     /// 23.1.2.6 get Array [ %Symbol.species% ]
     /// https://tc39.es/ecma262/#sec-get-array-%symbol.species%
-    fn @"%Symbol.species%"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.species"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.
         return this_value;
     }
@@ -935,7 +935,7 @@ pub const prototype = struct {
         const array = arrayCreate(
             agent,
             0,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         ) catch |err| try noexcept(err);
         return &array.object;
     }
@@ -985,21 +985,21 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Array%"()),
+            Value.from(try realm.intrinsic(.array)),
         );
 
         // 23.1.3.40 Array.prototype [ %Symbol.iterator% ] ( )
         // https://tc39.es/ecma262/#sec-array.prototype-%symbol.iterator%
         // NOTE: We can't use the intrinsic getter for this while creating the underlying prototype
         //       object, as it hasn't been finalized yet.
-        const @"%Array.prototype.values%" = object.getPropertyValueDirect(PropertyKey.from("values"));
-        try object.defineBuiltinProperty(agent, "%Symbol.iterator%", @"%Array.prototype.values%");
+        const array_prototype_values = object.getPropertyValueDirect(PropertyKey.from("values"));
+        try object.defineBuiltinProperty(agent, "Symbol.iterator", array_prototype_values);
 
         // 23.1.3.41 Array.prototype [ %Symbol.unscopables% ]
         // https://tc39.es/ecma262/#sec-array.prototype-%symbol.unscopables%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.unscopables%",
+            "Symbol.unscopables",
             blk: {
                 // 1. Let unscopableList be OrdinaryObjectCreate(null).
                 const unscopable_list = try ordinaryObjectCreate(agent, null);
@@ -1042,9 +1042,9 @@ pub const prototype = struct {
             },
         );
 
-        // Ensure function intrinsics are set right after the object is created
-        _ = try realm.intrinsics.@"%Array.prototype.toString%"();
-        _ = try realm.intrinsics.@"%Array.prototype.values%"();
+        // Ensure property intrinsics are looked up right after the object is created
+        _ = try realm.intrinsic(.array_prototype_to_string);
+        _ = try realm.intrinsic(.array_prototype_values);
     }
 
     /// 23.1.3.1 Array.prototype.at ( index )
@@ -1176,7 +1176,7 @@ pub const prototype = struct {
         // 2. Let spreadable be ? Get(obj, %Symbol.isConcatSpreadable%).
         const spreadable = try obj.asObject().get(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.isConcatSpreadable%"),
+            PropertyKey.from(agent.well_known_symbols.is_concat_spreadable),
         );
 
         // 3. If spreadable is not undefined, return ToBoolean(spreadable).
@@ -3347,7 +3347,7 @@ pub const prototype = struct {
 
         // 3. If IsCallable(func) is false, set func to the intrinsic function
         //    %Object.prototype.toString%.
-        if (!func.isCallable()) func = Value.from(try realm.intrinsics.@"%Object.prototype.toString%"());
+        if (!func.isCallable()) func = Value.from(try realm.intrinsic(.object_prototype_to_string));
 
         // 4. Return ? Call(func, array).
         return func.callAssumeCallable(agent, Value.from(array), &.{});

@@ -543,7 +543,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             1,
             "String",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -558,7 +558,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%String.prototype%"()),
+            Value.from(try realm.intrinsic(.string_prototype)),
             .none,
         );
     }
@@ -594,7 +594,7 @@ pub const constructor = struct {
         const string_obj = try stringCreate(
             agent,
             string,
-            try getPrototypeFromConstructor(agent, new_target.?, "%String.prototype%"),
+            try getPrototypeFromConstructor(agent, new_target.?, .string_prototype),
         );
         return Value.from(&string_obj.object);
     }
@@ -739,7 +739,7 @@ pub const prototype = struct {
         const string = try stringCreate(
             agent,
             .empty,
-            try realm.intrinsics.@"%Object.prototype%"(),
+            try realm.intrinsic(.object_prototype),
         );
         return &string.object;
     }
@@ -779,14 +779,14 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "trimEnd", trimEnd, 0, realm);
         try object.defineBuiltinFunction(agent, "trimStart", trimStart, 0, realm);
         try object.defineBuiltinFunction(agent, "valueOf", valueOf, 0, realm);
-        try object.defineBuiltinFunction(agent, "%Symbol.iterator%", @"%Symbol.iterator%", 0, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.iterator", @"Symbol.iterator", 0, realm);
 
         // 22.1.3.6 String.prototype.constructor
         // https://tc39.es/ecma262/#sec-string.prototype.constructor
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%String%"()),
+            Value.from(try realm.intrinsic(.string)),
         );
 
         if (build_options.enable_annex_b) {
@@ -807,13 +807,13 @@ pub const prototype = struct {
 
             // B.2.2.15 String.prototype.trimLeft ( )
             // https://tc39.es/ecma262/#String.prototype.trimleft
-            const @"%String.prototype.trimStart%" = object.getPropertyValueDirect(PropertyKey.from("trimStart"));
-            try object.defineBuiltinProperty(agent, "trimLeft", @"%String.prototype.trimStart%");
+            const string_prototype_trim_start = object.getPropertyValueDirect(PropertyKey.from("trimStart"));
+            try object.defineBuiltinProperty(agent, "trimLeft", string_prototype_trim_start);
 
             // B.2.2.16 String.prototype.trimRight ( )
             // https://tc39.es/ecma262/#String.prototype.trimright
-            const @"%String.prototype.trimEnd%" = object.getPropertyValueDirect(PropertyKey.from("trimEnd"));
-            try object.defineBuiltinProperty(agent, "trimRight", @"%String.prototype.trimEnd%");
+            const string_prototype_trim_end = object.getPropertyValueDirect(PropertyKey.from("trimEnd"));
+            try object.defineBuiltinProperty(agent, "trimRight", string_prototype_trim_end);
         }
     }
 
@@ -1259,7 +1259,7 @@ pub const prototype = struct {
         const realm = agent.currentRealm();
 
         // 4. Let collator be ? Construct(%Intl.Collator%, « locales, options »).
-        const collator_constructor = try realm.intrinsics.@"%Intl.Collator%"();
+        const collator_constructor = try realm.intrinsic(.intl_collator);
         const collator = try collator_constructor.construct(
             agent,
             &.{ locales, options },
@@ -1290,7 +1290,7 @@ pub const prototype = struct {
             // a. Let matcher be ? GetMethod(regexpOrPattern, %Symbol.match%).
             const maybe_matcher = try regexp_or_pattern.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
+                PropertyKey.from(agent.well_known_symbols.match),
             );
 
             // b. If matcher is not undefined, then
@@ -1313,7 +1313,7 @@ pub const prototype = struct {
         // 6. Return ? Invoke(regexp, %Symbol.match%, « string »).
         return Value.from(&regexp.object).invoke(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.match%"),
+            PropertyKey.from(agent.well_known_symbols.match),
             &.{Value.from(string)},
         );
     }
@@ -1357,7 +1357,7 @@ pub const prototype = struct {
             // c. Let matcher be ? GetMethod(regexpOrPattern, %Symbol.matchAll%).
             const maybe_matcher = try regexp_or_pattern.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
+                PropertyKey.from(agent.well_known_symbols.match_all),
             );
 
             // d. If matcher is not undefined, then
@@ -1380,7 +1380,7 @@ pub const prototype = struct {
         // 6. Return ? Invoke(regexp, %Symbol.matchAll%, « string »).
         return Value.from(&regexp.object).invoke(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.matchAll%"),
+            PropertyKey.from(agent.well_known_symbols.match_all),
             &.{Value.from(string)},
         );
     }
@@ -1571,7 +1571,7 @@ pub const prototype = struct {
             // a. Let replacer be ? GetMethod(searchValue, %Symbol.replace%).
             const maybe_replacer = try search_value.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.replace%"),
+                PropertyKey.from(agent.well_known_symbols.replace),
             );
 
             // b. If replacer is not undefined, then
@@ -1690,7 +1690,7 @@ pub const prototype = struct {
             // c. Let replacer be ? GetMethod(searchValue, %Symbol.replace%).
             const maybe_replacer = try search_value.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.replace%"),
+                PropertyKey.from(agent.well_known_symbols.replace),
             );
 
             // d. If replacer is not undefined, then
@@ -1820,7 +1820,7 @@ pub const prototype = struct {
             // a. Let searcher be ? GetMethod(regexpOrPattern, %Symbol.search%).
             const maybe_searcher = try regexp_or_pattern.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.search%"),
+                PropertyKey.from(agent.well_known_symbols.search),
             );
 
             // b. If searcher is not undefined, then
@@ -1839,7 +1839,7 @@ pub const prototype = struct {
         // 6. Return ? Invoke(regexp, %Symbol.search%, « string »).
         return Value.from(&regexp.object).invoke(
             agent,
-            PropertyKey.from(agent.well_known_symbols.@"%Symbol.search%"),
+            PropertyKey.from(agent.well_known_symbols.search),
             &.{Value.from(string)},
         );
     }
@@ -1920,7 +1920,7 @@ pub const prototype = struct {
             // a. Let splitter be ? GetMethod(separator, %Symbol.split%).
             const maybe_splitter = try separator_value.getMethod(
                 agent,
-                PropertyKey.from(agent.well_known_symbols.@"%Symbol.split%"),
+                PropertyKey.from(agent.well_known_symbols.split),
             );
 
             // b. If splitter is not undefined, then
@@ -2467,7 +2467,7 @@ pub const prototype = struct {
 
     /// 22.1.3.36 String.prototype [ %Symbol.iterator% ] ( )
     /// https://tc39.es/ecma262/#sec-string.prototype-%symbol.iterator%
-    fn @"%Symbol.iterator%"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+    fn @"Symbol.iterator"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
 
         // 1. Let string be the this value.
@@ -2483,7 +2483,7 @@ pub const prototype = struct {
         // 5. Return CreateIteratorFromClosure(closure, "%StringIteratorPrototype%",
         //    %StringIteratorPrototype%).
         const string_iterator = try StringIterator.create(agent, .{
-            .prototype = try realm.intrinsics.@"%StringIteratorPrototype%"(),
+            .prototype = try realm.intrinsic(.string_iterator_prototype),
             .fields = .{
                 .state = .{ .string = string, .position = 0 },
             },

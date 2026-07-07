@@ -59,7 +59,7 @@ pub const constructor = struct {
             .{ .constructor = impl },
             2,
             "ZonedDateTime",
-            .{ .realm = realm, .proto = try realm.intrinsics.@"%Function.prototype%"() },
+            .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
         );
         return &builtin_function.object;
     }
@@ -73,7 +73,7 @@ pub const constructor = struct {
         try object.defineBuiltinPropertyWithAttributes(
             agent,
             "prototype",
-            Value.from(try realm.intrinsics.@"%Temporal.ZonedDateTime.prototype%"()),
+            Value.from(try realm.intrinsic(.temporal_zoned_date_time_prototype)),
             .{
                 .writable = false,
                 .enumerable = false,
@@ -197,7 +197,7 @@ pub const constructor = struct {
 /// https://tc39.es/proposal-temporal/#sec-properties-of-the-temporal-zoneddatetime-prototype-object
 pub const prototype = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
-        return ordinaryObjectCreate(agent, try realm.intrinsics.@"%Object.prototype%"());
+        return ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
@@ -255,14 +255,14 @@ pub const prototype = struct {
         try object.defineBuiltinProperty(
             agent,
             "constructor",
-            Value.from(try realm.intrinsics.@"%Temporal.ZonedDateTime%"()),
+            Value.from(try realm.intrinsic(.temporal_zoned_date_time)),
         );
 
         // 6.3.2 Temporal.ZonedDateTime.prototype[ %Symbol.toStringTag% ]
         // https://tc39.es/proposal-temporal/#sec-temporal.zoneddatetime.prototype-%symbol.tostringtag%
         try object.defineBuiltinPropertyWithAttributes(
             agent,
-            "%Symbol.toStringTag%",
+            "Symbol.toStringTag",
             Value.from("Temporal.ZonedDateTime"),
             .{
                 .writable = false,
@@ -1681,7 +1681,7 @@ pub fn createTemporalZonedDateTime(
 
     // 1. Assert: IsValidEpochNanoseconds(epochNanoseconds) is true.
     // 2. If newTarget is not present, set newTarget to %Temporal.ZonedDateTime%.
-    const new_target = maybe_new_target orelse try realm.intrinsics.@"%Temporal.ZonedDateTime%"();
+    const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_zoned_date_time);
 
     // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.ZonedDateTime.prototype%",
     //    « [[InitializedTemporalZonedDateTime]], [[EpochNanoseconds]], [[TimeZone]], [[Calendar]] »).
@@ -1693,7 +1693,7 @@ pub fn createTemporalZonedDateTime(
         ZonedDateTime,
         agent,
         new_target,
-        "%Temporal.ZonedDateTime.prototype%",
+        .temporal_zoned_date_time_prototype,
         .{ .inner = inner },
     );
 }

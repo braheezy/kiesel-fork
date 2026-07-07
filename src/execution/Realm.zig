@@ -52,6 +52,18 @@ rng: std.Random.DefaultPrng,
 
 shapes: Shapes,
 
+pub const Intrinsic = std.meta.FieldEnum(Intrinsics);
+
+pub fn intrinsic(realm: *Realm, comptime field: Intrinsic) std.mem.Allocator.Error!*Object {
+    return realm.intrinsics.getOrCreate(realm, field);
+}
+
+pub const Shape = std.meta.FieldEnum(Shapes);
+
+pub fn shape(realm: *Realm, comptime field: Shape) std.mem.Allocator.Error!Shapes.Result(field) {
+    return realm.shapes.getOrCreate(realm, field);
+}
+
 /// 9.3.1 InitializeHostDefinedRealm ( )
 /// https://tc39.es/ecma262/#sec-initializehostdefinedrealm
 pub fn initializeHostDefinedRealm(
@@ -72,7 +84,7 @@ pub fn initializeHostDefinedRealm(
 
     realm.* = .{
         .intrinsics = realm.intrinsics,
-        .shapes = .init(realm),
+        .shapes = .init,
         .rng = .init(@intFromPtr(realm)),
         .global_object = undefined,
         .global_env = undefined,
@@ -112,7 +124,7 @@ pub fn initializeHostDefinedRealm(
     //     a. Let global be OrdinaryObjectCreate(realm.[[Intrinsics]].[[%Object.prototype%]]).
     const global = args.global_object orelse try ordinaryObjectCreate(
         agent,
-        try realm.intrinsics.@"%Object.prototype%"(),
+        try realm.intrinsic(.object_prototype),
     );
     global.shape = try global.shape.makeUnique(agent.gc_allocator);
 
@@ -140,11 +152,11 @@ pub fn initializeHostDefinedRealm(
 /// https://tc39.es/ecma262/#sec-createintrinsics
 fn createIntrinsics(realm: *Realm, agent: *Agent) std.mem.Allocator.Error!void {
     // 1. Set realmRecord.[[Intrinsics]] to a new Record.
-    realm.intrinsics = .{ .realm = realm };
+    realm.intrinsics = .init;
 
     // Ensure %Object.prototype% exists before %Function.prototype% is created, otherwise the
     // latter will be created twice.
-    _ = try realm.intrinsics.@"%Object.prototype%"();
+    _ = try realm.intrinsic(.object_prototype);
 
     // 2. Set fields of realmRecord.[[Intrinsics]] with the values listed in Table 6. The field
     //    names are the names listed in the “Intrinsic Name” column of the table. The value of each
@@ -165,7 +177,7 @@ fn createIntrinsics(realm: *Realm, agent: *Agent) std.mem.Allocator.Error!void {
     //    realmRecord.[[Intrinsics]].[[%Function.prototype%]], realmRecord).
     try addRestrictedFunctionProperties(
         agent,
-        try realm.intrinsics.@"%Function.prototype%"(),
+        try realm.intrinsic(.function_prototype),
         realm,
     );
 
