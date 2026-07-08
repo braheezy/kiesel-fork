@@ -1540,7 +1540,14 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
         if (try constantFold(b.gpa, test_expr)) |constant| {
             defer constant.deinit(b.gpa);
             if (!constant.isTruthy()) {
-                return try b.addInst(.{
+                if (has_scope) {
+                    _ = try b.addInst(.{
+                        .tag = .pop_scope,
+                        .data = .{ .none = {} },
+                    });
+                    b.scope_depth -= 1;
+                }
+                return b.addInst(.{
                     .tag = .undefined,
                     .data = .{ .none = {} },
                 });
