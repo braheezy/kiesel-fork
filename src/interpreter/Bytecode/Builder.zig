@@ -11,18 +11,18 @@ const Builder = @This();
 
 gpa: std.mem.Allocator,
 ir: *const Ir,
-blocks: std.ArrayList(*Block),
-current: ?*Block,
 lsra: LinearScanRegisterAllocation,
-label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
+blocks: std.ArrayList(Block),
+current_block: Block.Index,
+label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, Block.Index),
 exception_handlers: std.ArrayList(ExceptionHandler),
 array_states: std.ArrayList(ArrayState),
 inline_cache_count: u16,
 
 const ExceptionHandler = struct {
-    start: *Block,
-    end: *Block,
-    target: *Block,
+    start: Block.Index,
+    end: Block.Index,
+    target: Block.Index,
     exception_reg: Bytecode.Reg,
     scope_depth: u16,
 };
@@ -40,9 +40,9 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
     return .{
         .gpa = gpa,
         .ir = ir,
-        .blocks = .empty,
-        .current = null,
         .lsra = lsra,
+        .blocks = .empty,
+        .current_block = undefined, // Initialized in `build()`
         .label_blocks = .empty,
         .exception_handlers = .empty,
         .array_states = .empty,
@@ -51,60 +51,58 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
 }
 
 pub fn deinit(b: *Builder) void {
-    for (b.blocks.items) |block| {
-        block.deinit(b.gpa);
-        b.gpa.destroy(block);
-    }
-    b.blocks.deinit(b.gpa);
     b.lsra.deinit(b.gpa);
+    b.blocks.deinit(b.gpa);
     b.label_blocks.deinit(b.gpa);
     b.exception_handlers.deinit(b.gpa);
     b.array_states.deinit(b.gpa);
 }
 
 fn computeRPO(
-    gpa: std.mem.Allocator,
-    block: *Block,
-    visited: *std.AutoHashMapUnmanaged(*Block, void),
-    out: *std.ArrayList(*Block),
+    b: *const Builder,
+    block: Block.Index,
+    visited: *std.AutoHashMapUnmanaged(Block.Index, void),
+    out: *std.ArrayList(Block.Index),
 ) std.mem.Allocator.Error!void {
     const start = out.items.len;
-    try computeRPOInner(gpa, block, visited, out);
-    std.mem.reverse(*Block, out.items[start..]);
+    try b.computeRPOInner(block, visited, out);
+    std.mem.reverse(Block.Index, out.items[start..]);
 }
 
 fn computeRPOInner(
-    gpa: std.mem.Allocator,
-    block: *Block,
-    visited: *std.AutoHashMapUnmanaged(*Block, void),
-    out: *std.ArrayList(*Block),
+    b: *const Builder,
+    block: Block.Index,
+    visited: *std.AutoHashMapUnmanaged(Block.Index, void),
+    out: *std.ArrayList(Block.Index),
 ) std.mem.Allocator.Error!void {
-    const gop = try visited.getOrPut(gpa, block);
+    const gop = try visited.getOrPut(b.gpa, block);
     if (gop.found_existing) return;
 
-    switch (block.terminator) {
+    switch (b.blocks.items[@intFromEnum(block)].terminator) {
         .none, .noreturn => {},
-        .jump => |target| try computeRPOInner(gpa, target, visited, out),
+        .jump => |target| try b.computeRPOInner(target, visited, out),
         .branch => |br| {
-            try computeRPOInner(gpa, br.else_block, visited, out);
-            try computeRPOInner(gpa, br.then_block, visited, out);
+            try b.computeRPOInner(br.else_block, visited, out);
+            try b.computeRPOInner(br.then_block, visited, out);
         },
     }
 
-    try out.append(gpa, block);
+    try out.append(b.gpa, block);
 }
 
 pub fn build(b: *Builder) Error!Bytecode {
-    const entry = try b.createBlock();
-    b.switchToBlock(entry);
+    std.debug.assert(b.blocks.items.len == 0);
+    try b.blocks.append(b.gpa, .empty);
+    b.current_block = .root;
 
     // Pre-create blocks for all labels
     for (b.ir.instructions.items(.tag), 0..) |tag, i| {
         const index: Ir.Inst.Index = @enumFromInt(i);
         if (!index.liveness(b.ir)) continue;
         if (tag != .label) continue;
-        const block = try b.createBlock();
-        try b.label_blocks.put(b.gpa, index.toRef(), block);
+        try b.blocks.append(b.gpa, .empty);
+        const block_index: Block.Index = @enumFromInt(b.blocks.items.len - 1);
+        try b.label_blocks.put(b.gpa, index.toRef(), block_index);
     }
 
     // Lower alive instructions
@@ -249,23 +247,24 @@ pub fn build(b: *Builder) Error!Bytecode {
     std.debug.assert(b.terminated());
 
     // Order blocks in reverse post-order
-    var ordered: std.ArrayList(*Block) = .empty;
+    var ordered: std.ArrayList(Block.Index) = .empty;
     defer ordered.deinit(b.gpa);
-    var visited: std.AutoHashMapUnmanaged(*Block, void) = .empty;
+    var visited: std.AutoHashMapUnmanaged(Block.Index, void) = .empty;
     defer visited.deinit(b.gpa);
-    try computeRPO(b.gpa, b.blocks.items[0], &visited, &ordered);
-    for (b.blocks.items) |block| {
+    for (0..b.blocks.items.len) |i| {
+        const block: Block.Index = @enumFromInt(i);
         if (!visited.contains(block)) {
-            try computeRPO(b.gpa, block, &visited, &ordered);
+            try b.computeRPO(block, &visited, &ordered);
         }
     }
 
     // Assign offsets
     var offset: u32 = 0;
-    for (ordered.items, 0..) |block, i| {
+    for (ordered.items, 0..) |block_index, i| {
+        const block = &b.blocks.items[@intFromEnum(block_index)];
         block.offset = offset;
         offset += block.size();
-        const next: ?*Block = if (i + 1 < ordered.items.len) ordered.items[i + 1] else null;
+        const next = if (i + 1 < ordered.items.len) ordered.items[i + 1] else null;
         offset += block.terminatorSize(next);
     }
 
@@ -273,9 +272,10 @@ pub fn build(b: *Builder) Error!Bytecode {
     var aw: std.Io.Writer.Allocating = .init(b.gpa);
     errdefer aw.deinit();
 
-    for (ordered.items, 0..) |block, i| {
-        const next: ?*Block = if (i + 1 < ordered.items.len) ordered.items[i + 1] else null;
-        block.encode(&aw.writer, next) catch |err| switch (err) {
+    for (ordered.items, 0..) |block_index, i| {
+        const block = &b.blocks.items[@intFromEnum(block_index)];
+        const next = if (i + 1 < ordered.items.len) ordered.items[i + 1] else null;
+        block.encode(&aw.writer, b.blocks.items, next) catch |err| switch (err) {
             error.WriteFailed => return error.OutOfMemory,
         };
     }
@@ -374,9 +374,9 @@ pub fn build(b: *Builder) Error!Bytecode {
     defer exception_handlers_list.deinit(b.gpa);
     for (b.exception_handlers.items) |handler| {
         exception_handlers_list.appendAssumeCapacity(.{
-            .start = handler.start.offset,
-            .end = handler.end.offset,
-            .target = handler.target.offset,
+            .start = b.blocks.items[@intFromEnum(handler.start)].offset,
+            .end = b.blocks.items[@intFromEnum(handler.end)].offset,
+            .target = b.blocks.items[@intFromEnum(handler.target)].offset,
             .exception_reg = handler.exception_reg,
             .scope_depth = handler.scope_depth,
         });
@@ -409,6 +409,11 @@ const Block = struct {
         .offset = 0,
     };
 
+    const Index = enum(u32) {
+        root = 0,
+        _,
+    };
+
     const Condition = enum {
         truthy,
         falsy,
@@ -416,12 +421,12 @@ const Block = struct {
 
     const Terminator = union(enum) {
         none,
-        jump: *Block,
+        jump: Block.Index,
         branch: struct {
             condition: Condition,
             condition_reg: Bytecode.Reg,
-            then_block: *Block,
-            else_block: *Block,
+            then_block: Block.Index,
+            else_block: Block.Index,
         },
         noreturn,
     };
@@ -434,7 +439,7 @@ const Block = struct {
         return total;
     }
 
-    fn terminatorSize(block: *const Block, next: ?*const Block) u32 {
+    fn terminatorSize(block: *const Block, next: ?Block.Index) u32 {
         return switch (block.terminator) {
             .none => unreachable,
             .noreturn => 0,
@@ -451,7 +456,12 @@ const Block = struct {
         };
     }
 
-    fn encode(block: *const Block, writer: *std.Io.Writer, next: ?*const Block) std.Io.Writer.Error!void {
+    fn encode(
+        block: *const Block,
+        writer: *std.Io.Writer,
+        blocks: []const Block,
+        next: ?Block.Index,
+    ) std.Io.Writer.Error!void {
         for (block.instructions.items) |inst| {
             try inst.encode(writer);
         }
@@ -465,7 +475,9 @@ const Block = struct {
             .jump => |target| {
                 if (target != next) {
                     const current_offset = block.offset + block.size();
-                    const target_relative: i32 = @as(i32, @intCast(target.offset)) - @as(i32, @intCast(current_offset + jump_size));
+                    const target_relative: i32 =
+                        @as(i32, @intCast(blocks[@intFromEnum(target)].offset)) -
+                        @as(i32, @intCast(current_offset + jump_size));
                     try (Bytecode.Inst{
                         .tag = .jump,
                         .data = .{ .i32 = target_relative },
@@ -478,7 +490,9 @@ const Block = struct {
                     .falsy => .jump_if_false,
                 };
                 const after_jump_cond = block.offset + block.size() + jump_cond_size;
-                const then_relative: i32 = @as(i32, @intCast(br.then_block.offset)) - @as(i32, @intCast(after_jump_cond));
+                const then_relative: i32 =
+                    @as(i32, @intCast(blocks[@intFromEnum(br.then_block)].offset)) -
+                    @as(i32, @intCast(after_jump_cond));
                 try (Bytecode.Inst{
                     .tag = jump_cond_tag,
                     .data = .{ .reg_i32 = .{
@@ -488,7 +502,9 @@ const Block = struct {
                 }).encode(writer);
                 if (br.else_block != next) {
                     const current_offset = after_jump_cond;
-                    const else_relative: i32 = @as(i32, @intCast(br.else_block.offset)) - @as(i32, @intCast(current_offset + jump_size));
+                    const else_relative: i32 =
+                        @as(i32, @intCast(blocks[@intFromEnum(br.else_block)].offset)) -
+                        @as(i32, @intCast(current_offset + jump_size));
                     try (Bytecode.Inst{
                         .tag = .jump,
                         .data = .{ .i32 = else_relative },
@@ -503,37 +519,27 @@ const Block = struct {
     }
 };
 
-fn createBlock(b: *Builder) Error!*Block {
-    const block = try b.gpa.create(Block);
-    errdefer b.gpa.destroy(block);
-    block.* = .empty;
-    try b.blocks.append(b.gpa, block);
-    return block;
-}
-
-fn switchToBlock(b: *Builder, block: *Block) void {
-    if (b.current != null) std.debug.assert(b.terminated());
-    b.current = block;
-}
-
 fn terminated(b: *const Builder) bool {
-    return b.current.?.terminator != .none;
+    const block = &b.blocks.items[@intFromEnum(b.current_block)];
+    return block.terminator != .none;
 }
 
-fn jump(b: *Builder, target: *Block) void {
+fn jump(b: *Builder, target: Block.Index) void {
     std.debug.assert(!b.terminated());
-    b.current.?.terminator = .{ .jump = target };
+    const block = &b.blocks.items[@intFromEnum(b.current_block)];
+    block.terminator = .{ .jump = target };
 }
 
 fn branch(
     b: *Builder,
     condition: Block.Condition,
     condition_reg: Bytecode.Reg,
-    then_block: *Block,
-    else_block: *Block,
+    then_block: Block.Index,
+    else_block: Block.Index,
 ) void {
     std.debug.assert(!b.terminated());
-    b.current.?.terminator = .{ .branch = .{
+    const block = &b.blocks.items[@intFromEnum(b.current_block)];
+    block.terminator = .{ .branch = .{
         .condition = condition,
         .condition_reg = condition_reg,
         .then_block = then_block,
@@ -543,11 +549,13 @@ fn branch(
 
 fn @"noreturn"(b: *Builder) void {
     std.debug.assert(!b.terminated());
-    b.current.?.terminator = .noreturn;
+    const block = &b.blocks.items[@intFromEnum(b.current_block)];
+    block.terminator = .noreturn;
 }
 
 fn emit(b: *Builder, inst: Bytecode.Inst) Error!void {
-    try b.current.?.instructions.append(b.gpa, inst);
+    const block = &b.blocks.items[@intFromEnum(b.current_block)];
+    try block.instructions.append(b.gpa, inst);
 }
 
 fn emitUnaryOp(
@@ -963,7 +971,7 @@ fn lowerLabel(b: *Builder, dest: Ir.Inst.Ref) Error!void {
     if (!b.terminated()) {
         b.jump(label_block);
     }
-    b.switchToBlock(label_block);
+    b.current_block = label_block;
 }
 
 fn lowerBr(b: *Builder, data: Ir.Inst.Br) Error!void {
