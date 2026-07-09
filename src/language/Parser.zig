@@ -2318,6 +2318,22 @@ pub fn acceptLexicalDeclaration(
     };
     const binding_list = try self.acceptBindingList();
     if (!for_initializer) try self.acceptOrInsertSemicolon();
+
+    switch (@"type") {
+        .@"const" => for (binding_list.items) |binding| switch (binding) {
+            .binding_identifier => |binding_identifier| if (!for_initializer and binding_identifier.initializer == null) {
+                try self.emitErrorAt(
+                    state.location,
+                    "'const' declaration must have an initializer",
+                    .{},
+                );
+                return error.UnexpectedToken;
+            },
+            else => {},
+        },
+        else => {},
+    }
+
     return .{ .type = @"type", .binding_list = binding_list };
 }
 
