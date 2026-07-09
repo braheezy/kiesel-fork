@@ -11,6 +11,7 @@ const utils = @import("../utils.zig");
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Bytecode = interpreter.Bytecode;
+const DisposableResource = types.DisposableResource;
 const Iterator = types.Iterator;
 const Object = types.Object;
 const PrivateName = types.PrivateName;
@@ -18,6 +19,7 @@ const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
 
+const addDisposableResource = types.addDisposableResource;
 const applyStringOrNumericBinaryOperator = language.runtime.applyStringOrNumericBinaryOperator;
 const arrayCreateFast = builtins.arrayCreateFast;
 const await = builtins.await;
@@ -27,6 +29,7 @@ const createForInIterator = builtins.createForInIterator;
 const createMappedArgumentsObject = builtins.createMappedArgumentsObject;
 const createUnmappedArgumentsObject = builtins.createUnmappedArgumentsObject;
 const directEval = language.runtime.directEval;
+const disposeResources = types.disposeResources;
 const evaluateCall = language.runtime.evaluateCall;
 const evaluateImportCall = language.runtime.evaluateImportCall;
 const evaluateImportMeta = language.runtime.evaluateImportMeta;
@@ -321,6 +324,9 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .has_private_element => vm.executeHasPrivateElement(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .import_call => vm.executeImportCall(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .get_import_meta => vm.executeGetImportMeta(data.reg),
+                .add_disposable_resource_sync => vm.executeAddDisposableResource(data.reg, .sync_dispose),
+                .add_disposable_resource_async => vm.executeAddDisposableResource(data.reg, .async_dispose),
+                .dispose_resources => vm.executeDisposeResources(),
             };
             std.debug.assert(vm.call_stack.items.len == initial_call_stack_depth);
             switch (@typeInfo(@TypeOf(maybe_error))) {
@@ -342,12 +348,27 @@ fn handleError(vm: *Vm, err: Agent.Error, inst_pc: Pc, pc: *Pc) Agent.Error!void
     switch (err) {
         error.OutOfMemory => return err,
         error.ExceptionThrown => {
-            const handler = vm.frame.bytecode.findExceptionHandler(@intFromEnum(inst_pc)) orelse return err;
             const execution_context = vm.agent.runningExecutionContext();
-            while (vm.frame.scope_depth > handler.scope_depth) {
-                execution_context.ecmascript_code.lexical_environment = execution_context.ecmascript_code.lexical_environment.outerEnv().?;
+            const maybe_handler = vm.frame.bytecode.findExceptionHandler(@intFromEnum(inst_pc));
+            const target_scope_depth = if (maybe_handler) |handler| handler.scope_depth else 0;
+            while (true) {
+                const env = execution_context.ecmascript_code.lexical_environment;
+                if (env.declarativeEnv()) |decl_env| dispose: {
+                    if (decl_env.disposable_resource_stack.items.len == 0) break :dispose;
+                    _ = disposeResources(
+                        vm.agent,
+                        &decl_env.disposable_resource_stack,
+                        @as(Agent.Error!Value, err),
+                    ) catch |e| switch (e) {
+                        error.OutOfMemory => return error.OutOfMemory,
+                        error.ExceptionThrown => {},
+                    };
+                }
+                if (vm.frame.scope_depth == target_scope_depth) break;
                 vm.frame.scope_depth -= 1;
+                execution_context.ecmascript_code.lexical_environment = env.outerEnv().?;
             }
+            const handler = maybe_handler orelse return err;
             const exception = vm.agent.clearException();
             vm.load(handler.exception_reg, exception.value);
             pc.* = @enumFromInt(handler.target);
@@ -1932,7 +1953,7 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Byte
     const iterator_inner = iterator_obj.getValueAtPropertyOffset(@enumFromInt(0)).asObject();
     const next_method = iterator_obj.getValueAtPropertyOffset(@enumFromInt(1));
 
-    // Implements steps 6.a-f. of ForIn/OfBodyEvaluation for async iterators.
+    // Implements steps 8.a-f. of ForIn/OfBodyEvaluation for async iterators.
     // https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofbodyevaluation-lhs-stmt-iterator-lhskind-labelset
 
     // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
@@ -2466,4 +2487,27 @@ fn executeImportCall(vm: *Vm, dest: Bytecode.Reg, specifier_reg: Bytecode.Reg, o
 fn executeGetImportMeta(vm: *Vm, dest: Bytecode.Reg) std.mem.Allocator.Error!void {
     const result = try evaluateImportMeta(vm.agent);
     vm.load(dest, result);
+}
+
+fn executeAddDisposableResource(
+    vm: *Vm,
+    value_reg: Bytecode.Reg,
+    comptime kind: DisposableResource.Kind,
+) Agent.Error!void {
+    const value = vm.store(value_reg);
+    const execution_context = vm.agent.runningExecutionContext();
+    const env = execution_context.ecmascript_code.lexical_environment;
+    const decl_env = env.declarativeEnv().?;
+    try addDisposableResource(vm.agent, &decl_env.disposable_resource_stack, value, kind, null);
+}
+
+fn executeDisposeResources(vm: *Vm) Agent.Error!void {
+    const execution_context = vm.agent.runningExecutionContext();
+    const env = execution_context.ecmascript_code.lexical_environment;
+    const decl_env = env.declarativeEnv().?;
+    _ = try disposeResources(
+        vm.agent,
+        &decl_env.disposable_resource_stack,
+        @as(Agent.Error!Value, .undefined),
+    );
 }

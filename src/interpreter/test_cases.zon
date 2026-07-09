@@ -2746,4 +2746,237 @@
         \\
         ,
     },
+
+    // Explicit resource management
+    .{
+        .source =
+        \\var log = [];
+        \\
+        \\class Disposable {
+        \\  constructor(x) {
+        \\    this.x = x;
+        \\  }
+        \\
+        \\  [Symbol.dispose]() {
+        \\    log.push(this.x);
+        \\  }
+        \\}
+        \\
+        \\(function () {
+        \\  using _ = new Disposable(1);
+        \\})();
+        \\
+        \\for (using _ = new Disposable(2); false; );
+        \\
+        \\for (using _ of [new Disposable(3), new Disposable(4)]);
+        \\
+        \\try {
+        \\  using _ = new Disposable(5);
+        \\  throw new Error();
+        \\} catch {}
+        \\
+        \\log.join(",");
+        \\
+        ,
+        .expected_result = .{ .value = .{ .string = "1,2,3,4,5" } },
+        .expected_output =
+        \\IR (test)
+        \\  %0: [  0..1  ]                       array_create 0
+        \\  %1: [  1..1  ]                       set_binding @0 ("log"), %0
+        \\  %2: [  2..2  ]                       push_private_scope
+        \\  %3: [  3..4  ]                       get_binding @2 ("Symbol")
+        \\  %4: [  4..5  ]                       get_property %3, @3 ("dispose")
+        \\  %5: [  5..7  ]                       create_class @0, none, [%4]
+        \\  %6: [  6..6  ]                       pop_private_scope
+        \\  %7: [  7..7  ]                       initialize_binding @1 ("Disposable"), %5
+        \\  %8: [  8..9  ]                       create_function @0
+        \\  %9: [  9..9  ]                       call %8, none, []
+        \\ %10: [ 10..10 ]                       push_scope
+        \\ %11: [ 11..11 ]                       create_immutable_binding @4 ("_")
+        \\ %12: [ 12..14 ]                       get_binding @1 ("Disposable")
+        \\ %13: [ 13..14 ]                       number 2
+        \\ %14: [ 14..16 ]                       construct %12, [%13]
+        \\ %15: [ 15..15 ]                       add_disposable_resource_sync %14
+        \\ %16: [ 16..16 ]                       initialize_binding @4 ("_"), %14
+        \\ %17: [ 17..17 ]                       dispose_resources
+        \\ %18: [ 18..18 ]                       pop_scope
+        \\ %19: [ 19..19 ] dead                  undefined
+        \\ %20: [ 20..30 ]                       array_create 2
+        \\ %21: [ 21..23 ]                       get_binding @1 ("Disposable")
+        \\ %22: [ 22..23 ]                       number 3
+        \\ %23: [ 23..24 ]                       construct %21, [%22]
+        \\ %24: [ 24..24 ]                       array_push %20, %23
+        \\ %25: [ 25..27 ]                       get_binding @1 ("Disposable")
+        \\ %26: [ 26..27 ]                       number 4
+        \\ %27: [ 27..28 ]                       construct %25, [%26]
+        \\ %28: [ 28..28 ]                       array_push %20, %27
+        \\ %29: [ 29..44 ]                       undefined
+        \\ %30: [ 30..44 ]                       get_iterator %20
+        \\ %31: [ 31..31 ]                       br %32, %29
+        \\ %32: [ 32..46 ]                       label
+        \\ %33: [ 33..41 ]                       iterator_step_value %30
+        \\ %34: [ 34..35 ]                       iterator_is_done %30
+        \\ %35: [ 35..36 ]                       logical_not %34
+        \\ %36: [ 36..36 ]                       br_cond %35, %37, %45
+        \\ %37: [ 37..37 ]                       label
+        \\ %38: [ 38..38 ]                       push_scope
+        \\ %39: [ 39..39 ]                       create_immutable_binding @4 ("_")
+        \\ %40: [ 40..40 ]                       add_disposable_resource_sync %33
+        \\ %41: [ 41..41 ]                       initialize_binding @4 ("_"), %33
+        \\ %42: [ 42..42 ]                       dispose_resources
+        \\ %43: [ 43..43 ]                       pop_scope
+        \\ %44: [ 44..44 ]                       br %32, %29
+        \\ %45: [ 45..45 ]                       label
+        \\ %46: [ 46..46 ]                       br %47, %32
+        \\ %47: [ 47..47 ]                       label
+        \\ %48: [ 48..65 ]                       label
+        \\ %49: [ 49..49 ]                       push_scope
+        \\ %50: [ 50..50 ]                       create_immutable_binding @4 ("_")
+        \\ %51: [ 51..53 ]                       get_binding @1 ("Disposable")
+        \\ %52: [ 52..53 ]                       number 5
+        \\ %53: [ 53..55 ]                       construct %51, [%52]
+        \\ %54: [ 54..54 ]                       add_disposable_resource_sync %53
+        \\ %55: [ 55..55 ]                       initialize_binding @4 ("_"), %53
+        \\ %56: [ 56..57 ]                       get_binding @5 ("Error")
+        \\ %57: [ 57..58 ]                       construct %56, []
+        \\ %58: [ 58..58 ]                       throw %57
+        \\ %59: [ 59..59 ] dead                  dispose_resources
+        \\ %60: [ 60..60 ] dead                  pop_scope
+        \\ %61: [ 61..63 ] dead                  undefined
+        \\ %62: [ 62..65 ]                       label
+        \\ %63: [ 63..63 ] dead                  br %68, %61
+        \\ %64: [ 64..65 ]                       label
+        \\ %65: [ 65..65 ]                       exception_handler %48, %62, %64, 0
+        \\ %66: [ 66..67 ]                       undefined
+        \\ %67: [ 67..67 ]                       br %68, %66
+        \\ %68: [ 68..68 ]                       label
+        \\ %69: [ 69..72 ]                       get_binding @0 ("log")
+        \\ %70: [ 70..72 ]                       get_property %69, @6 ("join")
+        \\ %71: [ 71..72 ]                       string @7 (",")
+        \\ %72: [ 72..73 ]                       call %70, %69, [%71]
+        \\ %73: [ 73..73 ]                       return %72
+        \\
+        \\Bytecode (test)
+        \\   0: 0d 00 00 00 00 00 00             array_create r0, 0
+        \\   7: 4a 00 00 00 00 00 00             set_binding @0 ("log"), r0
+        \\  14: 87                               push_private_scope
+        \\  15: 46 00 00 02 00 00 00             get_binding r0, @2 ("Symbol")
+        \\  22: 47 01 00 00 00 03 00 00 00 00 00 get_property r1, r0, @3 ("dispose"), @0
+        \\  33: 79 00 00 00 00                   create_class r0, @0
+        \\  38: 88                               pop_private_scope
+        \\  39: 45 01 00 00 00 00 00             initialize_binding @1 ("Disposable"), r0
+        \\  46: 78 00 00 00 00                   create_function r0, @0
+        \\  51: 5b 01 00 00 00                   call0 r1, r0
+        \\  56: 3e                               push_scope
+        \\  57: 44 04 00 00 00                   create_immutable_binding @4 ("_")
+        \\  62: 46 00 00 01 00 00 00             get_binding r0, @1 ("Disposable")
+        \\  69: 07 01 00 02                      load_number_i8 r1, 2
+        \\  73: 66 02 00 00 00 01 00             construct1 r2, r0, r1
+        \\  80: 90 02 00                         add_disposable_resource_sync r2
+        \\  83: 45 04 00 00 00 02 00             initialize_binding @4 ("_"), r2
+        \\  90: 92                               dispose_resources
+        \\  91: 41                               pop_scope
+        \\  92: 0d 00 00 02 00 00 00             array_create r0, 2
+        \\  99: 46 01 00 01 00 00 00             get_binding r1, @1 ("Disposable")
+        \\ 106: 07 02 00 03                      load_number_i8 r2, 3
+        \\ 110: 66 03 00 01 00 02 00             construct1 r3, r1, r2
+        \\ 117: 10 00 00 03 00 00 00 00 00       array_set r0, r3, 0
+        \\ 126: 46 01 00 01 00 00 00             get_binding r1, @1 ("Disposable")
+        \\ 133: 07 02 00 04                      load_number_i8 r2, 4
+        \\ 137: 66 03 00 01 00 02 00             construct1 r3, r1, r2
+        \\ 144: 10 00 00 03 00 01 00 00 00       array_set r0, r3, 1
+        \\ 153: 03 01 00                         load_undefined r1
+        \\ 156: 69 02 00 00 00                   get_iterator r2, r0
+        \\ 161: 0c 00 00 01 00                   move r0, r1
+        \\ 166: 6d 03 00 02 00                   iterator_step_value r3, r2
+        \\ 171: 70 04 00 02 00                   iterator_is_done r4, r2
+        \\ 176: 25 05 00 04 00                   logical_not r5, r4
+        \\ 181: 01 05 00 05 00 00 00             jump_if_true r5, 5
+        \\ 188: 00 1c 00 00 00                   jump 28
+        \\ 193: 3e                               push_scope
+        \\ 194: 44 04 00 00 00                   create_immutable_binding @4 ("_")
+        \\ 199: 90 03 00                         add_disposable_resource_sync r3
+        \\ 202: 45 04 00 00 00 03 00             initialize_binding @4 ("_"), r3
+        \\ 209: 92                               dispose_resources
+        \\ 210: 41                               pop_scope
+        \\ 211: 0c 00 00 01 00                   move r0, r1
+        \\ 216: 00 c9 ff ff ff                   jump -55
+        \\ 221: 3e                               push_scope
+        \\ 222: 44 04 00 00 00                   create_immutable_binding @4 ("_")
+        \\ 227: 46 01 00 01 00 00 00             get_binding r1, @1 ("Disposable")
+        \\ 234: 07 02 00 05                      load_number_i8 r2, 5
+        \\ 238: 66 03 00 01 00 02 00             construct1 r3, r1, r2
+        \\ 245: 90 03 00                         add_disposable_resource_sync r3
+        \\ 248: 45 04 00 00 00 03 00             initialize_binding @4 ("_"), r3
+        \\ 255: 46 01 00 05 00 00 00             get_binding r1, @5 ("Error")
+        \\ 262: 65 02 00 01 00                   construct0 r2, r1
+        \\ 267: 72 02 00                         throw r2
+        \\ 270: 03 00 00                         load_undefined r0
+        \\ 273: 46 00 00 00 00 00 00             get_binding r0, @0 ("log")
+        \\ 280: 47 01 00 00 00 06 00 00 00 01 00 get_property r1, r0, @6 ("join"), @1
+        \\ 291: 0a 02 00 07 00 00 00             load_string r2, @7 (",")
+        \\ 298: 60 03 00 01 00 00 00 02 00       call_property1 r3, r1, r0, r2
+        \\ 307: 74 03 00                         return r3
+        \\
+        \\Exception handlers
+        \\  [ 221..270 ) →  270, r3, 0
+        \\
+        \\IR ()
+        \\  %0: [  0..0  ]                       push_scope
+        \\  %1: [  1..1  ]                       create_immutable_binding @0 ("_")
+        \\  %2: [  2..4  ]                       get_binding @1 ("Disposable")
+        \\  %3: [  3..4  ]                       one
+        \\  %4: [  4..6  ]                       construct %2, [%3]
+        \\  %5: [  5..5  ]                       add_disposable_resource_sync %4
+        \\  %6: [  6..6  ]                       initialize_binding @0 ("_"), %4
+        \\  %7: [  7..7  ]                       dispose_resources
+        \\  %8: [  8..8  ]                       return none
+        \\
+        \\Bytecode ()
+        \\   0: 3e                               push_scope
+        \\   1: 44 00 00 00 00                   create_immutable_binding @0 ("_")
+        \\   6: 46 00 00 01 00 00 00             get_binding r0, @1 ("Disposable")
+        \\  13: 07 01 00 01                      load_number_i8 r1, 1
+        \\  17: 66 02 00 00 00 01 00             construct1 r2, r0, r1
+        \\  24: 90 02 00                         add_disposable_resource_sync r2
+        \\  27: 45 00 00 00 00 02 00             initialize_binding @0 ("_"), r2
+        \\  34: 92                               dispose_resources
+        \\  35: 74 ff ff                         return
+        \\
+        \\IR (Disposable)
+        \\  %0: [  0..0  ]                       create_mutable_binding @0 ("x")
+        \\  %1: [  1..2  ]                       get_argument 0
+        \\  %2: [  2..2  ]                       initialize_binding @0 ("x"), %1
+        \\  %3: [  3..5  ]                       this
+        \\  %4: [  4..5  ]                       get_binding @0 ("x")
+        \\  %5: [  5..5  ]                       set_property_strict %3, @0 ("x"), %4
+        \\  %6: [  6..6  ]                       return none
+        \\
+        \\Bytecode (Disposable)
+        \\   0: 43 00 00 00 00                   create_mutable_binding @0 ("x")
+        \\   5: 7d 00 00 00 00                   get_argument r0, 0
+        \\  10: 45 00 00 00 00 00 00             initialize_binding @0 ("x"), r0
+        \\  17: 1c 00 00                         resolve_this_binding r0
+        \\  20: 46 01 00 00 00 00 00             get_binding r1, @0 ("x")
+        \\  27: 4d 00 00 01 00 00 00 00 00 00 00 set_property_strict r0, r1, @0 ("x"), @0
+        \\  38: 74 ff ff                         return
+        \\
+        \\IR ([Symbol.dispose])
+        \\  %0: [  0..4  ]                       get_binding @0 ("log")
+        \\  %1: [  1..4  ]                       get_property %0, @1 ("push")
+        \\  %2: [  2..3  ]                       this
+        \\  %3: [  3..4  ]                       get_property %2, @2 ("x")
+        \\  %4: [  4..4  ]                       call %1, %0, [%3]
+        \\  %5: [  5..5  ]                       return none
+        \\
+        \\Bytecode ([Symbol.dispose])
+        \\   0: 46 00 00 00 00 00 00             get_binding r0, @0 ("log")
+        \\   7: 47 01 00 00 00 01 00 00 00 00 00 get_property r1, r0, @1 ("push"), @0
+        \\  18: 1c 02 00                         resolve_this_binding r2
+        \\  21: 47 03 00 02 00 02 00 00 00 01 00 get_property r3, r2, @2 ("x"), @1
+        \\  32: 60 02 00 01 00 00 00 03 00       call_property1 r2, r1, r0, r3
+        \\  41: 74 ff ff                         return
+        \\
+        ,
+    },
 }

@@ -241,6 +241,9 @@ pub fn build(b: *Builder) Error!Bytecode {
             .has_private_element => try b.lowerHasPrivateElement(data.binary, dest),
             .import_call => try b.lowerImportCall(data.binary, dest),
             .get_import_meta => try b.lowerGetImportMeta(dest),
+            .add_disposable_resource_sync => try b.lowerAddDisposableResourceSync(data.ref),
+            .add_disposable_resource_async => try b.lowerAddDisposableResourceAsync(data.ref),
+            .dispose_resources => try b.lowerDisposeResources(),
         }
     }
 
@@ -2028,5 +2031,28 @@ fn lowerGetImportMeta(b: *Builder, dest: Ir.Inst.Ref) Error!void {
     try b.emit(.{
         .tag = .get_import_meta,
         .data = .{ .reg = dest_reg },
+    });
+}
+
+fn lowerAddDisposableResourceSync(b: *Builder, value: Ir.Inst.Ref) Error!void {
+    const value_reg = b.resolve(value);
+    try b.emit(.{
+        .tag = .add_disposable_resource_sync,
+        .data = .{ .reg = value_reg },
+    });
+}
+
+fn lowerAddDisposableResourceAsync(b: *Builder, value: Ir.Inst.Ref) Error!void {
+    const value_reg = b.resolve(value);
+    try b.emit(.{
+        .tag = .add_disposable_resource_async,
+        .data = .{ .reg = value_reg },
+    });
+}
+
+fn lowerDisposeResources(b: *Builder) Error!void {
+    try b.emit(.{
+        .tag = .dispose_resources,
+        .data = .{ .none = {} },
     });
 }

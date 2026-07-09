@@ -889,6 +889,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "some", some, 1, realm);
         try object.defineBuiltinFunction(agent, "take", take, 1, realm);
         try object.defineBuiltinFunction(agent, "toArray", toArray, 0, realm);
+        try object.defineBuiltinFunction(agent, "Symbol.dispose", @"Symbol.dispose", 0, realm);
         try object.defineBuiltinFunction(agent, "Symbol.iterator", @"Symbol.iterator", 0, realm);
 
         // 27.1.3.3.1 Iterator.prototype.constructor
@@ -1972,6 +1973,23 @@ pub const prototype = struct {
         }
         const array = try createArrayFromList(agent, items.items);
         return Value.from(&array.object);
+    }
+
+    /// 27.1.3.3.13 Iterator.prototype [ %Symbol.dispose% ] ( )
+    /// https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.dispose%
+    fn @"Symbol.dispose"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        // 1. Let obj be the this value.
+        // 2. Let return be ? GetMethod(obj, "return").
+        const maybe_return = try this_value.getMethod(agent, PropertyKey.from("return"));
+
+        // 3. If return is not undefined, then
+        if (maybe_return) |@"return"| {
+            // a. Perform ? Call(return, obj).
+            _ = try Value.from(@"return").callAssumeCallable(agent, this_value, &.{});
+        }
+
+        // 4. Return undefined.
+        return .undefined;
     }
 
     /// 27.1.3.3.14 Iterator.prototype [ %Symbol.iterator% ] ( )

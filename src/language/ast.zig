@@ -1045,6 +1045,40 @@ pub const Declaration = union(enum) {
             inline else => |node| try node.collectBoundNames(allocator, bound_names),
         }
     }
+
+    /// 8.2.4 Static Semantics: IsUsingDeclaration
+    /// https://tc39.es/ecma262/#sec-static-semantics-isusingdeclaration
+    pub fn isUsingDeclaration(self: Declaration) bool {
+        // LexicalDeclaration : LetOrConst BindingList ;
+        // 1. Return false.
+        // UsingDeclaration :
+        //     using BindingList ;
+        // AwaitUsingDeclaration :
+        //     CoverAwaitExpressionAndAwaitUsingDeclarationHead BindingList ;
+        // 1. Return true.
+        return switch (self) {
+            .lexical_declaration => |lex_decl| switch (lex_decl.type) {
+                .using, .await_using => true,
+                else => false,
+            },
+            else => false,
+        };
+    }
+
+    /// 8.2.5 Static Semantics: IsAwaitUsingDeclaration
+    /// https://tc39.es/ecma262/#sec-static-semantics-isawaitusingdeclaration
+    pub fn isAwaitUsingDeclaration(self: Declaration) bool {
+        // LexicalDeclaration : LetOrConst BindingList ;
+        // 1. Return false.
+        // UsingDeclaration : using BindingList ;
+        // 1. Return false.
+        // AwaitUsingDeclaration : CoverAwaitExpressionAndAwaitUsingDeclarationHead BindingList ;
+        // 1. Return true.
+        return switch (self) {
+            .lexical_declaration => |lex_decl| lex_decl.type == .await_using,
+            else => false,
+        };
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-HoistableDeclaration
@@ -1283,6 +1317,19 @@ pub const StatementList = struct {
         };
     }
 
+    /// 8.6.6 Static Semantics: ContainsUsing
+    /// https://tc39.es/ecma262/#sec-static-semantics-containsusing
+    pub fn containsUsing(self: StatementList) bool {
+        // StatementList : StatementList StatementListItem
+        // 1. If ContainsUsing of the derived StatementList is true, return true.
+        // 2. If ContainsUsing of StatementListItem is true, return true.
+        // 3. Return false.
+        for (self.items) |item| {
+            if (item.containsUsing()) return true;
+        }
+        return false;
+    }
+
     /// 11.2.1 Directive Prologues and the Use Strict Directive
     /// https://tc39.es/ecma262/#sec-directive-prologues-and-the-use-strict-directive
     pub fn containsDirective(self: StatementList, directive: []const u8) bool {
@@ -1449,6 +1496,21 @@ pub const StatementListItem = union(enum) {
         }
     }
 
+    /// 8.6.6 Static Semantics: ContainsUsing
+    /// https://tc39.es/ecma262/#sec-static-semantics-containsusing
+    pub fn containsUsing(self: StatementListItem) bool {
+        // StatementListItem : Statement
+        // 1. Return false.
+        // StatementListItem : Declaration
+        // 1. If IsUsingDeclaration of Declaration is true, return true.
+        // 2. If IsAwaitUsingDeclaration of Declaration is true, return true.
+        // 3. Return false.
+        return switch (self) {
+            .statement => false,
+            .declaration => |declaration| declaration.isUsingDeclaration() or declaration.isAwaitUsingDeclaration(),
+        };
+    }
+
     pub fn analyze(self: StatementListItem, query: AnalyzeQuery) bool {
         return switch (self) {
             inline else => |node| node.analyze(query),
@@ -1461,6 +1523,8 @@ pub const LexicalDeclaration = struct {
     pub const Type = enum {
         let,
         @"const",
+        using,
+        await_using,
     };
 
     type: Type,
@@ -1475,6 +1539,11 @@ pub const LexicalDeclaration = struct {
     ) std.mem.Allocator.Error!void {
         // LexicalDeclaration : LetOrConst BindingList ;
         // 1. Return the BoundNames of BindingList.
+        // UsingDeclaration :
+        //     using BindingList ;
+        // AwaitUsingDeclaration :
+        //     CoverAwaitExpressionAndAwaitUsingDeclarationHead BindingList ;
+        // 1. Return the BoundNames of BindingList.
         try self.binding_list.collectBoundNames(allocator, bound_names);
     }
 
@@ -1483,18 +1552,19 @@ pub const LexicalDeclaration = struct {
     pub fn isConstantDeclaration(self: LexicalDeclaration) bool {
         // LexicalDeclaration : LetOrConst BindingList ;
         // 1. Return IsConstantDeclaration of LetOrConst.
-        switch (self.type) {
-            // LetOrConst : let
-            .let => {
-                // 1. Return false.
-                return false;
-            },
-            // LetOrConst : const
-            .@"const" => {
-                // 1. Return true.
-                return true;
-            },
-        }
+        // LetOrConst : let
+        // 1. Return false.
+        // LetOrConst : const
+        // 1. Return true.
+        // UsingDeclaration :
+        //     using BindingList ;
+        // AwaitUsingDeclaration :
+        //     CoverAwaitExpressionAndAwaitUsingDeclarationHead BindingList ;
+        // 1. Return true.
+        return switch (self.type) {
+            .let => false,
+            else => true,
+        };
     }
 };
 

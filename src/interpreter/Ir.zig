@@ -250,6 +250,10 @@ pub const Inst = struct {
 
         import_call,
         get_import_meta,
+
+        add_disposable_resource_sync,
+        add_disposable_resource_async,
+        dispose_resources,
     };
 
     pub const Data = union {
@@ -426,6 +430,9 @@ pub const Inst = struct {
         .has_private_element = .binary,
         .import_call = .binary,
         .get_import_meta = .none,
+        .add_disposable_resource_sync = .ref,
+        .add_disposable_resource_async = .ref,
+        .dispose_resources = .none,
     });
 
     // Inline data types (8 bytes)

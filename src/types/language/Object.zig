@@ -76,6 +76,7 @@ pub const Tag = enum(u16) {
     array,
     array_buffer,
     array_iterator,
+    async_disposable_stack,
     async_from_sync_iterator,
     async_generator,
     big_int,
@@ -84,6 +85,7 @@ pub const Tag = enum(u16) {
     builtin_function,
     data_view,
     date,
+    disposable_stack,
     ecmascript_function,
     @"error",
     finalization_registry,
@@ -595,7 +597,9 @@ fn getPropertyKey(comptime name: []const u8, agent: *Agent) PropertyKey {
         const field = comptime std.StaticStringMap(
             std.meta.FieldEnum(Agent.WellKnownSymbols),
         ).initComptime(&.{
+            .{ "Symbol.asyncDispose", .async_dispose },
             .{ "Symbol.asyncIterator", .async_iterator },
+            .{ "Symbol.dispose", .dispose },
             .{ "Symbol.hasInstance", .has_instance },
             .{ "Symbol.isConcatSpreadable", .is_concat_spreadable },
             .{ "Symbol.iterator", .iterator },

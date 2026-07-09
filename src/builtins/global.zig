@@ -42,7 +42,7 @@ fn LazyIntrinsicInitializer(
     };
 }
 
-const num_properties = 59 +
+const num_properties = 62 +
     (if (build_options.enable_annex_b) 2 else 0) +
     (if (build_options.enable_intl) 1 else 0) +
     (if (build_options.enable_temporal) 1 else 0);
@@ -114,6 +114,10 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-arraybuffer
         .{ "ArrayBuffer", .{ .lazy_property = LazyIntrinsicInitializer(.array_buffer) } },
 
+        // 19.3.4 AsyncDisposableStack ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-asyncdisposablestack
+        .{ "AsyncDisposableStack", .{ .lazy_property = LazyIntrinsicInitializer(.async_disposable_stack) } },
+
         // 19.3.5 BigInt ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-bigint
         .{ "BigInt", .{ .lazy_property = LazyIntrinsicInitializer(.big_int) } },
@@ -137,6 +141,10 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         // 19.3.10 Date ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-date
         .{ "Date", .{ .lazy_property = LazyIntrinsicInitializer(.date) } },
+
+        // 19.3.11 DisposableStack ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-disposablestack
+        .{ "DisposableStack", .{ .lazy_property = LazyIntrinsicInitializer(.disposable_stack) } },
 
         // 19.3.12 Error ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-error
@@ -225,6 +233,10 @@ pub fn globalObjectProperties(realm: *Realm) [num_properties]GlobalObjectPropert
         // 19.3.33 String ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-string
         .{ "String", .{ .lazy_property = LazyIntrinsicInitializer(.string) } },
+
+        // 19.3.34 SuppressedError ( . . . )
+        // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-suppressederror
+        .{ "SuppressedError", .{ .lazy_property = LazyIntrinsicInitializer(.suppressed_error) } },
 
         // 19.3.35 Symbol ( . . . )
         // https://tc39.es/ecma262/#sec-constructor-properties-of-the-global-object-symbol

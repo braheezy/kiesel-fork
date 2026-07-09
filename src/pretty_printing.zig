@@ -160,6 +160,32 @@ fn prettyPrintArrayIterator(
     try terminal.setColor(.reset);
 }
 
+fn prettyPrintAsyncDisposableStack(
+    async_disposable_stack: *const builtins.AsyncDisposableStack,
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("AsyncDisposableStack(");
+    try terminal.setColor(.reset);
+    switch (async_disposable_stack.fields) {
+        .pending => |disposable_resource_stack| {
+            for (disposable_resource_stack.items, 0..) |resource, i| {
+                if (i != 0) try terminal.writer.writeAll(", ");
+                const value = if (resource.resource_value) |obj| Value.from(obj) else Value.undefined;
+                try terminal.writer.print("{f}", .{value.fmtPretty(terminal.mode)});
+            }
+        },
+        .disposed => {
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<disposed>");
+            try terminal.setColor(.reset);
+        },
+    }
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
+}
+
 fn prettyPrintAsyncGenerator(
     async_gen: *const builtins.AsyncGenerator,
     terminal: std.Io.Terminal,
@@ -242,6 +268,32 @@ fn prettyPrintDate(
         try terminal.setColor(.dim);
         try terminal.writer.writeAll("<invalid>");
         try terminal.setColor(.reset);
+    }
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll(")");
+    try terminal.setColor(.reset);
+}
+
+fn prettyPrintDisposableStack(
+    disposable_stack: *const builtins.DisposableStack,
+    terminal: std.Io.Terminal,
+) PrettyPrintError!void {
+    try terminal.setColor(.white);
+    try terminal.writer.writeAll("DisposableStack(");
+    try terminal.setColor(.reset);
+    switch (disposable_stack.fields) {
+        .pending => |disposable_resource_stack| {
+            for (disposable_resource_stack.items, 0..) |resource, i| {
+                if (i != 0) try terminal.writer.writeAll(", ");
+                const value = if (resource.resource_value) |obj| Value.from(obj) else Value.undefined;
+                try terminal.writer.print("{f}", .{value.fmtPretty(terminal.mode)});
+            }
+        },
+        .disposed => {
+            try terminal.setColor(.dim);
+            try terminal.writer.writeAll("<disposed>");
+            try terminal.setColor(.reset);
+        },
     }
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -1362,11 +1414,13 @@ pub fn prettyPrintValue(
             .{ builtins.Array, prettyPrintArray },
             .{ builtins.ArrayBuffer, prettyPrintArrayBuffer },
             .{ builtins.ArrayIterator, prettyPrintArrayIterator },
+            .{ builtins.AsyncDisposableStack, prettyPrintAsyncDisposableStack },
             .{ builtins.AsyncGenerator, prettyPrintAsyncGenerator },
             .{ builtins.BigInt, prettyPrintPrimitiveWrapper },
             .{ builtins.Boolean, prettyPrintPrimitiveWrapper },
             .{ builtins.DataView, prettyPrintDataView },
             .{ builtins.Date, prettyPrintDate },
+            .{ builtins.DisposableStack, prettyPrintDisposableStack },
             .{ builtins.Error, prettyPrintError },
             .{ builtins.FinalizationRegistry, prettyPrintFinalizationRegistry },
             .{ builtins.Generator, prettyPrintGenerator },

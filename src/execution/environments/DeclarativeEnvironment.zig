@@ -9,6 +9,7 @@ const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
 
 const Agent = execution.Agent;
+const DisposableResource = types.DisposableResource;
 const Environment = environments.Environment;
 const Object = types.Object;
 const String = types.String;
@@ -18,6 +19,9 @@ const DeclarativeEnvironment = @This();
 
 /// [[OuterEnv]]
 outer_env: ?Environment,
+
+/// [[DisposableResourceStack]]
+disposable_resource_stack: std.ArrayList(DisposableResource),
 
 bindings: String.HashMapUnmanaged(Binding),
 

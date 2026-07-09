@@ -32,7 +32,16 @@ pub const constructor = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
-        // 20.4.2.1 Symbol.asyncIterator
+        // 20.4.2.1 Symbol.asyncDispose
+        // https://tc39.es/ecma262/#sec-symbol.asyncdispose
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "asyncDispose",
+            Value.from(agent.well_known_symbols.async_dispose),
+            .none,
+        );
+
+        // 20.4.2.2 Symbol.asyncIterator
         // https://tc39.es/ecma262/#sec-symbol.asynciterator
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -41,9 +50,18 @@ pub const constructor = struct {
             .none,
         );
 
+        // 20.4.2.3 Symbol.dispose
+        // https://tc39.es/ecma262/#sec-symbol.dispose
+        try object.defineBuiltinPropertyWithAttributes(
+            agent,
+            "dispose",
+            Value.from(agent.well_known_symbols.dispose),
+            .none,
+        );
+
         try object.defineBuiltinFunction(agent, "for", @"for", 1, realm);
 
-        // 20.4.2.3 Symbol.hasInstance
+        // 20.4.2.5 Symbol.hasInstance
         // https://tc39.es/ecma262/#sec-symbol.hasinstance
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -52,7 +70,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.4 Symbol.isConcatSpreadable
+        // 20.4.2.6 Symbol.isConcatSpreadable
         // https://tc39.es/ecma262/#sec-symbol.isconcatspreadable
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -61,7 +79,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.5 Symbol.iterator
+        // 20.4.2.7 Symbol.iterator
         // https://tc39.es/ecma262/#sec-symbol.iterator
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -72,7 +90,7 @@ pub const constructor = struct {
 
         try object.defineBuiltinFunction(agent, "keyFor", keyFor, 1, realm);
 
-        // 20.4.2.7 Symbol.match
+        // 20.4.2.9 Symbol.match
         // https://tc39.es/ecma262/#sec-symbol.match
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -81,7 +99,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.8 Symbol.matchAll
+        // 20.4.2.10 Symbol.matchAll
         // https://tc39.es/ecma262/#sec-symbol.matchall
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -90,7 +108,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.9 Symbol.prototype
+        // 20.4.2.11 Symbol.prototype
         // https://tc39.es/ecma262/#sec-symbol.prototype
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -99,7 +117,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.10 Symbol.replace
+        // 20.4.2.12 Symbol.replace
         // https://tc39.es/ecma262/#sec-symbol.replace
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -108,7 +126,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.11 Symbol.search
+        // 20.4.2.13 Symbol.search
         // https://tc39.es/ecma262/#sec-symbol.search
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -117,7 +135,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.12 Symbol.species
+        // 20.4.2.14 Symbol.species
         // https://tc39.es/ecma262/#sec-symbol.species
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -126,7 +144,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.13 Symbol.split
+        // 20.4.2.15 Symbol.split
         // https://tc39.es/ecma262/#sec-symbol.split
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -135,7 +153,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.14 Symbol.toPrimitive
+        // 20.4.2.16 Symbol.toPrimitive
         // https://tc39.es/ecma262/#sec-symbol.toprimitive
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -144,7 +162,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.15 Symbol.toStringTag
+        // 20.4.2.17 Symbol.toStringTag
         // https://tc39.es/ecma262/#sec-symbol.tostringtag
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -153,7 +171,7 @@ pub const constructor = struct {
             .none,
         );
 
-        // 20.4.2.16 Symbol.unscopables
+        // 20.4.2.18 Symbol.unscopables
         // https://tc39.es/ecma262/#sec-symbol.unscopables
         try object.defineBuiltinPropertyWithAttributes(
             agent,
@@ -185,7 +203,7 @@ pub const constructor = struct {
         return Value.from(try types.Symbol.init(agent, description_string));
     }
 
-    /// 20.4.2.2 Symbol.for ( key )
+    /// 20.4.2.4 Symbol.for ( key )
     /// https://tc39.es/ecma262/#sec-symbol.for
     fn @"for"(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const key = arguments.get(0);
@@ -215,7 +233,7 @@ pub const constructor = struct {
         return Value.from(new_symbol);
     }
 
-    /// 20.4.2.6 Symbol.keyFor ( symbol )
+    /// 20.4.2.8 Symbol.keyFor ( symbol )
     /// https://tc39.es/ecma262/#sec-symbol.keyfor
     fn keyFor(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const symbol = arguments.get(0);

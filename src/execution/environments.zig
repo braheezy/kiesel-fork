@@ -40,6 +40,16 @@ pub const Environment = union(enum) {
         };
     }
 
+    pub fn declarativeEnv(self: Environment) ?*DeclarativeEnvironment {
+        return switch (self) {
+            .declarative_environment => |env| env,
+            .object_environment => null,
+            .function_environment => |env| &env.declarative_environment,
+            .global_environment => |env| env.declarative_record,
+            .module_environment => |env| &env.declarative_environment,
+        };
+    }
+
     pub fn hasBinding(self: Environment, agent: *Agent, name: *const String) Agent.Error!bool {
         return switch (self) {
             .declarative_environment => |env| env.hasBinding(name),
@@ -221,10 +231,13 @@ pub fn newDeclarativeEnvironment(
         // 2. Set envRecord.[[OuterEnv]] to outerEnv.
         .outer_env = outer_env,
 
+        // 3. Set envRecord.[[DisposableResourceStack]] to a new empty List.
+        .disposable_resource_stack = .empty,
+
         .bindings = .empty,
     };
 
-    // 3. Return envRecord.
+    // 4. Return envRecord.
     return env;
 }
 
@@ -277,16 +290,20 @@ pub fn newFunctionEnvironment(
         // 5. Set envRecord.[[NewTarget]] to newTarget.
         .new_target = new_target,
 
-        // 6. Set envRecord.[[OuterEnv]] to func.[[Environment]].
         .declarative_environment = .{
+            // 6. Set envRecord.[[OuterEnv]] to func.[[Environment]].
             .outer_env = func.fields.environment,
+
+            // 7. Set envRecord.[[DisposableResourceStack]] to a new empty List.
+            .disposable_resource_stack = .empty,
+
             .bindings = .empty,
         },
 
         .this_value = .undefined,
     };
 
-    // 7. Return envRecord.
+    // 8. Return envRecord.
     return env;
 }
 
@@ -332,16 +349,20 @@ pub fn newModuleEnvironment(
     // 1. Let envRecord be a new Module Environment Record containing no bindings.
     const env = try allocator.create(ModuleEnvironment);
     env.* = .{
-        // 2. Set envRecord.[[OuterEnv]] to outerEnv.
         .declarative_environment = .{
+            // 2. Set envRecord.[[OuterEnv]] to outerEnv.
             .outer_env = .{ .global_environment = outer_env },
+
+            // 3. Set envRecord.[[DisposableResourceStack]] to a new empty List.
+            .disposable_resource_stack = .empty,
+
             .bindings = .empty,
         },
 
         .indirect_bindings = .empty,
     };
 
-    // 3. Return envRecord.
+    // 4. Return envRecord.
     return env;
 }
 

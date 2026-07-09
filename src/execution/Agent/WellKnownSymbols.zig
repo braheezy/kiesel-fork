@@ -8,7 +8,9 @@ const Symbol = types.Symbol;
 
 const WellKnownSymbols = @This();
 
+async_dispose: *const Symbol,
 async_iterator: *const Symbol,
+dispose: *const Symbol,
 has_instance: *const Symbol,
 is_concat_spreadable: *const Symbol,
 iterator: *const Symbol,
@@ -23,7 +25,9 @@ to_string_tag: *const Symbol,
 unscopables: *const Symbol,
 
 pub const init: WellKnownSymbols = .{
+    .async_dispose = Symbol.initComptime(String.fromLiteral("Symbol.asyncDispose")),
     .async_iterator = Symbol.initComptime(String.fromLiteral("Symbol.asyncIterator")),
+    .dispose = Symbol.initComptime(String.fromLiteral("Symbol.dispose")),
     .has_instance = Symbol.initComptime(String.fromLiteral("Symbol.hasInstance")),
     .is_concat_spreadable = Symbol.initComptime(String.fromLiteral("Symbol.isConcatSpreadable")),
     .iterator = Symbol.initComptime(String.fromLiteral("Symbol.iterator")),

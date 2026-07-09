@@ -1768,22 +1768,24 @@ fn executeModule(
         // a. Assert: capability is not present.
         std.debug.assert(capability == null);
 
-        // b. Suspend the running execution context.
+        // b. Let env be module.[[Environment]].
+        // c. Suspend the running execution context.
 
-        // c. Push moduleContext onto the execution context stack; moduleContext is now the running
+        // d. Push moduleContext onto the execution context stack; moduleContext is now the running
         //    execution context.
         try agent.execution_context_stack.append(agent.gc_allocator, module_context);
 
-        // d. Let result be Completion(Evaluation of module.[[ECMAScriptCode]]).
+        // e. Let result be Completion(Evaluation of module.[[ECMAScriptCode]]).
+        // f. Set result to Completion(DisposeResources(env.[[DisposableResourceStack]], result)).
         const result = interpreter.compileAndRun(agent, .{ .module = &self.ecmascript_code }, "<module>");
 
-        // e. Suspend moduleContext and remove it from the execution context stack.
+        // g. Suspend moduleContext and remove it from the execution context stack.
         _ = agent.execution_context_stack.pop().?;
 
-        // f. Resume the context that is now on the top of the execution context stack as the
+        // h. Resume the context that is now on the top of the execution context stack as the
         //    running execution context.
 
-        // g. If result is an abrupt completion, then
+        // i. If result is an abrupt completion, then
         //     i. Return ? result.
         _ = try result;
     } else {

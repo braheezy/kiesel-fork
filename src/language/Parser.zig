@@ -2310,12 +2310,20 @@ pub fn acceptLexicalDeclaration(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const let_or_const = self.acceptKeyword("let") catch try self.core.accept(RuleSet.is(.@"const"));
-    const @"type": ast.LexicalDeclaration.Type = switch (let_or_const.type) {
-        .identifier => .let,
-        .@"const" => .@"const",
-        else => unreachable,
-    };
+    const @"type": ast.LexicalDeclaration.Type = if (self.acceptKeyword("let")) |_|
+        .let
+    else |_| if (self.core.accept(RuleSet.is(.@"const"))) |_|
+        .@"const"
+    else |_| if (self.acceptKeyword("using")) |_| blk: {
+        if (self.followedByLineTerminator()) return error.UnexpectedToken;
+        break :blk .using;
+    } else |_| if (self.core.accept(RuleSet.is(.await))) |_| blk: {
+        if (self.followedByLineTerminator()) return error.UnexpectedToken;
+        _ = try self.acceptKeyword("using");
+        if (self.followedByLineTerminator()) return error.UnexpectedToken;
+        break :blk .await_using;
+    } else |_| return error.UnexpectedToken;
+
     const binding_list = try self.acceptBindingList();
     if (!for_initializer) try self.acceptOrInsertSemicolon();
 
@@ -2330,6 +2338,24 @@ pub fn acceptLexicalDeclaration(
                 return error.UnexpectedToken;
             },
             else => {},
+        },
+        .using, .await_using => for (binding_list.items) |binding| switch (binding) {
+            .binding_identifier => |binding_identifier| if (!for_initializer and binding_identifier.initializer == null) {
+                try self.emitErrorAt(
+                    state.location,
+                    "'using' and 'await using' declarations must have an initializer",
+                    .{},
+                );
+                return error.UnexpectedToken;
+            },
+            .binding_pattern => {
+                try self.emitErrorAt(
+                    state.location,
+                    "'using' and 'await using' declarations must not contain binding pattern",
+                    .{},
+                );
+                return error.UnexpectedToken;
+            },
         },
         else => {},
     }
@@ -2772,16 +2798,23 @@ pub fn acceptForStatement(self: *Parser) AcceptError!ast.ForStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const error_count = self.diagnostics.errors.items.len;
+
     _ = try self.core.accept(RuleSet.is(.@"for"));
     _ = try self.core.accept(RuleSet.is(.@"("));
     const initializer: ?ast.ForStatement.Initializer = if (self.acceptVariableStatement(true)) |variable_statement|
         .{ .variable_statement = variable_statement }
     else |_| if (self.acceptLexicalDeclaration(true)) |lexical_declaration|
         .{ .lexical_declaration = lexical_declaration }
-    else |_| if (self.acceptExpression(.{ .forbidden = &.{.in} })) |expression|
-        .{ .expression = expression }
-    else |_|
-        null;
+    else |_| blk: {
+        // If parsing the lexical declaration failed we may have emitted a 'Missing initializer'
+        // diagnostic - get rid of those
+        while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
+        break :blk if (self.acceptExpression(.{ .forbidden = &.{.in} })) |expression|
+            .{ .expression = expression }
+        else |_|
+            null;
+    };
     _ = try self.core.accept(RuleSet.is(.@";"));
     const test_expression = self.acceptExpression(.{}) catch null;
     _ = try self.core.accept(RuleSet.is(.@";"));
@@ -2800,6 +2833,8 @@ pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
+    const error_count = self.diagnostics.errors.items.len;
+
     _ = try self.core.accept(RuleSet.is(.@"for"));
     const maybe_await_token = self.core.accept(RuleSet.is(.await)) catch null;
     _ = try self.core.accept(RuleSet.is(.@"("));
@@ -2808,10 +2843,15 @@ pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
         .{ .for_binding = try self.acceptForBinding() }
     else |_| if (self.acceptForDeclaration()) |for_declaration|
         .{ .for_declaration = for_declaration }
-    else |_| if (self.acceptExpression(.{ .forbidden = &.{.in} })) |expression|
-        .{ .expression = expression }
-    else |_|
-        return error.UnexpectedToken;
+    else |_| blk: {
+        // If parsing the for declaration failed we may have emitted a 'Missing initializer'
+        // diagnostic - get rid of those
+        while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
+        break :blk if (self.acceptExpression(.{ .forbidden = &.{.in} })) |expression|
+            .{ .expression = expression }
+        else |_|
+            return error.UnexpectedToken;
+    };
 
     // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
     // Error if the AssignmentTargetType of LeftHandSideExpression is invalid.
@@ -2844,6 +2884,20 @@ pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
             try self.emitErrorAt(await_token.location, "'for in' loop cannot be awaited", .{});
             return error.UnexpectedToken;
         }
+        switch (initializer) {
+            .for_declaration => |for_decl| switch (for_decl.type) {
+                .using, .await_using => {
+                    try self.emitErrorAt(
+                        initializer_location,
+                        "'using' and 'await using' declarations are not allowed in 'for in' loop",
+                        .{},
+                    );
+                    return error.UnexpectedToken;
+                },
+                else => {},
+            },
+            else => {},
+        }
         break :blk .in;
     } else |_| if (self.acceptKeyword("of")) |_|
         if (maybe_await_token) |_| .async_of else .of
@@ -2864,13 +2918,38 @@ pub fn acceptForDeclaration(self: *Parser) AcceptError!ast.ForDeclaration {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const let_or_const = self.acceptKeyword("let") catch try self.core.accept(RuleSet.is(.@"const"));
-    const @"type": ast.LexicalDeclaration.Type = switch (let_or_const.type) {
-        .identifier => .let,
-        .@"const" => .@"const",
-        else => unreachable,
-    };
+    const @"type": ast.LexicalDeclaration.Type = if (self.acceptKeyword("let")) |_|
+        .let
+    else |_| if (self.core.accept(RuleSet.is(.@"const"))) |_|
+        .@"const"
+    else |_| if (self.acceptKeyword("using")) |_| blk: {
+        if (self.followedByLineTerminator()) return error.UnexpectedToken;
+        const next = try self.peekToken();
+        if (next.type == .identifier and std.mem.eql(u8, next.text, "of")) {
+            return error.UnexpectedToken;
+        }
+        break :blk .using;
+    } else |_| if (self.core.accept(RuleSet.is(.await))) |_| blk: {
+        if (self.followedByLineTerminator()) return error.UnexpectedToken;
+        _ = try self.acceptKeyword("using");
+        if (self.followedByLineTerminator()) return error.UnexpectedToken;
+        break :blk .await_using;
+    } else |_| return error.UnexpectedToken;
+
     const for_binding = try self.acceptForBinding();
+
+    switch (@"type") {
+        .using, .await_using => if (for_binding == .binding_pattern) {
+            try self.emitErrorAt(
+                state.location,
+                "'using' and 'await using' declarations must not contain binding pattern",
+                .{},
+            );
+            return error.UnexpectedToken;
+        },
+        else => {},
+    }
+
     return .{ .type = @"type", .for_binding = for_binding };
 }
 
@@ -3070,6 +3149,17 @@ pub fn acceptCaseClause(self: *Parser) AcceptError!ast.CaseClause {
     const expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@":"));
     const statement_list = try self.acceptStatementList(.{});
+
+    // - It is a Syntax Error if ContainsUsing of StatementList is true.
+    if (statement_list.containsUsing()) {
+        try self.emitErrorAt(
+            state.location,
+            "'using' and 'await using' declarations are not allowed in 'case' clause",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
     return .{ .expression = expression, .statement_list = statement_list };
 }
 
@@ -3088,6 +3178,17 @@ pub fn acceptDefaultClause(self: *Parser, has_default_clause: bool) AcceptError!
     }
     _ = try self.core.accept(RuleSet.is(.@":"));
     const statement_list = try self.acceptStatementList(.{});
+
+    // - It is a Syntax Error if ContainsUsing of StatementList is true.
+    if (statement_list.containsUsing()) {
+        try self.emitErrorAt(
+            state.location,
+            "'using' and 'await using' declarations are not allowed in 'default' clause",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
     return .{ .statement_list = statement_list };
 }
 
@@ -4460,6 +4561,16 @@ pub fn acceptScript(self: *Parser) AcceptError!ast.Script {
         state.location,
     );
 
+    // - It is a Syntax Error if ContainsUsing of StatementList is true.
+    if (statement_list.containsUsing()) {
+        try self.emitErrorAt(
+            state.location,
+            "'using' and 'await using' declarations are not allowed at the top level of a script",
+            .{},
+        );
+        return error.UnexpectedToken;
+    }
+
     return script;
 }
 
@@ -4698,6 +4809,7 @@ pub fn acceptExportDeclaration(self: *Parser) AcceptError!ast.ExportDeclaration 
     errdefer self.core.restoreState(state);
 
     _ = try self.core.accept(RuleSet.is(.@"export"));
+    const location = (try self.peekToken()).location;
     if (self.acceptExportFrom()) |export_from|
         return .{ .export_from = export_from }
     else |_| if (self.acceptNamedExports()) |named_exports| {
@@ -4705,9 +4817,24 @@ pub fn acceptExportDeclaration(self: *Parser) AcceptError!ast.ExportDeclaration 
         return .{ .named_exports = named_exports };
     } else |_| if (self.acceptVariableStatement(false)) |variable_statement|
         return .{ .variable_statement = variable_statement }
-    else |_| if (self.acceptDeclaration()) |declaration|
-        return .{ .declaration = declaration }
-    else |_| if (self.core.accept(RuleSet.is(.default))) |_| {
+    else |_| if (self.acceptDeclaration()) |declaration| {
+        // export [lookahead ∉ { using, await }] Declaration
+        switch (declaration.*) {
+            .lexical_declaration => |lex_decl| switch (lex_decl.type) {
+                .using, .await_using => {
+                    try self.emitErrorAt(
+                        location,
+                        "'using' and 'await using' declarations are not allowed in export declaration",
+                        .{},
+                    );
+                    return error.UnexpectedToken;
+                },
+                else => {},
+            },
+            else => {},
+        }
+        return .{ .declaration = declaration };
+    } else |_| if (self.core.accept(RuleSet.is(.default))) |_| {
         const tmp = temporaryChange(&self.state.in_default_export, true);
         defer tmp.restore();
         if (self.acceptHoistableDeclaration()) |hoistable_declaration|

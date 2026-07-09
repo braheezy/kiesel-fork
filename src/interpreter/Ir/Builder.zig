@@ -464,10 +464,12 @@ fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
 }
 
 fn lowerScript(b: *Builder, script: *const ast.Script) Error!Ir.Inst.Ref {
+    std.debug.assert(!script.statement_list.containsUsing());
     return b.lowerStatementList(&script.statement_list);
 }
 
 fn lowerModule(b: *Builder, module: *const ast.Module) Error!Ir.Inst.Ref {
+    var has_using = false;
     for (module.module_item_list.items) |module_item| {
         switch (module_item) {
             // InitializeEnvironment is responsible for creating the bindings.
@@ -475,10 +477,21 @@ fn lowerModule(b: *Builder, module: *const ast.Module) Error!Ir.Inst.Ref {
             .export_declaration => |*export_decl| _ = try b.lowerExportDeclaration(export_decl),
             .statement_list_item => |stmt_list_item| switch (stmt_list_item) {
                 .statement => |stmt| _ = try b.lowerStatement(stmt),
-                .declaration => |decl| _ = try b.lowerDeclaration(decl),
+                .declaration => |decl| {
+                    _ = try b.lowerDeclaration(decl);
+                    if (decl.isUsingDeclaration()) has_using = true;
+                },
             },
         }
     }
+
+    if (has_using) {
+        _ = try b.addInst(.{
+            .tag = .dispose_resources,
+            .data = .{ .none = {} },
+        });
+    }
+
     return .none;
 }
 
@@ -523,6 +536,8 @@ fn lowerExportDeclaration(b: *Builder, export_decl: *const ast.ExportDeclaration
 }
 
 fn lowerFunction(b: *Builder, formal_parameters: *const ast.FormalParameters, function_body: *const ast.FunctionBody) Error!Ir.Inst.Ref {
+    const has_using = function_body.statement_list.containsUsing();
+
     try b.lowerFunctionDeclarationInstantiation(formal_parameters, function_body);
 
     switch (function_body.type) {
@@ -537,6 +552,14 @@ fn lowerFunction(b: *Builder, formal_parameters: *const ast.FormalParameters, fu
     }
 
     _ = try b.lowerStatementList(&function_body.statement_list);
+
+    if (has_using) {
+        _ = try b.addInst(.{
+            .tag = .dispose_resources,
+            .data = .{ .none = {} },
+        });
+    }
+
     // Implicit return is added in `build()`
     return .none;
 }
@@ -1216,6 +1239,7 @@ fn lowerBlockStatement(b: *Builder, block_stmt: *const ast.BlockStatement, break
 fn lowerBlock(b: *Builder, block: *const ast.Block, breakable_ctx: ?*BreakableContext) Error!Ir.Inst.Ref {
     const stmt_list = &block.statement_list;
     const has_scope = stmt_list.hasLexicallyScopedDeclarations();
+    const has_using = stmt_list.containsUsing();
 
     if (has_scope) {
         _ = try b.addInst(.{
@@ -1232,6 +1256,12 @@ fn lowerBlock(b: *Builder, block: *const ast.Block, breakable_ctx: ?*BreakableCo
     } else try b.lowerStatementList(stmt_list);
 
     if (has_scope) {
+        if (has_using) {
+            _ = try b.addInst(.{
+                .tag = .dispose_resources,
+                .data = .{ .none = {} },
+            });
+        }
         _ = try b.addInst(.{
             .tag = .pop_scope,
             .data = .{ .none = {} },
@@ -1486,10 +1516,19 @@ fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement, label
 }
 
 fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
-    const has_scope = if (for_stmt.initializer) |initializer|
-        initializer == .lexical_declaration
-    else
-        false;
+    const has_scope, const has_using = blk: {
+        if (for_stmt.initializer) |initializer| switch (initializer) {
+            .lexical_declaration => |lex_decl| {
+                const has_using = switch (lex_decl.type) {
+                    .using, .await_using => true,
+                    else => false,
+                };
+                break :blk .{ true, has_using };
+            },
+            else => {},
+        };
+        break :blk .{ false, false };
+    };
 
     if (has_scope) {
         const lex_decl = &for_stmt.initializer.?.lexical_declaration;
@@ -1541,6 +1580,12 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
             defer constant.deinit(b.gpa);
             if (!constant.isTruthy()) {
                 if (has_scope) {
+                    if (has_using) {
+                        _ = try b.addInst(.{
+                            .tag = .dispose_resources,
+                            .data = .{ .none = {} },
+                        });
+                    }
                     _ = try b.addInst(.{
                         .tag = .pop_scope,
                         .data = .{ .none = {} },
@@ -1604,6 +1649,12 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     const end_label = try b.addLabel();
 
     if (has_scope) {
+        if (has_using) {
+            _ = try b.addInst(.{
+                .tag = .dispose_resources,
+                .data = .{ .none = {} },
+            });
+        }
         _ = try b.addInst(.{
             .tag = .pop_scope,
             .data = .{ .none = {} },
@@ -1640,6 +1691,20 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
 }
 
 fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
+    const has_scope, const has_using = blk: {
+        switch (for_in_of_stmt.initializer) {
+            .for_declaration => |*for_decl| {
+                const has_using = switch (for_decl.type) {
+                    .using, .await_using => true,
+                    else => false,
+                };
+                break :blk .{ true, has_using };
+            },
+            else => {},
+        }
+        break :blk .{ false, false };
+    };
+
     const expr_value = try b.lowerExpression(&for_in_of_stmt.expression);
 
     const undefined_ref = try b.addInst(.{
@@ -1654,6 +1719,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     var skip_br: Deferred = undefined;
 
     if (for_in_of_stmt.type == .in) {
+        std.debug.assert(!has_using);
         const null_ref = try b.addInst(.{
             .tag = .null,
             .data = .{ .none = {} },
@@ -1865,17 +1931,28 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
             });
             b.scope_depth += 1;
 
-            const tag: Ir.Inst.Tag = switch (for_decl.type) {
-                .let => .create_mutable_binding,
-                .@"const" => .create_immutable_binding,
-            };
             switch (for_decl.for_binding) {
                 .binding_identifier => |identifier| {
+                    const tag: Ir.Inst.Tag = switch (for_decl.type) {
+                        .let => .create_mutable_binding,
+                        .@"const", .using, .await_using => .create_immutable_binding,
+                    };
                     const string_index = try b.internString(identifier, .literal);
                     _ = try b.addInst(.{
                         .tag = tag,
                         .data = .{ .string = string_index },
                     });
+                    switch (for_decl.type) {
+                        .using => _ = try b.addInst(.{
+                            .tag = .add_disposable_resource_sync,
+                            .data = .{ .ref = next_value },
+                        }),
+                        .await_using => _ = try b.addInst(.{
+                            .tag = .add_disposable_resource_async,
+                            .data = .{ .ref = next_value },
+                        }),
+                        else => {},
+                    }
                     _ = try b.addInst(.{
                         .tag = .initialize_binding,
                         .data = .{ .set_binding = .{
@@ -1885,6 +1962,11 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                     });
                 },
                 .binding_pattern => |*pattern| {
+                    const tag: Ir.Inst.Tag = switch (for_decl.type) {
+                        .let => .create_mutable_binding,
+                        .@"const" => .create_immutable_binding,
+                        .using, .await_using => unreachable,
+                    };
                     var bound_names: std.ArrayList(ast.Identifier) = .empty;
                     defer bound_names.deinit(b.gpa);
                     try pattern.collectBoundNames(b.gpa, &bound_names);
@@ -1909,7 +1991,13 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     };
     _ = try b.lowerBlockStatement(body_block_stmt, breakable_ctx);
 
-    if (for_in_of_stmt.initializer == .for_declaration) {
+    if (has_scope) {
+        if (has_using) {
+            _ = try b.addInst(.{
+                .tag = .dispose_resources,
+                .data = .{ .none = {} },
+            });
+        }
         _ = try b.addInst(.{
             .tag = .pop_scope,
             .data = .{ .none = {} },
@@ -2463,12 +2551,16 @@ fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) E
 
 fn lowerLexicalDeclaration(b: *Builder, lex_decl: *const ast.LexicalDeclaration) Error!Ir.Inst.Ref {
     for (lex_decl.binding_list.items) |*lex_binding| {
-        _ = try b.lowerLexicalBinding(lex_binding);
+        _ = try b.lowerLexicalBinding(lex_binding, lex_decl.type);
     }
     return .none;
 }
 
-fn lowerLexicalBinding(b: *Builder, lex_binding: *const ast.LexicalBinding) Error!Ir.Inst.Ref {
+fn lowerLexicalBinding(
+    b: *Builder,
+    lex_binding: *const ast.LexicalBinding,
+    lex_decl_type: ast.LexicalDeclaration.Type,
+) Error!Ir.Inst.Ref {
     // GlobalDeclarationInstantiation is responsible for creating the bindings.
     return switch (lex_binding.*) {
         .binding_identifier => |binding| {
@@ -2482,6 +2574,17 @@ fn lowerLexicalBinding(b: *Builder, lex_binding: *const ast.LexicalBinding) Erro
             const string_index = try b.internString(binding.binding_identifier, .literal);
             if (binding.initializer != null and binding.initializer.?.isAnonymousFunctionDefinition()) {
                 b.setAnonymousFunctionName(value, string_index);
+            }
+            switch (lex_decl_type) {
+                .using => _ = try b.addInst(.{
+                    .tag = .add_disposable_resource_sync,
+                    .data = .{ .ref = value },
+                }),
+                .await_using => _ = try b.addInst(.{
+                    .tag = .add_disposable_resource_async,
+                    .data = .{ .ref = value },
+                }),
+                else => {},
             }
             return b.addInst(.{
                 .tag = .initialize_binding,
