@@ -16,7 +16,7 @@ current: ?*Block,
 lsra: LinearScanRegisterAllocation,
 label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, *Block),
 exception_handlers: std.ArrayList(ExceptionHandler),
-array_states: std.AutoHashMapUnmanaged(Ir.Inst.Ref, ArrayState),
+array_states: std.ArrayList(ArrayState),
 inline_cache_count: u16,
 
 const ExceptionHandler = struct {
@@ -761,7 +761,7 @@ fn lowerArrayCreate(b: *Builder, data: Ir.Inst.Array, dest: Ir.Inst.Ref) Error!v
     });
 
     if (data.len > 0) {
-        try b.array_states.putNoClobber(b.gpa, dest, .{
+        try b.array_states.append(b.gpa, .{
             .index = 0,
             .len = data.len,
             .has_spread = data.has_spread,
@@ -771,12 +771,11 @@ fn lowerArrayCreate(b: *Builder, data: Ir.Inst.Array, dest: Ir.Inst.Ref) Error!v
 
 fn lowerArrayPush(b: *Builder, data: Ir.Inst.Binary) Error!void {
     const array_reg = b.resolve(data.lhs);
-    const state = b.array_states.getPtr(data.lhs).?;
+    const state = &b.array_states.items[b.array_states.items.len - 1];
     defer {
         state.index += 1;
         if (state.index == state.len) {
-            const removed = b.array_states.remove(data.lhs);
-            std.debug.assert(removed);
+            _ = b.array_states.pop().?;
         }
     }
 
@@ -815,13 +814,12 @@ fn lowerArrayPush(b: *Builder, data: Ir.Inst.Binary) Error!void {
 fn lowerArraySpread(b: *Builder, data: Ir.Inst.Binary) Error!void {
     const array_reg = b.resolve(data.lhs);
     const value_reg = b.resolve(data.rhs);
-    const state = b.array_states.getPtr(data.lhs).?;
+    const state = &b.array_states.items[b.array_states.items.len - 1];
     std.debug.assert(state.has_spread);
     defer {
         state.index += 1;
         if (state.index == state.len) {
-            const removed = b.array_states.remove(data.lhs);
-            std.debug.assert(removed);
+            _ = b.array_states.pop().?;
         }
     }
 
