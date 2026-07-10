@@ -335,7 +335,7 @@ const SingularRelativeTimeUnit = enum {
 /// https://tc39.es/ecma402/#sec-singularrelativetimeunit
 fn singularRelativeTimeUnit(
     agent: *Agent,
-    unit: *const String,
+    unit_string: *const String,
 ) Agent.Error!SingularRelativeTimeUnit {
     // 1. If unit is "seconds", return "second".
     // 2. If unit is "minutes", return "minute".
@@ -348,13 +348,7 @@ fn singularRelativeTimeUnit(
     // 9. If unit is not one of "second", "minute", "hour", "day", "week", "month", "quarter", or
     //    "year", throw a RangeError exception.
     // 10. Return unit.
-    const unit_ascii = switch (unit.asAsciiOrUtf16()) {
-        .ascii => |ascii| ascii,
-        .utf16 => {
-            return agent.throwException(.range_error, "Invalid unit '{f}'", .{unit.fmtEscaped()});
-        },
-    };
-    return std.StaticStringMap(SingularRelativeTimeUnit).initComptime(&.{
+    const unit_map = std.StaticStringMap(SingularRelativeTimeUnit).initComptime(&.{
         .{ "second", .second },
         .{ "seconds", .second },
         .{ "minute", .minute },
@@ -371,9 +365,12 @@ fn singularRelativeTimeUnit(
         .{ "quarters", .quarter },
         .{ "year", .year },
         .{ "years", .year },
-    }).get(unit_ascii) orelse {
-        return agent.throwException(.range_error, "Invalid unit '{f}'", .{unit.fmtEscaped()});
-    };
+    });
+    switch (unit_string.asAsciiOrUtf16()) {
+        .ascii => |unit_ascii| if (unit_map.get(unit_ascii)) |unit| return unit,
+        .utf16 => {},
+    }
+    return agent.throwException(.range_error, "Invalid unit '{f}'", .{unit_string.fmtEscaped()});
 }
 
 /// 18.5.4 FormatRelativeTime ( relativeTimeFormat, value, unit )

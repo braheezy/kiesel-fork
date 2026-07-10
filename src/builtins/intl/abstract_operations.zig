@@ -73,6 +73,171 @@ pub fn isWellFormedCurrencyCode(currency: *const String) bool {
     };
 }
 
+/// 6.4 AvailableCanonicalCurrencies ( )
+/// https://tc39.es/ecma402/#sec-availablecanonicalcurrencies
+pub fn availableCanonicalCurrencies() []const *const String {
+    // The implementation-defined abstract operation AvailableCanonicalCurrencies takes no arguments
+    // and returns a List of Strings. The returned List is sorted according to lexicographic code
+    // unit order, and contains unique, well-formed, and upper case canonicalized 3-letter ISO 4217
+    // currency codes, identifying the currencies for which the implementation provides the
+    // functionality of Intl.DisplayNames and Intl.NumberFormat objects.
+
+    // See: https://github.com/unicode-org/cldr-json/blob/master/cldr-json/cldr-numbers-full/main/en/currencies.json
+    // curl -sL 'https://raw.githubusercontent.com/unicode-org/cldr-json/master/cldr-json/cldr-numbers-full/main/en/currencies.json' |
+    //   jq -r '[.main.en.numbers.currencies | to_entries[] | select(.value | has("displayName")) | .key] | sort[]'
+    @setEvalBranchQuota(20000);
+    return comptime &.{
+        String.fromLiteral("ADP"), String.fromLiteral("AED"), String.fromLiteral("AFA"),
+        String.fromLiteral("AFN"), String.fromLiteral("ALK"), String.fromLiteral("ALL"),
+        String.fromLiteral("AMD"), String.fromLiteral("ANG"), String.fromLiteral("AOA"),
+        String.fromLiteral("AOK"), String.fromLiteral("AON"), String.fromLiteral("AOR"),
+        String.fromLiteral("ARA"), String.fromLiteral("ARL"), String.fromLiteral("ARM"),
+        String.fromLiteral("ARP"), String.fromLiteral("ARS"), String.fromLiteral("ATS"),
+        String.fromLiteral("AUD"), String.fromLiteral("AWG"), String.fromLiteral("AZM"),
+        String.fromLiteral("AZN"), String.fromLiteral("BAD"), String.fromLiteral("BAM"),
+        String.fromLiteral("BAN"), String.fromLiteral("BBD"), String.fromLiteral("BDT"),
+        String.fromLiteral("BEC"), String.fromLiteral("BEF"), String.fromLiteral("BEL"),
+        String.fromLiteral("BGL"), String.fromLiteral("BGM"), String.fromLiteral("BGN"),
+        String.fromLiteral("BGO"), String.fromLiteral("BHD"), String.fromLiteral("BIF"),
+        String.fromLiteral("BMD"), String.fromLiteral("BND"), String.fromLiteral("BOB"),
+        String.fromLiteral("BOL"), String.fromLiteral("BOP"), String.fromLiteral("BOV"),
+        String.fromLiteral("BRB"), String.fromLiteral("BRC"), String.fromLiteral("BRE"),
+        String.fromLiteral("BRL"), String.fromLiteral("BRN"), String.fromLiteral("BRR"),
+        String.fromLiteral("BRZ"), String.fromLiteral("BSD"), String.fromLiteral("BTN"),
+        String.fromLiteral("BUK"), String.fromLiteral("BWP"), String.fromLiteral("BYB"),
+        String.fromLiteral("BYN"), String.fromLiteral("BYR"), String.fromLiteral("BZD"),
+        String.fromLiteral("CAD"), String.fromLiteral("CDF"), String.fromLiteral("CHE"),
+        String.fromLiteral("CHF"), String.fromLiteral("CHW"), String.fromLiteral("CLE"),
+        String.fromLiteral("CLF"), String.fromLiteral("CLP"), String.fromLiteral("CNH"),
+        String.fromLiteral("CNX"), String.fromLiteral("CNY"), String.fromLiteral("COP"),
+        String.fromLiteral("COU"), String.fromLiteral("CRC"), String.fromLiteral("CSD"),
+        String.fromLiteral("CSK"), String.fromLiteral("CUC"), String.fromLiteral("CUP"),
+        String.fromLiteral("CVE"), String.fromLiteral("CYP"), String.fromLiteral("CZK"),
+        String.fromLiteral("DDM"), String.fromLiteral("DEM"), String.fromLiteral("DJF"),
+        String.fromLiteral("DKK"), String.fromLiteral("DOP"), String.fromLiteral("DZD"),
+        String.fromLiteral("ECS"), String.fromLiteral("ECV"), String.fromLiteral("EEK"),
+        String.fromLiteral("EGP"), String.fromLiteral("ERN"), String.fromLiteral("ESA"),
+        String.fromLiteral("ESB"), String.fromLiteral("ESP"), String.fromLiteral("ETB"),
+        String.fromLiteral("EUR"), String.fromLiteral("FIM"), String.fromLiteral("FJD"),
+        String.fromLiteral("FKP"), String.fromLiteral("FRF"), String.fromLiteral("GBP"),
+        String.fromLiteral("GEK"), String.fromLiteral("GEL"), String.fromLiteral("GHC"),
+        String.fromLiteral("GHS"), String.fromLiteral("GIP"), String.fromLiteral("GMD"),
+        String.fromLiteral("GNF"), String.fromLiteral("GNS"), String.fromLiteral("GQE"),
+        String.fromLiteral("GRD"), String.fromLiteral("GTQ"), String.fromLiteral("GWE"),
+        String.fromLiteral("GWP"), String.fromLiteral("GYD"), String.fromLiteral("HKD"),
+        String.fromLiteral("HNL"), String.fromLiteral("HRD"), String.fromLiteral("HRK"),
+        String.fromLiteral("HTG"), String.fromLiteral("HUF"), String.fromLiteral("IDR"),
+        String.fromLiteral("IEP"), String.fromLiteral("ILP"), String.fromLiteral("ILR"),
+        String.fromLiteral("ILS"), String.fromLiteral("INR"), String.fromLiteral("IQD"),
+        String.fromLiteral("IRR"), String.fromLiteral("ISJ"), String.fromLiteral("ISK"),
+        String.fromLiteral("ITL"), String.fromLiteral("JMD"), String.fromLiteral("JOD"),
+        String.fromLiteral("JPY"), String.fromLiteral("KES"), String.fromLiteral("KGS"),
+        String.fromLiteral("KHR"), String.fromLiteral("KMF"), String.fromLiteral("KPW"),
+        String.fromLiteral("KRH"), String.fromLiteral("KRO"), String.fromLiteral("KRW"),
+        String.fromLiteral("KWD"), String.fromLiteral("KYD"), String.fromLiteral("KZT"),
+        String.fromLiteral("LAK"), String.fromLiteral("LBP"), String.fromLiteral("LKR"),
+        String.fromLiteral("LRD"), String.fromLiteral("LSL"), String.fromLiteral("LTL"),
+        String.fromLiteral("LTT"), String.fromLiteral("LUC"), String.fromLiteral("LUF"),
+        String.fromLiteral("LUL"), String.fromLiteral("LVL"), String.fromLiteral("LVR"),
+        String.fromLiteral("LYD"), String.fromLiteral("MAD"), String.fromLiteral("MAF"),
+        String.fromLiteral("MCF"), String.fromLiteral("MDC"), String.fromLiteral("MDL"),
+        String.fromLiteral("MGA"), String.fromLiteral("MGF"), String.fromLiteral("MKD"),
+        String.fromLiteral("MKN"), String.fromLiteral("MLF"), String.fromLiteral("MMK"),
+        String.fromLiteral("MNT"), String.fromLiteral("MOP"), String.fromLiteral("MRO"),
+        String.fromLiteral("MRU"), String.fromLiteral("MTL"), String.fromLiteral("MTP"),
+        String.fromLiteral("MUR"), String.fromLiteral("MVP"), String.fromLiteral("MVR"),
+        String.fromLiteral("MWK"), String.fromLiteral("MXN"), String.fromLiteral("MXP"),
+        String.fromLiteral("MXV"), String.fromLiteral("MYR"), String.fromLiteral("MZE"),
+        String.fromLiteral("MZM"), String.fromLiteral("MZN"), String.fromLiteral("NAD"),
+        String.fromLiteral("NGN"), String.fromLiteral("NIC"), String.fromLiteral("NIO"),
+        String.fromLiteral("NLG"), String.fromLiteral("NOK"), String.fromLiteral("NPR"),
+        String.fromLiteral("NZD"), String.fromLiteral("OMR"), String.fromLiteral("PAB"),
+        String.fromLiteral("PEI"), String.fromLiteral("PEN"), String.fromLiteral("PES"),
+        String.fromLiteral("PGK"), String.fromLiteral("PHP"), String.fromLiteral("PKR"),
+        String.fromLiteral("PLN"), String.fromLiteral("PLZ"), String.fromLiteral("PTE"),
+        String.fromLiteral("PYG"), String.fromLiteral("QAR"), String.fromLiteral("RHD"),
+        String.fromLiteral("ROL"), String.fromLiteral("RON"), String.fromLiteral("RSD"),
+        String.fromLiteral("RUB"), String.fromLiteral("RUR"), String.fromLiteral("RWF"),
+        String.fromLiteral("SAR"), String.fromLiteral("SBD"), String.fromLiteral("SCR"),
+        String.fromLiteral("SDD"), String.fromLiteral("SDG"), String.fromLiteral("SDP"),
+        String.fromLiteral("SEK"), String.fromLiteral("SGD"), String.fromLiteral("SHP"),
+        String.fromLiteral("SIT"), String.fromLiteral("SKK"), String.fromLiteral("SLE"),
+        String.fromLiteral("SLL"), String.fromLiteral("SOS"), String.fromLiteral("SRD"),
+        String.fromLiteral("SRG"), String.fromLiteral("SSP"), String.fromLiteral("STD"),
+        String.fromLiteral("STN"), String.fromLiteral("SUR"), String.fromLiteral("SVC"),
+        String.fromLiteral("SYP"), String.fromLiteral("SZL"), String.fromLiteral("THB"),
+        String.fromLiteral("TJR"), String.fromLiteral("TJS"), String.fromLiteral("TMM"),
+        String.fromLiteral("TMT"), String.fromLiteral("TND"), String.fromLiteral("TOP"),
+        String.fromLiteral("TPE"), String.fromLiteral("TRL"), String.fromLiteral("TRY"),
+        String.fromLiteral("TTD"), String.fromLiteral("TWD"), String.fromLiteral("TZS"),
+        String.fromLiteral("UAH"), String.fromLiteral("UAK"), String.fromLiteral("UGS"),
+        String.fromLiteral("UGX"), String.fromLiteral("USD"), String.fromLiteral("USN"),
+        String.fromLiteral("USS"), String.fromLiteral("UYI"), String.fromLiteral("UYP"),
+        String.fromLiteral("UYU"), String.fromLiteral("UYW"), String.fromLiteral("UZS"),
+        String.fromLiteral("VEB"), String.fromLiteral("VED"), String.fromLiteral("VEF"),
+        String.fromLiteral("VES"), String.fromLiteral("VND"), String.fromLiteral("VNN"),
+        String.fromLiteral("VUV"), String.fromLiteral("WST"), String.fromLiteral("XAF"),
+        String.fromLiteral("XAG"), String.fromLiteral("XAU"), String.fromLiteral("XBA"),
+        String.fromLiteral("XBB"), String.fromLiteral("XBC"), String.fromLiteral("XBD"),
+        String.fromLiteral("XCD"), String.fromLiteral("XCG"), String.fromLiteral("XDR"),
+        String.fromLiteral("XEU"), String.fromLiteral("XFO"), String.fromLiteral("XFU"),
+        String.fromLiteral("XOF"), String.fromLiteral("XPD"), String.fromLiteral("XPF"),
+        String.fromLiteral("XPT"), String.fromLiteral("XRE"), String.fromLiteral("XSU"),
+        String.fromLiteral("XTS"), String.fromLiteral("XUA"), String.fromLiteral("XXX"),
+        String.fromLiteral("YDD"), String.fromLiteral("YER"), String.fromLiteral("YUD"),
+        String.fromLiteral("YUM"), String.fromLiteral("YUN"), String.fromLiteral("YUR"),
+        String.fromLiteral("ZAL"), String.fromLiteral("ZAR"), String.fromLiteral("ZMK"),
+        String.fromLiteral("ZMW"), String.fromLiteral("ZRN"), String.fromLiteral("ZRZ"),
+        String.fromLiteral("ZWD"), String.fromLiteral("ZWG"), String.fromLiteral("ZWL"),
+        String.fromLiteral("ZWR"),
+    };
+}
+
+/// 6.5.3 AvailablePrimaryTimeZoneIdentifiers ( )
+/// https://tc39.es/ecma402/#sec-availableprimarytimezoneidentifiers
+pub fn availablePrimaryTimeZoneIdentifiers(agent: *Agent) std.mem.Allocator.Error![]const *const String {
+    const gpa = agent.gpa;
+
+    // 1. Let records be AvailableNamedTimeZoneIdentifiers().
+
+    // 2. Let result be a new empty List.
+    var result: std.ArrayList(*const String) = .empty;
+
+    // 3. For each element timeZoneIdentifierRecord of records, do
+    //     a. If timeZoneIdentifierRecord.[[Identifier]] is
+    //        timeZoneIdentifierRecord.[[PrimaryIdentifier]], then
+    //         i. Append timeZoneIdentifierRecord.[[Identifier]] to result.
+    try result.append(agent.gc_allocator, String.fromLiteral("UTC"));
+    const iana_parser_extended = icu4zig.IanaParserExtended.init();
+    defer iana_parser_extended.deinit();
+    var it = iana_parser_extended.iter();
+    defer it.deinit();
+    while (try it.next(gpa)) |entry| {
+        defer entry.deinit(gpa);
+        // https://tc39.es/ecma402/#sec-use-of-iana-time-zone-database
+        // - For historical reasons, "UTC" must be a primary time zone identifier. "Etc/UTC",
+        //   "Etc/GMT", and "GMT", as well as all Link names that resolve to any of them, must be
+        //   non-primary time identifiers that resolve to "UTC".
+        if (std.mem.eql(u8, entry.canonical, "Etc/UTC") or
+            std.mem.eql(u8, entry.canonical, "Etc/GMT") or
+            std.mem.eql(u8, entry.canonical, "GMT"))
+            continue;
+        const string = try String.fromUtf8(
+            agent,
+            try agent.gc_allocator.dupe(u8, entry.canonical),
+        );
+        try result.append(agent.gc_allocator, string);
+    }
+    std.mem.sortUnstable(*const String, result.items, {}, struct {
+        fn lessThanFn(_: void, lhs: *const String, rhs: *const String) bool {
+            return std.mem.lessThan(u8, lhs.asAscii(), rhs.asAscii());
+        }
+    }.lessThanFn);
+
+    // 4. Return result.
+    return result.toOwnedSlice(agent.gc_allocator);
+}
+
 /// 6.6.1 IsWellFormedUnitIdentifier ( unitIdentifier )
 /// https://tc39.es/ecma402/#sec-iswellformedunitidentifier
 pub fn isWellFormedUnitIdentifier(unit_identifier: *const String) bool {
@@ -122,6 +287,8 @@ pub fn availableCanonicalUnits() []const *const String {
     // Strings. The returned List is sorted according to lexicographic code unit order, and
     // consists of the unique values of simple unit identifiers listed in every row of Table 2,
     // except the header row.
+
+    // See: https://tc39.es/ecma402/#table-sanctioned-single-unit-identifiers
     return comptime &.{
         String.fromLiteral("acre"),              String.fromLiteral("bit"),         String.fromLiteral("byte"),
         String.fromLiteral("celsius"),           String.fromLiteral("centimeter"),  String.fromLiteral("day"),
@@ -150,6 +317,8 @@ pub fn availableCanonicalNumberingSystems() []const *const String {
     // identifying the numbering systems for which the implementation provides the functionality of
     // Intl.DateTimeFormat, Intl.NumberFormat, and Intl.RelativeTimeFormat objects. The List must
     // include the Numbering System value of every row of Table 23, except the header row.
+
+    // See: https://tc39.es/ecma402/#table-numbering-system-digits
     return comptime &.{
         String.fromLiteral("adlm"),     String.fromLiteral("ahom"),     String.fromLiteral("arab"),
         String.fromLiteral("arabext"),  String.fromLiteral("bali"),     String.fromLiteral("beng"),
@@ -177,9 +346,28 @@ pub fn availableCanonicalNumberingSystems() []const *const String {
     };
 }
 
+/// 6.8.1 AvailableCanonicalCollations ( )
+/// https://tc39.es/ecma402/#sec-availablecanonicalcollations
+pub fn availableCanonicalCollations() []const *const String {
+    // The implementation-defined abstract operation AvailableCanonicalCollations takes no arguments
+    // and returns a List of Strings. The returned List is sorted according to lexicographic code
+    // unit order, and contains unique canonical collation types identifying the collations for
+    // which the implementation provides the functionality of Intl.Collator objects.
+
+    // See: https://github.com/unicode-org/icu4x/blob/main/components/locale_core/src/preferences/extensions/unicode/keywords/collation.rs
+    // "standard" and "search" are excluded as per https://tc39.es/ecma402/#sec-properties-of-intl-collator-instances
+    return comptime &.{
+        String.fromLiteral("compat"),   String.fromLiteral("dict"),   String.fromLiteral("ducet"),
+        String.fromLiteral("emoji"),    String.fromLiteral("eor"),    String.fromLiteral("phonebk"),
+        String.fromLiteral("phonetic"), String.fromLiteral("pinyin"), String.fromLiteral("searchjl"),
+        String.fromLiteral("stroke"),   String.fromLiteral("trad"),   String.fromLiteral("unihan"),
+        String.fromLiteral("zhuyin"),
+    };
+}
+
 /// 6.9.1 AvailableCalendars ( )
 /// https://tc39.es/ecma402/#sec-availablecalendars
-pub inline fn availableCalendars() []const *const String {
+pub fn availableCalendars() []const *const String {
     // The implementation-defined abstract operation AvailableCalendars takes no arguments and
     // returns a List of Strings. The returned List is sorted according to lexicographic code unit
     // order, and contains unique calendar types in canonical form (6.9) identifying the calendars
@@ -187,7 +375,7 @@ pub inline fn availableCalendars() []const *const String {
     // including their aliases (e.g., either both or neither of "islamicc" and "islamic-civil").
     // The List must include "iso8601".
     // NOTE: For now we only include the canonical BCP 47 language tags, so this isn't spec compliant.
-    comptime {
+    return comptime &blk: {
         const calendar_kinds = std.enums.values(icu4zig.Calendar.Kind);
         var result: [calendar_kinds.len - 1]*const String = undefined;
         var i = 0;
@@ -202,8 +390,8 @@ pub inline fn availableCalendars() []const *const String {
             }
         }.lessThanFn);
         const final = result; // Load bearing const assignment
-        return &final;
-    }
+        break :blk final;
+    };
 }
 
 /// 9.2.1 CanonicalizeLocaleList ( locales )
@@ -333,7 +521,7 @@ fn ResolutionOptions(comptime resolution_option_descriptors: anytype) type {
 const Matcher = enum { lookup, best_fit };
 
 /// 9.2.7 ResolveLocale ( availableLocales, requestedLocales, options, relevantExtensionKeys, localeData )
-/// tc39.es/ecma402/#sec-resolvelocale
+/// https://tc39.es/ecma402/#sec-resolvelocale
 fn resolveLocale(
     agent: *Agent,
     requested_locales: []const icu4zig.Locale,

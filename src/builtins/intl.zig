@@ -17,8 +17,11 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const availableCalendars = abstract_operations.availableCalendars;
+const availableCanonicalCollations = abstract_operations.availableCanonicalCollations;
+const availableCanonicalCurrencies = abstract_operations.availableCanonicalCurrencies;
 const availableCanonicalNumberingSystems = abstract_operations.availableCanonicalNumberingSystems;
 const availableCanonicalUnits = abstract_operations.availableCanonicalUnits;
+const availablePrimaryTimeZoneIdentifiers = abstract_operations.availablePrimaryTimeZoneIdentifiers;
 const createArrayFromListMapToValue = types.createArrayFromListMapToValue;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -186,46 +189,74 @@ pub const namespace = struct {
     /// https://tc39.es/ecma402/#sec-intl.supportedvaluesof
     fn supportedValuesOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         // 1. Let key be ? ToString(key).
-        const key = try arguments.get(0).toString(agent);
+        const key_string = try arguments.get(0).toString(agent);
 
-        var list: []const *const String = &.{};
+        const Key = enum {
+            calendar,
+            collation,
+            currency,
+            numbering_system,
+            time_zone,
+            unit,
+        };
+        const key_map = std.StaticStringMap(Key).initComptime(&.{
+            .{ "calendar", .calendar },
+            .{ "collation", .collation },
+            .{ "currency", .currency },
+            .{ "numberingSystem", .numbering_system },
+            .{ "timeZone", .time_zone },
+            .{ "unit", .unit },
+        });
+        const key = blk: {
+            switch (key_string.asAsciiOrUtf16()) {
+                .ascii => |key_ascii| if (key_map.get(key_ascii)) |key| break :blk key,
+                .utf16 => {},
+            }
+            return agent.throwException(.range_error, "Invalid key '{f}'", .{key_string.fmtEscaped()});
+        };
 
-        // 2. If key is "calendar", then
-        if (key.eql(String.fromLiteral("calendar"))) {
-            // a. Let list be a new empty List.
-            // b. For each element identifier of AvailableCalendars(), do
-            //     i. Let canonical be CanonicalizeUValue("ca", identifier).
-            //     ii. If identifier is canonical, then
-            //         1. Append identifier to list.
-            list = availableCalendars();
-        }
-        // 3. Else if key is "collation", then
-        else if (key.eql(String.fromLiteral("collation"))) {
-            // TODO: a. Let list be AvailableCanonicalCollations( ).
-        }
-        // 4. Else if key is "currency", then
-        else if (key.eql(String.fromLiteral("currency"))) {
-            // TODO: a. Let list be AvailableCanonicalCurrencies( ).
-        }
-        // 5. Else if key is "numberingSystem", then
-        else if (key.eql(String.fromLiteral("numberingSystem"))) {
-            // a. Let list be AvailableCanonicalNumberingSystems( ).
-            list = availableCanonicalNumberingSystems();
-        }
-        // 6. Else if key is "timeZone", then
-        else if (key.eql(String.fromLiteral("timeZone"))) {
-            // TODO: a. Let list be AvailablePrimaryTimeZoneIdentifiers( ).
-            // See https://github.com/unicode-org/icu4x/issues/3970
-        }
-        // 7. Else if key is "unit", then
-        else if (key.eql(String.fromLiteral("unit"))) {
-            // a. Let list be AvailableCanonicalUnits( ).
-            list = availableCanonicalUnits();
-        } else {
+        const list = switch (key) {
+            // 2. If key is "calendar", then
+            .calendar => blk: {
+                // a. Let list be a new empty List.
+                // b. For each element identifier of AvailableCalendars(), do
+                //     i. Let canonical be CanonicalizeUValue("ca", identifier).
+                //     ii. If identifier is canonical, then
+                //         1. Append identifier to list.
+                break :blk availableCalendars();
+            },
+            // 3. Else if key is "collation", then
+            .collation => blk: {
+                // a. Let list be AvailableCanonicalCollations( ).
+                break :blk availableCanonicalCollations();
+            },
+            // 4. Else if key is "currency", then
+            .currency => blk: {
+                // a. Let list be AvailableCanonicalCurrencies( ).
+                break :blk availableCanonicalCurrencies();
+            },
+            // 5. Else if key is "numberingSystem", then
+            .numbering_system => blk: {
+                // a. Let list be AvailableCanonicalNumberingSystems( ).
+                break :blk availableCanonicalNumberingSystems();
+            },
+            // 6. Else if key is "timeZone", then
+            .time_zone => blk: {
+                // a. Let list be AvailablePrimaryTimeZoneIdentifiers( ).
+                break :blk try availablePrimaryTimeZoneIdentifiers(agent);
+            },
+            // 7. Else if key is "unit", then
+            .unit => blk: {
+                // a. Let list be AvailableCanonicalUnits( ).
+                break :blk availableCanonicalUnits();
+            },
             // 8. Else,
-            // a. Throw a RangeError exception.
-            return agent.throwException(.range_error, "Invalid key '{f}'", .{key.fmtEscaped()});
-        }
+            //     a. Throw a RangeError exception.
+        };
+        defer switch (key) {
+            .time_zone => agent.gc_allocator.free(list),
+            else => {},
+        };
 
         // 9. Return CreateArrayFromList( list ).
         const array = try createArrayFromListMapToValue(agent, *const String, list, struct {
