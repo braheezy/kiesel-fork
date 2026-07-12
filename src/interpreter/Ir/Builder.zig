@@ -851,7 +851,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
                     .data = .{ .argument = @intCast(i) },
                 });
                 const value = try b.lowerDefaultExpression(arg_value, if (bpe.initializer) |*expr| expr else null, null);
-                _ = try b.lowerDestructuringAssignment(&bpe.binding_pattern, value, binding_op);
+                _ = try b.lowerBindingPattern(&bpe.binding_pattern, value, binding_op);
             },
         },
         .function_rest_parameter => |rest_param| switch (rest_param.binding_rest_element) {
@@ -874,7 +874,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
                     .tag = .get_rest_arguments,
                     .data = .{ .argument = @intCast(i) },
                 });
-                _ = try b.lowerDestructuringAssignment(pattern, rest_value, binding_op);
+                _ = try b.lowerBindingPattern(pattern, rest_value, binding_op);
             },
         },
     };
@@ -1300,7 +1300,7 @@ fn lowerVariableDeclaration(b: *Builder, var_decl: *const ast.VariableDeclaratio
         },
         .binding_pattern => |pattern| {
             const value = try b.lowerExpression(&pattern.initializer);
-            _ = try b.lowerDestructuringAssignment(&pattern.binding_pattern, value, .set);
+            _ = try b.lowerBindingPattern(&pattern.binding_pattern, value, .set);
         },
     }
     return .none;
@@ -1893,8 +1893,8 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                     });
                 },
             },
-            .binding_pattern_for_assignment_expression => |*pattern| {
-                _ = try b.lowerDestructuringAssignment(pattern, next_value, .set);
+            .assignment_pattern => |*assignment_pattern| {
+                _ = try b.lowerAssignmentPattern(assignment_pattern, next_value);
             },
             .call_expression => |*call_expr| {
                 _ = try b.lowerCallExpression(call_expr);
@@ -1920,8 +1920,8 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                     } },
                 });
             },
-            .binding_pattern => |*pattern| {
-                _ = try b.lowerDestructuringAssignment(pattern, next_value, .set);
+            .binding_pattern => |*binding_pattern| {
+                _ = try b.lowerBindingPattern(binding_pattern, next_value, .set);
             },
         },
         .for_declaration => |for_decl| {
@@ -1961,7 +1961,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                         } },
                     });
                 },
-                .binding_pattern => |*pattern| {
+                .binding_pattern => |*binding_pattern| {
                     const tag: Ir.Inst.Tag = switch (for_decl.type) {
                         .let => .create_mutable_binding,
                         .@"const" => .create_immutable_binding,
@@ -1969,7 +1969,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                     };
                     var bound_names: std.ArrayList(ast.Identifier) = .empty;
                     defer bound_names.deinit(b.gpa);
-                    try pattern.collectBoundNames(b.gpa, &bound_names);
+                    try binding_pattern.collectBoundNames(b.gpa, &bound_names);
                     for (bound_names.items) |name| {
                         const string_index = try b.internString(name, .literal);
                         _ = try b.addInst(.{
@@ -1977,7 +1977,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                             .data = .{ .string = string_index },
                         });
                     }
-                    _ = try b.lowerDestructuringAssignment(pattern, next_value, .initialize);
+                    _ = try b.lowerBindingPattern(binding_pattern, next_value, .initialize);
                 },
             }
         },
@@ -2427,7 +2427,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
                     });
                 },
                 .binding_pattern => |*binding_pattern| {
-                    _ = try b.lowerDestructuringAssignment(binding_pattern, exception_value, .initialize);
+                    _ = try b.lowerBindingPattern(binding_pattern, exception_value, .initialize);
                 },
             }
         }
@@ -2594,9 +2594,9 @@ fn lowerLexicalBinding(
                 } },
             });
         },
-        .binding_pattern => |pattern| {
-            const value = try b.lowerExpression(&pattern.initializer);
-            return try b.lowerDestructuringAssignment(&pattern.binding_pattern, value, .initialize);
+        .binding_pattern => |p| {
+            const value = try b.lowerExpression(&p.initializer);
+            return try b.lowerBindingPattern(&p.binding_pattern, value, .initialize);
         },
     };
 }
@@ -2686,16 +2686,322 @@ fn lowerDefaultExpression(b: *Builder, value: Ir.Inst.Ref, default_expr: ?*const
     return value;
 }
 
-const BindingOp = enum { set, initialize };
-
-fn lowerDestructuringAssignment(b: *Builder, pattern: *const ast.BindingPattern, value: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
+fn lowerAssignmentPattern(b: *Builder, pattern: *const ast.AssignmentPattern, value: Ir.Inst.Ref) Error!Ir.Inst.Ref {
     return switch (pattern.*) {
-        .array_binding_pattern => |*array_pattern| try b.lowerArrayDestructuring(array_pattern, value, binding_op),
-        .object_binding_pattern => |*object_pattern| try b.lowerObjectDestructuring(object_pattern, value, binding_op),
+        .object_assignment_pattern => |*object_pattern| try b.lowerObjectAssignmentPattern(object_pattern, value),
+        .array_assignment_pattern => |*array_pattern| try b.lowerArrayAssignmentPattern(array_pattern, value),
     };
 }
 
-fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern, array_value: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
+fn lowerArrayAssignmentPattern(b: *Builder, pattern: *const ast.ArrayAssignmentPattern, array_value: Ir.Inst.Ref) Error!Ir.Inst.Ref {
+    var last_ref: Ir.Inst.Ref = .none;
+
+    const iterator_ref = try b.addInst(.{
+        .tag = .get_iterator,
+        .data = .{ .ref = array_value },
+    });
+
+    for (pattern.elements) |element| switch (element) {
+        .elision => {
+            _ = try b.addInst(.{
+                .tag = .iterator_step,
+                .data = .{ .ref = iterator_ref },
+            });
+        },
+        .assignment_element => |assignment_element| {
+            const next_value = try b.addInst(.{
+                .tag = .iterator_step_value,
+                .data = .{ .ref = iterator_ref },
+            });
+            switch (assignment_element.destructuring_assignment_target) {
+                .assignment_pattern => |*assignment_pattern| {
+                    const default_expr = if (assignment_element.initializer) |*expr| expr else null;
+                    const value = try b.lowerDefaultExpression(next_value, default_expr, null);
+                    last_ref = try b.lowerAssignmentPattern(assignment_pattern, value);
+                },
+                .identifier_reference => |identifier_reference| {
+                    const string_index = try b.internString(identifier_reference, .literal);
+                    const default_expr, const anonymous_function_name = if (assignment_element.initializer) |*expr|
+                        .{ expr, if (expr.isAnonymousFunctionDefinition()) string_index else null }
+                    else
+                        .{ null, null };
+                    const value = try b.lowerDefaultExpression(next_value, default_expr, anonymous_function_name);
+                    last_ref = try b.lowerDestructuringAssignmentTarget(&assignment_element.destructuring_assignment_target, value);
+                },
+                .member_expression, .super_property => {
+                    const default_expr = if (assignment_element.initializer) |*expr| expr else null;
+                    const value = try b.lowerDefaultExpression(next_value, default_expr, null);
+                    last_ref = try b.lowerDestructuringAssignmentTarget(&assignment_element.destructuring_assignment_target, value);
+                },
+            }
+        },
+        .assignment_rest_element => |rest| {
+            const rest_array = try b.addInst(.{
+                .tag = .iterator_collect,
+                .data = .{ .ref = iterator_ref },
+            });
+            last_ref = try b.lowerDestructuringAssignmentTarget(&rest.destructuring_assignment_target, rest_array);
+        },
+    };
+
+    const iterator_done = try b.addInst(.{
+        .tag = .iterator_is_done,
+        .data = .{ .ref = iterator_ref },
+    });
+    const close_cond = try b.addInstDeferred(.br_cond);
+
+    const close_label = try b.addLabel();
+    _ = try b.addInst(.{
+        .tag = .iterator_close,
+        .data = .{ .ref = iterator_ref },
+    });
+
+    const done_label = try b.addLabel();
+
+    close_cond.set(.{ .br_cond = .{
+        .condition = iterator_done,
+        .then_target = done_label,
+        .else_target = close_label,
+    } });
+
+    return last_ref;
+}
+
+fn lowerObjectAssignmentPattern(b: *Builder, pattern: *const ast.ObjectAssignmentPattern, object_value: Ir.Inst.Ref) Error!Ir.Inst.Ref {
+    const object = try b.addInst(.{
+        .tag = .to_object,
+        .data = .{ .ref = object_value },
+    });
+
+    var last_ref = object;
+
+    for (pattern.properties) |property| switch (property) {
+        .assignment_property => |assignment_property| switch (assignment_property) {
+            .identifier_reference_and_expression => |binding| {
+                const string_index = try b.internString(binding.identifier_reference, .literal);
+                const prop_value = try b.addInst(.{
+                    .tag = .get_property,
+                    .data = .{ .get_property = .{
+                        .base = object,
+                        .name = string_index,
+                    } },
+                });
+                const default_expr, const anonymous_function_name = if (binding.initializer) |*expr|
+                    .{ expr, if (expr.isAnonymousFunctionDefinition()) string_index else null }
+                else
+                    .{ null, null };
+                const value = try b.lowerDefaultExpression(prop_value, default_expr, anonymous_function_name);
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode) .set_binding_strict else .set_binding;
+                last_ref = try b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .set_binding = .{
+                        .name = string_index,
+                        .value = value,
+                    } },
+                });
+            },
+            .property_name_and_assignment_element => |pnae| {
+                const key_ref = try b.lowerPropertyName(&pnae.property_name);
+                const prop_value = try b.addInst(.{
+                    .tag = .get_property_computed,
+                    .data = .{ .get_property_computed = .{
+                        .base = object,
+                        .property = key_ref,
+                    } },
+                });
+                switch (pnae.assignment_element.destructuring_assignment_target) {
+                    .assignment_pattern => |*assignment_pattern| {
+                        const default_expr = if (pnae.assignment_element.initializer) |*expr| expr else null;
+                        const value = try b.lowerDefaultExpression(prop_value, default_expr, null);
+                        last_ref = try b.lowerAssignmentPattern(assignment_pattern, value);
+                    },
+                    .identifier_reference => |identifier_reference| {
+                        const string_index = try b.internString(identifier_reference, .literal);
+                        const default_expr, const anonymous_function_name = if (pnae.assignment_element.initializer) |*expr|
+                            .{ expr, if (expr.isAnonymousFunctionDefinition()) string_index else null }
+                        else
+                            .{ null, null };
+                        const value = try b.lowerDefaultExpression(prop_value, default_expr, anonymous_function_name);
+                        last_ref = try b.lowerDestructuringAssignmentTarget(&pnae.assignment_element.destructuring_assignment_target, value);
+                    },
+                    .member_expression, .super_property => {
+                        const default_expr = if (pnae.assignment_element.initializer) |*expr| expr else null;
+                        const value = try b.lowerDefaultExpression(prop_value, default_expr, null);
+                        last_ref = try b.lowerDestructuringAssignmentTarget(&pnae.assignment_element.destructuring_assignment_target, value);
+                    },
+                }
+            },
+        },
+        .assignment_rest_property => |rest_property| {
+            var excluded_names: std.ArrayList(Ir.Inst.Ref) = .empty;
+            defer excluded_names.deinit(b.gpa);
+
+            for (pattern.properties) |p| switch (p) {
+                .assignment_property => |ap| switch (ap) {
+                    .identifier_reference_and_expression => |binding| {
+                        const string_index = try b.internString(binding.identifier_reference, .literal);
+                        const name_ref = try b.addInst(.{
+                            .tag = .string,
+                            .data = .{ .string = string_index },
+                        });
+                        try excluded_names.append(b.gpa, name_ref);
+                    },
+                    .property_name_and_assignment_element => |pnae| {
+                        const key_ref = try b.lowerPropertyName(&pnae.property_name);
+                        try excluded_names.append(b.gpa, key_ref);
+                    },
+                },
+                .assignment_rest_property => {},
+            };
+
+            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const excluded_len: u32 = @intCast(excluded_names.items.len);
+            try b.extra.append(b.gpa, @intFromEnum(object));
+            try b.extra.append(b.gpa, excluded_len);
+            try b.extra.appendSlice(b.gpa, @ptrCast(excluded_names.items));
+
+            const rest_obj = try b.addInst(.{
+                .tag = .copy_data_properties,
+                .data = .{ .copy_data_properties = extra_index },
+            });
+
+            last_ref = try b.lowerDestructuringAssignmentTarget(&rest_property.destructuring_assignment_target, rest_obj);
+        },
+    };
+
+    return last_ref;
+}
+
+fn lowerDestructuringAssignmentTarget(b: *Builder, target: *const ast.DestructuringAssignmentTarget, value: Ir.Inst.Ref) Error!Ir.Inst.Ref {
+    switch (target.*) {
+        .identifier_reference => |identifier_reference| {
+            const string_index = try b.internString(identifier_reference, .literal);
+            const tag: Ir.Inst.Tag = if (b.in_strict_mode) .set_binding_strict else .set_binding;
+            return b.addInst(.{
+                .tag = tag,
+                .data = .{ .set_binding = .{
+                    .name = string_index,
+                    .value = value,
+                } },
+            });
+        },
+        .member_expression => |*member_expr| {
+            const base = try b.lowerExpression(member_expr.expression);
+            switch (member_expr.property) {
+                .identifier => |identifier| {
+                    const string_index = try b.internString(identifier, .literal);
+                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                        .set_property_strict
+                    else
+                        .set_property;
+                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                        .base = base,
+                        .name = string_index,
+                        .value = value,
+                    });
+                    return b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .set_property = extra_index },
+                    });
+                },
+                .expression => |expr| {
+                    if (try constantFold(b.gpa, expr)) |constant| {
+                        defer constant.deinit(b.gpa);
+                        if (constant.toIndex()) |index| {
+                            const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                                .set_property_indexed_strict
+                            else
+                                .set_property_indexed;
+                            const extra_index = try b.addExtra(Ir.Inst.SetPropertyIndexed, .{
+                                .base = base,
+                                .index = index,
+                                .value = value,
+                            });
+                            return b.addInst(.{
+                                .tag = tag,
+                                .data = .{ .set_property_indexed = extra_index },
+                            });
+                        }
+                    }
+                    const property = try b.lowerExpression(expr);
+                    const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                        .set_property_computed_strict
+                    else
+                        .set_property_computed;
+                    const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                        .base = base,
+                        .property = property,
+                        .value = value,
+                    });
+                    return b.addInst(.{
+                        .tag = tag,
+                        .data = .{ .set_property_computed = extra_index },
+                    });
+                },
+                .private_identifier => |private_identifier| {
+                    const string_index = try b.internString(private_identifier, .literal);
+                    const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                        .base = base,
+                        .name = string_index,
+                        .value = value,
+                    });
+                    return b.addInst(.{
+                        .tag = .set_private_element,
+                        .data = .{ .set_property = extra_index },
+                    });
+                },
+            }
+        },
+        .super_property => |super_prop| switch (super_prop) {
+            .identifier => |identifier| {
+                const string_index = try b.internString(identifier, .literal);
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_super_property_strict
+                else
+                    .set_super_property;
+                const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
+                    .base = .none,
+                    .name = string_index,
+                    .value = value,
+                });
+                return b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .set_property = extra_index },
+                });
+            },
+            .expression => |prop_expr| {
+                const property = try b.lowerExpression(prop_expr);
+                const tag: Ir.Inst.Tag = if (b.in_strict_mode)
+                    .set_super_property_computed_strict
+                else
+                    .set_super_property_computed;
+                const extra_index = try b.addExtra(Ir.Inst.SetPropertyComputed, .{
+                    .base = .none,
+                    .property = property,
+                    .value = value,
+                });
+                return b.addInst(.{
+                    .tag = tag,
+                    .data = .{ .set_property_computed = extra_index },
+                });
+            },
+        },
+        .assignment_pattern => |*assignment_pattern| {
+            return b.lowerAssignmentPattern(assignment_pattern, value);
+        },
+    }
+}
+
+const BindingOp = enum { set, initialize };
+
+fn lowerBindingPattern(b: *Builder, pattern: *const ast.BindingPattern, value: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
+    return switch (pattern.*) {
+        .array_binding_pattern => |*array_pattern| try b.lowerArrayBindingPattern(array_pattern, value, binding_op),
+        .object_binding_pattern => |*object_pattern| try b.lowerObjectBindingPattern(object_pattern, value, binding_op),
+    };
+}
+
+fn lowerArrayBindingPattern(b: *Builder, pattern: *const ast.ArrayBindingPattern, array_value: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
     var last_ref: Ir.Inst.Ref = .none;
 
     const iterator_ref = try b.addInst(.{
@@ -2738,7 +3044,7 @@ fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern,
                 .binding_pattern_and_expression => |bpe| {
                     const default_expr = if (bpe.initializer) |*expr| expr else null;
                     const value = try b.lowerDefaultExpression(next_value, default_expr, null);
-                    last_ref = try b.lowerDestructuringAssignment(&bpe.binding_pattern, value, binding_op);
+                    last_ref = try b.lowerBindingPattern(&bpe.binding_pattern, value, binding_op);
                 },
             }
         },
@@ -2763,7 +3069,7 @@ fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern,
                     });
                 },
                 .binding_pattern => |*binding_pattern| {
-                    last_ref = try b.lowerDestructuringAssignment(binding_pattern, rest_array, binding_op);
+                    last_ref = try b.lowerBindingPattern(binding_pattern, rest_array, binding_op);
                 },
             }
         },
@@ -2792,7 +3098,7 @@ fn lowerArrayDestructuring(b: *Builder, pattern: *const ast.ArrayBindingPattern,
     return last_ref;
 }
 
-fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPattern, object_value: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
+fn lowerObjectBindingPattern(b: *Builder, pattern: *const ast.ObjectBindingPattern, object_value: Ir.Inst.Ref, binding_op: BindingOp) Error!Ir.Inst.Ref {
     const object = try b.addInst(.{
         .tag = .to_object,
         .data = .{ .ref = object_value },
@@ -2860,7 +3166,7 @@ fn lowerObjectDestructuring(b: *Builder, pattern: *const ast.ObjectBindingPatter
                     .binding_pattern_and_expression => |bpe| {
                         const default_expr = if (bpe.initializer) |*expr| expr else null;
                         const value = try b.lowerDefaultExpression(prop_value, default_expr, null);
-                        last_ref = try b.lowerDestructuringAssignment(&bpe.binding_pattern, value, binding_op);
+                        last_ref = try b.lowerBindingPattern(&bpe.binding_pattern, value, binding_op);
                     },
                 }
             },
@@ -2961,7 +3267,7 @@ fn lowerExpression(b: *Builder, expr: *const ast.Expression) Error!Ir.Inst.Ref {
         .await_expression => |*await_expr| try b.lowerAwaitExpression(await_expr),
         .yield_expression => |*yield_expr| try b.lowerYieldExpression(yield_expr),
         .tagged_template => |*tagged_template| try b.lowerTaggedTemplate(tagged_template),
-        .binding_pattern_for_assignment_expression => unreachable, // Only valid as assignment LHS
+        .assignment_pattern => unreachable, // Only valid as assignment LHS
     };
 }
 
@@ -4386,9 +4692,9 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                 });
             },
         },
-        .binding_pattern_for_assignment_expression => |*pattern| {
+        .assignment_pattern => |*assignment_pattern| {
             const value = try b.lowerExpression(assign_expr.rhs_expression);
-            _ = try b.lowerDestructuringAssignment(pattern, value, .set);
+            _ = try b.lowerAssignmentPattern(assignment_pattern, value);
             return value;
         },
         .call_expression => |*call_expr| {

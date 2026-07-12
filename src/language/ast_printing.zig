@@ -330,7 +330,7 @@ pub fn printExpression(node: ast.Expression, writer: *std.Io.Writer, indentation
         .await_expression => |x| try printAwaitExpression(x, writer, indentation + 1),
         .yield_expression => |x| try printYieldExpression(x, writer, indentation + 1),
         .tagged_template => |x| try printTaggedTemplate(x, writer, indentation + 1),
-        .binding_pattern_for_assignment_expression => |x| try printBindingPattern(x, writer, indentation + 1),
+        .assignment_pattern => |x| try printAssignmentPattern(x, writer, indentation + 1),
     }
 }
 
@@ -456,6 +456,77 @@ pub fn printVariableDeclaration(node: ast.VariableDeclaration, writer: *std.Io.W
             try printBindingPattern(binding_pattern.binding_pattern, writer, indentation + 1);
             try printExpression(binding_pattern.initializer, writer, indentation + 1);
         },
+    }
+}
+
+pub fn printAssignmentPattern(node: ast.AssignmentPattern, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
+    try print("AssignmentPattern", writer, indentation);
+    switch (node) {
+        .object_assignment_pattern => |x| try printObjectAssignmentPattern(x, writer, indentation + 1),
+        .array_assignment_pattern => |x| try printArrayAssignmentPattern(x, writer, indentation + 1),
+    }
+}
+
+pub fn printObjectAssignmentPattern(node: ast.ObjectAssignmentPattern, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
+    try print("ObjectAssignmentPattern", writer, indentation);
+    for (node.properties) |property| switch (property) {
+        .assignment_property => |assignment_property| try printAssignmentProperty(assignment_property, writer, indentation + 1),
+        .assignment_rest_property => |assignment_rest_property| try printAssignmentRestProperty(assignment_rest_property, writer, indentation + 1),
+    };
+}
+
+pub fn printArrayAssignmentPattern(node: ast.ArrayAssignmentPattern, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
+    try print("ArrayAssignmentPattern", writer, indentation);
+    for (node.elements) |element| switch (element) {
+        .elision => try print("<elision>", writer, indentation + 1),
+        .assignment_element => |assignment_element| try printAssignmentElement(assignment_element, writer, indentation + 1),
+        .assignment_rest_element => |assignment_rest_element| try printAssignmentRestElement(assignment_rest_element, writer, indentation + 1),
+    };
+}
+
+pub fn printAssignmentRestProperty(node: ast.AssignmentRestProperty, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
+    try print("AssignmentRestProperty", writer, indentation);
+    try printDestructuringAssignmentTarget(node.destructuring_assignment_target, writer, indentation + 1);
+}
+
+pub fn printAssignmentProperty(node: ast.AssignmentProperty, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
+    try print("AssignmentProperty", writer, indentation);
+    switch (node) {
+        .identifier_reference_and_expression => |x| {
+            try print(x.identifier_reference, writer, indentation + 1);
+            if (x.initializer) |initializer| {
+                try print("initializer:", writer, indentation + 1);
+                try printExpression(initializer, writer, indentation + 2);
+            }
+        },
+        .property_name_and_assignment_element => |x| {
+            try printPropertyName(x.property_name, writer, indentation + 1);
+            try printAssignmentElement(x.assignment_element, writer, indentation + 2);
+        },
+    }
+}
+
+pub fn printAssignmentElement(node: ast.AssignmentElement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
+    try print("AssignmentElement", writer, indentation);
+    try printDestructuringAssignmentTarget(node.destructuring_assignment_target, writer, indentation + 1);
+    if (node.initializer) |initializer| {
+        try print("initializer:", writer, indentation + 1);
+        try printExpression(initializer, writer, indentation + 2);
+    }
+}
+
+pub fn printAssignmentRestElement(node: ast.AssignmentRestElement, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
+    try print("AssignmentRestElement", writer, indentation);
+    try printDestructuringAssignmentTarget(node.destructuring_assignment_target, writer, indentation + 1);
+}
+
+pub fn printDestructuringAssignmentTarget(node: ast.DestructuringAssignmentTarget, writer: *std.Io.Writer, indentation: usize) std.Io.Writer.Error!void {
+    try print("DestructuringAssignmentTarget", writer, indentation);
+    switch (node) {
+        .identifier_reference => |identifier_reference| try print(identifier_reference, writer, indentation + 1),
+        .member_expression => |member_expression| try printMemberExpression(member_expression, writer, indentation + 1),
+        .super_property => |super_property| try printSuperProperty(super_property, writer, indentation + 1),
+        .assignment_pattern => |assignment_pattern| try printAssignmentPattern(assignment_pattern, writer, indentation + 1),
     }
 }
 

@@ -613,15 +613,20 @@
     .{
         .source =
         \\const {a, ...rest} = {a: 1, b: 2, c: 3};
-        \\const [x, y] = [10, 20];
-        \\const {d: {e}} = {d: {e: 5}};
-        \\const {f = 99} = {f: undefined};
-        \\const g = ({} = {g: 42}).g;
+        \\const {rest: {b, c}} = {rest};
+        \\const [d, e] = [4, 5];
+        \\const {f = 6} = {f: undefined};
+        \\const g = ({} = {g: 7}).g;
         \\
-        \\rest.b + x + e + f + g;
+        \\const obj = {};
+        \\const arr = [];
+        \\({x: obj.a} = {x: 8});
+        \\[obj.b, obj.c, arr[0] = 11] = [9, 10];
+        \\
+        \\a + b + c + d + e + f + g + obj.a + obj.b + obj.c + arr[0];
         \\
         ,
-        .expected_result = .{ .value = .{ .number = 158 } },
+        .expected_result = .{ .value = .{ .number = 66 } },
         .expected_output =
         \\IR (test)
         \\  %0: [  0..7  ]                       object_create
@@ -637,64 +642,120 @@
         \\ %10: [ 10..11 ]                       string @0 ("a")
         \\ %11: [ 11..12 ]                       copy_data_properties %7, [%10]
         \\ %12: [ 12..12 ]                       initialize_binding @3 ("rest"), %11
-        \\ %13: [ 13..18 ]                       array_create 2
-        \\ %14: [ 14..15 ]                       number 10
-        \\ %15: [ 15..15 ]                       array_push %13, %14
-        \\ %16: [ 16..17 ]                       number 20
-        \\ %17: [ 17..17 ]                       array_push %13, %16
-        \\ %18: [ 18..26 ]                       get_iterator %13
-        \\ %19: [ 19..20 ]                       iterator_step_value %18
-        \\ %20: [ 20..20 ]                       initialize_binding @4 ("x"), %19
-        \\ %21: [ 21..22 ]                       iterator_step_value %18
-        \\ %22: [ 22..22 ]                       initialize_binding @5 ("y"), %21
-        \\ %23: [ 23..24 ]                       iterator_is_done %18
-        \\ %24: [ 24..24 ]                       br_cond %23, %27, %25
-        \\ %25: [ 25..25 ]                       label
-        \\ %26: [ 26..26 ]                       iterator_close %18
-        \\ %27: [ 27..27 ]                       label
-        \\ %28: [ 28..33 ]                       object_create
-        \\ %29: [ 29..32 ]                       object_create
-        \\ %30: [ 30..31 ]                       number 5
-        \\ %31: [ 31..31 ]                       object_set %29, @7 ("e"), %30
-        \\ %32: [ 32..32 ]                       object_set %28, @6 ("d"), %29
-        \\ %33: [ 33..35 ]                       to_object %28
-        \\ %34: [ 34..35 ]                       string @6 ("d")
-        \\ %35: [ 35..36 ]                       get_property_computed %33, %34
-        \\ %36: [ 36..37 ]                       to_object %35
-        \\ %37: [ 37..38 ]                       get_property %36, @7 ("e")
-        \\ %38: [ 38..38 ]                       initialize_binding @7 ("e"), %37
+        \\ %13: [ 13..16 ]                       object_create
+        \\ %14: [ 14..15 ]                       get_binding @3 ("rest")
+        \\ %15: [ 15..15 ]                       object_set %13, @3 ("rest"), %14
+        \\ %16: [ 16..18 ]                       to_object %13
+        \\ %17: [ 17..18 ]                       string @3 ("rest")
+        \\ %18: [ 18..19 ]                       get_property_computed %16, %17
+        \\ %19: [ 19..22 ]                       to_object %18
+        \\ %20: [ 20..21 ]                       get_property %19, @1 ("b")
+        \\ %21: [ 21..21 ]                       initialize_binding @1 ("b"), %20
+        \\ %22: [ 22..23 ]                       get_property %19, @2 ("c")
+        \\ %23: [ 23..23 ]                       initialize_binding @2 ("c"), %22
+        \\ %24: [ 24..29 ]                       array_create 2
+        \\ %25: [ 25..26 ]                       number 4
+        \\ %26: [ 26..26 ]                       array_push %24, %25
+        \\ %27: [ 27..28 ]                       number 5
+        \\ %28: [ 28..28 ]                       array_push %24, %27
+        \\ %29: [ 29..37 ]                       get_iterator %24
+        \\ %30: [ 30..31 ]                       iterator_step_value %29
+        \\ %31: [ 31..31 ]                       initialize_binding @4 ("d"), %30
+        \\ %32: [ 32..33 ]                       iterator_step_value %29
+        \\ %33: [ 33..33 ]                       initialize_binding @5 ("e"), %32
+        \\ %34: [ 34..35 ]                       iterator_is_done %29
+        \\ %35: [ 35..35 ]                       br_cond %34, %38, %36
+        \\ %36: [ 36..36 ]                       label
+        \\ %37: [ 37..37 ]                       iterator_close %29
+        \\ %38: [ 38..38 ]                       label
         \\ %39: [ 39..42 ]                       object_create
-        \\ %40: [ 40..41 ]                       get_binding @9 ("undefined")
-        \\ %41: [ 41..41 ]                       object_set %39, @8 ("f"), %40
+        \\ %40: [ 40..41 ]                       get_binding @7 ("undefined")
+        \\ %41: [ 41..41 ]                       object_set %39, @6 ("f"), %40
         \\ %42: [ 42..43 ]                       to_object %39
-        \\ %43: [ 43..51 ]                       get_property %42, @8 ("f")
+        \\ %43: [ 43..51 ]                       get_property %42, @6 ("f")
         \\ %44: [ 44..45 ]                       undefined
         \\ %45: [ 45..46 ]                       eq_strict %43, %44
         \\ %46: [ 46..46 ]                       br_cond %45, %47, %50
         \\ %47: [ 47..47 ]                       label
-        \\ %48: [ 48..49 ]                       number 99
+        \\ %48: [ 48..49 ]                       number 6
         \\ %49: [ 49..49 ]                       br %52, %48
         \\ %50: [ 50..50 ]                       label
         \\ %51: [ 51..51 ]                       br %52, %43
         \\ %52: [ 52..53 ]                       label
-        \\ %53: [ 53..53 ]                       initialize_binding @8 ("f"), %52
+        \\ %53: [ 53..53 ]                       initialize_binding @6 ("f"), %52
         \\ %54: [ 54..58 ]                       object_create
-        \\ %55: [ 55..56 ]                       number 42
-        \\ %56: [ 56..56 ]                       object_set %54, @10 ("g"), %55
+        \\ %55: [ 55..56 ]                       number 7
+        \\ %56: [ 56..56 ]                       object_set %54, @8 ("g"), %55
         \\ %57: [ 57..57 ]                       to_object %54
-        \\ %58: [ 58..59 ]                       get_property %54, @10 ("g")
-        \\ %59: [ 59..59 ]                       initialize_binding @10 ("g"), %58
-        \\ %60: [ 60..61 ]                       get_binding @3 ("rest")
-        \\ %61: [ 61..63 ]                       get_property %60, @1 ("b")
-        \\ %62: [ 62..63 ]                       get_binding @4 ("x")
-        \\ %63: [ 63..65 ]                       add %61, %62
-        \\ %64: [ 64..65 ]                       get_binding @7 ("e")
-        \\ %65: [ 65..67 ]                       add %63, %64
-        \\ %66: [ 66..67 ]                       get_binding @8 ("f")
-        \\ %67: [ 67..69 ]                       add %65, %66
-        \\ %68: [ 68..69 ]                       get_binding @10 ("g")
-        \\ %69: [ 69..70 ]                       add %67, %68
-        \\ %70: [ 70..70 ]                       return %69
+        \\ %58: [ 58..59 ]                       get_property %54, @8 ("g")
+        \\ %59: [ 59..59 ]                       initialize_binding @8 ("g"), %58
+        \\ %60: [ 60..61 ]                       object_create
+        \\ %61: [ 61..61 ]                       initialize_binding @9 ("obj"), %60
+        \\ %62: [ 62..63 ]                       array_create 0
+        \\ %63: [ 63..63 ]                       initialize_binding @10 ("arr"), %62
+        \\ %64: [ 64..67 ]                       object_create
+        \\ %65: [ 65..66 ]                       number 8
+        \\ %66: [ 66..66 ]                       object_set %64, @11 ("x"), %65
+        \\ %67: [ 67..69 ]                       to_object %64
+        \\ %68: [ 68..69 ]                       string @11 ("x")
+        \\ %69: [ 69..71 ]                       get_property_computed %67, %68
+        \\ %70: [ 70..71 ]                       get_binding @9 ("obj")
+        \\ %71: [ 71..71 ]                       set_property %70, @0 ("a"), %69
+        \\ %72: [ 72..77 ]                       array_create 2
+        \\ %73: [ 73..74 ]                       number 9
+        \\ %74: [ 74..74 ]                       array_push %72, %73
+        \\ %75: [ 75..76 ]                       number 10
+        \\ %76: [ 76..76 ]                       array_push %72, %75
+        \\ %77: [ 77..99 ]                       get_iterator %72
+        \\ %78: [ 78..80 ]                       iterator_step_value %77
+        \\ %79: [ 79..80 ]                       get_binding @9 ("obj")
+        \\ %80: [ 80..80 ]                       set_property %79, @1 ("b"), %78
+        \\ %81: [ 81..83 ]                       iterator_step_value %77
+        \\ %82: [ 82..83 ]                       get_binding @9 ("obj")
+        \\ %83: [ 83..83 ]                       set_property %82, @2 ("c"), %81
+        \\ %84: [ 84..92 ]                       iterator_step_value %77
+        \\ %85: [ 85..86 ]                       undefined
+        \\ %86: [ 86..87 ]                       eq_strict %84, %85
+        \\ %87: [ 87..87 ]                       br_cond %86, %88, %91
+        \\ %88: [ 88..88 ]                       label
+        \\ %89: [ 89..90 ]                       number 11
+        \\ %90: [ 90..90 ]                       br %93, %89
+        \\ %91: [ 91..91 ]                       label
+        \\ %92: [ 92..92 ]                       br %93, %84
+        \\ %93: [ 93..95 ]                       label
+        \\ %94: [ 94..95 ]                       get_binding @10 ("arr")
+        \\ %95: [ 95..95 ]                       set_property_indexed %94, 0, %93
+        \\ %96: [ 96..97 ]                       iterator_is_done %77
+        \\ %97: [ 97..97 ]                       br_cond %96, %100, %98
+        \\ %98: [ 98..98 ]                       label
+        \\ %99: [ 99..99 ]                       iterator_close %77
+        \\%100: [100..100]                       label
+        \\%101: [101..103]                       get_binding @0 ("a")
+        \\%102: [102..103]                       get_binding @1 ("b")
+        \\%103: [103..105]                       add %101, %102
+        \\%104: [104..105]                       get_binding @2 ("c")
+        \\%105: [105..107]                       add %103, %104
+        \\%106: [106..107]                       get_binding @4 ("d")
+        \\%107: [107..109]                       add %105, %106
+        \\%108: [108..109]                       get_binding @5 ("e")
+        \\%109: [109..111]                       add %107, %108
+        \\%110: [110..111]                       get_binding @6 ("f")
+        \\%111: [111..113]                       add %109, %110
+        \\%112: [112..113]                       get_binding @8 ("g")
+        \\%113: [113..116]                       add %111, %112
+        \\%114: [114..115]                       get_binding @9 ("obj")
+        \\%115: [115..116]                       get_property %114, @0 ("a")
+        \\%116: [116..119]                       add %113, %115
+        \\%117: [117..118]                       get_binding @9 ("obj")
+        \\%118: [118..119]                       get_property %117, @1 ("b")
+        \\%119: [119..122]                       add %116, %118
+        \\%120: [120..121]                       get_binding @9 ("obj")
+        \\%121: [121..122]                       get_property %120, @2 ("c")
+        \\%122: [122..125]                       add %119, %121
+        \\%123: [123..124]                       get_binding @10 ("arr")
+        \\%124: [124..125]                       get_property_indexed %123, 0
+        \\%125: [125..126]                       add %122, %124
+        \\%126: [126..126]                       return %125
         \\
         \\Bytecode (test)
         \\   0: 12 00 00                         object_create r0
@@ -712,60 +773,361 @@
         \\  79: 0e 04 00 00 00                   array_push r4, r0
         \\  84: 59 02 00 01 00 04 00             copy_data_properties r2, r1, r4
         \\  91: 45 03 00 00 00 02 00             initialize_binding @3 ("rest"), r2
-        \\  98: 0d 00 00 02 00 00 00             array_create r0, 2
-        \\ 105: 07 01 00 0a                      load_number_i8 r1, 10
-        \\ 109: 10 00 00 01 00 00 00 00 00       array_set r0, r1, 0
-        \\ 118: 07 01 00 14                      load_number_i8 r1, 20
-        \\ 122: 10 00 00 01 00 01 00 00 00       array_set r0, r1, 1
-        \\ 131: 69 01 00 00 00                   get_iterator r1, r0
-        \\ 136: 6d 00 00 01 00                   iterator_step_value r0, r1
-        \\ 141: 45 04 00 00 00 00 00             initialize_binding @4 ("x"), r0
-        \\ 148: 6d 00 00 01 00                   iterator_step_value r0, r1
-        \\ 153: 45 05 00 00 00 00 00             initialize_binding @5 ("y"), r0
-        \\ 160: 70 00 00 01 00                   iterator_is_done r0, r1
-        \\ 165: 01 00 00 03 00 00 00             jump_if_true r0, 3
-        \\ 172: 6f 01 00                         iterator_close r1
-        \\ 175: 12 00 00                         object_create r0
-        \\ 178: 12 01 00                         object_create r1
-        \\ 181: 07 02 00 05                      load_number_i8 r2, 5
-        \\ 185: 13 01 00 07 00 00 00 02 00       object_set r1, @7 ("e"), r2
-        \\ 194: 13 00 00 06 00 00 00 01 00       object_set r0, @6 ("d"), r1
-        \\ 203: 20 01 00 00 00                   to_object r1, r0
-        \\ 208: 0a 00 00 06 00 00 00             load_string r0, @6 ("d")
-        \\ 215: 48 02 00 01 00 00 00             get_property_computed r2, r1, r0
-        \\ 222: 20 00 00 02 00                   to_object r0, r2
-        \\ 227: 47 01 00 00 00 07 00 00 00 01 00 get_property r1, r0, @7 ("e"), @1
-        \\ 238: 45 07 00 00 00 01 00             initialize_binding @7 ("e"), r1
-        \\ 245: 12 00 00                         object_create r0
-        \\ 248: 46 01 00 09 00 00 00             get_binding r1, @9 ("undefined")
-        \\ 255: 13 00 00 08 00 00 00 01 00       object_set r0, @8 ("f"), r1
-        \\ 264: 20 01 00 00 00                   to_object r1, r0
-        \\ 269: 47 00 00 01 00 08 00 00 00 02 00 get_property r0, r1, @8 ("f"), @2
-        \\ 280: 03 01 00                         load_undefined r1
-        \\ 283: 3c 02 00 00 00 01 00             eq_strict r2, r0, r1
-        \\ 290: 01 02 00 05 00 00 00             jump_if_true r2, 5
-        \\ 297: 00 0e 00 00 00                   jump 14
-        \\ 302: 07 01 00 63                      load_number_i8 r1, 99
-        \\ 306: 0c 00 00 01 00                   move r0, r1
-        \\ 311: 00 00 00 00 00                   jump 0
-        \\ 316: 45 08 00 00 00 00 00             initialize_binding @8 ("f"), r0
-        \\ 323: 12 00 00                         object_create r0
-        \\ 326: 07 01 00 2a                      load_number_i8 r1, 42
-        \\ 330: 13 00 00 0a 00 00 00 01 00       object_set r0, @10 ("g"), r1
-        \\ 339: 20 01 00 00 00                   to_object r1, r0
-        \\ 344: 47 01 00 00 00 0a 00 00 00 03 00 get_property r1, r0, @10 ("g"), @3
-        \\ 355: 45 0a 00 00 00 01 00             initialize_binding @10 ("g"), r1
-        \\ 362: 46 00 00 03 00 00 00             get_binding r0, @3 ("rest")
-        \\ 369: 47 01 00 00 00 01 00 00 00 04 00 get_property r1, r0, @1 ("b"), @4
-        \\ 380: 46 00 00 04 00 00 00             get_binding r0, @4 ("x")
-        \\ 387: 28 02 00 01 00 00 00             add r2, r1, r0
-        \\ 394: 46 00 00 07 00 00 00             get_binding r0, @7 ("e")
-        \\ 401: 28 01 00 02 00 00 00             add r1, r2, r0
-        \\ 408: 46 00 00 08 00 00 00             get_binding r0, @8 ("f")
-        \\ 415: 28 02 00 01 00 00 00             add r2, r1, r0
-        \\ 422: 46 00 00 0a 00 00 00             get_binding r0, @10 ("g")
-        \\ 429: 28 01 00 02 00 00 00             add r1, r2, r0
-        \\ 436: 74 01 00                         return r1
+        \\  98: 12 00 00                         object_create r0
+        \\ 101: 46 01 00 03 00 00 00             get_binding r1, @3 ("rest")
+        \\ 108: 13 00 00 03 00 00 00 01 00       object_set r0, @3 ("rest"), r1
+        \\ 117: 20 01 00 00 00                   to_object r1, r0
+        \\ 122: 0a 00 00 03 00 00 00             load_string r0, @3 ("rest")
+        \\ 129: 48 02 00 01 00 00 00             get_property_computed r2, r1, r0
+        \\ 136: 20 00 00 02 00                   to_object r0, r2
+        \\ 141: 47 01 00 00 00 01 00 00 00 01 00 get_property r1, r0, @1 ("b"), @1
+        \\ 152: 45 01 00 00 00 01 00             initialize_binding @1 ("b"), r1
+        \\ 159: 47 01 00 00 00 02 00 00 00 02 00 get_property r1, r0, @2 ("c"), @2
+        \\ 170: 45 02 00 00 00 01 00             initialize_binding @2 ("c"), r1
+        \\ 177: 0d 00 00 02 00 00 00             array_create r0, 2
+        \\ 184: 07 01 00 04                      load_number_i8 r1, 4
+        \\ 188: 10 00 00 01 00 00 00 00 00       array_set r0, r1, 0
+        \\ 197: 07 01 00 05                      load_number_i8 r1, 5
+        \\ 201: 10 00 00 01 00 01 00 00 00       array_set r0, r1, 1
+        \\ 210: 69 01 00 00 00                   get_iterator r1, r0
+        \\ 215: 6d 00 00 01 00                   iterator_step_value r0, r1
+        \\ 220: 45 04 00 00 00 00 00             initialize_binding @4 ("d"), r0
+        \\ 227: 6d 00 00 01 00                   iterator_step_value r0, r1
+        \\ 232: 45 05 00 00 00 00 00             initialize_binding @5 ("e"), r0
+        \\ 239: 70 00 00 01 00                   iterator_is_done r0, r1
+        \\ 244: 01 00 00 03 00 00 00             jump_if_true r0, 3
+        \\ 251: 6f 01 00                         iterator_close r1
+        \\ 254: 12 00 00                         object_create r0
+        \\ 257: 46 01 00 07 00 00 00             get_binding r1, @7 ("undefined")
+        \\ 264: 13 00 00 06 00 00 00 01 00       object_set r0, @6 ("f"), r1
+        \\ 273: 20 01 00 00 00                   to_object r1, r0
+        \\ 278: 47 00 00 01 00 06 00 00 00 03 00 get_property r0, r1, @6 ("f"), @3
+        \\ 289: 03 01 00                         load_undefined r1
+        \\ 292: 3c 02 00 00 00 01 00             eq_strict r2, r0, r1
+        \\ 299: 01 02 00 05 00 00 00             jump_if_true r2, 5
+        \\ 306: 00 0e 00 00 00                   jump 14
+        \\ 311: 07 01 00 06                      load_number_i8 r1, 6
+        \\ 315: 0c 00 00 01 00                   move r0, r1
+        \\ 320: 00 00 00 00 00                   jump 0
+        \\ 325: 45 06 00 00 00 00 00             initialize_binding @6 ("f"), r0
+        \\ 332: 12 00 00                         object_create r0
+        \\ 335: 07 01 00 07                      load_number_i8 r1, 7
+        \\ 339: 13 00 00 08 00 00 00 01 00       object_set r0, @8 ("g"), r1
+        \\ 348: 20 01 00 00 00                   to_object r1, r0
+        \\ 353: 47 01 00 00 00 08 00 00 00 04 00 get_property r1, r0, @8 ("g"), @4
+        \\ 364: 45 08 00 00 00 01 00             initialize_binding @8 ("g"), r1
+        \\ 371: 12 00 00                         object_create r0
+        \\ 374: 45 09 00 00 00 00 00             initialize_binding @9 ("obj"), r0
+        \\ 381: 0d 00 00 00 00 00 00             array_create r0, 0
+        \\ 388: 45 0a 00 00 00 00 00             initialize_binding @10 ("arr"), r0
+        \\ 395: 12 00 00                         object_create r0
+        \\ 398: 07 01 00 08                      load_number_i8 r1, 8
+        \\ 402: 13 00 00 0b 00 00 00 01 00       object_set r0, @11 ("x"), r1
+        \\ 411: 20 01 00 00 00                   to_object r1, r0
+        \\ 416: 0a 00 00 0b 00 00 00             load_string r0, @11 ("x")
+        \\ 423: 48 02 00 01 00 00 00             get_property_computed r2, r1, r0
+        \\ 430: 46 00 00 09 00 00 00             get_binding r0, @9 ("obj")
+        \\ 437: 4c 00 00 02 00 00 00 00 00 05 00 set_property r0, r2, @0 ("a"), @5
+        \\ 448: 0d 00 00 02 00 00 00             array_create r0, 2
+        \\ 455: 07 01 00 09                      load_number_i8 r1, 9
+        \\ 459: 10 00 00 01 00 00 00 00 00       array_set r0, r1, 0
+        \\ 468: 07 01 00 0a                      load_number_i8 r1, 10
+        \\ 472: 10 00 00 01 00 01 00 00 00       array_set r0, r1, 1
+        \\ 481: 69 01 00 00 00                   get_iterator r1, r0
+        \\ 486: 6d 00 00 01 00                   iterator_step_value r0, r1
+        \\ 491: 46 02 00 09 00 00 00             get_binding r2, @9 ("obj")
+        \\ 498: 4c 02 00 00 00 01 00 00 00 06 00 set_property r2, r0, @1 ("b"), @6
+        \\ 509: 6d 00 00 01 00                   iterator_step_value r0, r1
+        \\ 514: 46 02 00 09 00 00 00             get_binding r2, @9 ("obj")
+        \\ 521: 4c 02 00 00 00 02 00 00 00 07 00 set_property r2, r0, @2 ("c"), @7
+        \\ 532: 6d 00 00 01 00                   iterator_step_value r0, r1
+        \\ 537: 03 02 00                         load_undefined r2
+        \\ 540: 3c 03 00 00 00 02 00             eq_strict r3, r0, r2
+        \\ 547: 01 03 00 05 00 00 00             jump_if_true r3, 5
+        \\ 554: 00 0e 00 00 00                   jump 14
+        \\ 559: 07 02 00 0b                      load_number_i8 r2, 11
+        \\ 563: 0c 00 00 02 00                   move r0, r2
+        \\ 568: 00 00 00 00 00                   jump 0
+        \\ 573: 46 02 00 0a 00 00 00             get_binding r2, @10 ("arr")
+        \\ 580: 50 02 00 00 00 00 00 00 00       set_property_indexed r2, r0, 0
+        \\ 589: 70 00 00 01 00                   iterator_is_done r0, r1
+        \\ 594: 01 00 00 03 00 00 00             jump_if_true r0, 3
+        \\ 601: 6f 01 00                         iterator_close r1
+        \\ 604: 46 00 00 00 00 00 00             get_binding r0, @0 ("a")
+        \\ 611: 46 01 00 01 00 00 00             get_binding r1, @1 ("b")
+        \\ 618: 28 02 00 00 00 01 00             add r2, r0, r1
+        \\ 625: 46 00 00 02 00 00 00             get_binding r0, @2 ("c")
+        \\ 632: 28 01 00 02 00 00 00             add r1, r2, r0
+        \\ 639: 46 00 00 04 00 00 00             get_binding r0, @4 ("d")
+        \\ 646: 28 02 00 01 00 00 00             add r2, r1, r0
+        \\ 653: 46 00 00 05 00 00 00             get_binding r0, @5 ("e")
+        \\ 660: 28 01 00 02 00 00 00             add r1, r2, r0
+        \\ 667: 46 00 00 06 00 00 00             get_binding r0, @6 ("f")
+        \\ 674: 28 02 00 01 00 00 00             add r2, r1, r0
+        \\ 681: 46 00 00 08 00 00 00             get_binding r0, @8 ("g")
+        \\ 688: 28 01 00 02 00 00 00             add r1, r2, r0
+        \\ 695: 46 00 00 09 00 00 00             get_binding r0, @9 ("obj")
+        \\ 702: 47 02 00 00 00 00 00 00 00 08 00 get_property r2, r0, @0 ("a"), @8
+        \\ 713: 28 00 00 01 00 02 00             add r0, r1, r2
+        \\ 720: 46 01 00 09 00 00 00             get_binding r1, @9 ("obj")
+        \\ 727: 47 02 00 01 00 01 00 00 00 09 00 get_property r2, r1, @1 ("b"), @9
+        \\ 738: 28 01 00 00 00 02 00             add r1, r0, r2
+        \\ 745: 46 00 00 09 00 00 00             get_binding r0, @9 ("obj")
+        \\ 752: 47 02 00 00 00 02 00 00 00 0a 00 get_property r2, r0, @2 ("c"), @10
+        \\ 763: 28 00 00 01 00 02 00             add r0, r1, r2
+        \\ 770: 46 01 00 0a 00 00 00             get_binding r1, @10 ("arr")
+        \\ 777: 49 02 00 01 00 00 00 00 00       get_property_indexed r2, r1, 0
+        \\ 786: 28 01 00 00 00 02 00             add r1, r0, r2
+        \\ 793: 74 01 00                         return r1
+        \\
+        ,
+    },
+
+    // For-of with destructuring
+    .{
+        .source =
+        \\var result = 0;
+        \\for (const [a, b] of [[1, 2], [3, 4]]) {
+        \\  result += a + b;
+        \\}
+        \\for (var {d, c} of [{c: 5, d: 6}]) {
+        \\  result += c + d;
+        \\}
+        \\for ([e, f] of [[7, 8]]) {
+        \\  result += e + f;
+        \\}
+        \\result;
+        \\
+        ,
+        .expected_result = .{ .value = .{ .number = 36 } },
+        .expected_output =
+        \\IR (test)
+        \\  %0: [  0..1  ]                       zero
+        \\  %1: [  1..1  ]                       set_binding @0 ("result"), %0
+        \\  %2: [  2..16 ]                       array_create 2
+        \\  %3: [  3..8  ]                       array_create 2
+        \\  %4: [  4..5  ]                       one
+        \\  %5: [  5..5  ]                       array_push %3, %4
+        \\  %6: [  6..7  ]                       number 2
+        \\  %7: [  7..7  ]                       array_push %3, %6
+        \\  %8: [  8..8  ]                       array_push %2, %3
+        \\  %9: [  9..14 ]                       array_create 2
+        \\ %10: [ 10..11 ]                       number 3
+        \\ %11: [ 11..11 ]                       array_push %9, %10
+        \\ %12: [ 12..13 ]                       number 4
+        \\ %13: [ 13..13 ]                       array_push %9, %12
+        \\ %14: [ 14..14 ]                       array_push %2, %9
+        \\ %15: [ 15..17 ]                       undefined
+        \\ %16: [ 16..44 ]                       get_iterator %2
+        \\ %17: [ 17..17 ]                       br %18, %15
+        \\ %18: [ 18..46 ]                       label
+        \\ %19: [ 19..27 ]                       iterator_step_value %16
+        \\ %20: [ 20..21 ]                       iterator_is_done %16
+        \\ %21: [ 21..22 ]                       logical_not %20
+        \\ %22: [ 22..22 ]                       br_cond %21, %23, %45
+        \\ %23: [ 23..23 ]                       label
+        \\ %24: [ 24..24 ]                       push_scope
+        \\ %25: [ 25..25 ]                       create_immutable_binding @1 ("a")
+        \\ %26: [ 26..26 ]                       create_immutable_binding @2 ("b")
+        \\ %27: [ 27..35 ]                       get_iterator %19
+        \\ %28: [ 28..29 ]                       iterator_step_value %27
+        \\ %29: [ 29..29 ]                       initialize_binding @1 ("a"), %28
+        \\ %30: [ 30..31 ]                       iterator_step_value %27
+        \\ %31: [ 31..31 ]                       initialize_binding @2 ("b"), %30
+        \\ %32: [ 32..33 ]                       iterator_is_done %27
+        \\ %33: [ 33..33 ]                       br_cond %32, %36, %34
+        \\ %34: [ 34..34 ]                       label
+        \\ %35: [ 35..35 ]                       iterator_close %27
+        \\ %36: [ 36..36 ]                       label
+        \\ %37: [ 37..41 ]                       get_binding @0 ("result")
+        \\ %38: [ 38..40 ]                       get_binding @1 ("a")
+        \\ %39: [ 39..40 ]                       get_binding @2 ("b")
+        \\ %40: [ 40..41 ]                       add %38, %39
+        \\ %41: [ 41..42 ]                       add %37, %40
+        \\ %42: [ 42..44 ]                       set_binding @0 ("result"), %41
+        \\ %43: [ 43..43 ]                       pop_scope
+        \\ %44: [ 44..44 ]                       br %18, %42
+        \\ %45: [ 45..45 ]                       label
+        \\ %46: [ 46..46 ]                       br %47, %18
+        \\ %47: [ 47..47 ]                       label
+        \\ %48: [ 48..56 ]                       array_create 1
+        \\ %49: [ 49..54 ]                       object_create
+        \\ %50: [ 50..51 ]                       number 5
+        \\ %51: [ 51..51 ]                       object_set %49, @3 ("c"), %50
+        \\ %52: [ 52..53 ]                       number 6
+        \\ %53: [ 53..53 ]                       object_set %49, @4 ("d"), %52
+        \\ %54: [ 54..54 ]                       array_push %48, %49
+        \\ %55: [ 55..57 ]                       undefined
+        \\ %56: [ 56..75 ]                       get_iterator %48
+        \\ %57: [ 57..57 ]                       br %58, %55
+        \\ %58: [ 58..77 ]                       label
+        \\ %59: [ 59..64 ]                       iterator_step_value %56
+        \\ %60: [ 60..61 ]                       iterator_is_done %56
+        \\ %61: [ 61..62 ]                       logical_not %60
+        \\ %62: [ 62..62 ]                       br_cond %61, %63, %76
+        \\ %63: [ 63..63 ]                       label
+        \\ %64: [ 64..67 ]                       to_object %59
+        \\ %65: [ 65..66 ]                       get_property %64, @4 ("d")
+        \\ %66: [ 66..66 ]                       set_binding @4 ("d"), %65
+        \\ %67: [ 67..68 ]                       get_property %64, @3 ("c")
+        \\ %68: [ 68..68 ]                       set_binding @3 ("c"), %67
+        \\ %69: [ 69..73 ]                       get_binding @0 ("result")
+        \\ %70: [ 70..72 ]                       get_binding @3 ("c")
+        \\ %71: [ 71..72 ]                       get_binding @4 ("d")
+        \\ %72: [ 72..73 ]                       add %70, %71
+        \\ %73: [ 73..74 ]                       add %69, %72
+        \\ %74: [ 74..75 ]                       set_binding @0 ("result"), %73
+        \\ %75: [ 75..75 ]                       br %58, %74
+        \\ %76: [ 76..76 ]                       label
+        \\ %77: [ 77..77 ]                       br %78, %58
+        \\ %78: [ 78..78 ]                       label
+        \\ %79: [ 79..87 ]                       array_create 1
+        \\ %80: [ 80..85 ]                       array_create 2
+        \\ %81: [ 81..82 ]                       number 7
+        \\ %82: [ 82..82 ]                       array_push %80, %81
+        \\ %83: [ 83..84 ]                       number 8
+        \\ %84: [ 84..84 ]                       array_push %80, %83
+        \\ %85: [ 85..85 ]                       array_push %79, %80
+        \\ %86: [ 86..88 ]                       undefined
+        \\ %87: [ 87..111]                       get_iterator %79
+        \\ %88: [ 88..88 ]                       br %89, %86
+        \\ %89: [ 89..113]                       label
+        \\ %90: [ 90..95 ]                       iterator_step_value %87
+        \\ %91: [ 91..92 ]                       iterator_is_done %87
+        \\ %92: [ 92..93 ]                       logical_not %91
+        \\ %93: [ 93..93 ]                       br_cond %92, %94, %112
+        \\ %94: [ 94..94 ]                       label
+        \\ %95: [ 95..103]                       get_iterator %90
+        \\ %96: [ 96..97 ]                       iterator_step_value %95
+        \\ %97: [ 97..97 ]                       set_binding @5 ("e"), %96
+        \\ %98: [ 98..99 ]                       iterator_step_value %95
+        \\ %99: [ 99..99 ]                       set_binding @6 ("f"), %98
+        \\%100: [100..101]                       iterator_is_done %95
+        \\%101: [101..101]                       br_cond %100, %104, %102
+        \\%102: [102..102]                       label
+        \\%103: [103..103]                       iterator_close %95
+        \\%104: [104..104]                       label
+        \\%105: [105..109]                       get_binding @0 ("result")
+        \\%106: [106..108]                       get_binding @5 ("e")
+        \\%107: [107..108]                       get_binding @6 ("f")
+        \\%108: [108..109]                       add %106, %107
+        \\%109: [109..110]                       add %105, %108
+        \\%110: [110..111]                       set_binding @0 ("result"), %109
+        \\%111: [111..111]                       br %89, %110
+        \\%112: [112..112]                       label
+        \\%113: [113..113]                       br %114, %89
+        \\%114: [114..114]                       label
+        \\%115: [115..116]                       get_binding @0 ("result")
+        \\%116: [116..116]                       return %115
+        \\
+        \\Bytecode (test)
+        \\   0: 07 00 00 00                      load_number_i8 r0, 0
+        \\   4: 4a 00 00 00 00 00 00             set_binding @0 ("result"), r0
+        \\  11: 0d 00 00 02 00 00 00             array_create r0, 2
+        \\  18: 0d 01 00 02 00 00 00             array_create r1, 2
+        \\  25: 07 02 00 01                      load_number_i8 r2, 1
+        \\  29: 10 01 00 02 00 00 00 00 00       array_set r1, r2, 0
+        \\  38: 07 02 00 02                      load_number_i8 r2, 2
+        \\  42: 10 01 00 02 00 01 00 00 00       array_set r1, r2, 1
+        \\  51: 10 00 00 01 00 00 00 00 00       array_set r0, r1, 0
+        \\  60: 0d 01 00 02 00 00 00             array_create r1, 2
+        \\  67: 07 02 00 03                      load_number_i8 r2, 3
+        \\  71: 10 01 00 02 00 00 00 00 00       array_set r1, r2, 0
+        \\  80: 07 02 00 04                      load_number_i8 r2, 4
+        \\  84: 10 01 00 02 00 01 00 00 00       array_set r1, r2, 1
+        \\  93: 10 00 00 01 00 01 00 00 00       array_set r0, r1, 1
+        \\ 102: 03 01 00                         load_undefined r1
+        \\ 105: 69 02 00 00 00                   get_iterator r2, r0
+        \\ 110: 0c 00 00 01 00                   move r0, r1
+        \\ 115: 6d 01 00 02 00                   iterator_step_value r1, r2
+        \\ 120: 70 03 00 02 00                   iterator_is_done r3, r2
+        \\ 125: 25 04 00 03 00                   logical_not r4, r3
+        \\ 130: 01 04 00 05 00 00 00             jump_if_true r4, 5
+        \\ 137: 00 71 00 00 00                   jump 113
+        \\ 142: 3e                               push_scope
+        \\ 143: 44 01 00 00 00                   create_immutable_binding @1 ("a")
+        \\ 148: 44 02 00 00 00                   create_immutable_binding @2 ("b")
+        \\ 153: 69 03 00 01 00                   get_iterator r3, r1
+        \\ 158: 6d 01 00 03 00                   iterator_step_value r1, r3
+        \\ 163: 45 01 00 00 00 01 00             initialize_binding @1 ("a"), r1
+        \\ 170: 6d 01 00 03 00                   iterator_step_value r1, r3
+        \\ 175: 45 02 00 00 00 01 00             initialize_binding @2 ("b"), r1
+        \\ 182: 70 01 00 03 00                   iterator_is_done r1, r3
+        \\ 187: 01 01 00 03 00 00 00             jump_if_true r1, 3
+        \\ 194: 6f 03 00                         iterator_close r3
+        \\ 197: 46 01 00 00 00 00 00             get_binding r1, @0 ("result")
+        \\ 204: 46 03 00 01 00 00 00             get_binding r3, @1 ("a")
+        \\ 211: 46 04 00 02 00 00 00             get_binding r4, @2 ("b")
+        \\ 218: 28 05 00 03 00 04 00             add r5, r3, r4
+        \\ 225: 28 03 00 01 00 05 00             add r3, r1, r5
+        \\ 232: 4a 00 00 00 00 03 00             set_binding @0 ("result"), r3
+        \\ 239: 0c 01 00 03 00                   move r1, r3
+        \\ 244: 41                               pop_scope
+        \\ 245: 0c 00 00 01 00                   move r0, r1
+        \\ 250: 00 74 ff ff ff                   jump -140
+        \\ 255: 0d 00 00 01 00 00 00             array_create r0, 1
+        \\ 262: 12 01 00                         object_create r1
+        \\ 265: 07 02 00 05                      load_number_i8 r2, 5
+        \\ 269: 13 01 00 03 00 00 00 02 00       object_set r1, @3 ("c"), r2
+        \\ 278: 07 02 00 06                      load_number_i8 r2, 6
+        \\ 282: 13 01 00 04 00 00 00 02 00       object_set r1, @4 ("d"), r2
+        \\ 291: 10 00 00 01 00 00 00 00 00       array_set r0, r1, 0
+        \\ 300: 03 01 00                         load_undefined r1
+        \\ 303: 69 02 00 00 00                   get_iterator r2, r0
+        \\ 308: 0c 00 00 01 00                   move r0, r1
+        \\ 313: 6d 01 00 02 00                   iterator_step_value r1, r2
+        \\ 318: 70 03 00 02 00                   iterator_is_done r3, r2
+        \\ 323: 25 04 00 03 00                   logical_not r4, r3
+        \\ 328: 01 04 00 05 00 00 00             jump_if_true r4, 5
+        \\ 335: 00 62 00 00 00                   jump 98
+        \\ 340: 20 03 00 01 00                   to_object r3, r1
+        \\ 345: 47 01 00 03 00 04 00 00 00 00 00 get_property r1, r3, @4 ("d"), @0
+        \\ 356: 4a 04 00 00 00 01 00             set_binding @4 ("d"), r1
+        \\ 363: 47 01 00 03 00 03 00 00 00 01 00 get_property r1, r3, @3 ("c"), @1
+        \\ 374: 4a 03 00 00 00 01 00             set_binding @3 ("c"), r1
+        \\ 381: 46 01 00 00 00 00 00             get_binding r1, @0 ("result")
+        \\ 388: 46 03 00 03 00 00 00             get_binding r3, @3 ("c")
+        \\ 395: 46 04 00 04 00 00 00             get_binding r4, @4 ("d")
+        \\ 402: 28 05 00 03 00 04 00             add r5, r3, r4
+        \\ 409: 28 03 00 01 00 05 00             add r3, r1, r5
+        \\ 416: 4a 00 00 00 00 03 00             set_binding @0 ("result"), r3
+        \\ 423: 0c 01 00 03 00                   move r1, r3
+        \\ 428: 0c 00 00 01 00                   move r0, r1
+        \\ 433: 00 83 ff ff ff                   jump -125
+        \\ 438: 0d 00 00 01 00 00 00             array_create r0, 1
+        \\ 445: 0d 01 00 02 00 00 00             array_create r1, 2
+        \\ 452: 07 02 00 07                      load_number_i8 r2, 7
+        \\ 456: 10 01 00 02 00 00 00 00 00       array_set r1, r2, 0
+        \\ 465: 07 02 00 08                      load_number_i8 r2, 8
+        \\ 469: 10 01 00 02 00 01 00 00 00       array_set r1, r2, 1
+        \\ 478: 10 00 00 01 00 00 00 00 00       array_set r0, r1, 0
+        \\ 487: 03 01 00                         load_undefined r1
+        \\ 490: 69 02 00 00 00                   get_iterator r2, r0
+        \\ 495: 0c 00 00 01 00                   move r0, r1
+        \\ 500: 6d 01 00 02 00                   iterator_step_value r1, r2
+        \\ 505: 70 03 00 02 00                   iterator_is_done r3, r2
+        \\ 510: 25 04 00 03 00                   logical_not r4, r3
+        \\ 515: 01 04 00 05 00 00 00             jump_if_true r4, 5
+        \\ 522: 00 65 00 00 00                   jump 101
+        \\ 527: 69 03 00 01 00                   get_iterator r3, r1
+        \\ 532: 6d 01 00 03 00                   iterator_step_value r1, r3
+        \\ 537: 4a 05 00 00 00 01 00             set_binding @5 ("e"), r1
+        \\ 544: 6d 01 00 03 00                   iterator_step_value r1, r3
+        \\ 549: 4a 06 00 00 00 01 00             set_binding @6 ("f"), r1
+        \\ 556: 70 01 00 03 00                   iterator_is_done r1, r3
+        \\ 561: 01 01 00 03 00 00 00             jump_if_true r1, 3
+        \\ 568: 6f 03 00                         iterator_close r3
+        \\ 571: 46 01 00 00 00 00 00             get_binding r1, @0 ("result")
+        \\ 578: 46 03 00 05 00 00 00             get_binding r3, @5 ("e")
+        \\ 585: 46 04 00 06 00 00 00             get_binding r4, @6 ("f")
+        \\ 592: 28 05 00 03 00 04 00             add r5, r3, r4
+        \\ 599: 28 03 00 01 00 05 00             add r3, r1, r5
+        \\ 606: 4a 00 00 00 00 03 00             set_binding @0 ("result"), r3
+        \\ 613: 0c 01 00 03 00                   move r1, r3
+        \\ 618: 0c 00 00 01 00                   move r0, r1
+        \\ 623: 00 80 ff ff ff                   jump -128
+        \\ 628: 46 00 00 00 00 00 00             get_binding r0, @0 ("result")
+        \\ 635: 74 00 00                         return r0
         \\
         ,
     },

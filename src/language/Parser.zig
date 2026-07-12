@@ -1917,7 +1917,7 @@ pub fn acceptAssignmentExpression(
         .@"=" => blk: {
             // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a
             // Syntax Error if the AssignmentTargetType of LeftHandSideExpression is invalid.
-            break :blk primary_expression != .binding_pattern_for_assignment_expression and
+            break :blk primary_expression != .assignment_pattern and
                 primary_expression.assignmentTargetType(self.state.in_strict_mode) == .invalid;
         },
 
@@ -2045,7 +2045,7 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
         .@"{", .@"[" => blk: {
             const tmp_state = self.core.saveState();
             const error_count = self.diagnostics.errors.items.len;
-            if (self.acceptBindingPattern()) |binding_pattern| {
+            if (self.acceptAssignmentPattern()) |assignment_pattern| {
                 if (try self.core.peek()) |next_token_| switch (next_token_.type) {
                     // Assignment expression LHS
                     .@"=",
@@ -2064,21 +2064,21 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
                     .@"&&=",
                     .@"||=",
                     .@"??=",
-                    => break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern },
+                    => break :blk .{ .assignment_pattern = assignment_pattern },
                     .identifier,
                     => if (std.mem.eql(u8, next_token_.text, "of")) {
-                        break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern };
+                        break :blk .{ .assignment_pattern = assignment_pattern };
                     },
                     // For loop initializer
                     .in => if (std.mem.findScalar(Tokenizer.TokenType, ctx.forbidden, .in) != null) {
-                        break :blk .{ .binding_pattern_for_assignment_expression = binding_pattern };
+                        break :blk .{ .assignment_pattern = assignment_pattern };
                     },
                     else => {},
                 };
             } else |_| {}
             self.core.restoreState(tmp_state);
-            // If parsing the binding pattern failed we may have emitted an 'invalid binding
-            // identifier' error, e.g. for `"use strict"; ({ foo: eval })` - get rid of those
+            // If parsing the assignment pattern failed we may have emitted an 'invalid assignment
+            // target' error, e.g. for `"use strict"; ({ foo: eval })` - get rid of those
             while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
             const primary_expression = try self.acceptPrimaryExpression();
             break :blk .{ .primary_expression = primary_expression };
@@ -2458,6 +2458,160 @@ pub fn acceptVariableDeclaration(self: *Parser) AcceptError!ast.VariableDeclarat
             },
         };
     } else |_| return error.UnexpectedToken;
+}
+
+pub fn acceptAssignmentPattern(self: *Parser) AcceptError!ast.AssignmentPattern {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptObjectAssignmentPattern()) |object_assignment_pattern|
+        return .{ .object_assignment_pattern = object_assignment_pattern }
+    else |_| if (self.acceptArrayAssignmentPattern()) |array_assignment_pattern|
+        return .{ .array_assignment_pattern = array_assignment_pattern }
+    else |_|
+        return error.UnexpectedToken;
+}
+
+pub fn acceptObjectAssignmentPattern(self: *Parser) AcceptError!ast.ObjectAssignmentPattern {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var properties: std.ArrayList(ast.ObjectAssignmentPattern.Property) = .empty;
+    _ = try self.core.accept(RuleSet.is(.@"{"));
+    while (true) {
+        if (self.acceptAssignmentProperty()) |assignment_property| {
+            try properties.append(self.allocator, .{ .assignment_property = assignment_property });
+            _ = self.core.accept(RuleSet.is(.@",")) catch break;
+        } else |_| if (self.acceptAssignmentRestProperty()) |rest_property| {
+            try properties.append(self.allocator, .{ .assignment_rest_property = rest_property });
+            break;
+        } else |_| break;
+    }
+    _ = try self.core.accept(RuleSet.is(.@"}"));
+    return .{ .properties = try properties.toOwnedSlice(self.allocator) };
+}
+
+pub fn acceptArrayAssignmentPattern(self: *Parser) AcceptError!ast.ArrayAssignmentPattern {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    var elements: std.ArrayList(ast.ArrayAssignmentPattern.Element) = .empty;
+    _ = try self.core.accept(RuleSet.is(.@"["));
+    while (true) {
+        if (self.acceptAssignmentElement()) |assignment_element| {
+            try elements.append(self.allocator, .{ .assignment_element = assignment_element });
+            _ = self.core.accept(RuleSet.is(.@",")) catch break;
+        } else |_| if (self.acceptAssignmentRestElement()) |rest_element| {
+            try elements.append(self.allocator, .{ .assignment_rest_element = rest_element });
+            if (self.core.accept(RuleSet.is(.@","))) |token| {
+                try self.emitErrorAt(token.location, "Rest element must not be followed by comma", .{});
+            } else |_| {}
+            break;
+        } else |_| if (self.core.accept(RuleSet.is(.@","))) |_| {
+            try elements.append(self.allocator, .elision);
+        } else |_| break;
+    }
+    _ = try self.core.accept(RuleSet.is(.@"]"));
+    return .{ .elements = try elements.toOwnedSlice(self.allocator) };
+}
+
+pub fn acceptAssignmentRestProperty(self: *Parser) AcceptError!ast.AssignmentRestProperty {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"..."));
+    const destructuring_assignment_target = try self.acceptDestructuringAssignmentTarget();
+    return .{ .destructuring_assignment_target = destructuring_assignment_target };
+}
+
+pub fn acceptAssignmentProperty(self: *Parser) AcceptError!ast.AssignmentProperty {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const property_name = try self.acceptPropertyName();
+    if (self.core.accept(RuleSet.is(.@":"))) |_| {
+        const assignment_element = try self.acceptAssignmentElement();
+        return .{
+            .property_name_and_assignment_element = .{
+                .property_name = property_name,
+                .assignment_element = assignment_element,
+            },
+        };
+    } else |_| {}
+
+    self.core.restoreState(state);
+    const identifier_reference = try self.acceptIdentifierReference();
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
+    const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
+        try self.acceptExpression(ctx)
+    else |_|
+        null;
+    return .{
+        .identifier_reference_and_expression = .{
+            .identifier_reference = identifier_reference,
+            .initializer = initializer,
+        },
+    };
+}
+
+pub fn acceptAssignmentElement(self: *Parser) AcceptError!ast.AssignmentElement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    const destructuring_assignment_target = try self.acceptDestructuringAssignmentTarget();
+    const ctx: AcceptContext = .{ .precedence = getPrecedence(.@",") + 1 };
+    const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
+        try self.acceptExpression(ctx)
+    else |_|
+        null;
+    return .{
+        .destructuring_assignment_target = destructuring_assignment_target,
+        .initializer = initializer,
+    };
+}
+
+pub fn acceptAssignmentRestElement(self: *Parser) AcceptError!ast.AssignmentRestElement {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    _ = try self.core.accept(RuleSet.is(.@"..."));
+    const destructuring_assignment_target = try self.acceptDestructuringAssignmentTarget();
+    return .{ .destructuring_assignment_target = destructuring_assignment_target };
+}
+
+pub fn acceptDestructuringAssignmentTarget(self: *Parser) AcceptError!ast.DestructuringAssignmentTarget {
+    const state = self.core.saveState();
+    errdefer self.core.restoreState(state);
+
+    if (self.acceptAssignmentPattern()) |assignment_pattern|
+        return .{ .assignment_pattern = assignment_pattern }
+    else |_| {}
+
+    var expression: ast.Expression = if (self.acceptSuperProperty()) |super_property|
+        .{ .super_property = super_property }
+    else |_| if (self.acceptIdentifierReference()) |identifier_reference|
+        .{ .primary_expression = .{ .identifier_reference = identifier_reference } }
+    else |_|
+        return error.UnexpectedToken;
+
+    while (true) {
+        const member_expression = self.acceptMemberExpression(expression) catch break;
+        expression = .{ .member_expression = member_expression };
+    }
+
+    // - If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
+    //   Error if the AssignmentTargetType of LeftHandSideExpression is not simple.
+    if (expression.assignmentTargetType(self.state.in_strict_mode) != .simple) {
+        try self.emitErrorAt(state.location, "Invalid destructuring assignment target", .{});
+        return error.UnexpectedToken;
+    }
+
+    return switch (expression) {
+        .super_property => |super_property| .{ .super_property = super_property },
+        .primary_expression => .{ .identifier_reference = expression.primary_expression.identifier_reference },
+        .member_expression => |member_expression| .{ .member_expression = member_expression },
+        else => unreachable,
+    };
 }
 
 pub fn acceptBindingPattern(self: *Parser) AcceptError!ast.BindingPattern {
@@ -2856,7 +3010,7 @@ pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
     // If LeftHandSideExpression is neither an ObjectLiteral nor an ArrayLiteral, it is a Syntax
     // Error if the AssignmentTargetType of LeftHandSideExpression is invalid.
     if (initializer == .expression and
-        initializer.expression != .binding_pattern_for_assignment_expression and
+        initializer.expression != .assignment_pattern and
         initializer.expression.assignmentTargetType(self.state.in_strict_mode) == .invalid)
     {
         try self.emitErrorAt(

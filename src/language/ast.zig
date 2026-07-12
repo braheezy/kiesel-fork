@@ -773,8 +773,7 @@ pub const Expression = union(enum) {
     await_expression: AwaitExpression,
     yield_expression: YieldExpression,
     tagged_template: TaggedTemplate,
-    /// Modern problems (binding pattern LHS) require modern solutions (fake expression type)
-    binding_pattern_for_assignment_expression: BindingPattern,
+    assignment_pattern: AssignmentPattern,
 
     /// 8.4.3 Static Semantics: IsAnonymousFunctionDefinition ( expr )
     /// https://tc39.es/ecma262/#sec-isanonymousfunctiondefinition
@@ -809,7 +808,12 @@ pub const Expression = union(enum) {
             .primary_expression => |primary_expression| if (primary_expression == .identifier_reference) {
                 // 1. If IsStrict(this IdentifierReference) is true and the StringValue of
                 //    Identifier is either "eval" or "arguments", return invalid.
-                // NOTE: This is handled separately in the parser to get a better error message.
+                const name = self.primary_expression.identifier_reference;
+                if (is_strict == true and
+                    (std.mem.eql(u8, name, "eval") or std.mem.eql(u8, name, "arguments")))
+                {
+                    return .invalid;
+                }
 
                 // 2. Return simple.
                 return .simple;
@@ -1711,6 +1715,73 @@ pub const VariableDeclaration = union(enum) {
             },
         }
     }
+};
+
+/// https://tc39.es/ecma262/#prod-AssignmentPattern
+pub const AssignmentPattern = union(enum) {
+    object_assignment_pattern: ObjectAssignmentPattern,
+    array_assignment_pattern: ArrayAssignmentPattern,
+};
+
+/// https://tc39.es/ecma262/#prod-ObjectAssignmentPattern
+pub const ObjectAssignmentPattern = struct {
+    pub const Property = union(enum) {
+        assignment_property: AssignmentProperty,
+        assignment_rest_property: AssignmentRestProperty,
+    };
+
+    properties: []const Property,
+};
+
+/// https://tc39.es/ecma262/#prod-ArrayAssignmentPattern
+pub const ArrayAssignmentPattern = struct {
+    pub const Element = union(enum) {
+        elision,
+        assignment_element: AssignmentElement,
+        assignment_rest_element: AssignmentRestElement,
+    };
+
+    elements: []const Element,
+};
+
+/// https://tc39.es/ecma262/#prod-AssignmentRestProperty
+pub const AssignmentRestProperty = struct {
+    destructuring_assignment_target: DestructuringAssignmentTarget,
+};
+
+/// https://tc39.es/ecma262/#prod-AssignmentProperty
+pub const AssignmentProperty = union(enum) {
+    pub const IdentifierReferenceAndExpression = struct {
+        identifier_reference: IdentifierReference,
+        initializer: ?Expression,
+    };
+
+    pub const PropertyNameAndAssignmentElement = struct {
+        property_name: PropertyName,
+        assignment_element: AssignmentElement,
+    };
+
+    identifier_reference_and_expression: IdentifierReferenceAndExpression,
+    property_name_and_assignment_element: PropertyNameAndAssignmentElement,
+};
+
+/// https://tc39.es/ecma262/#prod-AssignmentElement
+pub const AssignmentElement = struct {
+    destructuring_assignment_target: DestructuringAssignmentTarget,
+    initializer: ?Expression,
+};
+
+/// https://tc39.es/ecma262/#prod-AssignmentRestElement
+pub const AssignmentRestElement = struct {
+    destructuring_assignment_target: DestructuringAssignmentTarget,
+};
+
+/// https://tc39.es/ecma262/#prod-DestructuringAssignmentTarget
+pub const DestructuringAssignmentTarget = union(enum) {
+    identifier_reference: IdentifierReference,
+    member_expression: MemberExpression,
+    super_property: SuperProperty,
+    assignment_pattern: AssignmentPattern,
 };
 
 /// https://tc39.es/ecma262/#prod-BindingPattern
