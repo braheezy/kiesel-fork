@@ -66,6 +66,7 @@ stack: std.ArrayList(Value),
 call_stack: std.ArrayList(CallFrame),
 per_bytecode_cache: std.AutoHashMapUnmanaged(*const Bytecode, PerBytecodeCache),
 frame: *CallFrame,
+locals: []Value,
 regs: []Value,
 cache_slots: CacheSlots,
 inline_caches: []InlineCache,
@@ -90,19 +91,20 @@ pub const CallFrame = struct {
     scope_depth: u16,
 
     pub fn stackLen(frame: *const CallFrame) usize {
-        return 1 + frame.argument_count + frame.bytecode.register_count;
+        return 1 + frame.argument_count + frame.bytecode.local_count + frame.bytecode.register_count;
     }
 };
 
 pub const GeneratorSuspension = struct {
     stack: []Value,
     argument_count: u16,
+    local_count: u16,
     scope_depth: u16,
     saved_pc: Pc,
     yield_reg: Bytecode.Reg,
 
     pub fn regs(suspension: *const GeneratorSuspension) []Value {
-        const regs_start = 1 + suspension.argument_count;
+        const regs_start = 1 + suspension.argument_count + suspension.local_count;
         return suspension.stack[regs_start..];
     }
 };
@@ -134,6 +136,7 @@ pub fn init(
         .call_stack = .empty,
         .per_bytecode_cache = .empty,
         .frame = undefined,
+        .locals = undefined,
         .regs = undefined,
         .cache_slots = undefined,
         .inline_caches = undefined,
@@ -219,6 +222,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
                 .logical_not => vm.executeLogicalNot(data.reg_reg[0], data.reg_reg[1]),
                 .typeof => vm.executeTypeof(data.reg_reg[0], data.reg_reg[1]),
+                .typeof_local => vm.executeTypeofLocal(data.reg_local[0], data.reg_local[1]),
                 .typeof_binding => vm.executeTypeofBinding(data.reg_string[0], data.reg_string[1]),
                 .add => vm.executeAdd(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .sub => vm.executeSub(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
@@ -250,10 +254,12 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .create_mutable_binding => vm.executeCreateMutableBinding(data.string),
                 .create_immutable_binding => vm.executeCreateImmutableBinding(data.string),
                 .initialize_binding => vm.executeInitializeBinding(data.string_reg[0], data.string_reg[1]),
+                .get_local => vm.executeGetLocal(data.reg_local[0], data.reg_local[1]),
                 .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
                 .get_property => vm.executeGetProperty(data.reg_reg_string_ic[0], data.reg_reg_string_ic[1], data.reg_reg_string_ic[2], data.reg_reg_string_ic[3]),
                 .get_property_computed => vm.executeGetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .get_property_indexed => vm.executeGetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
+                .set_local => vm.executeSetLocal(data.local_reg[0], data.local_reg[1]),
                 .set_binding => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], false),
                 .set_binding_strict => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], true),
                 .set_property => vm.executeSetProperty(data.reg_reg_string_ic[0], data.reg_reg_string_ic[1], data.reg_reg_string_ic[2], data.reg_reg_string_ic[3], false),
@@ -385,9 +391,10 @@ pub fn @"resume"(
 
     const stack_base: u32 = @intCast(vm.stack.items.len);
     const argument_count = suspension.argument_count;
+    const local_count = callee_bytecode.local_count;
     const register_count = callee_bytecode.register_count;
 
-    std.debug.assert(suspension.stack.len == 1 + argument_count + register_count);
+    std.debug.assert(suspension.stack.len == 1 + argument_count + local_count + register_count);
     try vm.stack.appendSlice(vm.agent.gc_allocator, suspension.stack);
 
     try vm.call_stack.append(vm.agent.gc_allocator, .{
@@ -422,8 +429,10 @@ fn ensurePerBytecodeCache(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.
 
 fn updateCachedFields(vm: *Vm, cache: PerBytecodeCache) void {
     const frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
-    const regs_start = frame.stack_base + 1 + frame.argument_count;
+    const locals_start = frame.stack_base + 1 + frame.argument_count;
+    const regs_start = locals_start + frame.bytecode.local_count;
     vm.frame = frame;
+    vm.locals = vm.stack.items[locals_start..][0..frame.bytecode.local_count];
     vm.regs = vm.stack.items[regs_start..][0..frame.bytecode.register_count];
     vm.cache_slots = cache.cache_slots;
     vm.inline_caches = cache.inline_caches;
@@ -438,12 +447,16 @@ pub fn pushCallFrame(
 
     const stack_base: u32 = @intCast(vm.stack.items.len);
     const argument_count: u16 = @intCast(args.len);
+    const local_count = callee_bytecode.local_count;
     const register_count = callee_bytecode.register_count;
 
-    const stack_len = 1 + argument_count + register_count;
+    const stack_len = 1 + argument_count + local_count + register_count;
     try vm.stack.ensureUnusedCapacity(vm.agent.gc_allocator, stack_len);
     vm.stack.appendAssumeCapacity(.uninitialized);
     vm.stack.appendSliceAssumeCapacity(args);
+    // Locals usually start out as undefined anyway so we we avoid initialization via `set_local`.
+    vm.stack.appendNTimesAssumeCapacity(.undefined, local_count);
+    // Registers however are not valid to read before a write.
     vm.stack.appendNTimesAssumeCapacity(undefined, register_count);
 
     try vm.call_stack.append(vm.agent.gc_allocator, .{
@@ -842,6 +855,11 @@ fn executeLogicalNot(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
 
 fn executeTypeof(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
     const value = vm.store(src);
+    vm.load(dst, Value.from(value.typeof()));
+}
+
+fn executeTypeofLocal(vm: *Vm, dst: Bytecode.Reg, local: Bytecode.Local) void {
+    const value = vm.locals[@intFromEnum(local)];
     vm.load(dst, Value.from(value.typeof()));
 }
 
@@ -1334,6 +1352,11 @@ fn executeInitializeBinding(
     try env.initializeBinding(vm.agent, name, value);
 }
 
+fn executeGetLocal(vm: *Vm, dst: Bytecode.Reg, local: Bytecode.Local) void {
+    const value = vm.locals[@intFromEnum(local)];
+    vm.load(dst, value);
+}
+
 fn executeGetBinding(vm: *Vm, dst: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const name = try vm.getString(name_index);
 
@@ -1473,6 +1496,10 @@ fn executeGetPropertyIndexed(
     );
 
     vm.load(dst, result);
+}
+
+fn executeSetLocal(vm: *Vm, local: Bytecode.Local, value_reg: Bytecode.Reg) void {
+    vm.locals[@intFromEnum(local)] = vm.store(value_reg);
 }
 
 fn executeSetBinding(
@@ -2069,6 +2096,7 @@ fn executeYield(vm: *Vm, dest: Bytecode.Reg, value_reg: Bytecode.Reg, pc: Pc) Ag
     return .{ .yield = .{
         .stack = stack,
         .argument_count = frame.argument_count,
+        .local_count = frame.bytecode.local_count,
         .scope_depth = frame.scope_depth,
         .saved_pc = pc,
         .yield_reg = dest,
@@ -2103,6 +2131,7 @@ fn executeYieldStar(vm: *Vm, reg: Bytecode.Reg, iter_reg: Bytecode.Reg, pc: Pc) 
     return .{ .yield = .{
         .stack = stack,
         .argument_count = frame.argument_count,
+        .local_count = frame.bytecode.local_count,
         .scope_depth = frame.scope_depth,
         .saved_pc = pc,
         .yield_reg = reg,

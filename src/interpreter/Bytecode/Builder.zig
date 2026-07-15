@@ -17,6 +17,7 @@ current_block: Block.Index,
 label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, Block.Index),
 exception_handlers: std.ArrayList(ExceptionHandler),
 array_states: std.ArrayList(ArrayState),
+locals: std.AutoHashMapUnmanaged(Ir.StringIndex, Bytecode.Local),
 inline_cache_count: u16,
 
 const ExceptionHandler = struct {
@@ -46,6 +47,7 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
         .label_blocks = .empty,
         .exception_handlers = .empty,
         .array_states = .empty,
+        .locals = .empty,
         .inline_cache_count = 0,
     };
 }
@@ -56,6 +58,7 @@ pub fn deinit(b: *Builder) void {
     b.label_blocks.deinit(b.gpa);
     b.exception_handlers.deinit(b.gpa);
     b.array_states.deinit(b.gpa);
+    b.locals.deinit(b.gpa);
 }
 
 fn computeRPO(
@@ -90,6 +93,87 @@ fn computeRPOInner(
     try out.append(b.gpa, block);
 }
 
+const CanOptimizeLocals = union(enum) {
+    none,
+    body: u32,
+    all,
+};
+
+fn canOptimizeLocals(b: *const Builder) CanOptimizeLocals {
+    const tags = b.ir.instructions.items(.tag);
+
+    // We don't have escape analysis yet so we deopt whenever an instruction
+    // *could* interfere. Ugly but works :^)
+    for (tags, 0..) |tag, i| {
+        const index: Ir.Inst.Index = @enumFromInt(i);
+        if (!index.liveness(b.ir)) continue;
+        switch (tag) {
+            .create_function,
+            .create_class,
+            .call_direct_eval,
+            .call_direct_eval_strict,
+            .create_mapped_arguments_object,
+            .push_with_scope,
+            => return .none,
+            else => {},
+        }
+    }
+
+    // Parameters with default expressions emit a `br_cond` before
+    // `push_var_scope` for the undefined check. Their bindings can't be
+    // optimized as locals since the default value may reference the parameter
+    // itself within the TDZ.
+    if (std.mem.findScalar(Ir.Inst.Tag, tags, .push_var_scope)) |push_var_scope_pos| {
+        if (std.mem.findScalar(Ir.Inst.Tag, tags[0..push_var_scope_pos], .br_cond)) |_| {
+            return .{ .body = @intCast(push_var_scope_pos + 1) };
+        }
+    }
+
+    return .all;
+}
+
+/// Collect bindings to optimize as fast locals:
+///
+/// - var declarations (`create_var_binding`)
+/// - function parameters (`create_mutable_binding`)
+/// - unmapped arguments object (`create_immutable_binding`)
+///
+/// We stop after the first `get_argument` to not collect let/const bindings.
+/// Bindings shadowed by let/const are deopted so env lookups work.
+fn collectLocals(b: *Builder) Error!void {
+    const start = switch (b.canOptimizeLocals()) {
+        .none => return,
+        .body => |start| start,
+        .all => 0,
+    };
+    var past_prologue = std.mem.findScalar(Ir.Inst.Tag, b.ir.instructions.items(.tag), .get_argument) == null;
+    var bindings: std.AutoArrayHashMapUnmanaged(Ir.StringIndex, void) = .empty;
+    defer bindings.deinit(b.gpa);
+    for (b.ir.instructions.items(.tag)[start..], b.ir.instructions.items(.data)[start..], 0..) |tag, data, i| {
+        const index: Ir.Inst.Index = @enumFromInt(i);
+        if (!index.liveness(b.ir)) continue;
+        switch (tag) {
+            .get_argument => past_prologue = true,
+            .create_var_binding => {
+                try bindings.put(b.gpa, data.string, {});
+            },
+            .create_mutable_binding, .create_immutable_binding => {
+                if (!past_prologue) {
+                    try bindings.put(b.gpa, data.string, {});
+                } else if (bindings.contains(data.string)) {
+                    _ = bindings.orderedRemove(data.string);
+                }
+            },
+            else => {},
+        }
+    }
+
+    try b.locals.ensureUnusedCapacity(b.gpa, @intCast(bindings.count()));
+    for (bindings.keys(), 0..) |name, i| {
+        b.locals.putAssumeCapacity(name, @enumFromInt(i));
+    }
+}
+
 pub fn build(b: *Builder) Error!Bytecode {
     std.debug.assert(b.blocks.items.len == 0);
     try b.blocks.append(b.gpa, .empty);
@@ -104,6 +188,8 @@ pub fn build(b: *Builder) Error!Bytecode {
         const block_index: Block.Index = @enumFromInt(b.blocks.items.len - 1);
         try b.label_blocks.put(b.gpa, index.toRef(), block_index);
     }
+
+    try b.collectLocals();
 
     // Lower alive instructions
     for (b.ir.instructions.items(.tag), b.ir.instructions.items(.data), 0..) |tag, data, i| {
@@ -390,6 +476,7 @@ pub fn build(b: *Builder) Error!Bytecode {
     return .{
         .name = name,
         .code = code,
+        .local_count = @intCast(b.locals.count()),
         .register_count = b.lsra.count(),
         .inline_cache_count = b.inline_cache_count,
         .strings = strings,
@@ -1049,14 +1136,24 @@ fn lowerTypeof(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
 
 fn lowerTypeofBinding(b: *Builder, name_index: Ir.StringIndex, dest: Ir.Inst.Ref) Error!void {
     const dest_reg = b.resolve(dest);
-    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
-    try b.emit(.{
-        .tag = .typeof_binding,
-        .data = .{ .reg_string = .{
-            dest_reg,
-            name_index_,
-        } },
-    });
+    if (b.locals.get(name_index)) |local| {
+        try b.emit(.{
+            .tag = .typeof_local,
+            .data = .{ .reg_local = .{
+                dest_reg,
+                local,
+            } },
+        });
+    } else {
+        const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+        try b.emit(.{
+            .tag = .typeof_binding,
+            .data = .{ .reg_string = .{
+                dest_reg,
+                name_index_,
+            } },
+        });
+    }
 }
 
 fn lowerSpread(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
@@ -1181,52 +1278,84 @@ fn lowerPopScope(b: *Builder) Error!void {
 }
 
 fn lowerCreateVarBinding(b: *Builder, name_index: Ir.StringIndex) Error!void {
-    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
-    try b.emit(.{
-        .tag = .create_var_binding,
-        .data = .{ .string = name_index_ },
-    });
+    if (b.locals.get(name_index)) |_| {
+        // Implicitly initialized to undefined via the Vm.
+    } else {
+        const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+        try b.emit(.{
+            .tag = .create_var_binding,
+            .data = .{ .string = name_index_ },
+        });
+    }
 }
 
 fn lowerCreateMutableBinding(b: *Builder, name_index: Ir.StringIndex) Error!void {
-    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
-    try b.emit(.{
-        .tag = .create_mutable_binding,
-        .data = .{ .string = name_index_ },
-    });
+    if (b.locals.get(name_index)) |_| {
+        // Implicitly initialized to undefined via the Vm.
+    } else {
+        const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+        try b.emit(.{
+            .tag = .create_mutable_binding,
+            .data = .{ .string = name_index_ },
+        });
+    }
 }
 
 fn lowerCreateImmutableBinding(b: *Builder, name_index: Ir.StringIndex) Error!void {
-    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
-    try b.emit(.{
-        .tag = .create_immutable_binding,
-        .data = .{ .string = name_index_ },
-    });
+    if (b.locals.get(name_index)) |_| {
+        // Implicitly initialized to undefined via the Vm.
+    } else {
+        const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+        try b.emit(.{
+            .tag = .create_immutable_binding,
+            .data = .{ .string = name_index_ },
+        });
+    }
 }
 
 fn lowerInitializeBinding(b: *Builder, name_index: Ir.StringIndex, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
-    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
     const value_reg = b.resolve(value);
-    try b.emit(.{
-        .tag = .initialize_binding,
-        .data = .{ .string_reg = .{
-            name_index_,
-            value_reg,
-        } },
-    });
+    if (b.locals.get(name_index)) |local| {
+        try b.emit(.{
+            .tag = .set_local,
+            .data = .{ .local_reg = .{
+                local,
+                value_reg,
+            } },
+        });
+    } else {
+        const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+        try b.emit(.{
+            .tag = .initialize_binding,
+            .data = .{ .string_reg = .{
+                name_index_,
+                value_reg,
+            } },
+        });
+    }
     try b.emitMoveIfNeeded(value, dest);
 }
 
 fn lowerGetBinding(b: *Builder, name_index: Ir.StringIndex, dest: Ir.Inst.Ref) Error!void {
     const dest_reg = b.resolve(dest);
-    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
-    try b.emit(.{
-        .tag = .get_binding,
-        .data = .{ .reg_string = .{
-            dest_reg,
-            name_index_,
-        } },
-    });
+    if (b.locals.get(name_index)) |local| {
+        try b.emit(.{
+            .tag = .get_local,
+            .data = .{ .reg_local = .{
+                dest_reg,
+                local,
+            } },
+        });
+    } else {
+        const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+        try b.emit(.{
+            .tag = .get_binding,
+            .data = .{ .reg_string = .{
+                dest_reg,
+                name_index_,
+            } },
+        });
+    }
 }
 
 fn lowerGetProperty(b: *Builder, data: Ir.Inst.GetProperty, dest: Ir.Inst.Ref) Error!void {
@@ -1273,19 +1402,29 @@ fn lowerGetPropertyIndexed(b: *Builder, data: Ir.Inst.GetPropertyIndexed, dest: 
 }
 
 fn lowerSetBinding(b: *Builder, name_index: Ir.StringIndex, value: Ir.Inst.Ref, strict: bool, dest: Ir.Inst.Ref) Error!void {
-    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
     const value_reg = b.resolve(value);
-    const tag: Bytecode.Inst.Tag = if (strict)
-        .set_binding_strict
-    else
-        .set_binding;
-    try b.emit(.{
-        .tag = tag,
-        .data = .{ .string_reg = .{
-            name_index_,
-            value_reg,
-        } },
-    });
+    if (b.locals.get(name_index)) |local| {
+        try b.emit(.{
+            .tag = .set_local,
+            .data = .{ .local_reg = .{
+                local,
+                value_reg,
+            } },
+        });
+    } else {
+        const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+        const tag: Bytecode.Inst.Tag = if (strict)
+            .set_binding_strict
+        else
+            .set_binding;
+        try b.emit(.{
+            .tag = tag,
+            .data = .{ .string_reg = .{
+                name_index_,
+                value_reg,
+            } },
+        });
+    }
     try b.emitMoveIfNeeded(value, dest);
 }
 
@@ -1352,14 +1491,21 @@ fn lowerSetPropertyIndexed(b: *Builder, extra_index: Ir.ExtraIndex, strict: bool
 
 fn lowerDeleteBinding(b: *Builder, name_index: Ir.StringIndex, dest: Ir.Inst.Ref) Error!void {
     const dest_reg = b.resolve(dest);
-    const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
-    try b.emit(.{
-        .tag = .delete_binding,
-        .data = .{ .reg_string = .{
-            dest_reg,
-            name_index_,
-        } },
-    });
+    if (b.locals.get(name_index)) |_| {
+        try b.emit(.{
+            .tag = .load_false,
+            .data = .{ .reg = dest_reg },
+        });
+    } else {
+        const name_index_: Bytecode.StringIndex = @enumFromInt(@intFromEnum(name_index));
+        try b.emit(.{
+            .tag = .delete_binding,
+            .data = .{ .reg_string = .{
+                dest_reg,
+                name_index_,
+            } },
+        });
+    }
 }
 
 fn lowerDeleteProperty(b: *Builder, data: Ir.Inst.DeleteProperty, strict: bool, dest: Ir.Inst.Ref) Error!void {

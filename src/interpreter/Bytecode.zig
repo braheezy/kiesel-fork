@@ -6,6 +6,7 @@ const Bytecode = @This();
 
 name: []const u8,
 code: []const u8,
+local_count: u16,
 register_count: u16,
 inline_cache_count: u16,
 strings: []const []const u8,
@@ -16,6 +17,8 @@ classes: []const Class,
 exception_handlers: []const ExceptionHandler,
 
 pub const Builder = @import("Bytecode/Builder.zig");
+
+pub const Local = enum(u16) { _ };
 
 pub const Reg = enum(u16) {
     /// Used for `return`/`yield` instructions to indicate no register
@@ -161,6 +164,7 @@ pub const Inst = struct {
         bitwise_not,
         logical_not,
         typeof,
+        typeof_local,
         typeof_binding,
 
         add,
@@ -197,10 +201,12 @@ pub const Inst = struct {
         create_immutable_binding,
         initialize_binding,
 
+        get_local,
         get_binding,
         get_property,
         get_property_computed,
         get_property_indexed,
+        set_local,
         set_binding,
         set_binding_strict,
         set_property,
@@ -300,6 +306,7 @@ pub const Inst = struct {
         reg_i32: struct { Reg, i32 },
         reg_u32: struct { Reg, u32 },
         reg_f64: struct { Reg, f64 },
+        reg_local: struct { Reg, Local },
         reg_string: struct { Reg, StringIndex },
         reg_reg_string: struct { Reg, Reg, StringIndex },
         reg_big_int: struct { Reg, BigIntIndex },
@@ -308,6 +315,7 @@ pub const Inst = struct {
         reg_reg_string_ic: struct { Reg, Reg, StringIndex, IcIndex },
         reg_function: struct { Reg, Function.Index },
         reg_class: struct { Reg, Class.Index },
+        local_reg: struct { Local, Reg },
         string: StringIndex,
         string_reg: struct { StringIndex, Reg },
     };
@@ -354,6 +362,7 @@ pub const Inst = struct {
             .bitwise_not = .reg_reg,
             .logical_not = .reg_reg,
             .typeof = .reg_reg,
+            .typeof_local = .reg_local,
             .typeof_binding = .reg_string,
             .add = .reg_reg_reg,
             .sub = .reg_reg_reg,
@@ -385,10 +394,12 @@ pub const Inst = struct {
             .create_mutable_binding = .string,
             .create_immutable_binding = .string,
             .initialize_binding = .string_reg,
+            .get_local = .reg_local,
             .get_binding = .reg_string,
             .get_property = .reg_reg_string_ic,
             .get_property_computed = .reg_reg_reg,
             .get_property_indexed = .reg_reg_u32,
+            .set_local = .local_reg,
             .set_binding = .string_reg,
             .set_binding_strict = .string_reg,
             .set_property = .reg_reg_string_ic,
@@ -522,13 +533,14 @@ pub const Inst = struct {
 
     inline fn decodeField(comptime T: type, code: []const u8) T {
         return switch (T) {
-            Reg => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
-            StringIndex => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
+            Reg,
+            Local,
             BigIntIndex,
             Function.Index,
             Class.Index,
             IcIndex,
             => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
+            StringIndex => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
             i8 => @bitCast(code[0]),
             u16 => std.mem.readInt(u16, code[0..2], .little),
             i32 => std.mem.readInt(i32, code[0..4], .little),
@@ -563,13 +575,14 @@ pub const Inst = struct {
 
     fn encodeField(comptime T: type, value: T, writer: *std.Io.Writer) std.Io.Writer.Error!void {
         switch (T) {
-            Reg => try writer.writeInt(u16, @intFromEnum(value), .little),
-            StringIndex => try writer.writeInt(u32, @intFromEnum(value), .little),
+            Reg,
+            Local,
             BigIntIndex,
             Function.Index,
             Class.Index,
             IcIndex,
             => try writer.writeInt(u16, @intFromEnum(value), .little),
+            StringIndex => try writer.writeInt(u32, @intFromEnum(value), .little),
             i8 => try writer.writeByte(@bitCast(value)),
             u16 => try writer.writeInt(u16, value, .little),
             i32 => try writer.writeInt(i32, value, .little),
@@ -755,6 +768,11 @@ fn printField(
         => {
             try terminal.setColor(.magenta);
             try terminal.writer.print("{}", .{value});
+            try terminal.setColor(.reset);
+        },
+        Local => {
+            try terminal.setColor(.cyan);
+            try terminal.writer.print("l{d}", .{@intFromEnum(value)});
             try terminal.setColor(.reset);
         },
         Reg => {
