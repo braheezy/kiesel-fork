@@ -574,6 +574,36 @@ fn objectToIterator(iterator_obj: *const Object) Iterator {
     };
 }
 
+fn argsArrayToList(
+    gpa: std.mem.Allocator,
+    args_array: *const builtins.Array,
+) std.mem.Allocator.Error!std.ArrayList(Value) {
+    const args_len = args_array.fields.length;
+
+    var args_list: std.ArrayList(Value) = try .initCapacity(gpa, args_len);
+    errdefer comptime unreachable;
+
+    const extra_data = args_array.object.extra_data orelse {
+        std.debug.assert(args_len == 0);
+        return args_list;
+    };
+    std.debug.assert(args_len == extra_data.indexed_properties.count());
+
+    switch (extra_data.indexed_properties.storage) {
+        .dense_i32 => |dense_i32| for (dense_i32.items) |value| {
+            args_list.appendAssumeCapacity(Value.from(value));
+        },
+        .dense_f64 => |dense_f64| for (dense_f64.items) |value| {
+            args_list.appendAssumeCapacity(Value.from(value));
+        },
+        .dense_value => |dense_value| args_list.appendSliceAssumeCapacity(dense_value.items),
+        // Bytecode lowering only emits dense argument arrays
+        .none, .sparse_value, .sparse_property_descriptor => unreachable,
+    }
+
+    return args_list;
+}
+
 fn executeJump(_: *Vm, offset: i32, pc: *Pc) void {
     pc.* = pc.offsetBy(offset);
 }
@@ -1761,19 +1791,13 @@ fn executeCall(
     const gpa = vm.agent.gpa;
     const callee_value = vm.store(callee_reg);
     const args_value = vm.store(args_reg);
-    const args_object = args_value.asObject();
-    const args_len = args_object.as(builtins.Array).fields.length;
+    const args_array = args_value.asObject().as(builtins.Array);
 
     var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
     const sfa = stack_fallback.get();
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    var args_list = try argsArrayToList(sfa, args_array);
     defer args_list.deinit(sfa);
-    for (0..args_len) |i| {
-        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
-        const arg = descriptor.value_or_accessor.value;
-        args_list.appendAssumeCapacity(arg);
-    }
 
     const result = try evaluateCall(vm.agent, callee_value, .undefined, args_list.items);
     vm.load(dest, result);
@@ -1806,19 +1830,13 @@ fn executeCallProperty(
     const callee_value = vm.store(callee_reg);
     const this_value = vm.store(this_reg);
     const args_value = vm.store(args_reg);
-    const args_object = args_value.asObject();
-    const args_len = args_object.as(builtins.Array).fields.length;
+    const args_array = args_value.asObject().as(builtins.Array);
 
     var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
     const sfa = stack_fallback.get();
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    var args_list = try argsArrayToList(sfa, args_array);
     defer args_list.deinit(sfa);
-    for (0..args_len) |i| {
-        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
-        const arg = descriptor.value_or_accessor.value;
-        args_list.appendAssumeCapacity(arg);
-    }
 
     const result = try evaluateCall(vm.agent, callee_value, this_value, args_list.items);
     vm.load(dest, result);
@@ -1852,19 +1870,13 @@ fn executeCallDirectEval(
     const gpa = vm.agent.gpa;
     const callee_value = vm.store(callee_reg);
     const args_value = vm.store(args_reg);
-    const args_object = args_value.asObject();
-    const args_len = args_object.as(builtins.Array).fields.length;
+    const args_array = args_value.asObject().as(builtins.Array);
 
     var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
     const sfa = stack_fallback.get();
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    var args_list = try argsArrayToList(sfa, args_array);
     defer args_list.deinit(sfa);
-    for (0..args_len) |i| {
-        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
-        const arg = descriptor.value_or_accessor.value;
-        args_list.appendAssumeCapacity(arg);
-    }
 
     const realm = vm.agent.currentRealm();
     const eval = try realm.intrinsic(.eval);
@@ -1885,19 +1897,13 @@ fn executeConstruct(
     const gpa = vm.agent.gpa;
     const constructor = vm.store(constructor_reg);
     const args_value = vm.store(args_reg);
-    const args_object = args_value.asObject();
-    const args_len = args_object.as(builtins.Array).fields.length;
+    const args_array = args_value.asObject().as(builtins.Array);
 
     var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
     const sfa = stack_fallback.get();
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    var args_list = try argsArrayToList(sfa, args_array);
     defer args_list.deinit(sfa);
-    for (0..args_len) |i| {
-        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
-        const arg = descriptor.value_or_accessor.value;
-        args_list.appendAssumeCapacity(arg);
-    }
 
     const result = try evaluateNew(vm.agent, constructor, args_list.items);
     vm.load(dest, Value.from(result));
@@ -2343,19 +2349,13 @@ fn executeSuperCall(
 ) Agent.Error!void {
     const gpa = vm.agent.gpa;
     const args_value = vm.store(args_reg);
-    const args_object = args_value.asObject();
-    const args_len = args_object.as(builtins.Array).fields.length;
+    const args_array = args_value.asObject().as(builtins.Array);
 
     var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
     const sfa = stack_fallback.get();
 
-    var args_list: std.ArrayList(Value) = try .initCapacity(sfa, args_len);
+    var args_list = try argsArrayToList(sfa, args_array);
     defer args_list.deinit(sfa);
-    for (0..args_len) |i| {
-        const descriptor = args_object.extra_data.?.indexed_properties.get(@intCast(i)).?;
-        const arg = descriptor.value_or_accessor.value;
-        args_list.appendAssumeCapacity(arg);
-    }
 
     const result = try evaluateSuperCall(vm.agent, args_list.items);
     vm.load(dest, result);
