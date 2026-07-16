@@ -138,16 +138,35 @@ const TaggedUnionImpl = union(enum) {
         };
     }
 
+    pub fn isBoolean(self: TaggedUnionImpl) bool {
+        return self == .boolean;
+    }
+
     pub fn asBoolean(self: TaggedUnionImpl) bool {
         return self.boolean;
+    }
+
+    pub fn isString(self: TaggedUnionImpl) bool {
+        return self == .string;
     }
 
     pub fn asString(self: TaggedUnionImpl) *const String {
         return self.string;
     }
 
+    pub fn isSymbol(self: TaggedUnionImpl) bool {
+        return self == .symbol;
+    }
+
     pub fn asSymbol(self: TaggedUnionImpl) *const Symbol {
         return self.symbol;
+    }
+
+    pub fn isNumber(self: TaggedUnionImpl) bool {
+        return switch (self) {
+            .number_i32, .number_f64 => true,
+            else => false,
+        };
     }
 
     pub fn asNumber(self: TaggedUnionImpl) Number {
@@ -158,8 +177,16 @@ const TaggedUnionImpl = union(enum) {
         };
     }
 
+    pub fn isBigInt(self: TaggedUnionImpl) bool {
+        return self == .big_int;
+    }
+
     pub fn asBigInt(self: TaggedUnionImpl) *const BigInt {
         return self.big_int;
+    }
+
+    pub fn isObject(self: TaggedUnionImpl) bool {
+        return self == .object;
     }
 
     pub fn asObject(self: TaggedUnionImpl) *Object {
@@ -314,11 +341,38 @@ const NanBoxingImpl = enum(u64) {
         };
     }
 
+    pub fn isBoolean(self: NanBoxingImpl) bool {
+        return self.getTag() == .boolean;
+    }
+
     pub fn asBoolean(self: NanBoxingImpl) bool {
         return switch (self) {
             .boolean_false => false,
             .boolean_true => true,
             else => unreachable,
+        };
+    }
+
+    pub fn isString(self: NanBoxingImpl) bool {
+        return self.getTag() == .string;
+    }
+
+    pub fn asString(self: NanBoxingImpl) *const String {
+        return self.getPayload(.string);
+    }
+
+    pub fn isSymbol(self: NanBoxingImpl) bool {
+        return self.getTag() == .symbol;
+    }
+
+    pub fn asSymbol(self: NanBoxingImpl) *const Symbol {
+        return self.getPayload(.symbol);
+    }
+
+    pub fn isNumber(self: NanBoxingImpl) bool {
+        return switch (self.getTag()) {
+            .number_i32, .number_f64 => true,
+            else => false,
         };
     }
 
@@ -330,16 +384,16 @@ const NanBoxingImpl = enum(u64) {
         };
     }
 
-    pub fn asString(self: NanBoxingImpl) *const String {
-        return self.getPayload(.string);
-    }
-
-    pub fn asSymbol(self: NanBoxingImpl) *const Symbol {
-        return self.getPayload(.symbol);
+    pub fn isBigInt(self: NanBoxingImpl) bool {
+        return self.getTag() == .big_int;
     }
 
     pub fn asBigInt(self: NanBoxingImpl) *const BigInt {
         return self.getPayload(.big_int);
+    }
+
+    pub fn isObject(self: NanBoxingImpl) bool {
+        return self.getTag() == .object;
     }
 
     pub fn asObject(self: NanBoxingImpl) *Object {
@@ -429,7 +483,7 @@ pub fn @"type"(self: Value) Type {
 }
 
 pub fn isUninitialized(value: Value) bool {
-    return value.impl.type() == .object and value.impl.asObject() == uninitialized.impl.asObject();
+    return value.impl.isObject() and value.impl.asObject() == uninitialized.impl.asObject();
 }
 
 pub fn isUndefined(self: Value) bool {
@@ -441,7 +495,7 @@ pub fn isNull(self: Value) bool {
 }
 
 pub fn isBoolean(self: Value) bool {
-    return self.impl.type() == .boolean;
+    return self.impl.isBoolean();
 }
 
 pub fn asBoolean(self: Value) bool {
@@ -449,7 +503,7 @@ pub fn asBoolean(self: Value) bool {
 }
 
 pub fn isString(self: Value) bool {
-    return self.impl.type() == .string;
+    return self.impl.isString();
 }
 
 pub fn asString(self: Value) *const String {
@@ -457,7 +511,7 @@ pub fn asString(self: Value) *const String {
 }
 
 pub fn isSymbol(self: Value) bool {
-    return self.impl.type() == .symbol;
+    return self.impl.isSymbol();
 }
 
 pub fn asSymbol(self: Value) *const Symbol {
@@ -465,7 +519,7 @@ pub fn asSymbol(self: Value) *const Symbol {
 }
 
 pub fn isNumber(self: Value) bool {
-    return self.impl.type() == .number;
+    return self.impl.isNumber();
 }
 
 pub fn asNumber(self: Value) Number {
@@ -473,7 +527,7 @@ pub fn asNumber(self: Value) Number {
 }
 
 pub fn isBigInt(self: Value) bool {
-    return self.impl.type() == .big_int;
+    return self.impl.isBigInt();
 }
 
 pub fn asBigInt(self: Value) *const BigInt {
@@ -481,7 +535,7 @@ pub fn asBigInt(self: Value) *const BigInt {
 }
 
 pub fn isObject(self: Value) bool {
-    if (self.impl.type() != .object) return false;
+    if (!self.impl.isObject()) return false;
     if (safety) {
         // The `uninitialized` sentinel value is an object value with a made-up pointer, make sure
         // we don't branch on it by accident in safe builds.
