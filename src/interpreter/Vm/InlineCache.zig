@@ -23,10 +23,13 @@ pub fn get(
     const shape = ic.shape orelse return null;
     if (base_object.shape != shape) return null;
 
-    if (!base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
         .ordinary_get_own_property,
-    }))) return null;
+    }));
+    // Assert IC update invariants are uphold
+    std.debug.assert(has_ordinary_internal_methods);
+    std.debug.assert(!base_object.shape.isUnique());
 
     switch (ic.type) {
         .value => return base_object.getValueAtPropertyOffset(ic.offset),
@@ -52,10 +55,13 @@ pub fn set(
     const shape = ic.shape orelse return false;
     if (base_object.shape != shape) return false;
 
-    if (!base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
         .ordinary_get_own_property,
-    }))) return false;
+    }));
+    // Assert IC update invariants are uphold
+    std.debug.assert(has_ordinary_internal_methods);
+    std.debug.assert(!base_object.shape.isUnique());
 
     switch (ic.type) {
         .value => {
@@ -83,14 +89,14 @@ pub fn update(
     property_key: PropertyKey,
     comptime kind: enum { get, set },
 ) void {
-    if (!base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
+    const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         switch (kind) {
             .get => .ordinary_get,
             .set => .ordinary_set,
         },
         .ordinary_get_own_property,
-    }))) return;
-
+    }));
+    if (!has_ordinary_internal_methods) return;
     if (base_object.shape.isUnique()) return;
 
     if (base_object.shape.properties.get(property_key)) |property| {
