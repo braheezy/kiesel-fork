@@ -458,19 +458,26 @@ pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
         .ordinary_get_own_property,
         .ordinary_get_prototype_of,
     }));
-    if (!has_ordinary_internal_methods or
-        extra_data.indexed_properties.count() <= index)
-    {
+    if (!has_ordinary_internal_methods) {
         @branchHint(.unlikely);
         return null;
     }
 
-    return switch (extra_data.indexed_properties.storage) {
-        .dense_i32 => |dense_i32| Value.from(dense_i32.items[index]),
-        .dense_f64 => |dense_f64| Value.from(dense_f64.items[index]),
-        .dense_value => |dense_value| dense_value.items[index],
-        .none, .sparse_value, .sparse_property_descriptor => null,
-    };
+    switch (extra_data.indexed_properties.storage) {
+        .dense_i32 => |dense_i32| {
+            if (index >= dense_i32.items.len) return null;
+            return Value.from(dense_i32.items[index]);
+        },
+        .dense_f64 => |dense_f64| {
+            if (index >= dense_f64.items.len) return null;
+            return Value.from(dense_f64.items[index]);
+        },
+        .dense_value => |dense_value| {
+            if (index >= dense_value.items.len) return null;
+            return dense_value.items[index];
+        },
+        .none, .sparse_value, .sparse_property_descriptor => return null,
+    }
 }
 
 pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, value: Value) std.mem.Allocator.Error!bool {
@@ -485,23 +492,28 @@ pub fn setIndexedFast(self: *Object, allocator: std.mem.Allocator, index: u32, v
     }));
     // Arrays have a custom [[DefineOwnProperty]] but it doesn't interfere with writeable
     // in-bounds indexed properties.
-    if ((!has_ordinary_internal_methods and !self.is(builtins.Array)) or
-        extra_data.indexed_properties.count() <= index)
-    {
+    if (!has_ordinary_internal_methods and !self.is(builtins.Array)) {
         @branchHint(.unlikely);
         return false;
     }
 
     switch (extra_data.indexed_properties.storage) {
-        .dense_i32 => |dense_i32| if (value.__isI32()) {
-            dense_i32.items[index] = value.__asI32();
-            return true;
+        .dense_i32 => |dense_i32| {
+            if (index >= dense_i32.items.len) return false;
+            if (value.__isI32()) {
+                dense_i32.items[index] = value.__asI32();
+                return true;
+            }
         },
-        .dense_f64 => |dense_f64| if (value.isNumber()) {
-            dense_f64.items[index] = value.__toF64();
-            return true;
+        .dense_f64 => |dense_f64| {
+            if (index >= dense_f64.items.len) return false;
+            if (value.isNumber()) {
+                dense_f64.items[index] = value.__toF64();
+                return true;
+            }
         },
         .dense_value => |dense_value| {
+            if (index >= dense_value.items.len) return false;
             dense_value.items[index] = value;
             return true;
         },
