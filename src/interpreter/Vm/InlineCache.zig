@@ -10,9 +10,23 @@ const Value = types.Value;
 
 const InlineCache = @This();
 
-shape: ?*Object.Shape,
-offset: Object.Shape.Property.Offset,
-type: Object.Shape.Property.Type,
+const Entry = struct {
+    shape: *Object.Shape,
+    offset: Object.Shape.Property.Offset,
+    type: Object.Shape.Property.Type,
+};
+
+const Entries = struct {
+    items: [4]Entry,
+    len: u3,
+};
+
+state: union(enum) {
+    empty,
+    monomorphic: Entry,
+    polymorphic: Entries,
+    megamorphic,
+},
 
 pub fn get(
     ic: *const InlineCache,
@@ -20,8 +34,19 @@ pub fn get(
     base_object: *Object,
     base_value: Value,
 ) Agent.Error!?Value {
-    const shape = ic.shape orelse return null;
-    if (base_object.shape != shape) return null;
+    const entry: *const Entry = switch (ic.state) {
+        .empty, .megamorphic => return null,
+        .monomorphic => |*entry| blk: {
+            if (base_object.shape == entry.shape) break :blk entry;
+            return null;
+        },
+        .polymorphic => |*entries| blk: {
+            for (entries.items[0..entries.len]) |*entry| {
+                if (base_object.shape == entry.shape) break :blk entry;
+            }
+            return null;
+        },
+    };
 
     const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_get,
@@ -31,10 +56,10 @@ pub fn get(
     std.debug.assert(has_ordinary_internal_methods);
     std.debug.assert(!base_object.shape.isUnique());
 
-    switch (ic.type) {
-        .value => return base_object.getValueAtPropertyOffset(ic.offset),
+    switch (entry.type) {
+        .value => return base_object.getValueAtPropertyOffset(entry.offset),
         .accessor => {
-            const getter_value = base_object.getValueAtPropertyOffset(ic.offset);
+            const getter_value = base_object.getValueAtPropertyOffset(entry.offset);
             if (getter_value.isNull()) {
                 @branchHint(.unlikely);
                 return .undefined;
@@ -52,8 +77,19 @@ pub fn set(
     base_value: Value,
     value: Value,
 ) Agent.Error!bool {
-    const shape = ic.shape orelse return false;
-    if (base_object.shape != shape) return false;
+    const entry: *const Entry = switch (ic.state) {
+        .empty, .megamorphic => return false,
+        .monomorphic => |*entry| blk: {
+            if (base_object.shape == entry.shape) break :blk entry;
+            return false;
+        },
+        .polymorphic => |*entries| blk: {
+            for (entries.items[0..entries.len]) |*entry| {
+                if (base_object.shape == entry.shape) break :blk entry;
+            }
+            return false;
+        },
+    };
 
     const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
         .ordinary_set,
@@ -63,14 +99,14 @@ pub fn set(
     std.debug.assert(has_ordinary_internal_methods);
     std.debug.assert(!base_object.shape.isUnique());
 
-    switch (ic.type) {
+    switch (entry.type) {
         .value => {
-            base_object.setValueAtPropertyOffset(ic.offset, value);
+            base_object.setValueAtPropertyOffset(entry.offset, value);
             return true;
         },
         .accessor => {
             const setter_value = base_object.getValueAtPropertyOffset(
-                @enumFromInt(@intFromEnum(ic.offset) + 1),
+                @enumFromInt(@intFromEnum(entry.offset) + 1),
             );
             if (setter_value.isNull()) {
                 @branchHint(.unlikely);
@@ -99,12 +135,33 @@ pub fn update(
     if (!has_ordinary_internal_methods) return;
     if (base_object.shape.isUnique()) return;
 
-    if (base_object.shape.properties.get(property_key)) |property| {
-        if (kind == .set and property.type == .value and !property.attributes.writable) return;
-        ic.* = .{
-            .shape = base_object.shape,
-            .offset = property.offset,
-            .type = property.type,
-        };
+    const property = base_object.shape.properties.get(property_key) orelse return;
+    if (kind == .set and property.type == .value and !property.attributes.writable) return;
+
+    const new_entry: Entry = .{
+        .shape = base_object.shape,
+        .offset = property.offset,
+        .type = property.type,
+    };
+
+    switch (ic.state) {
+        .empty => {
+            ic.state = .{ .monomorphic = new_entry };
+        },
+        .monomorphic => |*entry| {
+            ic.state = .{ .polymorphic = .{
+                .items = .{ entry.*, new_entry, undefined, undefined },
+                .len = 2,
+            } };
+        },
+        .polymorphic => |*entries| {
+            if (entries.len < 4) {
+                entries.items[entries.len] = new_entry;
+                entries.len += 1;
+            } else {
+                ic.state = .megamorphic;
+            }
+        },
+        .megamorphic => {},
     }
 }

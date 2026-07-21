@@ -418,7 +418,7 @@ fn ensurePerBytecodeCache(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.
         @memset(cache_slots, null);
         const inline_caches = try vm.agent.gc_allocator.alloc(InlineCache, bytecode.inline_cache_count);
         errdefer vm.agent.gc_allocator.free(inline_caches);
-        @memset(inline_caches, .{ .shape = null, .offset = undefined, .type = undefined });
+        @memset(inline_caches, .{ .state = .empty });
         gop.value_ptr.* = .{
             .cache_slots = cache_slots,
             .inline_caches = inline_caches,
