@@ -19,7 +19,9 @@ exception_handlers: std.ArrayList(ExceptionHandler),
 array_states: std.ArrayList(ArrayState),
 locals: std.AutoHashMapUnmanaged(Ir.StringIndex, Bytecode.Local),
 get_property_ic_count: u16,
+get_property_computed_ic_count: u16,
 set_property_ic_count: u16,
+set_property_computed_ic_count: u16,
 
 const ExceptionHandler = struct {
     start: Block.Index,
@@ -50,7 +52,9 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
         .array_states = .empty,
         .locals = .empty,
         .get_property_ic_count = 0,
+        .get_property_computed_ic_count = 0,
         .set_property_ic_count = 0,
+        .set_property_computed_ic_count = 0,
     };
 }
 
@@ -481,7 +485,9 @@ pub fn build(b: *Builder) Error!Bytecode {
         .local_count = @intCast(b.locals.count()),
         .register_count = b.lsra.count(),
         .get_property_ic_count = b.get_property_ic_count,
+        .get_property_computed_ic_count = b.get_property_computed_ic_count,
         .set_property_ic_count = b.set_property_ic_count,
+        .set_property_computed_ic_count = b.set_property_computed_ic_count,
         .strings = strings,
         .string_kinds = string_kinds,
         .big_ints = big_ints,
@@ -751,20 +757,26 @@ fn resolve(b: *Builder, ref: Ir.Inst.Ref) Bytecode.Reg {
 
 const IcKind = enum {
     get_property,
+    get_property_computed,
     set_property,
+    set_property_computed,
 };
 
 fn IcIndex(comptime kind: IcKind) type {
     return switch (kind) {
         .get_property => Bytecode.GetPropertyIcIndex,
+        .get_property_computed => Bytecode.GetPropertyComputedIcIndex,
         .set_property => Bytecode.SetPropertyIcIndex,
+        .set_property_computed => Bytecode.SetPropertyComputedIcIndex,
     };
 }
 
 fn nextIcIndex(b: *Builder, comptime kind: IcKind) IcIndex(kind) {
     const count = switch (kind) {
         .get_property => &b.get_property_ic_count,
+        .get_property_computed => &b.get_property_computed_ic_count,
         .set_property => &b.set_property_ic_count,
+        .set_property_computed => &b.set_property_computed_ic_count,
     };
     const index: IcIndex(kind) = @enumFromInt(count.*);
     count.* += 1;
@@ -1397,12 +1409,14 @@ fn lowerGetPropertyComputed(b: *Builder, data: Ir.Inst.GetPropertyComputed, dest
     const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
     const property_reg = b.resolve(data.property);
+    const ic_index = b.nextIcIndex(.get_property_computed);
     try b.emit(.{
         .tag = .get_property_computed,
-        .data = .{ .reg_reg_reg = .{
+        .data = .{ .reg_reg_reg_get_property_computed_ic = .{
             dest_reg,
             base_reg,
             property_reg,
+            ic_index,
         } },
     });
 }
@@ -1474,16 +1488,18 @@ fn lowerSetPropertyComputed(b: *Builder, extra_index: Ir.ExtraIndex, strict: boo
     const base_reg = b.resolve(extra.data.base);
     const property_reg = b.resolve(extra.data.property);
     const value_reg = b.resolve(extra.data.value);
+    const ic_index = b.nextIcIndex(.set_property_computed);
     const tag: Bytecode.Inst.Tag = if (strict)
         .set_property_computed_strict
     else
         .set_property_computed;
     try b.emit(.{
         .tag = tag,
-        .data = .{ .reg_reg_reg = .{
+        .data = .{ .reg_reg_reg_set_property_computed_ic = .{
             base_reg,
             property_reg,
             value_reg,
+            ic_index,
         } },
     });
     try b.emitMoveIfNeeded(extra.data.value, dest);

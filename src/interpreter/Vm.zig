@@ -70,7 +70,9 @@ locals: []Value,
 regs: []Value,
 cache_slots: CacheSlots,
 get_property_ics: []ic.GetProperty,
+get_property_computed_ics: []ic.GetPropertyComputed,
 set_property_ics: []ic.SetProperty,
+set_property_computed_ics: []ic.SetPropertyComputed,
 
 pub const Pc = enum(u32) {
     start = 0,
@@ -125,7 +127,9 @@ const CacheSlots = []?*align(cache_slots_align) const anyopaque;
 const PerBytecodeCache = struct {
     cache_slots: CacheSlots,
     get_property_ics: []ic.GetProperty,
+    get_property_computed_ics: []ic.GetPropertyComputed,
     set_property_ics: []ic.SetProperty,
+    set_property_computed_ics: []ic.SetPropertyComputed,
 };
 
 pub fn init(
@@ -142,7 +146,9 @@ pub fn init(
         .regs = undefined,
         .cache_slots = undefined,
         .get_property_ics = undefined,
+        .get_property_computed_ics = undefined,
         .set_property_ics = undefined,
+        .set_property_computed_ics = undefined,
     };
     try vm.pushCallFrame(bytecode, &.{});
     return vm;
@@ -161,7 +167,9 @@ pub fn deinit(vm: *Vm) void {
         // Values might outlive the VM and need to be GC'd, but we can free the array
         vm.agent.gc_allocator.free(entry.value_ptr.cache_slots);
         vm.agent.gc_allocator.free(entry.value_ptr.get_property_ics);
+        vm.agent.gc_allocator.free(entry.value_ptr.get_property_computed_ics);
         vm.agent.gc_allocator.free(entry.value_ptr.set_property_ics);
+        vm.agent.gc_allocator.free(entry.value_ptr.set_property_computed_ics);
     }
     vm.per_bytecode_cache.deinit(vm.agent.gc_allocator);
 }
@@ -261,15 +269,15 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .get_local => vm.executeGetLocal(data.reg_local[0], data.reg_local[1]),
                 .get_binding => vm.executeGetBinding(data.reg_string[0], data.reg_string[1]),
                 .get_property => vm.executeGetProperty(data.reg_reg_string_get_property_ic[0], data.reg_reg_string_get_property_ic[1], data.reg_reg_string_get_property_ic[2], data.reg_reg_string_get_property_ic[3]),
-                .get_property_computed => vm.executeGetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
+                .get_property_computed => vm.executeGetPropertyComputed(data.reg_reg_reg_get_property_computed_ic[0], data.reg_reg_reg_get_property_computed_ic[1], data.reg_reg_reg_get_property_computed_ic[2], data.reg_reg_reg_get_property_computed_ic[3]),
                 .get_property_indexed => vm.executeGetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
                 .set_local => vm.executeSetLocal(data.local_reg[0], data.local_reg[1]),
                 .set_binding => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], false),
                 .set_binding_strict => vm.executeSetBinding(data.string_reg[0], data.string_reg[1], true),
                 .set_property => vm.executeSetProperty(data.reg_reg_string_set_property_ic[0], data.reg_reg_string_set_property_ic[1], data.reg_reg_string_set_property_ic[2], data.reg_reg_string_set_property_ic[3], false),
                 .set_property_strict => vm.executeSetProperty(data.reg_reg_string_set_property_ic[0], data.reg_reg_string_set_property_ic[1], data.reg_reg_string_set_property_ic[2], data.reg_reg_string_set_property_ic[3], true),
-                .set_property_computed => vm.executeSetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], false),
-                .set_property_computed_strict => vm.executeSetPropertyComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2], true),
+                .set_property_computed => vm.executeSetPropertyComputed(data.reg_reg_reg_set_property_computed_ic[0], data.reg_reg_reg_set_property_computed_ic[1], data.reg_reg_reg_set_property_computed_ic[2], data.reg_reg_reg_set_property_computed_ic[3], false),
+                .set_property_computed_strict => vm.executeSetPropertyComputed(data.reg_reg_reg_set_property_computed_ic[0], data.reg_reg_reg_set_property_computed_ic[1], data.reg_reg_reg_set_property_computed_ic[2], data.reg_reg_reg_set_property_computed_ic[3], true),
                 .set_property_indexed => vm.executeSetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], false),
                 .set_property_indexed_strict => vm.executeSetPropertyIndexed(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2], true),
                 .delete_binding => vm.executeDeleteBinding(data.reg_string[0], data.reg_string[1]),
@@ -423,13 +431,21 @@ fn ensurePerBytecodeCache(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.
         const get_property_ics = try vm.agent.gc_allocator.alloc(ic.GetProperty, bytecode.get_property_ic_count);
         errdefer vm.agent.gc_allocator.free(get_property_ics);
         @memset(get_property_ics, .empty);
+        const get_property_computed_ics = try vm.agent.gc_allocator.alloc(ic.GetPropertyComputed, bytecode.get_property_computed_ic_count);
+        errdefer vm.agent.gc_allocator.free(get_property_computed_ics);
+        @memset(get_property_computed_ics, .empty);
         const set_property_ics = try vm.agent.gc_allocator.alloc(ic.SetProperty, bytecode.set_property_ic_count);
         errdefer vm.agent.gc_allocator.free(set_property_ics);
         @memset(set_property_ics, .empty);
+        const set_property_computed_ics = try vm.agent.gc_allocator.alloc(ic.SetPropertyComputed, bytecode.set_property_computed_ic_count);
+        errdefer vm.agent.gc_allocator.free(set_property_computed_ics);
+        @memset(set_property_computed_ics, .empty);
         gop.value_ptr.* = .{
             .cache_slots = cache_slots,
             .get_property_ics = get_property_ics,
+            .get_property_computed_ics = get_property_computed_ics,
             .set_property_ics = set_property_ics,
+            .set_property_computed_ics = set_property_computed_ics,
         };
     }
     return gop.value_ptr.*;
@@ -444,7 +460,9 @@ fn updateCachedFields(vm: *Vm, cache: PerBytecodeCache) void {
     vm.regs = vm.stack.items[regs_start..][0..frame.bytecode.register_count];
     vm.cache_slots = cache.cache_slots;
     vm.get_property_ics = cache.get_property_ics;
+    vm.get_property_computed_ics = cache.get_property_computed_ics;
     vm.set_property_ics = cache.set_property_ics;
+    vm.set_property_computed_ics = cache.set_property_computed_ics;
 }
 
 pub fn pushCallFrame(
@@ -547,7 +565,9 @@ fn getClass(vm: *Vm, index: Bytecode.Class.Index) *const Bytecode.Class {
 fn Ic(comptime IcIndex: type) type {
     return switch (IcIndex) {
         Bytecode.GetPropertyIcIndex => ic.GetProperty,
+        Bytecode.GetPropertyComputedIcIndex => ic.GetPropertyComputed,
         Bytecode.SetPropertyIcIndex => ic.SetProperty,
+        Bytecode.SetPropertyComputedIcIndex => ic.SetPropertyComputed,
         else => comptime unreachable,
     };
 }
@@ -555,7 +575,9 @@ fn Ic(comptime IcIndex: type) type {
 fn getIc(vm: *Vm, index: anytype) *Ic(@TypeOf(index)) {
     return switch (@TypeOf(index)) {
         Bytecode.GetPropertyIcIndex => &vm.get_property_ics[@intFromEnum(index)],
+        Bytecode.GetPropertyComputedIcIndex => &vm.get_property_computed_ics[@intFromEnum(index)],
         Bytecode.SetPropertyIcIndex => &vm.set_property_ics[@intFromEnum(index)],
+        Bytecode.SetPropertyComputedIcIndex => &vm.set_property_computed_ics[@intFromEnum(index)],
         else => comptime unreachable,
     };
 }
@@ -1469,6 +1491,7 @@ fn executeGetPropertyComputed(
     dst: Bytecode.Reg,
     base_reg: Bytecode.Reg,
     property_reg: Bytecode.Reg,
+    ic_index: Bytecode.GetPropertyComputedIcIndex,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
     const property_value = vm.store(property_reg);
@@ -1497,14 +1520,34 @@ fn executeGetPropertyComputed(
         // Fall through to prototype chain lookup for out of bounds access
     }
 
-    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
-    const property_key = try property_value.toPropertyKey(vm.agent);
+    const get_property_computed_ic = vm.getIc(ic_index);
+
+    const base_object, const property_key = if (base_value.isObject()) blk: {
+        @branchHint(.likely);
+        const base_object = base_value.asObject();
+        const property_key = try property_value.toPropertyKey(vm.agent);
+        if (try get_property_computed_ic.get(vm.agent, base_object, base_value, property_key)) |value| {
+            vm.load(dst, value);
+            return;
+        }
+        break :blk .{ base_object, property_key };
+    } else blk: {
+        const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
+        const property_key = try property_value.toPropertyKey(vm.agent);
+        break :blk .{ base_object, property_key };
+    };
+
     const result = try base_object.internalMethods().get(
         vm.agent,
         base_object,
         property_key,
         base_value,
     );
+
+    if (base_value.isObject()) {
+        get_property_computed_ic.update(base_value.asObject(), property_key);
+    }
+
     vm.load(dst, result);
 }
 
@@ -1627,6 +1670,7 @@ fn executeSetPropertyComputed(
     base_reg: Bytecode.Reg,
     property_reg: Bytecode.Reg,
     value_reg: Bytecode.Reg,
+    ic_index: Bytecode.SetPropertyComputedIcIndex,
     comptime strict: bool,
 ) Agent.Error!void {
     const base_value = vm.store(base_reg);
@@ -1643,8 +1687,20 @@ fn executeSetPropertyComputed(
         }
     }
 
-    const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
-    const property_key = try property_value.toPropertyKey(vm.agent);
+    const set_property_computed_ic = vm.getIc(ic_index);
+
+    const base_object, const property_key = if (base_value.isObject()) blk: {
+        @branchHint(.likely);
+        const base_object = base_value.asObject();
+        const property_key = try property_value.toPropertyKey(vm.agent);
+        if (try set_property_computed_ic.set(vm.agent, base_object, base_value, property_key, value)) return;
+        break :blk .{ base_object, property_key };
+    } else blk: {
+        const base_object = try toObjectForPropertyAccess(vm.agent, base_value);
+        const property_key = try property_value.toPropertyKey(vm.agent);
+        break :blk .{ base_object, property_key };
+    };
+
     const success = try base_object.internalMethods().set(
         vm.agent,
         base_object,
@@ -1652,9 +1708,16 @@ fn executeSetPropertyComputed(
         value,
         base_value,
     );
-    if (!success and strict) {
+    if (!success) {
         @branchHint(.unlikely);
-        return vm.agent.throwException(.type_error, "Could not set property", .{});
+        if (strict) {
+            return vm.agent.throwException(.type_error, "Could not set property", .{});
+        }
+        return;
+    }
+
+    if (base_value.isObject()) {
+        set_property_computed_ic.update(base_value.asObject(), property_key);
     }
 }
 
