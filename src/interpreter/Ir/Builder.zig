@@ -428,24 +428,10 @@ fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
             .tag = if (boolean) .true else .false,
             .data = .{ .none = {} },
         }),
-        .number => |number| {
-            if (number == 0 and !std.math.isNegativeZero(number)) {
-                return b.addInst(.{
-                    .tag = .zero,
-                    .data = .{ .none = {} },
-                });
-            } else if (number == 1) {
-                return b.addInst(.{
-                    .tag = .one,
-                    .data = .{ .none = {} },
-                });
-            } else {
-                return b.addInst(.{
-                    .tag = .number,
-                    .data = .{ .number = number },
-                });
-            }
-        },
+        .number => |number| b.addInst(.{
+            .tag = .number,
+            .data = .{ .number = number },
+        }),
         .big_int => |big_int| {
             const big_int_index = try b.internBigInt(big_int);
             return b.addInst(.{

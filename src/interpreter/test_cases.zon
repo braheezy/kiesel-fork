@@ -47,7 +47,7 @@
         .expected_result = .{ .value = .{ .number = 4 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..0  ] dead                  one
+        \\  %0: [  0..0  ] dead                  number 1
         \\  %1: [  1..2  ]                       undefined
         \\  %2: [  2..2  ]                       br %3, %1
         \\  %3: [  3..12 ]                       label
@@ -95,7 +95,7 @@
         \\  %2: [  2..3  ]                       number 6
         \\  %3: [  3..3  ]                       br %4, %2
         \\  %4: [  4..10 ]                       label
-        \\  %5: [  5..6  ]                       zero
+        \\  %5: [  5..6  ]                       number 0
         \\  %6: [  6..6  ]                       br_cond %5, %7, %9
         \\  %7: [  7..7  ]                       label
         \\  %8: [  8..8  ]                       br %0, %4
@@ -127,7 +127,7 @@
         .expected_output =
         \\IR (test)
         \\  %0: [  0..14 ]                       array_create 4
-        \\  %1: [  1..2  ]                       one
+        \\  %1: [  1..2  ]                       number 1
         \\  %2: [  2..2  ]                       array_push %0, %1
         \\  %3: [  3..3  ]                       array_push %0, none
         \\  %4: [  4..9  ]                       array_create 2
@@ -173,7 +173,7 @@
         .expected_result = .ignore,
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       one
+        \\  %0: [  0..1  ]                       number 1
         \\  %1: [  1..1  ]                       set_binding @0 ("a"), %0
         \\  %2: [  2..5  ]                       object_create
         \\  %3: [  3..4  ]                       number 2
@@ -249,7 +249,7 @@
         .expected_result = .{ .value = null },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       one
+        \\  %0: [  0..1  ]                       number 1
         \\  %1: [  1..1  ]                       set_binding @0 ("x"), %0
         \\  %2: [  2..2  ]                       return none
         \\
@@ -304,7 +304,7 @@
         .expected_result = .{ .value = .{ .number = 1 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       one
+        \\  %0: [  0..1  ]                       number 1
         \\  %1: [  1..1  ]                       initialize_binding @0 ("a"), %0
         \\  %2: [  2..2  ]                       push_scope
         \\  %3: [  3..3  ]                       create_mutable_binding @0 ("a")
@@ -449,8 +449,8 @@
         \\IR (test)
         \\  %0: [  0..0  ] dead                  false
         \\  %1: [  1..1  ] dead                  true
-        \\  %2: [  2..2  ] dead                  one
-        \\  %3: [  3..4  ]                       zero
+        \\  %2: [  2..2  ] dead                  number 1
+        \\  %3: [  3..4  ]                       number 0
         \\  %4: [  4..4  ]                       set_binding @0 ("x"), %3
         \\  %5: [  5..8  ]                       true
         \\  %6: [  6..6  ]                       br_cond %5, %9, %7
@@ -458,7 +458,7 @@
         \\  %8: [  8..8  ]                       br %15, %5
         \\  %9: [  9..9  ]                       label
         \\ %10: [ 10..12 ]                       get_binding @0 ("x")
-        \\ %11: [ 11..12 ]                       one
+        \\ %11: [ 11..12 ]                       number 1
         \\ %12: [ 12..13 ]                       add %10, %11
         \\ %13: [ 13..14 ]                       set_binding @0 ("x"), %12
         \\ %14: [ 14..14 ]                       br %15, %13
@@ -556,7 +556,7 @@
         \\ %13: [ 13..13 ]                       call %7, %6, [%8, %11, %12]
         \\ %14: [ 14..25 ]                       get_binding @0 ("Math")
         \\ %15: [ 15..25 ]                       get_property %14, @8 ("max")
-        \\ %16: [ 16..25 ]                       one
+        \\ %16: [ 16..25 ]                       number 1
         \\ %17: [ 17..25 ]                       number 5
         \\ %18: [ 18..23 ]                       array_create 2
         \\ %19: [ 19..20 ]                       number 3
@@ -630,7 +630,7 @@
         .expected_output =
         \\IR (test)
         \\  %0: [  0..7  ]                       object_create
-        \\  %1: [  1..2  ]                       one
+        \\  %1: [  1..2  ]                       number 1
         \\  %2: [  2..2  ]                       object_set %0, @0 ("a"), %1
         \\  %3: [  3..4  ]                       number 2
         \\  %4: [  4..4  ]                       object_set %0, @1 ("b"), %3
@@ -902,11 +902,11 @@
         .expected_result = .{ .value = .{ .number = 36 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       zero
+        \\  %0: [  0..1  ]                       number 0
         \\  %1: [  1..1  ]                       set_binding @0 ("result"), %0
         \\  %2: [  2..16 ]                       array_create 2
         \\  %3: [  3..8  ]                       array_create 2
-        \\  %4: [  4..5  ]                       one
+        \\  %4: [  4..5  ]                       number 1
         \\  %5: [  5..5  ]                       array_push %3, %4
         \\  %6: [  6..7  ]                       number 2
         \\  %7: [  7..7  ]                       array_push %3, %6
@@ -1145,7 +1145,7 @@
         .expected_result = .{ .value = .{ .number = 8 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       zero
+        \\  %0: [  0..1  ]                       number 0
         \\  %1: [  1..1  ]                       set_binding @0 ("x"), %0
         \\  %2: [  2..3  ]                       undefined
         \\  %3: [  3..3  ]                       br %4, %2
@@ -1156,7 +1156,7 @@
         \\  %8: [  8..8  ]                       br_cond %7, %9, %15
         \\  %9: [  9..9  ]                       label
         \\ %10: [ 10..12 ]                       get_binding @0 ("x")
-        \\ %11: [ 11..12 ]                       one
+        \\ %11: [ 11..12 ]                       number 1
         \\ %12: [ 12..13 ]                       add %10, %11
         \\ %13: [ 13..14 ]                       set_binding @0 ("x"), %12
         \\ %14: [ 14..14 ]                       br %4, %13
@@ -1166,7 +1166,7 @@
         \\ %18: [ 18..31 ]                       label
         \\ %19: [ 19..19 ] dead                  undefined
         \\ %20: [ 20..22 ]                       get_binding @0 ("x")
-        \\ %21: [ 21..22 ]                       one
+        \\ %21: [ 21..22 ]                       number 1
         \\ %22: [ 22..23 ]                       add %20, %21
         \\ %23: [ 23..24 ]                       set_binding @0 ("x"), %22
         \\ %24: [ 24..24 ]                       br %25, %23
@@ -1180,7 +1180,7 @@
         \\ %32: [ 32..32 ]                       label
         \\ %33: [ 33..33 ]                       br %34, %25
         \\ %34: [ 34..34 ]                       label
-        \\ %35: [ 35..36 ]                       zero
+        \\ %35: [ 35..36 ]                       number 0
         \\ %36: [ 36..36 ]                       set_binding @1 ("i"), %35
         \\ %37: [ 37..38 ]                       undefined
         \\ %38: [ 38..38 ]                       br %39, %37
@@ -1274,7 +1274,7 @@
         .expected_result = .{ .value = .{ .number = 121 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       zero
+        \\  %0: [  0..1  ]                       number 0
         \\  %1: [  1..1  ]                       set_binding @0 ("x"), %0
         \\  %2: [  2..3  ]                       undefined
         \\  %3: [  3..3  ]                       br %4, %2
@@ -1283,7 +1283,7 @@
         \\  %6: [  6..6  ]                       br_cond %5, %7, %25
         \\  %7: [  7..7  ]                       label
         \\  %8: [  8..10 ]                       get_binding @0 ("x")
-        \\  %9: [  9..10 ]                       one
+        \\  %9: [  9..10 ]                       number 1
         \\ %10: [ 10..11 ]                       add %8, %9
         \\ %11: [ 11..17 ]                       set_binding @0 ("x"), %10
         \\ %12: [ 12..14 ]                       get_binding @0 ("x")
@@ -1309,7 +1309,7 @@
         \\ %32: [ 32..32 ]                       br_cond %31, %33, %53
         \\ %33: [ 33..33 ]                       label
         \\ %34: [ 34..36 ]                       get_binding @0 ("x")
-        \\ %35: [ 35..36 ]                       one
+        \\ %35: [ 35..36 ]                       number 1
         \\ %36: [ 36..37 ]                       add %34, %35
         \\ %37: [ 37..43 ]                       set_binding @0 ("x"), %36
         \\ %38: [ 38..40 ]                       get_binding @0 ("x")
@@ -1339,13 +1339,13 @@
         \\ %62: [ 62..62 ]                       br_cond %61, %63, %87
         \\ %63: [ 63..63 ]                       label
         \\ %64: [ 64..66 ]                       get_binding @0 ("x")
-        \\ %65: [ 65..66 ]                       one
+        \\ %65: [ 65..66 ]                       number 1
         \\ %66: [ 66..67 ]                       add %64, %65
         \\ %67: [ 67..75 ]                       set_binding @0 ("x"), %66
         \\ %68: [ 68..70 ]                       get_binding @0 ("x")
         \\ %69: [ 69..70 ]                       number 2
         \\ %70: [ 70..72 ]                       rem %68, %69
-        \\ %71: [ 71..72 ]                       zero
+        \\ %71: [ 71..72 ]                       number 0
         \\ %72: [ 72..73 ]                       eq_strict %70, %71
         \\ %73: [ 73..73 ]                       br_cond %72, %74, %78
         \\ %74: [ 74..74 ]                       label
@@ -1473,7 +1473,7 @@
         .expected_result = .{ .value = .{ .number = 5 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       zero
+        \\  %0: [  0..1  ]                       number 0
         \\  %1: [  1..1  ]                       set_binding @0 ("x"), %0
         \\  %2: [  2..17 ]                       string @1 ("b")
         \\  %3: [  3..3  ]                       push_scope
@@ -1495,7 +1495,7 @@
         \\ %19: [ 19..19 ]                       label
         \\ %20: [ 20..20 ]                       br %36, %5
         \\ %21: [ 21..21 ]                       label
-        \\ %22: [ 22..23 ]                       one
+        \\ %22: [ 22..23 ]                       number 1
         \\ %23: [ 23..24 ]                       set_binding @0 ("x"), %22
         \\ %24: [ 24..24 ]                       br %40, %23
         \\ %25: [ 25..25 ]                       label
@@ -1620,10 +1620,10 @@
         .expected_result = .{ .value = .{ .number = 15 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       zero
+        \\  %0: [  0..1  ]                       number 0
         \\  %1: [  1..1  ]                       set_binding @0 ("x"), %0
         \\  %2: [  2..9  ]                       label
-        \\  %3: [  3..4  ]                       one
+        \\  %3: [  3..4  ]                       number 1
         \\  %4: [  4..4  ]                       throw %3
         \\  %5: [  5..7  ] dead                  undefined
         \\  %6: [  6..9  ]                       label
@@ -1769,10 +1769,10 @@
         .expected_result = .{ .value = .{ .number = 6 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       zero
+        \\  %0: [  0..1  ]                       number 0
         \\  %1: [  1..1  ]                       set_binding @0 ("sum"), %0
         \\  %2: [  2..10 ]                       array_create 3
-        \\  %3: [  3..4  ]                       one
+        \\  %3: [  3..4  ]                       number 1
         \\  %4: [  4..4  ]                       array_push %2, %3
         \\  %5: [  5..6  ]                       number 2
         \\  %6: [  6..6  ]                       array_push %2, %5
@@ -1845,7 +1845,7 @@
         \\  %0: [  0..1  ]                       object_create
         \\  %1: [  1..1  ]                       set_binding @0 ("x"), %0
         \\  %2: [  2..14 ]                       object_create
-        \\  %3: [  3..4  ]                       one
+        \\  %3: [  3..4  ]                       number 1
         \\  %4: [  4..4  ]                       object_set %2, @1 ("a"), %3
         \\  %5: [  5..6  ]                       number 2
         \\  %6: [  6..6  ]                       object_set %2, @2 ("b"), %5
@@ -1921,7 +1921,7 @@
         .expected_output =
         \\IR (test)
         \\  %0: [  0..3  ]                       object_create
-        \\  %1: [  1..2  ]                       one
+        \\  %1: [  1..2  ]                       number 1
         \\  %2: [  2..2  ]                       object_set %0, @0 ("x"), %1
         \\  %3: [  3..3  ]                       set_binding @1 ("o"), %0
         \\  %4: [  4..5  ]                       get_binding @1 ("o")
@@ -2132,7 +2132,7 @@
         \\  %1: [  1..1  ]                       set_binding @0 ("f"), %0
         \\  %2: [  2..9  ]                       get_binding @0 ("f")
         \\  %3: [  3..9  ]                       object_create
-        \\  %4: [  4..5  ]                       one
+        \\  %4: [  4..5  ]                       number 1
         \\  %5: [  5..5  ]                       object_set %3, @1 ("a"), %4
         \\  %6: [  6..9  ]                       number 2
         \\  %7: [  7..9  ]                       number 3
@@ -2172,7 +2172,7 @@
         \\ %10: [ 10..11 ]                       eq_strict %8, %9
         \\ %11: [ 11..11 ]                       br_cond %10, %12, %15
         \\ %12: [ 12..12 ]                       label
-        \\ %13: [ 13..14 ]                       zero
+        \\ %13: [ 13..14 ]                       number 0
         \\ %14: [ 14..14 ]                       br %17, %13
         \\ %15: [ 15..15 ]                       label
         \\ %16: [ 16..16 ]                       br %17, %8
@@ -2243,10 +2243,10 @@
         .expected_output =
         \\IR (test)
         \\  %0: [  0..2  ]                       get_binding @0 ("mapped")
-        \\  %1: [  1..2  ]                       one
+        \\  %1: [  1..2  ]                       number 1
         \\  %2: [  2..6  ]                       call %0, none, [%1]
         \\  %3: [  3..5  ]                       get_binding @1 ("unmapped")
-        \\  %4: [  4..5  ]                       one
+        \\  %4: [  4..5  ]                       number 1
         \\  %5: [  5..6  ]                       call %3, none, [%4]
         \\  %6: [  6..7  ]                       sub %2, %5
         \\  %7: [  7..7  ]                       return %6
@@ -2447,7 +2447,7 @@
         \\  %4: [  4..5  ]                       get_binding @3 ("g")
         \\  %5: [  5..6  ]                       call %4, none, []
         \\  %6: [  6..6  ]                       set_binding @0 ("gen"), %5
-        \\  %7: [  7..8  ]                       zero
+        \\  %7: [  7..8  ]                       number 0
         \\  %8: [  8..8  ]                       set_binding @1 ("sum"), %7
         \\  %9: [  9..35 ]                       undefined
         \\ %10: [ 10..10 ]                       br %11, %9
@@ -2519,7 +2519,7 @@
         \\IR (g)
         \\  %0: [  0..0  ]                       push_scope
         \\  %1: [  1..1  ]                       yield none
-        \\  %2: [  2..3  ]                       one
+        \\  %2: [  2..3  ]                       number 1
         \\  %3: [  3..3  ]                       yield %2
         \\  %4: [  4..5  ]                       number 2
         \\  %5: [  5..5  ]                       yield %4
@@ -2666,7 +2666,7 @@
         \\IR (g)
         \\  %0: [  0..0  ]                       push_scope
         \\  %1: [  1..1  ]                       yield none
-        \\  %2: [  2..3  ]                       one
+        \\  %2: [  2..3  ]                       number 1
         \\  %3: [  3..3  ]                       yield %2
         \\  %4: [  4..5  ]                       number 2
         \\  %5: [  5..5  ]                       yield %4
@@ -2788,7 +2788,7 @@
         \\  %0: [  0..2  ]                       this
         \\  %1: [  1..2  ]                       get_super_property @0 ("getX")
         \\  %2: [  2..4  ]                       call %1, %0, []
-        \\  %3: [  3..4  ]                       one
+        \\  %3: [  3..4  ]                       number 1
         \\  %4: [  4..5  ]                       add %2, %3
         \\  %5: [  5..5  ]                       return %4
         \\  %6: [  6..6  ] dead                  return none
@@ -2834,9 +2834,9 @@
         .expected_result = .{ .value = .{ .number = 55 } },
         .expected_output =
         \\IR (test)
-        \\  %0: [  0..1  ]                       zero
+        \\  %0: [  0..1  ]                       number 0
         \\  %1: [  1..1  ]                       set_binding @0 ("calls"), %0
-        \\  %2: [  2..3  ]                       zero
+        \\  %2: [  2..3  ]                       number 0
         \\  %3: [  3..3  ]                       set_binding @1 ("caught"), %2
         \\  %4: [  4..11 ]                       label
         \\  %5: [  5..6  ]                       get_binding @2 ("foo")
@@ -2847,7 +2847,7 @@
         \\ %10: [ 10..11 ]                       label
         \\ %11: [ 11..11 ]                       exception_handler %4, %8, %10, 0
         \\ %12: [ 12..14 ]                       get_binding @1 ("caught")
-        \\ %13: [ 13..14 ]                       one
+        \\ %13: [ 13..14 ]                       number 1
         \\ %14: [ 14..15 ]                       add %12, %13
         \\ %15: [ 15..16 ]                       set_binding @1 ("caught"), %14
         \\ %16: [ 16..16 ]                       br %17, %15
@@ -2861,7 +2861,7 @@
         \\ %24: [ 24..25 ]                       label
         \\ %25: [ 25..25 ]                       exception_handler %18, %22, %24, 0
         \\ %26: [ 26..28 ]                       get_binding @1 ("caught")
-        \\ %27: [ 27..28 ]                       one
+        \\ %27: [ 27..28 ]                       number 1
         \\ %28: [ 28..29 ]                       add %26, %27
         \\ %29: [ 29..30 ]                       set_binding @1 ("caught"), %28
         \\ %30: [ 30..30 ]                       br %31, %29
@@ -2875,7 +2875,7 @@
         \\ %38: [ 38..39 ]                       label
         \\ %39: [ 39..39 ]                       exception_handler %32, %36, %38, 0
         \\ %40: [ 40..42 ]                       get_binding @1 ("caught")
-        \\ %41: [ 41..42 ]                       one
+        \\ %41: [ 41..42 ]                       number 1
         \\ %42: [ 42..43 ]                       add %40, %41
         \\ %43: [ 43..44 ]                       set_binding @1 ("caught"), %42
         \\ %44: [ 44..44 ]                       br %45, %43
@@ -2889,14 +2889,14 @@
         \\ %52: [ 52..53 ]                       label
         \\ %53: [ 53..53 ]                       exception_handler %46, %50, %52, 0
         \\ %54: [ 54..56 ]                       get_binding @1 ("caught")
-        \\ %55: [ 55..56 ]                       one
+        \\ %55: [ 55..56 ]                       number 1
         \\ %56: [ 56..57 ]                       add %54, %55
         \\ %57: [ 57..58 ]                       set_binding @1 ("caught"), %56
         \\ %58: [ 58..58 ]                       br %59, %57
         \\ %59: [ 59..59 ]                       label
         \\ %60: [ 60..89 ]                       label
         \\ %61: [ 61..69 ]                       object_create
-        \\ %62: [ 62..63 ]                       one
+        \\ %62: [ 62..63 ]                       number 1
         \\ %63: [ 63..63 ]                       object_set %61, @3 ("a"), %62
         \\ %64: [ 64..84 ]                       undefined
         \\ %65: [ 65..66 ]                       null
@@ -2925,7 +2925,7 @@
         \\ %88: [ 88..89 ]                       label
         \\ %89: [ 89..89 ]                       exception_handler %60, %86, %88, 0
         \\ %90: [ 90..92 ]                       get_binding @1 ("caught")
-        \\ %91: [ 91..92 ]                       one
+        \\ %91: [ 91..92 ]                       number 1
         \\ %92: [ 92..93 ]                       add %90, %91
         \\ %93: [ 93..94 ]                       set_binding @1 ("caught"), %92
         \\ %94: [ 94..94 ]                       br %95, %93
@@ -3017,7 +3017,7 @@
         \\IR (foo)
         \\  %0: [  0..0  ]                       push_scope
         \\  %1: [  1..3  ]                       get_binding @0 ("calls")
-        \\  %2: [  2..3  ]                       one
+        \\  %2: [  2..3  ]                       number 1
         \\  %3: [  3..4  ]                       add %1, %2
         \\  %4: [  4..4  ]                       set_binding @0 ("calls"), %3
         \\  %5: [  5..5  ]                       return none
@@ -3275,7 +3275,7 @@
         \\  %0: [  0..0  ]                       push_scope
         \\  %1: [  1..1  ]                       create_immutable_binding @0 ("_")
         \\  %2: [  2..4  ]                       get_binding @1 ("Disposable")
-        \\  %3: [  3..4  ]                       one
+        \\  %3: [  3..4  ]                       number 1
         \\  %4: [  4..6  ]                       construct %2, [%3]
         \\  %5: [  5..5  ]                       add_disposable_resource_sync %4
         \\  %6: [  6..6  ]                       initialize_binding @0 ("_"), %4

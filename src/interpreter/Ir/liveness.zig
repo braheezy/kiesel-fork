@@ -25,8 +25,6 @@ pub fn computeLiveness(
             .null,
             .true,
             .false,
-            .zero,
-            .one,
             .number,
             .string,
             .big_int,

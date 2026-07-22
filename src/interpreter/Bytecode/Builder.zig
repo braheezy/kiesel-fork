@@ -207,8 +207,6 @@ pub fn build(b: *Builder) Error!Bytecode {
             .null => try b.lowerNull(dest),
             .true => try b.lowerTrue(dest),
             .false => try b.lowerFalse(dest),
-            .zero => try b.lowerZero(dest),
-            .one => try b.lowerOne(dest),
             .number => try b.lowerNumber(data.number, dest),
             .string => try b.lowerString(data.string, dest),
             .big_int => try b.lowerBigInt(data.big_int, dest),
@@ -812,22 +810,6 @@ fn lowerFalse(b: *Builder, dest: Ir.Inst.Ref) Error!void {
     try b.emit(.{
         .tag = .load_false,
         .data = .{ .reg = dest_reg },
-    });
-}
-
-fn lowerZero(b: *Builder, dest: Ir.Inst.Ref) Error!void {
-    const dest_reg = b.resolve(dest);
-    try b.emit(.{
-        .tag = .load_number_i8,
-        .data = .{ .reg_i8 = .{ dest_reg, 0 } },
-    });
-}
-
-fn lowerOne(b: *Builder, dest: Ir.Inst.Ref) Error!void {
-    const dest_reg = b.resolve(dest);
-    try b.emit(.{
-        .tag = .load_number_i8,
-        .data = .{ .reg_i8 = .{ dest_reg, 1 } },
     });
 }
 
