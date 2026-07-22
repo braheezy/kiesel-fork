@@ -160,6 +160,7 @@ pub const Inst = struct {
 
         resolve_this_binding,
 
+        to_boolean,
         to_number,
         to_numeric,
         to_string,
@@ -361,6 +362,7 @@ pub const Inst = struct {
             .object_spread = .reg_reg,
             .reg_exp_create = .reg_string_string,
             .resolve_this_binding = .reg,
+            .to_boolean = .reg_reg,
             .to_number = .reg_reg,
             .to_numeric = .reg_reg,
             .to_string = .reg_reg,

@@ -224,6 +224,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .br => try b.lowerBr(data.br),
             .br_cond => try b.lowerBrCond(data.br_cond),
             .exception_handler => try b.lowerExceptionHandler(data.exception_handler, dest),
+            .to_boolean => try b.lowerToBoolean(data.ref, dest),
             .to_number => try b.lowerToNumber(data.ref, dest),
             .to_numeric => try b.lowerToNumeric(data.ref, dest),
             .to_string => try b.lowerToString(data.ref, dest),
@@ -1105,6 +1106,10 @@ fn lowerExceptionHandler(b: *Builder, extra_index: Ir.ExtraIndex, exception_ref:
         .exception_reg = exception_reg,
         .scope_depth = scope_depth,
     });
+}
+
+fn lowerToBoolean(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.to_boolean, value, dest);
 }
 
 fn lowerToNumber(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {

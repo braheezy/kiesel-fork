@@ -127,6 +127,7 @@ pub const Inst = struct {
         br_cond,
         exception_handler,
 
+        to_boolean,
         to_number,
         to_numeric,
         to_string,
@@ -319,6 +320,7 @@ pub const Inst = struct {
         .br = .br,
         .br_cond = .br_cond,
         .exception_handler = .exception_handler,
+        .to_boolean = .ref,
         .to_number = .ref,
         .to_numeric = .ref,
         .to_string = .ref,

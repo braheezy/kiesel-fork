@@ -224,6 +224,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .object_spread => vm.executeObjectSpread(data.reg_reg[0], data.reg_reg[1]),
                 .reg_exp_create => vm.executeRegExpCreate(data.reg_string_string[0], data.reg_string_string[1], data.reg_string_string[2]),
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
+                .to_boolean => vm.executeToBoolean(data.reg_reg[0], data.reg_reg[1]),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
                 .to_numeric => vm.executeToNumeric(data.reg_reg[0], data.reg_reg[1]),
                 .to_string => vm.executeToString(data.reg_reg[0], data.reg_reg[1]),
@@ -652,13 +653,13 @@ fn executeJump(_: *Vm, offset: i32, pc: *Pc) void {
 }
 
 fn executeJumpIfTrue(vm: *Vm, reg: Bytecode.Reg, offset: i32, pc: *Pc) void {
-    if (vm.store(reg).toBoolean()) {
+    if (vm.store(reg).asBoolean()) {
         pc.* = pc.offsetBy(offset);
     }
 }
 
 fn executeJumpIfFalse(vm: *Vm, reg: Bytecode.Reg, offset: i32, pc: *Pc) void {
-    if (!vm.store(reg).toBoolean()) {
+    if (!vm.store(reg).asBoolean()) {
         pc.* = pc.offsetBy(offset);
     }
 }
@@ -831,6 +832,11 @@ fn executeResolveThisBinding(vm: *Vm, reg: Bytecode.Reg) Agent.Error!void {
         cached_this_value.* = try vm.agent.resolveThisBinding();
     }
     vm.load(reg, cached_this_value.*);
+}
+
+fn executeToBoolean(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
+    const value = vm.store(src);
+    vm.load(dst, Value.from(value.toBoolean()));
 }
 
 fn executeToNumber(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!void {

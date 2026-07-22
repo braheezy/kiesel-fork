@@ -1307,7 +1307,10 @@ fn lowerIfStatement(b: *Builder, if_stmt: *const ast.IfStatement) Error!Ir.Inst.
         });
     }
 
-    const test_result = try b.lowerExpression(&if_stmt.test_expression);
+    const test_result = try b.addInst(.{
+        .tag = .to_boolean,
+        .data = .{ .ref = try b.lowerExpression(&if_stmt.test_expression) },
+    });
     const test_br_cond = try b.addInstDeferred(.br_cond);
 
     const then_label = try b.addLabel();
@@ -1397,7 +1400,10 @@ fn lowerDoWhileStatement(b: *Builder, do_while_stmt: *const ast.DoWhileStatement
     const body_br = try b.addInstDeferred(.br);
 
     const test_label = try b.addLabel();
-    const test_result = try b.lowerExpression(&do_while_stmt.test_expression);
+    const test_result = try b.addInst(.{
+        .tag = .to_boolean,
+        .data = .{ .ref = try b.lowerExpression(&do_while_stmt.test_expression) },
+    });
     const test_br_cond = try b.addInstDeferred(.br_cond);
 
     const continue_label = try b.addLabel();
@@ -1450,7 +1456,10 @@ fn lowerWhileStatement(b: *Builder, while_stmt: *const ast.WhileStatement, label
     const entry_br = try b.addInstDeferred(.br);
 
     const test_label = try b.addLabel();
-    const test_result = try b.lowerExpression(&while_stmt.test_expression);
+    const test_result = try b.addInst(.{
+        .tag = .to_boolean,
+        .data = .{ .ref = try b.lowerExpression(&while_stmt.test_expression) },
+    });
     const test_br_cond = try b.addInstDeferred(.br_cond);
 
     const body_label = try b.addLabel();
@@ -1594,7 +1603,10 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
 
     const test_label = try b.addLabel();
     const test_result = if (for_stmt.test_expression) |*test_expr|
-        try b.lowerExpression(test_expr)
+        try b.addInst(.{
+            .tag = .to_boolean,
+            .data = .{ .ref = try b.lowerExpression(test_expr) },
+        })
     else
         try b.addInst(.{
             .tag = .true,
@@ -4457,8 +4469,14 @@ fn lowerLogicalExpression(b: *Builder, log_expr: *const ast.LogicalExpression) E
     const lhs = try b.lowerExpression(log_expr.lhs_expression);
 
     const condition, const then_target_is_rhs = switch (log_expr.operator) {
-        .@"&&" => .{ lhs, true },
-        .@"||" => .{ lhs, false },
+        .@"&&" => .{ try b.addInst(.{
+            .tag = .to_boolean,
+            .data = .{ .ref = lhs },
+        }), true },
+        .@"||" => .{ try b.addInst(.{
+            .tag = .to_boolean,
+            .data = .{ .ref = lhs },
+        }), false },
         .@"??" => blk: {
             const null_ref = try b.addInst(.{
                 .tag = .null,
@@ -4511,7 +4529,10 @@ fn lowerConditionalExpression(b: *Builder, cond_expr: *const ast.ConditionalExpr
             try b.lowerExpression(cond_expr.alternate_expression);
     }
 
-    const test_result = try b.lowerExpression(cond_expr.test_expression);
+    const test_result = try b.addInst(.{
+        .tag = .to_boolean,
+        .data = .{ .ref = try b.lowerExpression(cond_expr.test_expression) },
+    });
     const test_br_cond = try b.addInstDeferred(.br_cond);
 
     const then_label = try b.addLabel();
@@ -5088,8 +5109,14 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
     };
 
     const condition, const then_target_is_assign = switch (assign_expr.operator) {
-        .@"&&=" => .{ current_value, true },
-        .@"||=" => .{ current_value, false },
+        .@"&&=" => .{ try b.addInst(.{
+            .tag = .to_boolean,
+            .data = .{ .ref = current_value },
+        }), true },
+        .@"||=" => .{ try b.addInst(.{
+            .tag = .to_boolean,
+            .data = .{ .ref = current_value },
+        }), false },
         .@"??=" => blk: {
             const null_ref = try b.addInst(.{
                 .tag = .null,
