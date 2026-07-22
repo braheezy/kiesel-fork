@@ -8,7 +8,8 @@ name: []const u8,
 code: []const u8,
 local_count: u16,
 register_count: u16,
-inline_cache_count: u16,
+get_property_ic_count: u16,
+set_property_ic_count: u16,
 strings: []const []const u8,
 string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,
@@ -51,7 +52,8 @@ pub const BigIntIndex = enum(u16) {
     }
 };
 
-pub const IcIndex = enum(u16) { _ };
+pub const GetPropertyIcIndex = enum(u16) { _ };
+pub const SetPropertyIcIndex = enum(u16) { _ };
 
 pub const Function = struct {
     source_range: ast.SourceRange,
@@ -312,7 +314,8 @@ pub const Inst = struct {
         reg_big_int: struct { Reg, BigIntIndex },
         reg_string_reg: struct { Reg, StringIndex, Reg },
         reg_string_string: struct { Reg, StringIndex, StringIndex },
-        reg_reg_string_ic: struct { Reg, Reg, StringIndex, IcIndex },
+        reg_reg_string_get_property_ic: struct { Reg, Reg, StringIndex, GetPropertyIcIndex },
+        reg_reg_string_set_property_ic: struct { Reg, Reg, StringIndex, SetPropertyIcIndex },
         reg_function: struct { Reg, Function.Index },
         reg_class: struct { Reg, Class.Index },
         local_reg: struct { Local, Reg },
@@ -396,14 +399,14 @@ pub const Inst = struct {
             .initialize_binding = .string_reg,
             .get_local = .reg_local,
             .get_binding = .reg_string,
-            .get_property = .reg_reg_string_ic,
+            .get_property = .reg_reg_string_get_property_ic,
             .get_property_computed = .reg_reg_reg,
             .get_property_indexed = .reg_reg_u32,
             .set_local = .local_reg,
             .set_binding = .string_reg,
             .set_binding_strict = .string_reg,
-            .set_property = .reg_reg_string_ic,
-            .set_property_strict = .reg_reg_string_ic,
+            .set_property = .reg_reg_string_set_property_ic,
+            .set_property_strict = .reg_reg_string_set_property_ic,
             .set_property_computed = .reg_reg_reg,
             .set_property_computed_strict = .reg_reg_reg,
             .set_property_indexed = .reg_reg_u32,
@@ -538,7 +541,8 @@ pub const Inst = struct {
             BigIntIndex,
             Function.Index,
             Class.Index,
-            IcIndex,
+            GetPropertyIcIndex,
+            SetPropertyIcIndex,
             => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
             StringIndex => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
             i8 => @bitCast(code[0]),
@@ -580,7 +584,8 @@ pub const Inst = struct {
             BigIntIndex,
             Function.Index,
             Class.Index,
-            IcIndex,
+            GetPropertyIcIndex,
+            SetPropertyIcIndex,
             => try writer.writeInt(u16, @intFromEnum(value), .little),
             StringIndex => try writer.writeInt(u32, @intFromEnum(value), .little),
             i8 => try writer.writeByte(@bitCast(value)),
@@ -805,7 +810,8 @@ fn printField(
         },
         Function.Index,
         Class.Index,
-        IcIndex,
+        GetPropertyIcIndex,
+        SetPropertyIcIndex,
         => {
             try terminal.setColor(.yellow);
             try terminal.writer.print("@{d}", .{@intFromEnum(value)});

@@ -18,7 +18,8 @@ label_blocks: std.AutoHashMapUnmanaged(Ir.Inst.Ref, Block.Index),
 exception_handlers: std.ArrayList(ExceptionHandler),
 array_states: std.ArrayList(ArrayState),
 locals: std.AutoHashMapUnmanaged(Ir.StringIndex, Bytecode.Local),
-inline_cache_count: u16,
+get_property_ic_count: u16,
+set_property_ic_count: u16,
 
 const ExceptionHandler = struct {
     start: Block.Index,
@@ -48,7 +49,8 @@ pub fn init(gpa: std.mem.Allocator, ir: *const Ir) std.mem.Allocator.Error!Build
         .exception_handlers = .empty,
         .array_states = .empty,
         .locals = .empty,
-        .inline_cache_count = 0,
+        .get_property_ic_count = 0,
+        .set_property_ic_count = 0,
     };
 }
 
@@ -478,7 +480,8 @@ pub fn build(b: *Builder) Error!Bytecode {
         .code = code,
         .local_count = @intCast(b.locals.count()),
         .register_count = b.lsra.count(),
-        .inline_cache_count = b.inline_cache_count,
+        .get_property_ic_count = b.get_property_ic_count,
+        .set_property_ic_count = b.set_property_ic_count,
         .strings = strings,
         .string_kinds = string_kinds,
         .big_ints = big_ints,
@@ -746,9 +749,25 @@ fn resolve(b: *Builder, ref: Ir.Inst.Ref) Bytecode.Reg {
     return reg;
 }
 
-fn nextIcIndex(b: *Builder) Bytecode.IcIndex {
-    const index: Bytecode.IcIndex = @enumFromInt(b.inline_cache_count);
-    b.inline_cache_count += 1;
+const IcKind = enum {
+    get_property,
+    set_property,
+};
+
+fn IcIndex(comptime kind: IcKind) type {
+    return switch (kind) {
+        .get_property => Bytecode.GetPropertyIcIndex,
+        .set_property => Bytecode.SetPropertyIcIndex,
+    };
+}
+
+fn nextIcIndex(b: *Builder, comptime kind: IcKind) IcIndex(kind) {
+    const count = switch (kind) {
+        .get_property => &b.get_property_ic_count,
+        .set_property => &b.set_property_ic_count,
+    };
+    const index: IcIndex(kind) = @enumFromInt(count.*);
+    count.* += 1;
     return index;
 }
 
@@ -1362,10 +1381,10 @@ fn lowerGetProperty(b: *Builder, data: Ir.Inst.GetProperty, dest: Ir.Inst.Ref) E
     const dest_reg = b.resolve(dest);
     const base_reg = b.resolve(data.base);
     const name_index: Bytecode.StringIndex = @enumFromInt(@intFromEnum(data.name));
-    const ic_index = b.nextIcIndex();
+    const ic_index = b.nextIcIndex(.get_property);
     try b.emit(.{
         .tag = .get_property,
-        .data = .{ .reg_reg_string_ic = .{
+        .data = .{ .reg_reg_string_get_property_ic = .{
             dest_reg,
             base_reg,
             name_index,
@@ -1433,14 +1452,14 @@ fn lowerSetProperty(b: *Builder, extra_index: Ir.ExtraIndex, strict: bool, dest:
     const base_reg = b.resolve(extra.data.base);
     const value_reg = b.resolve(extra.data.value);
     const name_index: Bytecode.StringIndex = @enumFromInt(@intFromEnum(extra.data.name));
-    const ic_index = b.nextIcIndex();
+    const ic_index = b.nextIcIndex(.set_property);
     const tag: Bytecode.Inst.Tag = if (strict)
         .set_property_strict
     else
         .set_property;
     try b.emit(.{
         .tag = tag,
-        .data = .{ .reg_reg_string_ic = .{
+        .data = .{ .reg_reg_string_set_property_ic = .{
             base_reg,
             value_reg,
             name_index,
