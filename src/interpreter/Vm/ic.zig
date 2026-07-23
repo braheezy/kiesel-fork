@@ -2,8 +2,10 @@ const std = @import("std");
 
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
+const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
+const BoundedArray = utils.BoundedArray;
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Value = types.Value;
@@ -15,19 +17,14 @@ fn State(comptime Entry: type, comptime Key: type) type {
         polymorphic: Entries,
         megamorphic,
 
-        const max_entries = 4;
-
-        const Entries = struct {
-            items: [max_entries]Entry,
-            len: std.math.IntFittingRange(0, max_entries),
-        };
+        const Entries = BoundedArray(Entry, 4);
 
         fn get(state: *const @This(), key: Key) ?*const Entry {
             switch (state.*) {
                 .empty, .megamorphic => return null,
                 .monomorphic => |*entry| return if (entry.matches(key)) entry else null,
                 .polymorphic => |*entries| {
-                    for (entries.items[0..entries.len]) |*entry| {
+                    for (entries.slice()) |*entry| {
                         if (entry.matches(key)) return entry;
                     }
                     return null;
@@ -41,21 +38,15 @@ fn State(comptime Entry: type, comptime Key: type) type {
                     state.* = .{ .monomorphic = new_entry };
                 },
                 .monomorphic => |*entry| {
-                    var items: [max_entries]Entry = undefined;
-                    items[0] = entry.*;
-                    items[1] = new_entry;
-                    state.* = .{ .polymorphic = .{
-                        .items = items,
-                        .len = 2,
-                    } };
+                    var entries: Entries = .empty;
+                    entries.append(entry.*) catch unreachable;
+                    entries.append(new_entry) catch unreachable;
+                    state.* = .{ .polymorphic = entries };
                 },
                 .polymorphic => |*entries| {
-                    if (entries.len < max_entries) {
-                        entries.items[entries.len] = new_entry;
-                        entries.len += 1;
-                    } else {
+                    entries.append(new_entry) catch {
                         state.* = .megamorphic;
-                    }
+                    };
                 },
                 .megamorphic => {},
             }
