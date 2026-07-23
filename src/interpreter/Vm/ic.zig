@@ -19,17 +19,19 @@ fn State(comptime Entry: type, comptime Key: type) type {
 
         const Entries = BoundedArray(Entry, 4);
 
-        fn get(state: *const @This(), key: Key) ?*const Entry {
+        fn get(state: *const @This(), key: Key) ?struct { *const Entry, *Object } {
             switch (state.*) {
-                .empty, .megamorphic => return null,
-                .monomorphic => |*entry| return if (entry.matches(key)) entry else null,
+                .empty, .megamorphic => {},
+                .monomorphic => |*entry| {
+                    if (entry.resolve(key)) |holder| return .{ entry, holder };
+                },
                 .polymorphic => |*entries| {
                     for (entries.slice()) |*entry| {
-                        if (entry.matches(key)) return entry;
+                        if (entry.resolve(key)) |holder| return .{ entry, holder };
                     }
-                    return null;
                 },
             }
+            return null;
         }
 
         fn add(state: *@This(), new_entry: Entry) void {
@@ -54,17 +56,28 @@ fn State(comptime Entry: type, comptime Key: type) type {
     };
 }
 
+const ProtoShapes = BoundedArray(*const Object.Shape, 4);
+
 pub const GetProperty = struct {
     const Entry = struct {
-        shape: *const Object.Shape,
+        receiver_shape: *const Object.Shape,
+        proto_shapes: ProtoShapes,
         offset: Object.Shape.Property.Offset,
         type: Object.Shape.Property.Type,
 
-        fn matches(entry: *const Entry, shape: Key) bool {
-            return entry.shape == shape;
+        fn resolve(entry: *const Entry, key: Key) ?*Object {
+            if (key.receiver.shape != entry.receiver_shape) return null;
+            var current = key.receiver;
+            for (entry.proto_shapes.slice()) |proto_shape| {
+                current = current.shape.prototype.?;
+                if (current.shape != proto_shape) return null;
+            }
+            return current;
         }
     };
-    const Key = *const Object.Shape;
+    const Key = struct {
+        receiver: *Object,
+    };
 
     state: State(Entry, Key),
 
@@ -73,23 +86,26 @@ pub const GetProperty = struct {
     pub fn get(
         ic: *const GetProperty,
         agent: *Agent,
-        base_object: *Object,
+        receiver: *Object,
         base_value: Value,
     ) Agent.Error!?Value {
-        const entry = ic.state.get(base_object.shape) orelse return null;
+        const key: Key = .{ .receiver = receiver };
+        const entry, const holder = ic.state.get(key) orelse return null;
 
-        const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
-            .ordinary_get,
-            .ordinary_get_own_property,
-        }));
+        const has_ordinary_internal_methods = holder.internalMethods().flags.supersetOf(
+            comptime .initMany(&.{
+                .ordinary_get,
+                .ordinary_get_own_property,
+            }),
+        );
         // Assert IC update invariants are upheld
         std.debug.assert(has_ordinary_internal_methods);
-        std.debug.assert(!base_object.shape.isUnique());
+        std.debug.assert(!holder.shape.isUnique());
 
         switch (entry.type) {
-            .value => return base_object.getValueAtPropertyOffset(entry.offset),
+            .value => return holder.getValueAtPropertyOffset(entry.offset),
             .accessor => {
-                const getter_value = base_object.getValueAtPropertyOffset(entry.offset);
+                const getter_value = holder.getValueAtPropertyOffset(entry.offset);
                 if (getter_value.isNull()) {
                     @branchHint(.unlikely);
                     return .undefined;
@@ -102,20 +118,31 @@ pub const GetProperty = struct {
 
     pub fn update(
         ic: *GetProperty,
-        base_object: *Object,
+        receiver: *Object,
         property_key: PropertyKey,
     ) void {
-        const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
-            .ordinary_get,
-            .ordinary_get_own_property,
-        }));
-        if (!has_ordinary_internal_methods) return;
-        if (base_object.shape.isUnique()) return;
+        var proto_shapes: ProtoShapes = .empty;
+        var current: *Object = receiver;
+        const property = while (true) {
+            const has_ordinary_internal_methods = current.internalMethods().flags.supersetOf(
+                comptime .initMany(&.{
+                    .ordinary_get,
+                    .ordinary_get_own_property,
+                }),
+            );
+            if (!has_ordinary_internal_methods) return;
+            if (current.shape.isUnique()) return;
 
-        const property = base_object.shape.properties.get(property_key) orelse return;
+            if (current.shape.properties.get(property_key)) |property| break property;
+
+            const proto = current.shape.prototype orelse return;
+            proto_shapes.append(proto.shape) catch return;
+            current = proto;
+        };
 
         ic.state.add(.{
-            .shape = base_object.shape,
+            .receiver_shape = receiver.shape,
+            .proto_shapes = proto_shapes,
             .offset = property.offset,
             .type = property.type,
         });
@@ -124,17 +151,25 @@ pub const GetProperty = struct {
 
 pub const GetPropertyComputed = struct {
     const Entry = struct {
-        shape: *const Object.Shape,
+        receiver_shape: *const Object.Shape,
+        proto_shapes: ProtoShapes,
         property_key: PropertyKey,
         offset: Object.Shape.Property.Offset,
         type: Object.Shape.Property.Type,
 
-        fn matches(entry: *const Entry, key: Key) bool {
-            return entry.shape == key.shape and entry.property_key.eql(key.property_key);
+        fn resolve(entry: *const Entry, key: Key) ?*Object {
+            if (!key.property_key.eql(entry.property_key)) return null;
+            if (key.receiver.shape != entry.receiver_shape) return null;
+            var current = key.receiver;
+            for (entry.proto_shapes.slice()) |proto_shape| {
+                current = current.shape.prototype.?;
+                if (current.shape != proto_shape) return null;
+            }
+            return current;
         }
     };
     const Key = struct {
-        shape: *const Object.Shape,
+        receiver: *Object,
         property_key: PropertyKey,
     };
 
@@ -145,26 +180,28 @@ pub const GetPropertyComputed = struct {
     pub fn get(
         ic: *const GetPropertyComputed,
         agent: *Agent,
-        base_object: *Object,
+        receiver: *Object,
         base_value: Value,
         property_key: PropertyKey,
     ) Agent.Error!?Value {
         if (property_key == .integer_index) return null;
-        const key: Key = .{ .shape = base_object.shape, .property_key = property_key };
-        const entry = ic.state.get(key) orelse return null;
+        const key: Key = .{ .receiver = receiver, .property_key = property_key };
+        const entry, const holder = ic.state.get(key) orelse return null;
 
-        const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
-            .ordinary_get,
-            .ordinary_get_own_property,
-        }));
+        const has_ordinary_internal_methods = holder.internalMethods().flags.supersetOf(
+            comptime .initMany(&.{
+                .ordinary_get,
+                .ordinary_get_own_property,
+            }),
+        );
         // Assert IC update invariants are upheld
         std.debug.assert(has_ordinary_internal_methods);
-        std.debug.assert(!base_object.shape.isUnique());
+        std.debug.assert(!holder.shape.isUnique());
 
         switch (entry.type) {
-            .value => return base_object.getValueAtPropertyOffset(entry.offset),
+            .value => return holder.getValueAtPropertyOffset(entry.offset),
             .accessor => {
-                const getter_value = base_object.getValueAtPropertyOffset(entry.offset);
+                const getter_value = holder.getValueAtPropertyOffset(entry.offset);
                 if (getter_value.isNull()) {
                     @branchHint(.unlikely);
                     return .undefined;
@@ -177,23 +214,34 @@ pub const GetPropertyComputed = struct {
 
     pub fn update(
         ic: *GetPropertyComputed,
-        base_object: *Object,
+        receiver: *Object,
         property_key: PropertyKey,
     ) void {
         // Indices go through their own indexed property fast path
         if (property_key == .integer_index) return;
 
-        const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
-            .ordinary_get,
-            .ordinary_get_own_property,
-        }));
-        if (!has_ordinary_internal_methods) return;
-        if (base_object.shape.isUnique()) return;
+        var proto_shapes: ProtoShapes = .empty;
+        var current: *Object = receiver;
+        const property = while (true) {
+            const has_ordinary_internal_methods = current.internalMethods().flags.supersetOf(
+                comptime .initMany(&.{
+                    .ordinary_get,
+                    .ordinary_get_own_property,
+                }),
+            );
+            if (!has_ordinary_internal_methods) return;
+            if (current.shape.isUnique()) return;
 
-        const property = base_object.shape.properties.get(property_key) orelse return;
+            if (current.shape.properties.get(property_key)) |property| break property;
+
+            const proto = current.shape.prototype orelse return;
+            proto_shapes.append(proto.shape) catch return;
+            current = proto;
+        };
 
         ic.state.add(.{
-            .shape = base_object.shape,
+            .receiver_shape = receiver.shape,
+            .proto_shapes = proto_shapes,
             .property_key = property_key,
             .offset = property.offset,
             .type = property.type,
@@ -203,15 +251,18 @@ pub const GetPropertyComputed = struct {
 
 pub const SetProperty = struct {
     const Entry = struct {
-        shape: *const Object.Shape,
+        receiver_shape: *const Object.Shape,
         offset: Object.Shape.Property.Offset,
         type: Object.Shape.Property.Type,
 
-        fn matches(entry: *const Entry, shape: Key) bool {
-            return entry.shape == shape;
+        fn resolve(entry: *const Entry, key: Key) ?*Object {
+            if (key.receiver.shape != entry.receiver_shape) return null;
+            return key.receiver;
         }
     };
-    const Key = *const Object.Shape;
+    const Key = struct {
+        receiver: *Object,
+    };
 
     state: State(Entry, Key),
 
@@ -220,27 +271,30 @@ pub const SetProperty = struct {
     pub fn set(
         ic: *const SetProperty,
         agent: *Agent,
-        base_object: *Object,
+        receiver: *Object,
         base_value: Value,
         value: Value,
     ) Agent.Error!bool {
-        const entry = ic.state.get(base_object.shape) orelse return false;
+        const key: Key = .{ .receiver = receiver };
+        const entry, const holder = ic.state.get(key) orelse return false;
 
-        const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
-            .ordinary_set,
-            .ordinary_get_own_property,
-        }));
+        const has_ordinary_internal_methods = holder.internalMethods().flags.supersetOf(
+            comptime .initMany(&.{
+                .ordinary_set,
+                .ordinary_get_own_property,
+            }),
+        );
         // Assert IC update invariants are upheld
         std.debug.assert(has_ordinary_internal_methods);
-        std.debug.assert(!base_object.shape.isUnique());
+        std.debug.assert(!holder.shape.isUnique());
 
         switch (entry.type) {
             .value => {
-                base_object.setValueAtPropertyOffset(entry.offset, value);
+                holder.setValueAtPropertyOffset(entry.offset, value);
                 return true;
             },
             .accessor => {
-                const setter_value = base_object.getValueAtPropertyOffset(
+                const setter_value = holder.getValueAtPropertyOffset(
                     @enumFromInt(@intFromEnum(entry.offset) + 1),
                 );
                 if (setter_value.isNull()) {
@@ -256,21 +310,23 @@ pub const SetProperty = struct {
 
     pub fn update(
         ic: *SetProperty,
-        base_object: *Object,
+        receiver: *Object,
         property_key: PropertyKey,
     ) void {
-        const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
-            .ordinary_set,
-            .ordinary_get_own_property,
-        }));
+        const has_ordinary_internal_methods = receiver.internalMethods().flags.supersetOf(
+            comptime .initMany(&.{
+                .ordinary_set,
+                .ordinary_get_own_property,
+            }),
+        );
         if (!has_ordinary_internal_methods) return;
-        if (base_object.shape.isUnique()) return;
+        if (receiver.shape.isUnique()) return;
 
-        const property = base_object.shape.properties.get(property_key) orelse return;
+        const property = receiver.shape.properties.get(property_key) orelse return;
         if (property.type == .value and !property.attributes.writable) return;
 
         ic.state.add(.{
-            .shape = base_object.shape,
+            .receiver_shape = receiver.shape,
             .offset = property.offset,
             .type = property.type,
         });
@@ -279,17 +335,19 @@ pub const SetProperty = struct {
 
 pub const SetPropertyComputed = struct {
     const Entry = struct {
-        shape: *const Object.Shape,
+        receiver_shape: *const Object.Shape,
         property_key: PropertyKey,
         offset: Object.Shape.Property.Offset,
         type: Object.Shape.Property.Type,
 
-        fn matches(entry: *const Entry, key: Key) bool {
-            return entry.shape == key.shape and entry.property_key.eql(key.property_key);
+        fn resolve(entry: *const Entry, key: Key) ?*Object {
+            if (!key.property_key.eql(entry.property_key)) return null;
+            if (key.receiver.shape != entry.receiver_shape) return null;
+            return key.receiver;
         }
     };
     const Key = struct {
-        shape: *const Object.Shape,
+        receiver: *Object,
         property_key: PropertyKey,
     };
 
@@ -300,30 +358,32 @@ pub const SetPropertyComputed = struct {
     pub fn set(
         ic: *const SetPropertyComputed,
         agent: *Agent,
-        base_object: *Object,
+        receiver: *Object,
         base_value: Value,
         property_key: PropertyKey,
         value: Value,
     ) Agent.Error!bool {
         if (property_key == .integer_index) return false;
-        const key: Key = .{ .shape = base_object.shape, .property_key = property_key };
-        const entry = ic.state.get(key) orelse return false;
+        const key: Key = .{ .receiver = receiver, .property_key = property_key };
+        const entry, const holder = ic.state.get(key) orelse return false;
 
-        const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
-            .ordinary_set,
-            .ordinary_get_own_property,
-        }));
+        const has_ordinary_internal_methods = holder.internalMethods().flags.supersetOf(
+            comptime .initMany(&.{
+                .ordinary_set,
+                .ordinary_get_own_property,
+            }),
+        );
         // Assert IC update invariants are upheld
         std.debug.assert(has_ordinary_internal_methods);
-        std.debug.assert(!base_object.shape.isUnique());
+        std.debug.assert(!holder.shape.isUnique());
 
         switch (entry.type) {
             .value => {
-                base_object.setValueAtPropertyOffset(entry.offset, value);
+                holder.setValueAtPropertyOffset(entry.offset, value);
                 return true;
             },
             .accessor => {
-                const setter_value = base_object.getValueAtPropertyOffset(
+                const setter_value = holder.getValueAtPropertyOffset(
                     @enumFromInt(@intFromEnum(entry.offset) + 1),
                 );
                 if (setter_value.isNull()) {
@@ -339,24 +399,26 @@ pub const SetPropertyComputed = struct {
 
     pub fn update(
         ic: *SetPropertyComputed,
-        base_object: *Object,
+        receiver: *Object,
         property_key: PropertyKey,
     ) void {
         // Indices go through their own indexed property fast path
         if (property_key == .integer_index) return;
 
-        const has_ordinary_internal_methods = base_object.internalMethods().flags.supersetOf(comptime .initMany(&.{
-            .ordinary_set,
-            .ordinary_get_own_property,
-        }));
+        const has_ordinary_internal_methods = receiver.internalMethods().flags.supersetOf(
+            comptime .initMany(&.{
+                .ordinary_set,
+                .ordinary_get_own_property,
+            }),
+        );
         if (!has_ordinary_internal_methods) return;
-        if (base_object.shape.isUnique()) return;
+        if (receiver.shape.isUnique()) return;
 
-        const property = base_object.shape.properties.get(property_key) orelse return;
+        const property = receiver.shape.properties.get(property_key) orelse return;
         if (property.type == .value and !property.attributes.writable) return;
 
         ic.state.add(.{
-            .shape = base_object.shape,
+            .receiver_shape = receiver.shape,
             .property_key = property_key,
             .offset = property.offset,
             .type = property.type,
