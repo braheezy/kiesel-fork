@@ -129,6 +129,25 @@ pub const StringParser = struct {
     }
 };
 
+pub fn BoundedArray(comptime T: type, comptime capacity: usize) type {
+    return struct {
+        buffer: [capacity]T,
+        len: std.math.IntFittingRange(0, capacity),
+
+        pub const empty: @This() = .{ .buffer = undefined, .len = 0 };
+
+        pub fn slice(list: *const @This()) []const T {
+            return list.buffer[0..list.len];
+        }
+
+        pub fn append(list: *@This(), item: T) error{Overflow}!void {
+            if (list.len == capacity) return error.Overflow;
+            list.buffer[list.len] = item;
+            list.len += 1;
+        }
+    };
+}
+
 test parseDigits {
     try std.testing.expectEqual(0, try parseDigits(u8, "0", 2));
     try std.testing.expectEqual(0, try parseDigits(u8, "0", 10));
@@ -145,4 +164,26 @@ test parseDigits {
     try std.testing.expectError(error.InvalidCharacter, parseDigits(u8, "G", 16));
     try std.testing.expectError(error.Overflow, parseDigits(u8, "256", 10));
     try std.testing.expectError(error.Overflow, parseDigits(u8, "100", 16));
+}
+
+test BoundedArray {
+    var list: BoundedArray(u8, 3) = .empty;
+    try std.testing.expectEqual(0, list.len);
+    try std.testing.expectEqualSlices(u8, &.{}, list.slice());
+
+    try list.append(1);
+    try std.testing.expectEqual(1, list.len);
+    try std.testing.expectEqualSlices(u8, &.{1}, list.slice());
+
+    // Copying a partially-filled list must not UB on the undefined tail slots.
+    const partial_copy = list;
+    try std.testing.expectEqualSlices(u8, &.{1}, partial_copy.slice());
+
+    try list.append(2);
+    try list.append(3);
+    try std.testing.expectEqual(3, list.len);
+    try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, list.slice());
+
+    try std.testing.expectError(error.Overflow, list.append(4));
+    try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, list.slice());
 }
