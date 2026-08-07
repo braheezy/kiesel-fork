@@ -241,7 +241,9 @@ pub fn asyncBlockStart(
                 },
             }
 
-            // i. Return NormalCompletion(unused).
+            // i. Let callerContext be the running execution context.
+            // j. Resume callerContext, passing NormalCompletion(unused).
+            // k. Assert: This step is never reached.
         }
     }.func;
 
@@ -256,7 +258,7 @@ pub fn asyncBlockStart(
 
     // 4. Assert: result is unused.
     // 5. NOTE: The possible sources of result values are Await or, if the async function doesn't
-    //    await anything, step 1.i above.
+    //    await anything, step 1.j above.
     result catch |err| try noexcept(err);
 
     // 6. Return unused.

@@ -933,7 +933,7 @@ pub fn methodDefinitionEvaluation(
                     // 11. Perform ? DefinePropertyOrThrow(obj, propertyKey, propertyDesc).
                     try obj.definePropertyOrThrow(agent, property_key, property_desc);
 
-                    // 12. Return unused.
+                    // 12. Return empty.
                     return null;
                 },
             }
@@ -1002,7 +1002,7 @@ pub fn methodDefinitionEvaluation(
                     // 10. Perform ? DefinePropertyOrThrow(obj, propertyKey, propertyDesc).
                     try obj.definePropertyOrThrow(agent, property_key, property_desc);
 
-                    // 11. Return unused.
+                    // 11. Return empty.
                     return null;
                 },
             }
@@ -2136,7 +2136,7 @@ fn classElementEvaluation(
 
         // ClassElement : ;
         .empty_statement => {
-            // 1. Return unused.
+            // 1. Return empty.
             return null;
         },
     }
@@ -2449,7 +2449,7 @@ pub fn classDefinitionEvaluation(
 
         // c. If element is an abrupt completion, then
         // d. Set element to ! element.
-        const element = element_or_error catch |err| {
+        const maybe_element = element_or_error catch |err| {
             // i. Set the running execution context's LexicalEnvironment to envRecord.
             agent.runningExecutionContext().ecmascript_code.lexical_environment = env;
 
@@ -2460,7 +2460,7 @@ pub fn classDefinitionEvaluation(
             return err;
         };
 
-        if (element != null) switch (element.?) {
+        if (maybe_element) |element| switch (element) {
             // e. If element is a PrivateElement, then
             .private_method_definition => |private_method_definition| {
                 // i. Assert: element.[[Kind]] is either method or accessor.
@@ -2536,7 +2536,10 @@ pub fn classDefinitionEvaluation(
                     .{ .class_static_block_definition = class_static_block_definition },
                 );
             },
-        };
+        } else {
+            // h. Else,
+            // i. Assert: element is empty.
+        }
     }
 
     // 27. Set the running execution context's LexicalEnvironment to envRecord.

@@ -1055,16 +1055,18 @@ pub const Declaration = union(enum) {
     pub fn isUsingDeclaration(self: Declaration) bool {
         // LexicalDeclaration : LetOrConst BindingList ;
         // 1. Return false.
-        // UsingDeclaration :
-        //     using BindingList ;
-        // AwaitUsingDeclaration :
-        //     CoverAwaitExpressionAndAwaitUsingDeclarationHead BindingList ;
+        // UsingDeclaration : using BindingList ;
         // 1. Return true.
+        // AwaitUsingDeclaration : CoverAwaitExpressionAndAwaitUsingDeclarationHead BindingList ;
+        // 1. Return false.
+        // ForDeclaration : LetOrConst ForBinding
+        // 1. Return false.
+        // ForDeclaration : using ForBinding
+        // 1. Return true.
+        // ForDeclaration : await using ForBinding
+        // 1. Return false.
         return switch (self) {
-            .lexical_declaration => |lex_decl| switch (lex_decl.type) {
-                .using, .await_using => true,
-                else => false,
-            },
+            .lexical_declaration => |lex_decl| lex_decl.type == .using,
             else => false,
         };
     }
@@ -1077,6 +1079,12 @@ pub const Declaration = union(enum) {
         // UsingDeclaration : using BindingList ;
         // 1. Return false.
         // AwaitUsingDeclaration : CoverAwaitExpressionAndAwaitUsingDeclarationHead BindingList ;
+        // 1. Return true.
+        // ForDeclaration : LetOrConst ForBinding
+        // 1. Return false.
+        // ForDeclaration : using ForBinding
+        // 1. Return false.
+        // ForDeclaration : await using ForBinding
         // 1. Return true.
         return switch (self) {
             .lexical_declaration => |lex_decl| lex_decl.type == .await_using,

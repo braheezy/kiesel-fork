@@ -263,10 +263,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(relativeTimeFormat, [[InitializedRelativeTimeFormat]]).
         const relative_time_format = try this_value.requireInternalSlot(agent, RelativeTimeFormat);
 
-        // 3. Let value be ? ToNumber(value).
+        // 3. Set value to ? ToNumber(value).
         const value = try value_value.toNumber(agent);
 
-        // 4. Let unit be ? ToString(unit).
+        // 4. Set unit to ? ToString(unit).
         const unit = try unit_value.toString(agent);
 
         // 5. Return ? FormatRelativeTime(relativeTimeFormat, value, unit).

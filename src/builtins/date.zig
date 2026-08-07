@@ -342,12 +342,12 @@ pub fn localTime(platform: *const Agent.Platform, tv: f64) f64 {
     } else blk: {
         // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
-        //    ℤ(ℝ(tv) × 10**6)).
-        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, tv * 1_000_000);
+        //    ℤ(ℝ(tv) × nsPerMillisecond)).
+        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, tv * std.time.ns_per_ms);
     };
 
-    // 4. Let offsetMs be truncate(offsetNs / 10**6).
-    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 1_000_000);
+    // 4. Let offsetMs be truncate(offsetNs / nsPerMillisecond).
+    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / std.time.ns_per_ms);
 
     // 5. Return tv + 𝔽(offsetMs).
     return tv + offset_ms;
@@ -375,8 +375,8 @@ pub fn utc(platform: *const Agent.Platform, t: f64) f64 {
         break :blk 0;
     };
 
-    // 5. Let offsetMs be truncate(offsetNs / 10**6).
-    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / 1_000_000);
+    // 5. Let offsetMs be truncate(offsetNs / nsPerMillisecond).
+    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / std.time.ns_per_ms);
 
     // 6. Return t - 𝔽(offsetMs).
     return t - offset_ms;
@@ -784,12 +784,12 @@ pub fn formatTimeZoneString(data: FormatTimeZoneStringData, writer: *std.Io.Writ
     } else blk: {
         // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
-        //    ℤ(ℝ(tv) × 10**6)).
-        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, time_value * 1_000_000);
+        //    ℤ(ℝ(tv) × nsPerMillisecond)).
+        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, time_value * std.time.ns_per_ms);
     };
 
-    // 4. Let offset be 𝔽(truncate(offsetNs / 10**6)).
-    const offset = @trunc(@as(f64, @floatFromInt(offset_ns)) / 1_000_000);
+    // 4. Let offset be 𝔽(truncate(offsetNs / nsPerMillisecond)).
+    const offset = @trunc(@as(f64, @floatFromInt(offset_ns)) / std.time.ns_per_ms);
 
     // 5. If offset is +0𝔽 or offset > +0𝔽, then
     //     a. Let offsetSign be "+".

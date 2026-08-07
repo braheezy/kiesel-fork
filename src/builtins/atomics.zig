@@ -21,8 +21,6 @@ const Value = types.Value;
 const getModifySetValueInBuffer = builtins.getModifySetValueInBuffer;
 const getValueFromBuffer = builtins.getValueFromBuffer;
 const isSharedArrayBuffer = builtins.isSharedArrayBuffer;
-const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
-const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
 const numericToRawBytes = builtins.numericToRawBytes;
@@ -33,6 +31,7 @@ const setValueInBuffer = builtins.setValueInBuffer;
 const typedArrayElementSize = builtins.typedArrayElementSize;
 const typedArrayLength = builtins.typedArrayLength;
 const validateTypedArray = builtins.validateTypedArray;
+const validateTypedArrayBounds = builtins.validateTypedArrayBounds;
 
 /// 25.4.3.1 ValidateIntegerTypedArray ( ta, waitable )
 /// https://tc39.es/ecma262/#sec-validateintegertypedarray
@@ -41,39 +40,36 @@ fn validateIntegerTypedArray(
     typed_array_value: Value,
     waitable: bool,
 ) Agent.Error!TypedArrayWithBufferWitness {
-    // 1. Let taRecord be ? ValidateTypedArray(ta, unordered).
-    // 2. NOTE: Bounds checking is not a synchronizing operation when ta's backing buffer is a
+    // 1. NOTE: Bounds checking is not a synchronizing operation when ta's backing buffer is a
     //    growable SharedArrayBuffer.
+
+    // 2. Let taRecord be ? ValidateTypedArray(ta, unordered).
     const ta = try validateTypedArray(agent, typed_array_value, .unordered);
     const typed_array = ta.object;
-    const @"type" = typed_array.fields.element_type;
 
-    // 3. If waitable is true, then
-    if (waitable) {
-        // a. If ta.[[TypedArrayName]] is neither "Int32Array" nor "BigInt64Array", throw a
-        //    TypeError exception.
-        if (@"type" != .int32 and @"type" != .bigint64) {
-            return agent.throwException(
-                .type_error,
-                "Only Int32Array and BigInt64Array can be waited on, got {s}",
-                .{@"type".typedArrayName()},
-            );
-        }
-    } else {
-        // 4. Else,
-        // a. Let type be TypedArrayElementType(ta).
-        // b. If IsUnclampedIntegerElementType(type) is false and IsBigIntElementType(type) is
-        //    false, throw a TypeError exception.
-        if (!@"type".isUnclampedIntegerElementType() and !@"type".isBigIntElementType()) {
-            return agent.throwException(
-                .type_error,
-                "Atomic operations are only supported on integer typed arrays",
-                .{},
-            );
-        }
+    // 3. Let elementType be TypedArrayElementType(ta).
+    const element_type = typed_array.fields.element_type;
+
+    // 4. If IsNoTearConfiguration(elementType, seq-cst) is false, throw a TypeError exception.
+    if (!element_type.isNoTearConfiguration(.seq_cst)) {
+        return agent.throwException(
+            .type_error,
+            "Atomic operations are only supported on integer typed arrays",
+            .{},
+        );
     }
 
-    // 5. Return taRecord.
+    // 5. If waitable is true and elementType is neither int32 nor bigint64, throw a TypeError
+    //    exception.
+    if (waitable and element_type != .int32 and element_type != .bigint64) {
+        return agent.throwException(
+            .type_error,
+            "Only Int32Array and BigInt64Array can be waited on, got {s}",
+            .{element_type.typedArrayName()},
+        );
+    }
+
+    // 6. Return taRecord.
     return ta;
 }
 
@@ -134,20 +130,16 @@ fn revalidateAtomicAccess(
     typed_array: *const builtins.TypedArray,
     byte_index_in_buffer: u53,
 ) Agent.Error!void {
-    // 1. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(ta, unordered).
-    // 2. NOTE: Bounds checking is not a synchronizing operation when ta's backing buffer is a
+    // 1. NOTE: Bounds checking is not a synchronizing operation when ta's backing buffer is a
     //    growable SharedArrayBuffer.
-    const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .unordered);
 
-    // 3. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
-    if (isTypedArrayOutOfBounds(ta)) {
-        return agent.throwException(.type_error, "Typed array is out of bounds", .{});
-    }
+    // 2. Let taRecord be ? ValidateTypedArrayBounds(ta, unordered).
+    const ta = try validateTypedArrayBounds(agent, typed_array, .unordered);
 
-    // 4. Assert: byteIndexInBuffer ≥ ta.[[ByteOffset]].
+    // 3. Assert: byteIndexInBuffer ≥ ta.[[ByteOffset]].
     std.debug.assert(byte_index_in_buffer >= @intFromEnum(typed_array.fields.byte_offset));
 
-    // 5. If byteIndexInBuffer ≥ taRecord.[[CachedBufferByteLength]], throw a RangeError exception.
+    // 4. If byteIndexInBuffer ≥ taRecord.[[CachedBufferByteLength]], throw a RangeError exception.
     if (byte_index_in_buffer >= @intFromEnum(ta.cached_buffer_byte_length)) {
         return agent.throwException(
             .range_error,
@@ -156,7 +148,7 @@ fn revalidateAtomicAccess(
         );
     }
 
-    // 6. Return unused.
+    // 5. Return unused.
 }
 
 /// 25.4.3.14 DoWait ( mode, ta, index, value, timeout )
@@ -191,13 +183,17 @@ fn doWait(
 
     const typed_array = typed_array_value.asObject().as(builtins.TypedArray);
 
-    // 5. Let arrayTypeName be ta.[[TypedArrayName]].
-    // 6. If arrayTypeName is "BigInt64Array", let expected be ? ToBigInt64(value).
-    // 7. Else, let expected be ? ToInt32(value).
-    const expected = if (typed_array.fields.element_type == .bigint64)
-        Value.from(try BigInt.fromValue(agent, try value.toBigInt64(agent)))
-    else
-        Value.from(try value.toInt32(agent));
+    // 5. Let elementType be TypedArrayElementType(ta).
+    const element_type = typed_array.fields.element_type;
+
+    // 6. Assert: elementType is either bigint64 or int32.
+    // 7. If elementType is bigint64, let expected be ? ToBigInt64(value); else let expected be
+    //    ? ToInt32(value).
+    const expected = switch (element_type) {
+        .bigint64 => Value.from(try BigInt.fromValue(agent, try value.toBigInt64(agent))),
+        .int32 => Value.from(try value.toInt32(agent)),
+        else => unreachable,
+    };
 
     // 8. Let timeoutNumber be ? ToNumber(timeout).
     const timeout_number = try timeout.toNumber(agent);
@@ -244,12 +240,10 @@ fn doWait(
 
     // TODO: 17. Perform EnterCriticalSection(waiterList).
 
-    // 18. Let elementType be TypedArrayElementType(ta).
-    const witness = switch (typed_array.fields.element_type) {
+    // 18. Let witness be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true, seq-cst).
+    const witness = switch (element_type) {
         .uint8_clamped, .float16, .float32, .float64 => unreachable,
         inline else => |@"type"| blk: {
-            // 19. Let witness be GetValueFromBuffer(buffer, byteIndexInBuffer, elementType, true,
-            //     seq-cst).
             const witness = getValueFromBuffer(
                 agent,
                 buffer,
@@ -266,7 +260,7 @@ fn doWait(
         },
     };
 
-    // 20. If expected ≠ witness, then
+    // 19. If expected ≠ witness, then
     if (!sameValue(expected, witness)) {
         // TODO: a. Perform LeaveCriticalSection(waiterList).
 
@@ -291,7 +285,7 @@ fn doWait(
         return Value.from(result_obj);
     }
 
-    // 21. If realTimeout = 0 and mode is async, then
+    // 20. If realTimeout = 0 and mode is async, then
     if (real_timeout == 0 and mode == .async) {
         // a. NOTE: There is no special handling of synchronous immediate timeouts. Asynchronous
         //    immediate timeouts have special handling in order to fail fast and avoid unnecessary
@@ -317,27 +311,27 @@ fn doWait(
         return Value.from(result_obj);
     }
 
-    // TODO: 22-31.
+    // TODO: 21-30.
     const waiter = .{ .result = "timed-out" };
 
-    // 32. If mode is sync, return waiterRecord.[[Result]].
+    // 31. If mode is sync, return waiterRecord.[[Result]].
     if (mode == .sync) return Value.from(waiter.result);
 
-    // 33. Perform ! CreateDataPropertyOrThrow(resultObj, "async", true).
+    // 32. Perform ! CreateDataPropertyOrThrow(resultObj, "async", true).
     try result_obj.createDataPropertyDirect(
         agent,
         PropertyKey.from("async"),
         .true,
     );
 
-    // 34. Perform ! CreateDataPropertyOrThrow(resultObj, "value", promiseCapability.[[Promise]]).
+    // 33. Perform ! CreateDataPropertyOrThrow(resultObj, "value", promiseCapability.[[Promise]]).
     try result_obj.createDataPropertyDirect(
         agent,
         PropertyKey.from("value"),
         Value.from(promise_capability.promise),
     );
 
-    // 35. Return resultObj.
+    // 34. Return resultObj.
     return Value.from(result_obj);
 }
 

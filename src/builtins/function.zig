@@ -555,27 +555,24 @@ pub const prototype = struct {
 
             // b. If targetLength is a Number, then
             if (target_length.isNumber()) {
-                // i. If targetLength is +∞𝔽, then
-                if (target_length.asNumber().isPositiveInf()) {
+                // i. Let targetLengthAsInt be ! ToIntegerOrInfinity(targetLength).
+                const target_length_as_int = target_length.toIntegerOrInfinity(agent) catch unreachable;
+
+                // ii. If targetLengthAsInt = +∞, then
+                if (std.math.isPositiveInf(target_length_as_int)) {
                     // 1. Set length to +∞.
                     length = std.math.inf(f64);
                 }
-                // ii. Else if targetLength is -∞𝔽, then
-                else if (target_length.asNumber().isNegativeInf()) {
+                // iii. Else if targetLengthAsInt = -∞, then
+                else if (std.math.isNegativeInf(target_length_as_int)) {
                     // 1. Set length to 0.
                     length = 0;
                 } else {
-                    // iii. Else,
-                    // 1. Let targetLengthAsInt be ! ToIntegerOrInfinity(targetLength).
-                    const target_length_as_int = target_length.toIntegerOrInfinity(agent) catch unreachable;
-
-                    // 2. Assert: targetLengthAsInt is finite.
-                    std.debug.assert(std.math.isFinite(target_length_as_int));
-
-                    // 3. Let argCount be the number of elements in args.
+                    // iv. Else,
+                    // 1. Let argCount be the number of elements in args.
                     const arg_count = args.len;
 
-                    // 4. Set length to max(targetLengthAsInt - argCount, 0).
+                    // 2. Set length to max(targetLengthAsInt - argCount, 0).
                     length = @max(target_length_as_int - @as(f64, @floatFromInt(arg_count)), 0);
                 }
             }

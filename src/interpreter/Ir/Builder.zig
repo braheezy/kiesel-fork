@@ -461,12 +461,12 @@ fn lowerModule(b: *Builder, module: *const ast.Module) Error!Ir.Inst.Ref {
             // InitializeEnvironment is responsible for creating the bindings.
             .import_declaration => {},
             .export_declaration => |*export_decl| _ = try b.lowerExportDeclaration(export_decl),
-            .statement_list_item => |stmt_list_item| switch (stmt_list_item) {
-                .statement => |stmt| _ = try b.lowerStatement(stmt),
-                .declaration => |decl| {
-                    _ = try b.lowerDeclaration(decl);
-                    if (decl.isUsingDeclaration()) has_using = true;
-                },
+            .statement_list_item => |stmt_list_item| {
+                switch (stmt_list_item) {
+                    .statement => |stmt| _ = try b.lowerStatement(stmt),
+                    .declaration => |decl| _ = try b.lowerDeclaration(decl),
+                }
+                if (stmt_list_item.containsUsing()) has_using = true;
             },
         }
     }

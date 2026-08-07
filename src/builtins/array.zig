@@ -1057,23 +1057,14 @@ pub const prototype = struct {
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
 
-        // 3. Let relativeIndex be ? ToIntegerOrInfinity(index).
-        const relative_index = try index.toIntegerOrInfinity(agent);
+        // 3. Let k be ? ToAbsoluteIndex(index, length).
+        const k_f64 = try index.toAbsoluteIndex(agent, length);
 
-        // 4. If relativeIndex ≥ 0, then
-        //     a. Let k be relativeIndex.
-        // 5. Else,
-        //     a. Let k be length + relativeIndex.
-        const k_f64 = if (relative_index >= 0)
-            relative_index
-        else
-            @as(f64, @floatFromInt(length)) + relative_index;
-
-        // 6. If k < 0 or k ≥ length, return undefined.
+        // 4. If k < 0 or k ≥ length, return undefined.
         if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(length))) return .undefined;
         const k: u53 = @intFromFloat(k_f64);
 
-        // 7. Return ? Get(obj, ! ToString(𝔽(k))).
+        // 5. Return ? Get(obj, ! ToString(𝔽(k))).
         return obj.get(agent, PropertyKey.from(k));
     }
 
@@ -1198,61 +1189,24 @@ pub const prototype = struct {
 
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
-        const length_f64: f64 = @floatFromInt(length);
 
-        // 3. Let relativeTarget be ? ToIntegerOrInfinity(target).
-        const relative_target = try target.toIntegerOrInfinity(agent);
+        // 3. Let to be ? ToClampedIndex(target, length).
+        var to = try target.toClampedIndex(agent, length);
 
-        // 4. If relativeTarget = -∞, let to be 0.
-        const to_f64 = if (std.math.isNegativeInf(relative_target)) blk: {
-            break :blk 0;
-        } else if (relative_target < 0) blk: {
-            // 5. Else if relativeTarget < 0, let to be max(length + relativeTarget, 0).
-            break :blk @max(length_f64 + relative_target, 0);
-        } else blk: {
-            // 6. Else, let to be min(relativeTarget, length).
-            break :blk @min(relative_target, length_f64);
-        };
-        var to: u53 = @intFromFloat(to_f64);
+        // 4. Let from be ? ToClampedIndex(start, length).
+        var from = try start.toClampedIndex(agent, length);
 
-        // 7. Let relativeStart be ? ToIntegerOrInfinity(start).
-        const relative_start = try start.toIntegerOrInfinity(agent);
-
-        // 8. If relativeStart = -∞, let from be 0.
-        const from_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
-            break :blk 0;
-        } else if (relative_start < 0) blk: {
-            // 9. Else if relativeStart < 0, let from be max(length + relativeStart, 0).
-            break :blk @max(length_f64 + relative_start, 0);
-        } else blk: {
-            // 10. Else, let from be min(relativeStart, length).
-            break :blk @min(relative_start, length_f64);
-        };
-        var from: u53 = @intFromFloat(from_f64);
-
-        // 11. If end is undefined, let relativeEnd be length; else let relativeEnd be
-        //     ? ToIntegerOrInfinity(end).
-        const relative_end = if (end.isUndefined())
-            length_f64
+        // 5. If end is undefined, let final be length; else let final be ? ToClampedIndex(end,
+        //    length).
+        const final = if (end.isUndefined())
+            length
         else
-            try end.toIntegerOrInfinity(agent);
+            try end.toClampedIndex(agent, length);
 
-        // 12. If relativeEnd = -∞, let final be 0.
-        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
-            break :blk 0;
-        } else if (relative_end < 0) blk: {
-            // 13. Else if relativeEnd < 0, let final be max(length + relativeEnd, 0).
-            break :blk @max(length_f64 + relative_end, 0);
-        } else blk: {
-            // 14. Else, let final be min(relativeEnd, length).
-            break :blk @min(relative_end, length_f64);
-        };
-        const final: u53 = @intFromFloat(final_f64);
-
-        // 15. Let count be min(final - from, length - to).
+        // 6. Let count be min(final - from, length - to).
         var count = @min(final -| from, length -| to);
 
-        // 16. If from < to and to < from + count, then
+        // 7. If from < to and to < from + count, then
         const direction: i2 = if (from < to and to < (from + count)) blk: {
             // b. Set from to from + count - 1.
             from = from + count - 1;
@@ -1263,12 +1217,12 @@ pub const prototype = struct {
             // a. Let direction be -1.
             break :blk -1;
         } else blk: {
-            // 17. Else,
+            // 8. Else,
             // a. Let direction be 1.
             break :blk 1;
         };
 
-        // 18. Repeat, while count > 0,
+        // 9. Repeat, while count > 0,
         while (count > 0) : ({
             if (direction == 1) from += 1 else from -|= 1;
             if (direction == 1) to += 1 else to -|= 1;
@@ -1304,7 +1258,7 @@ pub const prototype = struct {
             // h. Set count to count - 1.
         }
 
-        // 19. Return obj.
+        // 10. Return obj.
         return Value.from(obj);
     }
 
@@ -1395,41 +1349,16 @@ pub const prototype = struct {
 
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
-        const length_f64: f64 = @floatFromInt(length);
 
-        // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
-        const relative_start = try start.toIntegerOrInfinity(agent);
+        // 3. Let k be ? ToClampedIndex(start, length).
+        var k = try start.toClampedIndex(agent, length);
 
-        // 4. If relativeStart = -∞, let k be 0.
-        const k_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
-            break :blk 0;
-        } else if (relative_start < 0) blk: {
-            // 5. Else if relativeStart < 0, let k be max(length + relativeStart, 0).
-            break :blk @max(length_f64 + relative_start, 0);
-        } else blk: {
-            // 6. Else, let k be min(relativeStart, length).
-            break :blk @min(relative_start, length_f64);
-        };
-        var k: u53 = @intFromFloat(k_f64);
-
-        // 7. If end is undefined, let relativeEnd be length; else let relativeEnd be
-        //    ? ToIntegerOrInfinity(end).
-        const relative_end = if (end.isUndefined())
-            length_f64
+        // 4. If end is undefined, let final be length; else let final be ? ToClampedIndex(end,
+        //    length).
+        const final = if (end.isUndefined())
+            length
         else
-            try end.toIntegerOrInfinity(agent);
-
-        // 8. If relativeEnd = -∞, let final be 0.
-        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
-            break :blk 0;
-        } else if (relative_end < 0) blk: {
-            // 9. Else if relativeEnd < 0, let final be max(length + relativeEnd, 0).
-            break :blk @max(length_f64 + relative_end, 0);
-        } else blk: {
-            // 10. Else, let final be min(relativeEnd, length).
-            break :blk @min(relative_end, length_f64);
-        };
-        const final: u53 = @intFromFloat(final_f64);
+            try end.toClampedIndex(agent, length);
 
         // OPTIMIZATION: Use fast path if applicable
         if (try array_fast_paths.fill(
@@ -1443,7 +1372,7 @@ pub const prototype = struct {
             return Value.from(obj);
         }
 
-        // 11. Repeat, while k < final,
+        // 5. Repeat, while k < final,
         while (k < final) : (k += 1) {
             // a. Let propertyKey be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
@@ -1454,7 +1383,7 @@ pub const prototype = struct {
             // c. Set k to k + 1.
         }
 
-        // 12. Return obj.
+        // 6. Return obj.
         return Value.from(obj);
     }
 
@@ -1883,33 +1812,15 @@ pub const prototype = struct {
         // 3. If length = 0, return false.
         if (length == 0) return .false;
 
-        // 4. Let startIndex be ? ToIntegerOrInfinity(fromIndex).
-        var start_index = try from_index.toIntegerOrInfinity(agent);
-
-        // 5. Assert: If fromIndex is undefined, then startIndex is 0.
-        if (from_index.isUndefined()) std.debug.assert(start_index == 0);
-
-        // 6. If startIndex = +∞, return false.
-        if (std.math.isPositiveInf(start_index)) return .false;
-
-        // 7. If startIndex = -∞, set startIndex to 0.
-        if (std.math.isNegativeInf(start_index)) start_index = 0;
-
-        // 8. If startIndex ≥ 0, then
-        //     a. Let k be startIndex.
-        // 9. Else,
-        //     a. Let k be length + startIndex.
-        //     b. If k < 0, set k to 0.
-        const k_f64 = if (start_index >= 0) start_index else @max(@as(f64, @floatFromInt(length)) + start_index, 0);
-        if (k_f64 >= std.math.maxInt(u53)) return .false;
-        var k: u53 = @intFromFloat(k_f64);
+        // 4. Let k be ? ToClampedIndex(fromIndex, length).
+        var k = try from_index.toClampedIndex(agent, length);
 
         // OPTIMIZATION: Use fast path if applicable
         if (array_fast_paths.includes(obj, length, k, search_element)) |result| {
             return Value.from(result);
         }
 
-        // 10. Repeat, while k < length,
+        // 5. Repeat, while k < length,
         while (k < length) : (k += 1) {
             // a. Let elementK be ? Get(obj, ! ToString(𝔽(k))).
             const element_k = try obj.get(agent, PropertyKey.from(k));
@@ -1920,7 +1831,7 @@ pub const prototype = struct {
             // c. Set k to k + 1.
         }
 
-        // 11. Return false.
+        // 6. Return false.
         return .false;
     }
 
@@ -1939,33 +1850,15 @@ pub const prototype = struct {
         // 3. If length = 0, return -1𝔽.
         if (length == 0) return Value.from(-1);
 
-        // 4. Let startIndex be ? ToIntegerOrInfinity(fromIndex).
-        var start_index = try from_index.toIntegerOrInfinity(agent);
-
-        // 5. Assert: If fromIndex is undefined, then startIndex is 0.
-        if (from_index.isUndefined()) std.debug.assert(start_index == 0);
-
-        // 6. If startIndex = +∞, return -1𝔽.
-        if (std.math.isPositiveInf(start_index)) return Value.from(-1);
-
-        // 7. If startIndex = -∞, set startIndex to 0.
-        if (std.math.isNegativeInf(start_index)) start_index = 0;
-
-        // 8. If startIndex ≥ 0, then
-        //     a. Let k be startIndex.
-        // 9. Else,
-        //     a. Let k be length + startIndex.
-        //     b. If k < 0, set k to 0.
-        const k_f64 = if (start_index >= 0) start_index else @max(@as(f64, @floatFromInt(length)) + start_index, 0);
-        if (k_f64 >= std.math.maxInt(u53)) return Value.from(-1);
-        var k: u53 = @intFromFloat(k_f64);
+        // 4. Let k be ? ToClampedIndex(fromIndex, length).
+        var k = try from_index.toClampedIndex(agent, length);
 
         // OPTIMIZATION: Use fast path if applicable
         if (array_fast_paths.indexOf(obj, length, k, search_element)) |result| {
             return result;
         }
 
-        // 10. Repeat, while k < length,
+        // 5. Repeat, while k < length,
         while (k < length) : (k += 1) {
             // a. Let propertyKey be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
@@ -1985,7 +1878,7 @@ pub const prototype = struct {
             // d. Set k to k + 1.
         }
 
-        // 11. Return -1𝔽.
+        // 6. Return -1𝔽.
         return Value.from(-1);
     }
 
@@ -2069,33 +1962,22 @@ pub const prototype = struct {
         // 3. If length = 0, return -1𝔽.
         if (length == 0) return Value.from(-1);
 
-        // 4. If fromIndex is present, let startIndex be ? ToIntegerOrInfinity(fromIndex); else let
-        //    startIndex be length - 1.
-        const start_index = if (arguments.count() > 1)
-            try from_index.toIntegerOrInfinity(agent)
-        else
-            @as(f64, @floatFromInt(length)) - 1;
-
-        // 5. If startIndex = -∞, return -1𝔽.
-        if (std.math.isNegativeInf(start_index)) return Value.from(-1);
-
-        // 6. If startIndex ≥ 0, then
-        //     a. Let k be min(startIndex, length - 1).
-        // 7. Else,
-        //     a. Let k be length + startIndex.
-        const k_f64 = if (start_index >= 0)
-            @min(start_index, @as(f64, @floatFromInt(length)) - 1)
-        else
-            @as(f64, @floatFromInt(length)) + start_index;
-        if (k_f64 < 0) return Value.from(-1);
-        var k: u53 = @intFromFloat(k_f64);
+        // 4. If fromIndex is not present, let k be length - 1; else let k be min(? ToAbsoluteIndex(
+        //    fromIndex, length), length - 1).
+        var k = if (arguments.count() <= 1)
+            length - 1
+        else blk: {
+            const absolute = try from_index.toAbsoluteIndex(agent, length);
+            if (absolute < 0) return Value.from(-1);
+            break :blk @as(u53, @intFromFloat(@min(absolute, @as(f64, @floatFromInt(length - 1)))));
+        };
 
         // OPTIMIZATION: Use fast path if applicable
         if (array_fast_paths.lastIndexOf(obj, length, k, search_element)) |result| {
             return result;
         }
 
-        // 8. Repeat, while k ≥ 0,
+        // 5. Repeat, while k ≥ 0,
         while (k >= 0) : (k -|= 1) {
             // a. Let propertyKey be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
@@ -2116,7 +1998,7 @@ pub const prototype = struct {
             if (k == 0) break;
         }
 
-        // 9. Return -1𝔽.
+        // 6. Return -1𝔽.
         return Value.from(-1);
     }
 
@@ -2618,52 +2500,27 @@ pub const prototype = struct {
 
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
-        const length_f64: f64 = @floatFromInt(length);
 
-        // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
-        const relative_start = try start.toIntegerOrInfinity(agent);
+        // 3. Let k be ? ToClampedIndex(start, length).
+        var k = try start.toClampedIndex(agent, length);
 
-        // 4. If relativeStart = -∞, let k be 0.
-        const k_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
-            break :blk 0;
-        } else if (relative_start < 0) blk: {
-            // 5. Else if relativeStart < 0, let k be max(length + relativeStart, 0).
-            break :blk @max(length_f64 + relative_start, 0);
-        } else blk: {
-            // 6. Else, let k be min(relativeStart, length).
-            break :blk @min(relative_start, length_f64);
-        };
-        var k: u53 = @intFromFloat(k_f64);
-
-        // 7. If end is undefined, let relativeEnd be length; else let relativeEnd be
-        //    ? ToIntegerOrInfinity(end).
-        const relative_end = if (end.isUndefined())
-            length_f64
+        // 4. If end is undefined, let final be length; else let final be ? ToClampedIndex(end,
+        //    length).
+        const final = if (end.isUndefined())
+            length
         else
-            try end.toIntegerOrInfinity(agent);
+            try end.toClampedIndex(agent, length);
 
-        // 8. If relativeEnd = -∞, let final be 0.
-        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
-            break :blk 0;
-        } else if (relative_end < 0) blk: {
-            // 9. Else if relativeEnd < 0, let final be max(length + relativeEnd, 0).
-            break :blk @max(length_f64 + relative_end, 0);
-        } else blk: {
-            // 10. Else, let final be min(relativeEnd, length).
-            break :blk @min(relative_end, length_f64);
-        };
-        const final: u53 = @intFromFloat(final_f64);
+        // 5. Let count be max(final - k, 0).
+        const count = final -| k;
 
-        // 11. Let count be max(final - k, 0).
-        const count: u53 = @intFromFloat(@max(final_f64 - k_f64, 0));
-
-        // 12. Let array be ? ArraySpeciesCreate(obj, count).
+        // 6. Let array be ? ArraySpeciesCreate(obj, count).
         const array = try arraySpeciesCreate(agent, obj, count);
 
-        // 13. Let resultIndex be 0.
+        // 7. Let resultIndex be 0.
         var result_index: u53 = 0;
 
-        // 14. Repeat, while k < final,
+        // 8. Repeat, while k < final,
         while (k < final) : ({
             k += 1;
             result_index += 1;
@@ -2688,10 +2545,10 @@ pub const prototype = struct {
             // e. Set resultIndex to resultIndex + 1.
         }
 
-        // 15. Perform ? Set(array, "length", 𝔽(resultIndex), true).
+        // 9. Perform ? Set(array, "length", 𝔽(resultIndex), true).
         try array.set(agent, PropertyKey.from("length"), Value.from(result_index), .throw);
 
-        // 16. Return array.
+        // 10. Return array.
         return Value.from(array);
     }
 
@@ -2830,8 +2687,8 @@ pub const prototype = struct {
     /// 23.1.3.31 Array.prototype.splice ( start, deleteCount, ...items )
     /// https://tc39.es/ecma262/#sec-array.prototype.splice
     fn splice(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const start = arguments.getOrNull(0);
-        const delete_count = arguments.getOrNull(1);
+        const start = arguments.get(0);
+        const delete_count = arguments.get(1);
         const items = if (arguments.count() <= 2) &[_]Value{} else arguments.values[2..];
 
         // 1. Let obj be ? ToObject(this value).
@@ -2839,58 +2696,46 @@ pub const prototype = struct {
 
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
-        const length_f64: f64 = @floatFromInt(length);
 
-        // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
-        const relative_start = if (start) |s| try s.toIntegerOrInfinity(agent) else 0;
+        // 3. Let actualStart be ? ToClampedIndex(start, length).
+        const actual_start = try start.toClampedIndex(agent, length);
 
-        // 4. If relativeStart = -∞, let actualStart be 0.
-        const actual_start_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
-            break :blk 0;
-        } else if (relative_start < 0) blk: {
-            // 5. Else if relativeStart < 0, let actualStart be max(length + relativeStart, 0).
-            break :blk @max(length_f64 + relative_start, 0);
-        } else blk: {
-            // 6. Else, let actualStart be min(relativeStart, length).
-            break :blk @min(relative_start, length_f64);
-        };
-        const actual_start: u53 = @intFromFloat(actual_start_f64);
-
-        // 7. Let itemCount be the number of elements in items.
+        // 4. Let itemCount be the number of elements in items.
         const item_count: u53 = @intCast(items.len);
 
-        // 8. If start is not present, then
-        const actual_delete_count = if (start == null) blk: {
+        // 5. If start is not present, then
+        const actual_delete_count = if (arguments.count() == 0) blk: {
             // a. Let actualDeleteCount be 0.
             break :blk 0;
-        } else if (delete_count == null) blk: {
-            // 9. Else if deleteCount is not present, then
+        } else if (arguments.count() == 1) blk: {
+            // 6. Else if deleteCount is not present, then
             // a. Let actualDeleteCount be length - actualStart.
+            // b. Assert: actualDeleteCount ≥ 0.
             break :blk length - actual_start;
         } else blk: {
-            // 10. Else,
+            // 7. Else,
             // a. Let dc be ? ToIntegerOrInfinity(deleteCount).
-            const delete_count_f64 = try delete_count.?.toIntegerOrInfinity(agent);
+            const dc = try delete_count.toIntegerOrInfinity(agent);
 
             // b. Let actualDeleteCount be the result of clamping dc between 0 and
             //    length - actualStart.
             break :blk @as(u53, @intFromFloat(
-                std.math.clamp(delete_count_f64, 0, length_f64 - actual_start_f64),
+                std.math.clamp(dc, 0, @as(f64, @floatFromInt(length - actual_start))),
             ));
         };
 
-        // 11. If length + itemCount - actualDeleteCount > 2**53 - 1, throw a TypeError exception.
+        // 8. If length + itemCount - actualDeleteCount > 2**53 - 1, throw a TypeError exception.
         _ = std.math.add(u53, length - actual_delete_count, item_count) catch {
             return agent.throwException(.type_error, "Maximum array length exceeded", .{});
         };
 
-        // 12. Let deletedArray be ? ArraySpeciesCreate(obj, actualDeleteCount).
+        // 9. Let deletedArray be ? ArraySpeciesCreate(obj, actualDeleteCount).
         const deleted_array = try arraySpeciesCreate(agent, obj, actual_delete_count);
 
-        // 13. Let k be 0.
+        // 10. Let k be 0.
         var k: u53 = 0;
 
-        // 14. Repeat, while k < actualDeleteCount,
+        // 11. Repeat, while k < actualDeleteCount,
         while (k < actual_delete_count) : (k += 1) {
             // a. Let from be ! ToString(𝔽(actualStart + k)).
             const from = PropertyKey.from(actual_start + k);
@@ -2908,10 +2753,10 @@ pub const prototype = struct {
             // c. Set k to k + 1.
         }
 
-        // 15. Perform ? Set(deletedArray, "length", 𝔽(actualDeleteCount), true).
+        // 12. Perform ? Set(deletedArray, "length", 𝔽(actualDeleteCount), true).
         try deleted_array.set(agent, PropertyKey.from("length"), Value.from(actual_delete_count), .throw);
 
-        // 16. If itemCount < actualDeleteCount, then
+        // 13. If itemCount < actualDeleteCount, then
         if (item_count < actual_delete_count) {
             // a. Set k to actualStart.
             k = actual_start;
@@ -2951,7 +2796,7 @@ pub const prototype = struct {
                 // ii. Set k to k - 1.
             }
         }
-        // 17. Else if itemCount > actualDeleteCount, then
+        // 14. Else if itemCount > actualDeleteCount, then
         else if (item_count > actual_delete_count) {
             // a. Set k to (length - actualDeleteCount).
             k = length - actual_delete_count;
@@ -2981,10 +2826,10 @@ pub const prototype = struct {
             }
         }
 
-        // 18. Set k to actualStart.
+        // 15. Set k to actualStart.
         k = actual_start;
 
-        // 19. For each element item of items, do
+        // 16. For each element item of items, do
         for (items) |item| {
             // a. Perform ? Set(obj, ! ToString(𝔽(k)), item, true).
             try obj.set(agent, PropertyKey.from(k), item, .throw);
@@ -2993,7 +2838,7 @@ pub const prototype = struct {
             k += 1;
         }
 
-        // 20. Perform ? Set(obj, "length", 𝔽(length - actualDeleteCount + itemCount), true).
+        // 17. Perform ? Set(obj, "length", 𝔽(length - actualDeleteCount + itemCount), true).
         try obj.set(
             agent,
             PropertyKey.from("length"),
@@ -3001,7 +2846,7 @@ pub const prototype = struct {
             .throw,
         );
 
-        // 21. Return deletedArray.
+        // 18. Return deletedArray.
         return Value.from(deleted_array);
     }
 
@@ -3219,8 +3064,8 @@ pub const prototype = struct {
     /// 23.1.3.35 Array.prototype.toSpliced ( start, skipCount, ...items )
     /// https://tc39.es/ecma262/#sec-array.prototype.tospliced
     fn toSpliced(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const start = arguments.getOrNull(0);
-        const skip_count = arguments.getOrNull(1);
+        const start = arguments.get(0);
+        const skip_count = arguments.get(1);
         const items = if (arguments.count() <= 2) &[_]Value{} else arguments.values[2..];
 
         // 1. Let obj be ? ToObject(this value).
@@ -3228,62 +3073,50 @@ pub const prototype = struct {
 
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
-        const length_f64: f64 = @floatFromInt(length);
 
-        // 3. Let relativeStart be ? ToIntegerOrInfinity(start).
-        const relative_start = if (start) |s| try s.toIntegerOrInfinity(agent) else 0;
+        // 3. Let actualStart be ? ToClampedIndex(start, length).
+        const actual_start = try start.toClampedIndex(agent, length);
 
-        // 4. If relativeStart = -∞, let actualStart be 0.
-        const actual_start_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
-            break :blk 0;
-        } else if (relative_start < 0) blk: {
-            // 5. Else if relativeStart < 0, let actualStart be max(length + relativeStart, 0).
-            break :blk @max(length_f64 + relative_start, 0);
-        } else blk: {
-            // 6. Else, let actualStart be min(relativeStart, length).
-            break :blk @min(relative_start, length_f64);
-        };
-        const actual_start: u53 = @intFromFloat(actual_start_f64);
-
-        // 7. Let insertCount be the number of elements in items.
+        // 4. Let insertCount be the number of elements in items.
         const insert_count: u53 = @intCast(items.len);
 
-        // 8. If start is not present, then
-        const actual_skip_count = if (start == null) blk: {
+        // 5. Let maxSkipCount be length - actualStart.
+        const max_skip_count = length - actual_start;
+
+        // 6. If start is not present, then
+        const actual_skip_count = if (arguments.count() == 0) blk: {
             // a. Let actualSkipCount be 0.
             break :blk 0;
-        } else if (skip_count == null) blk: {
-            // 9. Else if skipCount is not present, then
-            // a. Let actualSkipCount be length - actualStart.
-            break :blk length - actual_start;
+        } else if (arguments.count() == 1) blk: {
+            // 7. Else if skipCount is not present, then
+            // a. Let actualSkipCount be maxSkipCount.
+            break :blk max_skip_count;
         } else blk: {
-            // 10. Else,
-            // a. Let sc be ? ToIntegerOrInfinity(skipCount).
-            const skip_count_f64 = try skip_count.?.toIntegerOrInfinity(agent);
-
-            // b. Let actualSkipCount be the result of clamping sc between 0 and
-            //    length - actualStart.
+            // 8. Else,
+            // a. Let actualSkipCount be the result of clamping ? ToIntegerOrInfinity(skipCount)
+            //    between 0 and maxSkipCount.
             break :blk @as(u53, @intFromFloat(
-                std.math.clamp(skip_count_f64, 0, length_f64 - actual_start_f64),
+                std.math.clamp(try skip_count.toIntegerOrInfinity(agent), 0, @as(f64, @floatFromInt(max_skip_count))),
             ));
         };
 
-        // 11. Let newLength be length + insertCount - actualSkipCount.
-        // 12. If newLength > 2**53 - 1, throw a TypeError exception.
+        // 9. Let newLength be length + insertCount - actualSkipCount.
+        // 10. Assert: newLength ≥ 0.
+        // 11. If newLength > 2**53 - 1, throw a TypeError exception.
         const new_length = std.math.add(u53, length - actual_skip_count, insert_count) catch {
             return agent.throwException(.type_error, "Maximum array length exceeded", .{});
         };
 
-        // 13. Let newArray be ? ArrayCreate(newLength).
+        // 12. Let newArray be ? ArrayCreate(newLength).
         const new_array = try arrayCreate(agent, new_length, null);
 
-        // 14. Let writeIndex be 0.
+        // 13. Let writeIndex be 0.
         var write_index: u53 = 0;
 
-        // 15. Let readIndex be actualStart + actualSkipCount.
+        // 14. Let readIndex be actualStart + actualSkipCount.
         var read_index = actual_start + actual_skip_count;
 
-        // 16. Repeat, while writeIndex < actualStart,
+        // 15. Repeat, while writeIndex < actualStart,
         while (write_index < actual_start) : (write_index += 1) {
             // a. Let propertyKey be ! ToString(𝔽(writeIndex)).
             const property_key = PropertyKey.from(write_index);
@@ -3297,7 +3130,7 @@ pub const prototype = struct {
             // d. Set writeIndex to writeIndex + 1.
         }
 
-        // 17. For each element item of items, do
+        // 16. For each element item of items, do
         for (items) |item| {
             // a. Let propertyKey be ! ToString(𝔽(writeIndex)).
             const property_key = PropertyKey.from(write_index);
@@ -3309,7 +3142,7 @@ pub const prototype = struct {
             write_index += 1;
         }
 
-        // 18. Repeat, while writeIndex < newLength,
+        // 17. Repeat, while writeIndex < newLength,
         while (write_index < new_length) : ({
             write_index += 1;
             read_index += 1;
@@ -3330,7 +3163,7 @@ pub const prototype = struct {
             // f. Set readIndex to readIndex + 1.
         }
 
-        // 19. Return newArray.
+        // 18. Return newArray.
         return Value.from(&new_array.object);
     }
 
@@ -3458,29 +3291,22 @@ pub const prototype = struct {
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
 
-        // 3. Let relativeIndex be ? ToIntegerOrInfinity(index).
-        const relative_index = try index.toIntegerOrInfinity(agent);
+        // 3. Let actualIndex be ? ToAbsoluteIndex(index, length).
+        const actual_index_f64 = try index.toAbsoluteIndex(agent, length);
 
-        // 4. If relativeIndex ≥ 0, let actualIndex be relativeIndex.
-        // 5. Else, let actualIndex be length + relativeIndex.
-        const actual_index_f64 = if (relative_index >= 0)
-            relative_index
-        else
-            @as(f64, @floatFromInt(length)) + relative_index;
-
-        // 6. If actualIndex ≥ length or actualIndex < 0, throw a RangeError exception.
-        if (actual_index_f64 >= @as(f64, @floatFromInt(length)) or actual_index_f64 < 0) {
+        // 4. If actualIndex < 0 or actualIndex ≥ length, throw a RangeError exception.
+        if (actual_index_f64 < 0 or actual_index_f64 >= @as(f64, @floatFromInt(length))) {
             return agent.throwException(.range_error, "Index is out of array bounds", .{});
         }
         const actual_index: u53 = @intFromFloat(actual_index_f64);
 
-        // 7. Let array be ? ArrayCreate(length).
+        // 5. Let array be ? ArrayCreate(length).
         const array = try arrayCreate(agent, length, null);
 
-        // 8. Let k be 0.
+        // 6. Let k be 0.
         var k: u53 = 0;
 
-        // 9. Repeat, while k < length,
+        // 7. Repeat, while k < length,
         while (k < length) : (k += 1) {
             // a. Let propertyKey be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
@@ -3498,7 +3324,7 @@ pub const prototype = struct {
             // e. Set k to k + 1.
         }
 
-        // 10. Return array.
+        // 8. Return array.
         return Value.from(&array.object);
     }
 };

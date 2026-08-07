@@ -573,7 +573,7 @@ pub const prototype = struct {
 
         // 4. Let parts be PartitionDurationFormatPattern(df, record).
         // 5. Let result be the empty String.
-        // 6. For each Record { [[Type]], [[Value]], [[Unit]] } part in parts, do
+        // 6. For each Record { [[Type]], [[Value]], [[Unit]] } part of parts, do
         //    a. Set result to the string-concatenation of result and part.[[Value]].
         // 7. Return result.
         // TODO: This is blocked on missing C APIs in ICU4X. https://github.com/unicode-org/icu4x/issues/801

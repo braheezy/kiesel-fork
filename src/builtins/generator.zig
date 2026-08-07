@@ -237,16 +237,19 @@ pub fn generatorStart(
                     //    associated with acGen can be discarded at this point.
                     closure_gen.fields.evaluation_state = undefined;
 
-                    // i. If result is a normal completion, then
-                    //     i. Let resultValue be undefined.
-                    // j. Else if result is a return completion, then
-                    //     i. Let resultValue be result.[[Value]].
-                    // k. Else,
-                    //     i. Assert: result is a throw completion.
-                    //     ii. Return ? result.
+                    // i. If result is a throw completion, then
+                    //     i. Let resumption be result.
+                    // j. Else,
+                    //     i. If result is a normal completion, then
+                    //         1. Let resultValue be undefined.
+                    //     ii. Else if result is a return completion, then
+                    //         1. Let resultValue be result.[[Value]].
+                    //     iii. Let resumption be NormalCompletion(CreateIteratorResultObject(
+                    //          resultValue, true)).
+                    // k. Let callerContext be the running execution context.
+                    // l. Resume callerContext, passing resumption.
+                    // m. Assert: This step is never reached.
                     const result_value: Value = value orelse .undefined;
-
-                    // l. Return NormalCompletion(CreateIteratorResultObject(resultValue, true)).
                     return createIteratorResultObject(agent_, result_value, true);
                 },
             }

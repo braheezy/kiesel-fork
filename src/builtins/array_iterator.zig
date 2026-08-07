@@ -16,10 +16,9 @@ const Realm = execution.Realm;
 const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createIteratorResultObject = types.createIteratorResultObject;
-const isTypedArrayOutOfBounds = builtins.isTypedArrayOutOfBounds;
-const makeTypedArrayWithBufferWitnessRecord = builtins.makeTypedArrayWithBufferWitnessRecord;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const typedArrayLength = builtins.typedArrayLength;
+const validateTypedArrayBounds = builtins.validateTypedArrayBounds;
 
 /// 23.1.5.1 CreateArrayIterator ( array, kind )
 /// https://tc39.es/ecma262/#sec-createarrayiterator
@@ -102,18 +101,14 @@ pub const prototype = struct {
 
         // 8. If array has a [[TypedArrayName]] internal slot, then
         const length = if (array.cast(builtins.TypedArray)) |typed_array| blk: {
-            // a. Let taRecord be MakeTypedArrayWithBufferWitnessRecord(array, seq-cst).
-            const ta = makeTypedArrayWithBufferWitnessRecord(
+            // a. Let taRecord be ? ValidateTypedArrayBounds(array, seq-cst).
+            const ta = try validateTypedArrayBounds(
+                agent,
                 typed_array,
                 .seq_cst,
             );
 
-            // b. If IsTypedArrayOutOfBounds(taRecord) is true, throw a TypeError exception.
-            if (isTypedArrayOutOfBounds(ta)) {
-                return agent.throwException(.type_error, "Typed array is out of bounds", .{});
-            }
-
-            // c. Let length be TypedArrayLength(taRecord).
+            // b. Let length be TypedArrayLength(taRecord).
             break :blk @intFromEnum(typedArrayLength(ta));
         } else blk: {
             // 9. Else,

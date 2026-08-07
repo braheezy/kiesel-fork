@@ -260,5 +260,6 @@ pub const typedArrayLength = typed_array.typedArrayLength;
 pub const validateNonRevokedProxy = proxy.validateNonRevokedProxy;
 pub const validateTemporalUnitValue = temporal.validateTemporalUnitValue;
 pub const validateTypedArray = typed_array.validateTypedArray;
+pub const validateTypedArrayBounds = typed_array.validateTypedArrayBounds;
 pub const weakRefDeref = weak_ref.weakRefDeref;
 pub const yield = generator.yield;

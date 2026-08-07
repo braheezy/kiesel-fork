@@ -1384,11 +1384,11 @@ pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
     // 1. Let length be ? ToIntegerOrInfinity(arg).
     const length = try self.toIntegerOrInfinity(agent);
 
-    // 2. If length ≤ 0, return +0𝔽.
-    if (length <= 0) return 0;
+    // 2. Let clampedLen be the result of clamping length between 0 and 2**53 - 1.
+    const clamped_length = std.math.clamp(length, 0, std.math.maxInt(u53));
 
-    // 3. Return 𝔽(min(length, 2**53 - 1)).
-    return @intFromFloat(@min(length, std.math.maxInt(u53)));
+    // 3. Return 𝔽(clampedLen).
+    return @intFromFloat(clamped_length);
 }
 
 /// 7.1.23 ToIndex ( arg )
@@ -1409,6 +1409,31 @@ pub fn toIndex(arg: Value, agent: *Agent) Agent.Error!u53 {
 
     // 3. Return int.
     return @intFromFloat(int);
+}
+
+/// 7.1.24 ToAbsoluteIndex ( value, length )
+/// https://tc39.es/ecma262/#sec-toabsoluteindex
+pub fn toAbsoluteIndex(value: Value, agent: *Agent, length: u53) Agent.Error!f64 {
+    // 1. Let int be ? ToIntegerOrInfinity(value).
+    var int = try value.toIntegerOrInfinity(agent);
+
+    // 2. If int is finite and int < 0, set int to length + int.
+    if (std.math.isFinite(int) and int < 0) {
+        int = @as(f64, @floatFromInt(length)) + int;
+    }
+
+    // 3. Return int.
+    return int;
+}
+
+/// 7.1.25 ToClampedIndex ( value, length )
+/// https://tc39.es/ecma262/#sec-toclampedindex
+pub fn toClampedIndex(value: Value, agent: *Agent, length: u53) Agent.Error!u53 {
+    // 1. Let index be ? ToAbsoluteIndex(value, length).
+    const index = try value.toAbsoluteIndex(agent, length);
+
+    // 2. Return the result of clamping index between 0 and length.
+    return std.math.clamp(std.math.lossyCast(u53, index), 0, length);
 }
 
 /// 7.2.1 RequireObjectCoercible ( arg )

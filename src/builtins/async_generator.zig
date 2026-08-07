@@ -409,7 +409,9 @@ pub fn asyncGeneratorStart(
                     // k. Perform AsyncGeneratorDrainQueue(acGen).
                     try asyncGeneratorDrainQueue(agent_, closure_gen);
 
-                    // l. Return NormalCompletion(undefined).
+                    // l. Let callerContext be the running execution context.
+                    // m. Resume callerContext, passing NormalCompletion(undefined).
+                    // n. Assert: This step is never reached.
                     return;
                 },
             }

@@ -948,63 +948,37 @@ pub const prototype = struct {
 
         // 5. Let length be obj.[[ArrayBufferByteLength]].
         const length = @intFromEnum(array_buffer.fields.byte_length);
-        const length_f64: f64 = @floatFromInt(length);
 
-        // 6. Let relativeStart be ? ToIntegerOrInfinity(start).
-        const relative_start = try start.toIntegerOrInfinity(agent);
+        // 6. Let first be ? ToClampedIndex(start, length).
+        const first = try start.toClampedIndex(agent, length);
 
-        // 7. If relativeStart = -∞, let first be 0.
-        const first_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
-            break :blk 0;
-        } else if (relative_start < 0) blk: {
-            // 8. Else if relativeStart < 0, let first be max(length + relativeStart, 0).
-            break :blk @max(length_f64 + relative_start, 0);
-        } else blk: {
-            // 9. Else, let first be min(relativeStart, length).
-            break :blk @min(relative_start, length_f64);
-        };
-        const first: u53 = @intFromFloat(first_f64);
-
-        // 10. If end is undefined, let relativeEnd be length; else let relativeEnd be
-        //     ? ToIntegerOrInfinity(end).
-        const relative_end = if (end.isUndefined())
-            length_f64
+        // 7. If end is undefined, let final be length; else let final be ? ToClampedIndex(end,
+        //    length).
+        const final = if (end.isUndefined())
+            length
         else
-            try end.toIntegerOrInfinity(agent);
+            try end.toClampedIndex(agent, length);
 
-        // 11. If relativeEnd = -∞, let final be 0.
-        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
-            break :blk 0;
-        } else if (relative_end < 0) blk: {
-            // 12. Else if relativeEnd < 0, let final be max(length + relativeEnd, 0).
-            break :blk @max(length_f64 + relative_end, 0);
-        } else blk: {
-            // 13. Else, let final be min(relativeEnd, length).
-            break :blk @min(relative_end, length_f64);
-        };
+        // 8. Let newLength be max(final - first, 0).
+        const new_length: ByteLength = @enumFromInt(final -| first);
 
-        // 14. Let newLength be max(final - first, 0).
-        const new_length: ByteLength = @enumFromInt(
-            @as(u53, @intFromFloat(@max(final_f64 - first_f64, 0))),
-        );
-
-        // 15. Let ctor be ? SpeciesConstructor(obj, %ArrayBuffer%).
+        // 9. Let ctor be ? SpeciesConstructor(obj, %ArrayBuffer%).
         const ctor = try array_buffer.object.speciesConstructor(
             agent,
             try realm.intrinsic(.array_buffer),
         );
 
-        // 16. Let new be ? Construct(ctor, « 𝔽(newLength) »).
+        // 10. Let new be ? Construct(ctor, « 𝔽(newLength) »).
         const new_object = try ctor.construct(
             agent,
             &.{Value.from(@intFromEnum(new_length))},
             null,
         );
 
-        // 17. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
+        // 11. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
         const new = try Value.from(new_object).requireInternalSlot(agent, ArrayBuffer);
 
-        // 18. If IsSharedArrayBuffer(new) is true, throw a TypeError exception.
+        // 12. If IsSharedArrayBuffer(new) is true, throw a TypeError exception.
         if (isSharedArrayBuffer(new)) {
             return agent.throwException(
                 .type_error,
@@ -1013,12 +987,12 @@ pub const prototype = struct {
             );
         }
 
-        // 19. If IsDetachedBuffer(new) is true, throw a TypeError exception.
+        // 13. If IsDetachedBuffer(new) is true, throw a TypeError exception.
         if (isDetachedBuffer(new)) {
             return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
 
-        // 20. If SameValue(new, obj) is true, throw a TypeError exception.
+        // 14. If SameValue(new, obj) is true, throw a TypeError exception.
         if (new == array_buffer) {
             return agent.throwException(
                 .type_error,
@@ -1027,36 +1001,39 @@ pub const prototype = struct {
             );
         }
 
-        // 21. If new.[[ArrayBufferByteLength]] < newLength, throw a TypeError exception.
+        // 15. If new.[[ArrayBufferByteLength]] < newLength, throw a TypeError exception.
         if (@intFromEnum(new.fields.byte_length) < @intFromEnum(new_length)) {
             return agent.throwException(.type_error, "ArrayBuffer is too small", .{});
         }
 
-        // 22. NOTE: Side-effects of the above steps may have detached or resized obj.
-        // 23. If IsDetachedBuffer(obj) is true, throw a TypeError exception.
+        // 16. NOTE: Side-effects of the above steps may have detached or resized obj.
+        // 17. If IsDetachedBuffer(obj) is true, throw a TypeError exception.
         if (isDetachedBuffer(array_buffer)) {
             return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
 
-        // 24. Let fromBuf be obj.[[ArrayBufferData]].
+        // 18. Let fromBuf be obj.[[ArrayBufferData]].
         const from_buf = array_buffer.fields.data_block.?;
 
-        // 25. Let toBuf be new.[[ArrayBufferData]].
+        // 19. Let toBuf be new.[[ArrayBufferData]].
         const to_buf = new.fields.data_block.?;
 
-        // 26. Let currentLength be obj.[[ArrayBufferByteLength]].
+        // 20. Let currentLength be obj.[[ArrayBufferByteLength]].
         const current_length = array_buffer.fields.byte_length;
 
-        // 27. If first < currentLength, then
-        if (first < @intFromEnum(current_length)) {
-            // a. Let count be min(newLength, currentLength - first).
-            const count = @min(@intFromEnum(new_length), @intFromEnum(current_length) - first);
+        // 21. Let maxCount be currentLength - first.
+        const max_count = @intFromEnum(current_length) -| first;
+
+        // 22. If maxCount > 0, then
+        if (max_count > 0) {
+            // a. Let count be min(newLength, maxCount).
+            const count = @min(@intFromEnum(new_length), max_count);
 
             // b. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, count).
             copyDataBlockBytes(to_buf, 0, from_buf, first, count);
         }
 
-        // 28. Return new.
+        // 23. Return new.
         return Value.from(&new.object);
     }
 

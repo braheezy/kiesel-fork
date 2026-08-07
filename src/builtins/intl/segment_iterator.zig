@@ -186,8 +186,8 @@ pub fn createSegmentDataObject(
 
     // 10. If granularity is "word", then
     if (granularity == .word) {
-        // a. Let isWordLike be a Boolean value indicating whether the segment in string is
-        //    "word-like" according to locale segmenter.[[Locale]].
+        // a. Let isWordLike be a Boolean indicating whether the segment in string is "word-like"
+        //    according to locale segmenter.[[Locale]].
 
         // b. Perform ! CreateDataPropertyOrThrow(result, "isWordLike", isWordLike).
         try result.createDataPropertyDirect(

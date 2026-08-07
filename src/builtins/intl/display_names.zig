@@ -314,7 +314,7 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(displayNames, [[InitializedDisplayNames]]).
         const display_names = try this_value.requireInternalSlot(agent, DisplayNames);
 
-        // 3. Let code be ? ToString(code).
+        // 3. Set code to ? ToString(code).
         const code = try code_value.toString(agent);
 
         // 4. Set code to ? CanonicalCodeForDisplayNames(displayNames.[[Type]], code).

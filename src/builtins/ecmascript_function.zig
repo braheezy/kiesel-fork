@@ -969,7 +969,7 @@ pub fn defineMethodProperty(
             // 5. NOTE: DefinePropertyOrThrow only returns an abrupt completion when attempting to
             //    define a class static method whose name is "prototype".
 
-            // 6. Return unused.
+            // 6. Return empty.
             return null;
         },
     }

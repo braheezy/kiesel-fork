@@ -209,7 +209,7 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(segmenter, [[InitializedSegmenter]]).
         const segmenter = try this_value.requireInternalSlot(agent, Segmenter);
 
-        // 3. Let string be ? ToString(string).
+        // 3. Set string to ? ToString(string).
         const string = try string_value.toString(agent);
 
         // 4. Return CreateSegmentsObject(segmenter, string).

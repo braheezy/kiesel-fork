@@ -83,17 +83,19 @@ pub fn createDateTimeFormat(
         .{ .coerce_options = true },
     );
 
-    // 5. Set options to optionsResolution.[[Options]].
+    // TODO: 5. Let hour12 be specialOptions.[[Hour12]].
+
+    // 6. Set options to optionsResolution.[[Options]].
     const options = options_resolution.options;
 
-    // 6. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
+    // 7. Let resolvedLocale be optionsResolution.[[ResolvedLocale]].
     const resolved_locale = options_resolution.resolved_locale;
     const locale = resolved_locale.locale;
 
-    // 7. Set dateTimeFormat.[[Locale]] to resolvedLocale.[[Locale]].
+    // 8. Set dateTimeFormat.[[Locale]] to resolvedLocale.[[Locale]].
     date_time_format.fields.locale = locale;
 
-    // 8. Let resolvedCalendar be resolvedLocale.[[ca]].
+    // 9. Let resolvedCalendar be resolvedLocale.[[ca]].
     const resolved_calendar = if (try locale.getUnicodeExtension(agent.gc_allocator, "ca")) |ca|
         try String.fromAscii(agent, ca)
     else
@@ -118,22 +120,22 @@ pub fn createDateTimeFormat(
         .{ "roc", .roc },
     }).get(resolved_calendar.asAscii()) orelse .gregorian;
 
-    // 9. Set dateTimeFormat.[[Calendar]] to resolvedCalendar.
+    // 10. Set dateTimeFormat.[[Calendar]] to resolvedCalendar.
     date_time_format.fields.calendar = calendar;
 
-    // 10. Set dateTimeFormat.[[NumberingSystem]] to resolvedLocale.[[nu]].
+    // 11. Set dateTimeFormat.[[NumberingSystem]] to resolvedLocale.[[nu]].
     const numbering_system = if (try locale.getUnicodeExtension(agent.gc_allocator, "nu")) |nu|
         try String.fromAscii(agent, nu)
     else
         resolved_locale.options.nu orelse String.fromLiteral("latn");
     date_time_format.fields.numbering_system = numbering_system;
 
-    // TODO: 11-14.
+    // TODO: 12-15.
 
-    // 15. Let timeZone be ? Get(options, "timeZone").
+    // 16. Let timeZone be ? Get(options, "timeZone").
     const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
 
-    // 16. If timeZone is undefined, then
+    // 17. If timeZone is undefined, then
     const time_zone_string = if (time_zone_value.isUndefined()) blk: {
         // a. Set timeZone to SystemTimeZoneIdentifier().
         const time_zone = systemTimeZoneIdentifier(agent.platform);
@@ -142,12 +144,12 @@ pub fn createDateTimeFormat(
         temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner);
         break :blk try write.toOwnedSlice();
     } else blk: {
-        // 17. Else,
+        // 18. Else,
         // a. Set timeZone to ? ToString(timeZone).
         break :blk try (try time_zone_value.toString(agent)).toUtf8(agent.gc_allocator);
     };
 
-    // 18. If IsTimeZoneOffsetString(timeZone) is true, then
+    // 19. If IsTimeZoneOffsetString(timeZone) is true, then
     //     a. Let parseResult be ParseText(StringToCodePoints(timeZone), UTCOffset).
     //     b. Assert: parseResult is a Parse Node.
     //     c. If parseResult contains more than one MinuteSecond Parse Node, throw a RangeError
@@ -156,22 +158,22 @@ pub fn createDateTimeFormat(
     //     e. Let offsetMinutes be offsetNanoseconds / (6 × 10**10).
     //     f. Assert: offsetMinutes is an integer.
     //     g. Set timeZone to FormatOffsetTimeZoneIdentifier(offsetMinutes).
-    // 19. Else,
+    // 20. Else,
     //     a. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(timeZone).
     //     b. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
     //     c. Set timeZone to timeZoneIdentifierRecord.[[PrimaryIdentifier]].
     // TODO: Detect invalid time zone
 
-    // 20. Set dateTimeFormat.[[TimeZone]] to timeZone.
+    // 21. Set dateTimeFormat.[[TimeZone]] to timeZone.
     date_time_format.fields.time_zone = try String.fromAscii(agent, time_zone_string);
 
-    // TODO: 21. Let formatOptions be a new Record.
-    // TODO: 22. Set formatOptions.[[hourCycle]] to hc.
+    // TODO: 22. Let formatOptions be a new Record.
+    // TODO: 23. Set formatOptions.[[hourCycle]] to hc.
 
-    // 23. Let hasExplicitFormatComponents be false.
+    // 24. Let hasExplicitFormatComponents be false.
     var has_explicit_format_components = false;
 
-    // 24. For each row of Table 16, except the header row, in table order, do
+    // 25. For each row of Table 16, except the header row, in table order, do
     inline for (comptime .{
         .{ "weekday", &.{
             String.fromLiteral("narrow"),
@@ -260,7 +262,7 @@ pub fn createDateTimeFormat(
         }
     }
 
-    // 25. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic",
+    // 26. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic",
     //     "best fit" », "best fit").
     const format_matcher = try options.getOption(
         agent,
@@ -270,7 +272,7 @@ pub fn createDateTimeFormat(
         String.fromLiteral("best fit"),
     );
 
-    // 26. Let dateStyle be ? GetOption(options, "dateStyle", string, « "full", "long", "medium",
+    // 27. Let dateStyle be ? GetOption(options, "dateStyle", string, « "full", "long", "medium",
     //     "short" », undefined).
     const maybe_date_style_string = try options.getOption(
         agent,
@@ -294,10 +296,10 @@ pub fn createDateTimeFormat(
     else
         null;
 
-    // 27. Set dateTimeFormat.[[DateStyle]] to dateStyle.
+    // 28. Set dateTimeFormat.[[DateStyle]] to dateStyle.
     date_time_format.fields.date_style = date_style;
 
-    // 28. Let timeStyle be ? GetOption(options, "timeStyle", string, « "full", "long", "medium",
+    // 29. Let timeStyle be ? GetOption(options, "timeStyle", string, « "full", "long", "medium",
     //     "short" », undefined).
     const maybe_time_style_string = try options.getOption(
         agent,
@@ -321,10 +323,10 @@ pub fn createDateTimeFormat(
     else
         null;
 
-    // 29. Set dateTimeFormat.[[TimeStyle]] to timeStyle.
+    // 30. Set dateTimeFormat.[[TimeStyle]] to timeStyle.
     date_time_format.fields.time_style = time_style;
 
-    // 30. If dateStyle is not undefined or timeStyle is not undefined, then
+    // 31. If dateStyle is not undefined or timeStyle is not undefined, then
     if (date_style != null or time_style != null) {
         // a. If hasExplicitFormatComponents is true, then
         if (has_explicit_format_components) {
@@ -359,7 +361,7 @@ pub fn createDateTimeFormat(
         // TODO: d. Let styles be resolvedLocaleData.[[styles]].[[<resolvedCalendar>]].
         // TODO: e. Let bestFormat be DateTimeStyleFormat(dateStyle, timeStyle, styles).
     } else {
-        // 31. Else,
+        // 32. Else,
         // TODO: a-f.
         _ = defaults;
 
@@ -372,11 +374,11 @@ pub fn createDateTimeFormat(
         }
     }
 
-    // TODO: 32. Set dateTimeFormat.[[DateTimeFormat]] to bestFormat.
-    // TODO: 33. If bestFormat has a field [[hour]], then
+    // TODO: 33. Set dateTimeFormat.[[DateTimeFormat]] to bestFormat.
+    // TODO: 34. If bestFormat has a field [[hour]], then
     //           a. Set dateTimeFormat.[[HourCycle]] to hc.
 
-    // 34. Return dateTimeFormat.
+    // 35. Return dateTimeFormat.
     return date_time_format;
 }
 

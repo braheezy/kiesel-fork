@@ -877,8 +877,8 @@ fn innerModuleEvaluation(
         }
     }
 
-    // 12. If module.[[PendingAsyncDependencies]] > 0 or module.[[HasTLA]] is true, then
-    if (module.pending_async_dependencies.? > 0 or module.has_tla) {
+    // 12. If module.[[HasTLA]] is true or module.[[PendingAsyncDependencies]] > 0, then
+    if (module.has_tla or module.pending_async_dependencies.? > 0) {
         // a. Assert: module.[[AsyncEvaluationOrder]] is unset.
         std.debug.assert(module.async_evaluation_order == .unset);
 

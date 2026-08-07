@@ -188,7 +188,7 @@ pub const namespace = struct {
     /// 8.3.2 Intl.supportedValuesOf ( key )
     /// https://tc39.es/ecma402/#sec-intl.supportedvaluesof
     fn supportedValuesOf(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        // 1. Let key be ? ToString(key).
+        // 1. Set key to ? ToString(key).
         const key_string = try arguments.get(0).toString(agent);
 
         const Key = enum {

@@ -305,10 +305,10 @@ fn evalDeclarationInstantiation(
                     if (this_env.hasBinding(agent, name) catch |err| try noexcept(err)) {
                         // i. If the host is a web browser or otherwise supports VariableStatements
                         //    in Catch Blocks, then
-                        //     i. If thisEnv is not the Environment Record for a Catch clause, throw
+                        //     1. If thisEnv is not the Environment Record for a Catch clause, throw
                         //        a SyntaxError exception.
                         // ii. Else,
-                        //     i. Throw a SyntaxError exception.
+                        //     1. Throw a SyntaxError exception.
                         return agent.throwException(.syntax_error, "idk", .{});
                     }
 

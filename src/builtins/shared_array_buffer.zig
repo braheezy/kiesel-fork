@@ -398,57 +398,33 @@ pub const prototype = struct {
 
         // 4. Let length be ArrayBufferByteLength(obj, seq-cst).
         const length = arrayBufferByteLength(array_buffer, .seq_cst);
-        const length_f64: f64 = @floatFromInt(@intFromEnum(length));
 
-        // 5. Let relativeStart be ? ToIntegerOrInfinity(start).
-        const relative_start = try start.toIntegerOrInfinity(agent);
+        // 5. Let first be ? ToClampedIndex(start, length).
+        const first = try start.toClampedIndex(agent, @intFromEnum(length));
 
-        // 6. If relativeStart = -∞, let first be 0.
-        const first_f64 = if (std.math.isNegativeInf(relative_start)) blk: {
-            break :blk 0;
-        } else if (relative_start < 0) blk: {
-            // 7. Else if relativeStart < 0, let first be max(length + relativeStart, 0).
-            break :blk @max(length_f64 + relative_start, 0);
-        } else blk: {
-            // 8. Else, let first be min(relativeStart, length).
-            break :blk @min(relative_start, length_f64);
-        };
-        const first: u53 = @intFromFloat(first_f64);
-
-        // 9. If end is undefined, let relativeEnd be length; else let relativeEnd be
-        //    ? ToIntegerOrInfinity(end).
-        const relative_end = if (end.isUndefined())
-            length_f64
+        // 6. If end is undefined, let final be length; else let final be ? ToClampedIndex(end,
+        //    length).
+        const final = if (end.isUndefined())
+            @intFromEnum(length)
         else
-            try end.toIntegerOrInfinity(agent);
+            try end.toClampedIndex(agent, @intFromEnum(length));
 
-        // 10. If relativeEnd = -∞, let final be 0.
-        const final_f64 = if (std.math.isNegativeInf(relative_end)) blk: {
-            break :blk 0;
-        } else if (relative_end < 0) blk: {
-            // 11. Else if relativeEnd < 0, let final be max(length + relativeEnd, 0).
-            break :blk @max(length_f64 + relative_end, 0);
-        } else blk: {
-            // 12. Else, let final be min(relativeEnd, length).
-            break :blk @min(relative_end, length_f64);
-        };
+        // 7. Let newLength be max(final - first, 0).
+        const new_length = final -| first;
 
-        // 13. Let newLength be max(final - first, 0).
-        const new_length: u53 = @intFromFloat(@max(final_f64 - first_f64, 0));
-
-        // 14. Let ctor be ? SpeciesConstructor(obj, %SharedArrayBuffer%).
+        // 8. Let ctor be ? SpeciesConstructor(obj, %SharedArrayBuffer%).
         const ctor = try array_buffer.object.speciesConstructor(
             agent,
             try realm.intrinsic(.shared_array_buffer),
         );
 
-        // 15. Let new be ? Construct(ctor, « 𝔽(newLength) »).
+        // 9. Let new be ? Construct(ctor, « 𝔽(newLength) »).
         const new_object = try ctor.construct(agent, &.{Value.from(new_length)}, null);
 
-        // 16. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
+        // 10. Perform ? RequireInternalSlot(new, [[ArrayBufferData]]).
         const new = try Value.from(new_object).requireInternalSlot(agent, ArrayBuffer);
 
-        // 17. If IsSharedArrayBuffer(new) is false, throw a TypeError exception.
+        // 11. If IsSharedArrayBuffer(new) is false, throw a TypeError exception.
         if (!isSharedArrayBuffer(new)) {
             return agent.throwException(
                 .type_error,
@@ -457,7 +433,7 @@ pub const prototype = struct {
             );
         }
 
-        // 18. If new.[[ArrayBufferData]] is obj.[[ArrayBufferData]], throw a TypeError exception.
+        // 12. If new.[[ArrayBufferData]] is obj.[[ArrayBufferData]], throw a TypeError exception.
         if (new.fields.data_block.?.bytes.ptr == array_buffer.fields.data_block.?.bytes.ptr) {
             return agent.throwException(
                 .type_error,
@@ -466,21 +442,21 @@ pub const prototype = struct {
             );
         }
 
-        // 19. If ArrayBufferByteLength(new, seq-cst) < newLength, throw a TypeError exception.
+        // 13. If ArrayBufferByteLength(new, seq-cst) < newLength, throw a TypeError exception.
         if (@intFromEnum(arrayBufferByteLength(new, .seq_cst)) < new_length) {
             return agent.throwException(.type_error, "SharedArrayBuffer is too small", .{});
         }
 
-        // 20. Let fromBuf be obj.[[ArrayBufferData]].
+        // 14. Let fromBuf be obj.[[ArrayBufferData]].
         const from_buf = array_buffer.fields.data_block.?;
 
-        // 21. Let toBuf be new.[[ArrayBufferData]].
+        // 15. Let toBuf be new.[[ArrayBufferData]].
         const to_buf = new.fields.data_block.?;
 
-        // 22. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLength).
+        // 16. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLength).
         copyDataBlockBytes(to_buf, 0, from_buf, first, new_length);
 
-        // 23. Return new.
+        // 17. Return new.
         return Value.from(&new.object);
     }
 };

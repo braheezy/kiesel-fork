@@ -855,23 +855,14 @@ pub const prototype = struct {
         // 4. Let length be the length of string.
         const length = string.length;
 
-        // 5. Let relativeIndex be ? ToIntegerOrInfinity(index).
-        const relative_index = try index.toIntegerOrInfinity(agent);
+        // 5. Let k be ? ToAbsoluteIndex(index, length).
+        const k_f64 = try index.toAbsoluteIndex(agent, length);
 
-        // 6. If relativeIndex ≥ 0, then
-        //     a. Let k be relativeIndex.
-        // 7. Else,
-        //     a. Let k be length + relativeIndex.
-        const k_f64 = if (relative_index >= 0)
-            relative_index
-        else
-            @as(f64, @floatFromInt(length)) + relative_index;
-
-        // 8. If k < 0 or k ≥ length, return undefined.
+        // 6. If k < 0 or k ≥ length, return undefined.
         if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(length))) return .undefined;
         const k = std.math.lossyCast(u32, k_f64);
 
-        // 9. Return the substring of string from k to k + 1.
+        // 7. Return the substring of string from k to k + 1.
         return Value.from(try string.substring(agent, k, k + 1));
     }
 
@@ -1022,33 +1013,34 @@ pub const prototype = struct {
         // 7. Let length be the length of string.
         const length = string.length;
 
-        // 8. If endPosition is undefined, let position be length; else let position be
-        //    ? ToIntegerOrInfinity(endPosition).
-        const position = if (end_position.isUndefined())
-            @as(f64, @floatFromInt(length))
+        // 8. If endPosition is undefined, let end be length; else let end be the result of clamping
+        //    ? ToIntegerOrInfinity(endPosition) between 0 and length.
+        const end = if (end_position.isUndefined())
+            length
         else
-            try end_position.toIntegerOrInfinity(agent);
+            std.math.clamp(
+                std.math.lossyCast(u32, try end_position.toIntegerOrInfinity(agent)),
+                0,
+                length,
+            );
 
-        // 9. Let end be the result of clamping position between 0 and length.
-        const end = std.math.clamp(std.math.lossyCast(u32, position), 0, length);
-
-        // 10. Let searchLength be the length of searchString.
+        // 9. Let searchLength be the length of searchString.
         const search_length = search_string.length;
 
-        // 11. If searchLength = 0, return true.
+        // 10. If searchLength = 0, return true.
         if (search_length == 0) return .true;
 
-        // 12. Let start be end - searchLength.
-        // 13. If start < 0, return false.
+        // 11. Let start be end - searchLength.
+        // 12. If start < 0, return false.
         const start = std.math.sub(u32, end, search_length) catch return .false;
 
-        // 14. Let substring be the substring of string from start to end.
+        // 13. Let substring be the substring of string from start to end.
         const substring_ = try string.substring(agent, start, end);
 
-        // 15. If substring is searchString, return true.
+        // 14. If substring is searchString, return true.
         if (substring_.eql(search_string)) return .true;
 
-        // 16. Return false.
+        // 15. Return false.
         return .false;
     }
 
@@ -1081,21 +1073,23 @@ pub const prototype = struct {
         // 6. Set searchString to ? ToString(searchString).
         const search_string = try search_value.toString(agent);
 
-        // 7. Let positionInt be ? ToIntegerOrInfinity(position).
-        // 8. Assert: If position is undefined, then positionInt is 0.
-        const position = try position_value.toIntegerOrInfinity(agent);
-
-        // 9. Let length be the length of string.
+        // 7. Let length be the length of string.
         const length = string.length;
 
-        // 10. Let start be the result of clamping positionInt between 0 and length.
-        const start = std.math.clamp(std.math.lossyCast(u32, position), 0, length);
+        // 8. Let start be the result of clamping ? ToIntegerOrInfinity(position) between 0 and
+        //    length.
+        // 9. Assert: If position is undefined, then start is 0.
+        const start = std.math.clamp(
+            std.math.lossyCast(u32, try position_value.toIntegerOrInfinity(agent)),
+            0,
+            length,
+        );
 
-        // 11. Let index be StringIndexOf(string, searchString, start).
+        // 10. Let index be StringIndexOf(string, searchString, start).
         const index = string.indexOf(search_string, start);
 
-        // 12. If index is not-found, return false.
-        // 13. Return true.
+        // 11. If index is not-found, return false.
+        // 12. Return true.
         return Value.from(index != null);
     }
 
@@ -1116,19 +1110,21 @@ pub const prototype = struct {
         // 4. Set searchString to ? ToString(searchString).
         const search_string = try search_value.toString(agent);
 
-        // 5. Let positionInt be ? ToIntegerOrInfinity(position).
-        // 6. Assert: If position is undefined, then positionInt is 0.
-        const position = try position_value.toIntegerOrInfinity(agent);
-
-        // 7. Let length be the length of string.
+        // 5. Let length be the length of string.
         const length = string.length;
 
-        // 8. Let start be the result of clamping positionInt between 0 and length.
-        const start = std.math.clamp(std.math.lossyCast(u32, position), 0, length);
+        // 6. Let start be the result of clamping ? ToIntegerOrInfinity(position) between 0 and
+        //    length.
+        // 7. Assert: If position is undefined, then start is 0.
+        const start = std.math.clamp(
+            std.math.lossyCast(u32, try position_value.toIntegerOrInfinity(agent)),
+            0,
+            length,
+        );
 
-        // 9. Let result be StringIndexOf(string, searchString, start).
-        // 10. If result is not-found, return -1𝔽.
-        // 11. Return 𝔽(result).
+        // 8. Let result be StringIndexOf(string, searchString, start).
+        // 9. If result is not-found, return -1𝔽.
+        // 10. Return 𝔽(result).
         return if (string.indexOf(search_string, start)) |result|
             Value.from(@as(u53, @intCast(result)))
         else
@@ -1170,25 +1166,28 @@ pub const prototype = struct {
         // 5. Let numberPosition be ? ToNumber(position).
         const number_position = try position_value.toNumber(agent);
 
-        // 6. Assert: If position is undefined, then numberPosition is NaN.
-        // 7. If numberPosition is NaN, set position to +∞; else set position to
-        //    ! ToIntegerOrInfinity(numberPosition).
-        const position = if (number_position.isNan())
-            std.math.inf(f64)
-        else
-            Value.from(number_position).toIntegerOrInfinity(agent) catch unreachable;
-
-        // 8. Let length be the length of string.
+        // 6. Let length be the length of string.
         const length = string.length;
 
-        // 9. Let searchLength be the length of searchString.
+        // 7. Let searchLength be the length of searchString.
         const search_length = search_string.length;
 
-        // 10. If length < searchLength, return -1𝔽.
+        // 8. Let maxStart be length - searchLength.
+        // 9. If maxStart < 0, return -1𝔽.
         if (length < search_length) return Value.from(-1);
+        const max_start = length - search_length;
 
-        // 11. Let start be the result of clamping position between 0 and length - searchLength.
-        const start = std.math.clamp(std.math.lossyCast(u32, position), 0, length - search_length);
+        // 10. If numberPosition is NaN, let start be maxStart; else let start be the result of
+        //     clamping ! ToIntegerOrInfinity(numberPosition) between 0 and maxStart.
+        // 11. Assert: If position is undefined, then start is maxStart.
+        const start = if (number_position.isNan())
+            max_start
+        else
+            std.math.clamp(
+                std.math.lossyCast(u32, Value.from(number_position).toIntegerOrInfinity(agent) catch unreachable),
+                0,
+                max_start,
+            );
 
         // 12. Let result be StringLastIndexOf(string, searchString, start).
         // 13. If result is not-found, return -1𝔽.
@@ -1860,46 +1859,20 @@ pub const prototype = struct {
 
         // 4. Let length be the length of string.
         const length = string.length;
-        const length_f64: f64 = @floatFromInt(length);
 
-        // 5. Let intStart be ? ToIntegerOrInfinity(start).
-        const int_start = try start.toIntegerOrInfinity(agent);
+        // 5. Let from be ? ToClampedIndex(start, length).
+        const from = std.math.lossyCast(u32, try start.toClampedIndex(agent, length));
 
-        // 6. If intStart = -∞, let from be 0.
-        const from_f64 = if (std.math.isNegativeInf(int_start)) blk: {
-            break :blk 0;
-        } else if (int_start < 0) blk: {
-            // 7. Else if intStart < 0, let from be max(length + intStart, 0).
-            break :blk @max(length_f64 + int_start, 0);
-        } else blk: {
-            // 8. Else, let from be min(intStart, length).
-            break :blk @min(int_start, length_f64);
-        };
-        const from = std.math.lossyCast(u32, from_f64);
-
-        // 9. If end is undefined, let intEnd be length; else let intEnd be ? ToIntegerOrInfinity(
-        //    end).
-        const int_end = if (end.isUndefined())
-            length_f64
+        // 6. If end is undefined, let to be length; else let to be ? ToClampedIndex(end, length).
+        const to = if (end.isUndefined())
+            length
         else
-            try end.toIntegerOrInfinity(agent);
+            std.math.lossyCast(u32, try end.toClampedIndex(agent, length));
 
-        // 10. If intEnd = -∞, let to be 0.
-        const to_f64 = if (std.math.isNegativeInf(int_end)) blk: {
-            break :blk 0;
-        } else if (int_end < 0) blk: {
-            // 11. Else if intEnd < 0, let to be max(length + intEnd, 0).
-            break :blk @max(length_f64 + int_end, 0);
-        } else blk: {
-            // 12. Else, let to be min(intEnd, length).
-            break :blk @min(int_end, length_f64);
-        };
-        const to = std.math.lossyCast(u32, to_f64);
-
-        // 13. If from ≥ to, return the empty String.
+        // 7. If from ≥ to, return the empty String.
         if (from >= to) return Value.from("");
 
-        // 14. Return the substring of string from from to to.
+        // 8. Return the substring of string from from to to.
         return Value.from(try string.substring(agent, from, to));
     }
 
@@ -2086,12 +2059,14 @@ pub const prototype = struct {
         // 7. Let length be the length of string.
         const length = string.length;
 
-        // 8. If position is undefined, set position to 0; else set position to
-        //    ? ToIntegerOrInfinity(position).
-        const position = if (position_value.isUndefined()) 0 else try position_value.toIntegerOrInfinity(agent);
-
-        // 9. Let start be the result of clamping position between 0 and length.
-        const start = std.math.clamp(std.math.lossyCast(u32, position), 0, length);
+        // 8. Let start be the result of clamping ? ToIntegerOrInfinity(position) between 0 and
+        //    length.
+        // 9. Assert: If position is undefined, then start is 0.
+        const start = std.math.clamp(
+            std.math.lossyCast(u32, try position_value.toIntegerOrInfinity(agent)),
+            0,
+            length,
+        );
 
         // 10. Let searchLength be the length of searchString.
         const search_length = search_string.length;
@@ -2132,29 +2107,33 @@ pub const prototype = struct {
         // 4. Let length be the length of string.
         const length = string.length;
 
-        // 5. Let intStart be ? ToIntegerOrInfinity(start).
-        const int_start = try start.toIntegerOrInfinity(agent);
+        // 5. Let finalStart be the result of clamping ? ToIntegerOrInfinity(start) between 0 and
+        //    length.
+        // 6. Assert: If start is undefined, then finalStart is 0.
+        const final_start = std.math.clamp(
+            std.math.lossyCast(u32, try start.toIntegerOrInfinity(agent)),
+            0,
+            length,
+        );
 
-        // 6. If end is undefined, let intEnd be length; else let intEnd be ? ToIntegerOrInfinity(
-        //    end).
-        const int_end = if (end.isUndefined())
-            @as(f64, @floatFromInt(length))
+        // 7. If end is undefined, let finalEnd be length; else let finalEnd be the result of
+        //    clamping ? ToIntegerOrInfinity(end) between 0 and length.
+        const final_end = if (end.isUndefined())
+            length
         else
-            try end.toIntegerOrInfinity(agent);
+            std.math.clamp(
+                std.math.lossyCast(u32, try end.toIntegerOrInfinity(agent)),
+                0,
+                length,
+            );
 
-        // 7. Let finalStart be the result of clamping intStart between 0 and length.
-        const final_start = std.math.clamp(std.math.lossyCast(u32, int_start), 0, length);
-
-        // 8. Let finalEnd be the result of clamping intEnd between 0 and length.
-        const final_end = std.math.clamp(std.math.lossyCast(u32, int_end), 0, length);
-
-        // 9. Let from be min(finalStart, finalEnd).
+        // 8. Let from be min(finalStart, finalEnd).
         const from = @min(final_start, final_end);
 
-        // 10. Let to be max(finalStart, finalEnd).
+        // 9. Let to be max(finalStart, finalEnd).
         const to = @max(final_start, final_end);
 
-        // 11. Return the substring of string from from to to.
+        // 10. Return the substring of string from from to to.
         return Value.from(try string.substring(agent, from, to));
     }
 
@@ -2507,44 +2486,28 @@ pub const prototype = struct {
         const string = try obj.toString(agent);
 
         // 4. Let size be the length of string.
-        const size: f64 = @floatFromInt(string.length);
+        const size = string.length;
 
-        // 5. Let intStart be ? ToIntegerOrInfinity(start).
-        var int_start = try start.toIntegerOrInfinity(agent);
+        // 5. Let intStart be ? ToClampedIndex(start, size).
+        const int_start = std.math.lossyCast(u32, try start.toClampedIndex(agent, size));
 
-        // 6. If intStart = -∞, set intStart to 0.
-        if (std.math.isNegativeInf(int_start)) {
-            int_start = 0;
-        }
-        // 7. Else if intStart < 0, set intStart to max(size + intStart, 0).
-        else if (int_start < 0) {
-            int_start = @max(size + int_start, 0);
-        }
-        // 8. Else, set intStart to min(intStart, size).
-        else {
-            int_start = @min(int_start, size);
-        }
-
-        // 9. If length is undefined, let intLength be size; else let intLength be
-        //    ? ToIntegerOrInfinity(length).
-        var int_length = if (length.isUndefined())
+        // 6. If length is undefined, let intLength be size; else let intLength be the result of
+        //    clamping ? ToIntegerOrInfinity(length) between 0 and size.
+        const int_length = if (length.isUndefined())
             size
         else
-            try length.toIntegerOrInfinity(agent);
+            std.math.lossyCast(u32, std.math.clamp(
+                try length.toIntegerOrInfinity(agent),
+                0,
+                @as(f64, @floatFromInt(size)),
+            ));
 
-        // 10. Set intLength to the result of clamping intLength between 0 and size.
-        int_length = std.math.clamp(int_length, 0, size);
+        // 7. Let intEnd be min(intStart + intLength, size).
+        const int_end = @min(int_start +| int_length, size);
 
-        // 11. Let intEnd be min(intStart + intLength, size).
-        const int_end = @min(int_start + int_length, size);
-
-        // 12. Return the substring of string from intStart to intEnd.
+        // 8. Return the substring of string from intStart to intEnd.
         return Value.from(
-            try string.substring(
-                agent,
-                @intFromFloat(int_start),
-                @intFromFloat(int_end),
-            ),
+            try string.substring(agent, int_start, int_end),
         );
     }
 

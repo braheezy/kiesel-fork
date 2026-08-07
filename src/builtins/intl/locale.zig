@@ -200,14 +200,14 @@ pub const constructor = struct {
 
         // 8. If tag is an Object and tag has an [[InitializedLocale]] internal slot, then
         const tag_string = if (tag_value.castObject(Locale)) |tag_locale| blk: {
-            // a. Let tag be tag.[[Locale]].
+            // a. Set tag to tag.[[Locale]].
             break :blk try String.fromAscii(
                 agent,
                 try tag_locale.fields.locale.toString(agent.gc_allocator),
             );
         } else blk: {
             // 9. Else,
-            // a. Let tag be ? ToString(tag).
+            // a. Set tag to ? ToString(tag).
             break :blk try tag_value.toString(agent);
         };
 
