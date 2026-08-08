@@ -23,7 +23,7 @@ outer_env: ?Environment,
 /// [[DisposableResourceStack]]
 disposable_resource_stack: std.ArrayList(DisposableResource),
 
-bindings: String.HashMapUnmanaged(Binding),
+bindings: String.HashMap(Binding),
 
 pub const Binding = struct {
     value: Value,

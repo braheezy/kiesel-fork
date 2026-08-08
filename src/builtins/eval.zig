@@ -329,7 +329,7 @@ fn evalDeclarationInstantiation(
     defer funcs_to_initialize.deinit(agent.gc_allocator);
 
     // 9. Let declaredFuncNames be a new empty List.
-    var declared_func_names: String.HashMapUnmanaged(void) = .empty;
+    var declared_func_names: String.HashMap(void) = .empty;
     defer declared_func_names.deinit(agent.gc_allocator);
 
     // 10. For each element variableDecl of variableDecls, in reverse List order, do
@@ -381,7 +381,7 @@ fn evalDeclarationInstantiation(
     }
 
     // 11. Let declaredVariableNames be a new empty List.
-    var declared_variable_names: String.HashMapUnmanaged(void) = .empty;
+    var declared_variable_names: String.HashMap(void) = .empty;
     defer declared_variable_names.deinit(agent.gc_allocator);
 
     var bound_names: std.ArrayList(ast.Identifier) = .empty;

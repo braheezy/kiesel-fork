@@ -819,7 +819,7 @@ fn ownPropertyKeys(agent: *Agent, obj: *Object) Agent.Error![]PropertyKey {
 
     // 8. Let trapResult be ? CreateListFromArrayLike(trapResultArray, property-key).
     const elements = try trap_result_array.createListFromArrayLike(agent, .property_key);
-    var trap_result: PropertyKey.ArrayHashMapUnmanaged(void) = .empty;
+    var trap_result: PropertyKey.ArrayHashMap(void) = .empty;
     defer trap_result.deinit(agent.gc_allocator);
     try trap_result.ensureTotalCapacity(agent.gc_allocator, elements.len);
 
@@ -881,7 +881,7 @@ fn ownPropertyKeys(agent: *Agent, obj: *Object) Agent.Error![]PropertyKey {
     }
 
     // 18. Let uncheckedResultKeys be a List whose elements are the elements of trapResult.
-    var unchecked_result_keys: PropertyKey.HashMapUnmanaged(void) = .empty;
+    var unchecked_result_keys: PropertyKey.HashMap(void) = .empty;
     defer unchecked_result_keys.deinit(agent.gc_allocator);
     try unchecked_result_keys.ensureTotalCapacity(agent.gc_allocator, @intCast(trap_result.count()));
     for (trap_result.keys()) |key| {

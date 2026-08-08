@@ -337,7 +337,7 @@ pub fn createMappedArgumentsObject(
     arguments.object.setValueAtPropertyOffset(offsets.length, Value.from(@as(u53, @intCast(length))));
 
     // 17. Let mappedNames be a new empty List.
-    var mapped_names: String.HashMapUnmanaged(void) = .empty;
+    var mapped_names: String.HashMap(void) = .empty;
     defer mapped_names.deinit(agent.gc_allocator);
 
     const map = &arguments.fields.parameter_map;

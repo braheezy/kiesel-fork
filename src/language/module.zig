@@ -56,7 +56,7 @@ pub const ModuleRequest = struct {
         return true;
     }
 
-    pub fn HashMapUnmanaged(comptime V: type) type {
+    pub fn HashMap(comptime V: type) type {
         return std.HashMapUnmanaged(ModuleRequest, V, struct {
             pub fn hash(_: @This(), key: ModuleRequest) u64 {
                 // The order of import attributes doesn't matter so we force a hash collision for
@@ -70,7 +70,7 @@ pub const ModuleRequest = struct {
         }, std.hash_map.default_max_load_percentage);
     }
 
-    pub fn ArrayHashMapUnmanaged(comptime V: type) type {
+    pub fn ArrayHashMap(comptime V: type) type {
         return std.array_hash_map.Custom(ModuleRequest, V, struct {
             pub fn hash(_: @This(), key: ModuleRequest) u32 {
                 // The order of import attributes doesn't matter so we force a hash collision for

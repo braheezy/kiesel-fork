@@ -3731,7 +3731,7 @@ pub const Module = struct {
         //      a. If requests does not contain a ModuleRequest Record otherModuleRequest such that
         //         ModuleRequestsEqual(moduleRequest, otherModuleRequest) is true, then
         //          i. Append moduleRequest to requests.
-        var deduplicated: ModuleRequest.ArrayHashMapUnmanaged(void) = .empty;
+        var deduplicated: ModuleRequest.ArrayHashMap(void) = .empty;
         for (module_requests.items) |module_request| {
             try deduplicated.put(allocator, module_request, {});
         }

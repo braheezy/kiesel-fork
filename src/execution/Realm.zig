@@ -42,7 +42,7 @@ global_env: *GlobalEnvironment,
 template_map: std.AutoHashMapUnmanaged(u64, *builtins.Array),
 
 /// [[LoadedModules]]
-loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
+loaded_modules: ModuleRequest.HashMap(Module),
 
 /// [[HostDefined]]
 host_defined: ?*anyopaque,

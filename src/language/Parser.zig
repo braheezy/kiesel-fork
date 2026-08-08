@@ -4906,7 +4906,7 @@ pub fn acceptWithClause(self: *Parser) AcceptError!ast.WithClause {
     _ = try self.core.accept(RuleSet.is(.with));
     var with_clause_items: std.ArrayList(ast.WithClause.Item) = .empty;
     errdefer with_clause_items.deinit(self.allocator);
-    var seen_keys: String.HashMapUnmanaged(void) = .empty;
+    var seen_keys: String.HashMap(void) = .empty;
     defer seen_keys.deinit(self.allocator);
     _ = try self.core.accept(RuleSet.is(.@"{"));
     while (self.acceptWithClauseItem(&seen_keys)) |with_clause_item| {
@@ -4919,7 +4919,7 @@ pub fn acceptWithClause(self: *Parser) AcceptError!ast.WithClause {
 
 pub fn acceptWithClauseItem(
     self: *Parser,
-    seen_keys: *String.HashMapUnmanaged(void),
+    seen_keys: *String.HashMap(void),
 ) AcceptError!ast.WithClause.Item {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);

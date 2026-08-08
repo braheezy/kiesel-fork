@@ -20,8 +20,8 @@ root_node: Ast,
 in_strict_mode: bool,
 instructions: std.MultiArrayList(Ir.Inst),
 extra: std.ArrayList(u32),
-strings: StringArrayHashMapUnmanaged(void),
-big_ints: BigIntArrayHashMapUnmanaged(void),
+strings: StringArrayHashMap(void),
+big_ints: BigIntArrayHashMap(void),
 functions: std.ArrayList(Ir.Function),
 classes: std.ArrayList(Ir.Class),
 breakable_stack: std.ArrayList(*BreakableContext),
@@ -61,7 +61,7 @@ const StringContext = struct {
     }
 };
 
-fn StringArrayHashMapUnmanaged(comptime V: type) type {
+fn StringArrayHashMap(comptime V: type) type {
     return std.array_hash_map.Custom(StringKey, V, StringContext, true);
 }
 
@@ -80,7 +80,7 @@ const BigIntContext = struct {
     }
 };
 
-fn BigIntArrayHashMapUnmanaged(comptime V: type) type {
+fn BigIntArrayHashMap(comptime V: type) type {
     return std.array_hash_map.Custom(std.math.big.int.Const, V, BigIntContext, true);
 }
 

@@ -50,8 +50,8 @@ pub const Properties = union(enum) {
 
 pub const ExtraData = struct {
     /// [[PrivateElements]]
-    private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
-    lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
+    private_elements: PrivateName.HashMap(PrivateElement),
+    lazy_properties: PropertyKey.HashMap(LazyProperty),
     indexed_properties: Object.IndexedProperties,
 };
 

@@ -36,7 +36,7 @@ pub fn eql(a: PrivateName, b: PrivateName) bool {
     return a.symbol == b.symbol;
 }
 
-pub fn HashMapUnmanaged(comptime V: type) type {
+pub fn HashMap(comptime V: type) type {
     return std.HashMapUnmanaged(PrivateName, V, struct {
         pub fn hash(_: @This(), private_name: PrivateName) u64 {
             return private_name.hash();

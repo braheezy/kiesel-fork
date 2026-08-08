@@ -118,7 +118,7 @@ const JSONParseRecord = struct {
         array: []const JSONParseRecord,
 
         /// [[Entries]]
-        object: String.HashMapUnmanaged(JSONParseRecord),
+        object: String.HashMap(JSONParseRecord),
     };
 };
 
@@ -231,7 +231,7 @@ fn createJSONParseRecord(
                 std.debug.assert(token == .object_end);
             }
 
-            var entries: String.HashMapUnmanaged(JSONParseRecord) = .empty;
+            var entries: String.HashMap(JSONParseRecord) = .empty;
             try entries.ensureTotalCapacity(agent.gc_allocator, property_nodes.count());
 
             // iii. NOTE: Because value was produced from JSON text and has not been modified, all
@@ -317,7 +317,7 @@ fn internalizeJSONProperty(
 
     const records: union(enum) {
         array: []const JSONParseRecord,
-        object: *const String.HashMapUnmanaged(JSONParseRecord),
+        object: *const String.HashMap(JSONParseRecord),
         none,
     } = blk: {
         // 3. If parseRecord is a JSON Parse Record and SameValue(parseRecord.[[Value]], value) is
@@ -478,7 +478,7 @@ const JSONSerialization = struct {
     replacer_function: ?*Object,
 
     /// [[PropertyList]]
-    property_list: ?PropertyKey.ArrayHashMapUnmanaged(void),
+    property_list: ?PropertyKey.ArrayHashMap(void),
 
     /// [[Gap]]
     gap: *const String,
@@ -708,7 +708,7 @@ fn serializeJSONObject(
     var keys = state.property_list orelse blk: {
         var keys = try value.enumerableOwnProperties(agent, .key);
         defer keys.deinit(agent.gc_allocator);
-        var converted: PropertyKey.ArrayHashMapUnmanaged(void) = .empty;
+        var converted: PropertyKey.ArrayHashMap(void) = .empty;
         try converted.ensureUnusedCapacity(agent.gc_allocator, keys.items.len);
         for (keys.items) |key| {
             converted.putAssumeCapacityNoClobber(key.toPropertyKey(agent) catch |err| try noexcept(err), {});
@@ -1065,7 +1065,7 @@ pub const namespace = struct {
         const indent: *const String = .empty;
 
         // 3. Let propertyList be undefined.
-        var property_list: ?PropertyKey.ArrayHashMapUnmanaged(void) = null;
+        var property_list: ?PropertyKey.ArrayHashMap(void) = null;
         defer if (property_list) |*p| p.deinit(agent.gc_allocator);
 
         // 4. Let replacerFunc be undefined.

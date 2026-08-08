@@ -1746,8 +1746,8 @@ const KeyCoercion = enum { property, collection };
 
 fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
     return switch (key_coercion) {
-        .property => PropertyKey.ArrayHashMapUnmanaged(std.ArrayList(Value)),
-        .collection => Value.ArrayHashMapUnmanaged(std.ArrayList(Value), sameValue),
+        .property => PropertyKey.ArrayHashMap(std.ArrayList(Value)),
+        .collection => Value.ArrayHashMap(std.ArrayList(Value), sameValue),
     };
 }
 
@@ -2571,7 +2571,7 @@ pub fn hash(value: Value) u32 {
     return tag ^ value_hash;
 }
 
-pub fn ArrayHashMapUnmanaged(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
+pub fn ArrayHashMap(comptime V: type, comptime eqlFn: fn (Value, Value) bool) type {
     return std.array_hash_map.Custom(Value, V, struct {
         pub fn hash(_: @This(), key: Value) u32 {
             return key.hash();

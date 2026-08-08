@@ -239,7 +239,7 @@ pub const prototype = struct {
     }
 };
 
-const WeakSetData = Value.Weak.HashMapUnmanaged(void);
+const WeakSetData = Value.Weak.HashMap(void);
 
 /// 24.4.4 Properties of WeakSet Instances
 /// https://tc39.es/ecma262/#sec-properties-of-weakset-instances

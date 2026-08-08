@@ -343,7 +343,7 @@ pub const prototype = struct {
     }
 };
 
-const WeakMapData = Value.Weak.HashMapUnmanaged(Value);
+const WeakMapData = Value.Weak.HashMap(Value);
 
 /// 24.3.4 Properties of WeakMap Instances
 /// https://tc39.es/ecma262/#sec-properties-of-weakmap-instances

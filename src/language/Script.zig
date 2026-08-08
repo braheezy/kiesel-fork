@@ -33,7 +33,7 @@ realm: *Realm,
 ecmascript_code: ast.Script,
 
 /// [[LoadedModules]]
-loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
+loaded_modules: ModuleRequest.HashMap(Module),
 
 /// [[HostDefined]]
 host_defined: ?*anyopaque,
@@ -211,7 +211,7 @@ pub fn globalDeclarationInstantiation(
     defer funcs_to_initialize.deinit(agent.gc_allocator);
 
     // 7. Let declaredFuncNames be a new empty List.
-    var declared_func_names: String.HashMapUnmanaged(void) = .empty;
+    var declared_func_names: String.HashMap(void) = .empty;
     defer declared_func_names.deinit(agent.gc_allocator);
 
     // 8. For each element variableDecl of variableDecls, in reverse List order, do
@@ -257,7 +257,7 @@ pub fn globalDeclarationInstantiation(
     }
 
     // 9. Let declaredVariableNames be a new empty List.
-    var declared_variable_names: String.HashMapUnmanaged(void) = .empty;
+    var declared_variable_names: String.HashMap(void) = .empty;
     defer declared_variable_names.deinit(agent.gc_allocator);
 
     var bound_names: std.ArrayList(ast.Identifier) = .empty;

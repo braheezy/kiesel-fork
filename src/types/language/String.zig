@@ -875,7 +875,7 @@ pub fn concat(
     return builder.build(agent);
 }
 
-pub fn HashMapUnmanaged(comptime V: type) type {
+pub fn HashMap(comptime V: type) type {
     return std.HashMapUnmanaged(*const String, V, struct {
         pub fn hash(_: @This(), key: *const String) u64 {
             return key.hash;
@@ -887,7 +887,7 @@ pub fn HashMapUnmanaged(comptime V: type) type {
     }, std.hash_map.default_max_load_percentage);
 }
 
-pub fn ArrayHashMapUnmanaged(comptime V: type) type {
+pub fn ArrayHashMap(comptime V: type) type {
     return std.array_hash_map.Custom(*const String, V, struct {
         pub fn hash(_: @This(), key: *const String) u32 {
             return @truncate(key.hash);

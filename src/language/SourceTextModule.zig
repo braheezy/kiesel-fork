@@ -90,7 +90,7 @@ dfs_ancestor_index: ?usize,
 requested_modules: std.ArrayList(ModuleRequest),
 
 /// [[LoadedModules]]
-loaded_modules: ModuleRequest.HashMapUnmanaged(Module),
+loaded_modules: ModuleRequest.HashMap(Module),
 
 /// [[CycleRoot]]
 cycle_root: ?*SourceTextModule,
@@ -1658,7 +1658,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
     try code.collectVarScopedDeclarations(agent.gc_allocator, &variable_decls);
 
     // 20. Let declaredVariableNames be a new empty List.
-    var declared_variable_names: String.HashMapUnmanaged(void) = .empty;
+    var declared_variable_names: String.HashMap(void) = .empty;
     defer declared_variable_names.deinit(agent.gc_allocator);
 
     var bound_names: std.ArrayList(ast.Identifier) = .empty;
