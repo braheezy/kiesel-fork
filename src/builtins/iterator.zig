@@ -22,6 +22,7 @@ const getIteratorDirect = types.getIteratorDirect;
 const getIteratorFlattenable = types.getIteratorFlattenable;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const sameValueZero = types.sameValueZero;
 
 /// 27.1.3.1 The Iterator Constructor
 /// https://tc39.es/ecma262/#sec-iterator-constructor
@@ -885,6 +886,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "find", find, 1, realm);
         try object.defineBuiltinFunction(agent, "flatMap", flatMap, 1, realm);
         try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
+        try object.defineBuiltinFunction(agent, "includes", includes, 1, realm);
         try object.defineBuiltinFunction(agent, "map", map, 1, realm);
         try object.defineBuiltinFunction(agent, "reduce", reduce, 1, realm);
         try object.defineBuiltinFunction(agent, "some", some, 1, realm);
@@ -1468,6 +1470,105 @@ pub const prototype = struct {
             counter += 1;
         }
         return .undefined;
+    }
+
+    /// 1 Iterator.prototype.includes ( searchElement [ , skippedElements ] )
+    /// https://tc39.es/proposal-iterator-includes/#sec-iterator.prototype.includes
+    fn includes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const search_element = arguments.get(0);
+        const skipped_elements = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. If O is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+        const obj = this_value.asObject();
+
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
+        var iterated: types.Iterator = .{
+            .iterator = obj,
+            .next_method = .undefined,
+            .done = false,
+        };
+
+        const to_skip: f64 = blk: {
+            // 4. If skippedElements is undefined, then
+            //     a. Let toSkip be +0𝔽.
+            if (skipped_elements.isUndefined()) break :blk 0;
+
+            // 5. Else,
+            //     a. If skippedElements is not one of +∞𝔽, -∞𝔽, or an integral Number, then
+            if (skipped_elements.isNumber() and
+                (skipped_elements.asNumber().isPositiveInf() or
+                    skipped_elements.asNumber().isNegativeInf() or
+                    skipped_elements.asNumber().isIntegral()))
+            {
+                break :blk skipped_elements.asNumber().asFloat();
+            }
+
+            // i. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Skipped elements must be an integral number",
+                .{},
+            );
+
+            // ii. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+
+            // b. Let toSkip be skippedElements.
+        };
+
+        // 6. If toSkip < -0𝔽, then
+        if (to_skip < 0) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Skipped elements must not be negative",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 7. If toSkip is finite and toSkip > 𝔽(2**53 - 1), then
+        if (std.math.isFinite(to_skip) and to_skip > std.math.maxInt(u53)) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Skipped elements must not exceed 2^53 - 1",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 8. Let skipped be +0𝔽.
+        var skipped: f64 = 0;
+
+        // 9. Set iterated to ? GetIteratorDirect(O).
+        iterated = try getIteratorDirect(agent, obj);
+
+        // 10. Repeat,
+        //     a. Let value be ? IteratorStepValue(iterated).
+        //     b. If value is done, return false.
+        while (try iterated.stepValue(agent)) |value| {
+            // c. If skipped < toSkip, then
+            if (skipped < to_skip) {
+                // i. Set skipped to skipped + 1𝔽.
+                skipped += 1;
+            }
+            // d. Else if SameValueZero(value, searchElement) is true, then
+            else if (sameValueZero(value, search_element)) {
+                // i. Return ? IteratorClose(iterated, NormalCompletion(true)).
+                return iterated.close(agent, @as(Agent.Error!Value, .true));
+            }
+        }
+        return .false;
     }
 
     /// 27.1.3.3.6 Iterator.prototype.flatMap ( mapper )
