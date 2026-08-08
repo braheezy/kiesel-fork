@@ -664,7 +664,7 @@ pub const Number = union(enum) {
                 const scientific = std.fmt.bufPrint(&buffer, "{e}", .{x}) catch |err| switch (err) {
                     error.NoSpaceLeft => unreachable,
                 };
-                const exponent_index = std.mem.indexOfScalar(u8, scientific, 'e').?;
+                const exponent_index = std.mem.findScalar(u8, scientific, 'e').?;
                 try writer.writeAll(scientific[0 .. exponent_index + 1]);
                 const exponent = scientific[exponent_index + 1 ..];
                 if (exponent[0] != '-') {

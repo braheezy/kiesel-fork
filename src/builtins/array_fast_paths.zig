@@ -16,7 +16,7 @@ const sameValueZero = types.sameValueZero;
 const FindViaPredicateDirection = builtins.array.FindViaPredicateDirection;
 const FindViaPredicateResult = builtins.array.FindViaPredicateResult;
 
-fn lastIndexOfScalarPos(comptime T: type, slice: []const T, start_index: usize, value: T) ?usize {
+fn findLastScalarPos(comptime T: type, slice: []const T, start_index: usize, value: T) ?usize {
     var i: usize = start_index;
     while (true) : (i -= 1) {
         if (slice[i] == value) return i;
@@ -501,7 +501,7 @@ pub fn lastIndexOf(obj: *Object, length: u53, from_index: u53, search_element: V
         .none => {},
         .dense_i32 => |dense_i32| {
             const search_element_i32 = toI32(search_element) orelse return Value.from(-1);
-            if (lastIndexOfScalarPos(
+            if (findLastScalarPos(
                 i32,
                 dense_i32.items,
                 start_index,
@@ -512,7 +512,7 @@ pub fn lastIndexOf(obj: *Object, length: u53, from_index: u53, search_element: V
         },
         .dense_f64 => |dense_f64| {
             const search_element_f64 = toF64(search_element) orelse return Value.from(-1);
-            if (lastIndexOfScalarPos(
+            if (findLastScalarPos(
                 f64,
                 dense_f64.items,
                 start_index,

@@ -564,7 +564,7 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
     if (from_index >= length or search_length > length) return null;
     if (self.isAscii() and search_value.isAscii()) {
         const end = std.math.clamp(from_index + search_length, 0, length);
-        return if (std.mem.lastIndexOf(
+        return if (std.mem.findLast(
             u8,
             self.asAscii()[0..end],
             search_value.asAscii(),
@@ -575,7 +575,7 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
     }
     if (self.isUtf16() and search_value.isUtf16()) {
         const end = std.math.clamp(from_index + search_length, 0, length);
-        return if (std.mem.lastIndexOf(
+        return if (std.mem.findLast(
             u16,
             self.asUtf16()[0..end],
             search_value.asUtf16(),
