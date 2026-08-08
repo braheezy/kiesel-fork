@@ -878,6 +878,7 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "chunks", chunks, 1, realm);
         try object.defineBuiltinFunction(agent, "drop", drop, 1, realm);
         try object.defineBuiltinFunction(agent, "every", every, 1, realm);
         try object.defineBuiltinFunction(agent, "filter", filter, 1, realm);
@@ -889,6 +890,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "some", some, 1, realm);
         try object.defineBuiltinFunction(agent, "take", take, 1, realm);
         try object.defineBuiltinFunction(agent, "toArray", toArray, 0, realm);
+        try object.defineBuiltinFunction(agent, "windows", windows, 1, realm);
         try object.defineBuiltinFunction(agent, "Symbol.dispose", @"Symbol.dispose", 0, realm);
         try object.defineBuiltinFunction(agent, "Symbol.iterator", @"Symbol.iterator", 0, realm);
 
@@ -965,6 +967,138 @@ pub const prototype = struct {
             }.set,
             realm,
         );
+    }
+
+    /// 1 Iterator.prototype.chunks ( chunkSize )
+    /// https://tc39.es/proposal-iterator-chunking/#sec-iterator.prototype.chunks
+    fn chunks(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const chunk_size_value = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. If O is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+        const obj = this_value.asObject();
+
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
+        var iterated: types.Iterator = .{
+            .iterator = obj,
+            .next_method = .undefined,
+            .done = false,
+        };
+
+        // 4. If chunkSize is not an integral Number, then
+        if (!chunk_size_value.isNumber() or !chunk_size_value.asNumber().isIntegral()) {
+            // a. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Chunk size must be an integral number",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 5. If chunkSize is not in the inclusive interval from 1𝔽 to 𝔽(2**32 - 1), then
+        const chunk_size_float = chunk_size_value.asNumber().asFloat();
+        if (chunk_size_float < 1 or chunk_size_float > std.math.maxInt(u32)) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Chunk size must be in the inclusive interval from 1 to 2^32 - 1",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+        const chunk_size: u32 = @intFromFloat(chunk_size_float);
+
+        // 6. Set iterated to ? GetIteratorDirect(O).
+        iterated = try getIteratorDirect(agent, obj);
+
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
+        const Captures = struct {
+            iterated: *types.Iterator,
+            chunk_size: u32,
+            buffer: std.ArrayList(Value),
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .chunk_size = chunk_size,
+            .buffer = .empty,
+        };
+
+        // 7. Let closure be a new Abstract Closure with no parameters that captures iterated and
+        //    chunkSize and performs the following steps when called:
+        const closure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
+                const iterated_ = captures_.iterated;
+                const chunk_size_ = captures_.chunk_size;
+                const buffer = &captures_.buffer;
+
+                // a. Let buffer be a new empty List.
+                // b. Repeat,
+                while (true) {
+                    // i. Let value be ? IteratorStepValue(iterated).
+                    // ii. If value is done, then
+                    const value = try iterated_.stepValue(agent_) orelse {
+                        // 1. If buffer is not empty, then
+                        if (buffer.items.len != 0) {
+                            defer buffer.clearAndFree(agent_.gc_allocator);
+
+                            // a. Perform Completion(Yield(CreateArrayFromList(buffer))).
+                            const array = try createArrayFromList(agent_, buffer.items);
+                            return Value.from(&array.object);
+                        }
+
+                        // 2. Return ReturnCompletion(undefined).
+                        return null;
+                    };
+
+                    // iii. Append value to buffer.
+                    try buffer.append(agent_.gc_allocator, value);
+
+                    // iv. If the number of elements in buffer is ℝ(chunkSize), then
+                    if (buffer.items.len == chunk_size_) {
+                        defer buffer.clearRetainingCapacity();
+
+                        // 1. Let completion be Completion(Yield(CreateArrayFromList(buffer))).
+                        const array = try createArrayFromList(agent_, buffer.items);
+
+                        // 2. IfAbruptCloseIterator(completion, iterated).
+                        // 3. Set buffer to a new empty List.
+                        return Value.from(&array.object);
+                    }
+                }
+            }
+        }.func;
+
+        // 8. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        const result = try builtins.IteratorHelper.create(agent, .{
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
+            .fields = .{
+                .state = .{
+                    // 9. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
+
+                    .closure = closure,
+                    .captures = captures,
+                },
+            },
+        });
+
+        // 10. Return result.
+        return Value.from(&result.object);
     }
 
     /// 27.1.3.3.2 Iterator.prototype.drop ( limit )
@@ -1973,6 +2107,171 @@ pub const prototype = struct {
         }
         const array = try createArrayFromList(agent, items.items);
         return Value.from(&array.object);
+    }
+
+    /// 2 Iterator.prototype.windows ( windowSize [ , undersized ] )
+    /// https://tc39.es/proposal-iterator-chunking/#sec-iterator.prototype.windows
+    fn windows(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const window_size_value = arguments.get(0);
+        const undersized_value = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. If O is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+        const obj = this_value.asObject();
+
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
+        var iterated: types.Iterator = .{
+            .iterator = obj,
+            .next_method = .undefined,
+            .done = false,
+        };
+
+        // 4. If windowSize is not an integral Number, then
+        if (!window_size_value.isNumber() or !window_size_value.asNumber().isIntegral()) {
+            // a. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Window size must be an integral number",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 5. If windowSize is not in the inclusive interval from 1𝔽 to 𝔽(2**32 - 1), then
+        const window_size_float = window_size_value.asNumber().asFloat();
+        if (window_size_float < 1 or window_size_float > std.math.maxInt(u32)) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Window size must be in the inclusive interval from 1 to 2^32 - 1",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+        const window_size: u32 = @intFromFloat(window_size_float);
+
+        const Undersized = enum { only_full, allow_partial };
+
+        // 6. If undersized is undefined, set undersized to "only-full".
+        // 7. If undersized is neither "only-full" nor "allow-partial", then
+        const undersized: Undersized = blk: {
+            if (undersized_value.isUndefined()) break :blk .only_full;
+            if (undersized_value.isString()) {
+                if (undersized_value.asString().eql(String.fromLiteral("only-full"))) break :blk .only_full;
+                if (undersized_value.asString().eql(String.fromLiteral("allow-partial"))) break :blk .allow_partial;
+            }
+
+            // a. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Invalid undersized {f}",
+                .{undersized_value},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        };
+
+        // 8. Set iterated to ? GetIteratorDirect(O).
+        iterated = try getIteratorDirect(agent, obj);
+
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
+        const Captures = struct {
+            iterated: *types.Iterator,
+            window_size: u32,
+            undersized: Undersized,
+            buffer: std.ArrayList(Value),
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .window_size = window_size,
+            .undersized = undersized,
+            .buffer = .empty,
+        };
+
+        // 9. Let closure be a new Abstract Closure with no parameters that captures iterated,
+        //    windowSize, and undersized and performs the following steps when called:
+        const closure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
+                const iterated_ = captures_.iterated;
+                const window_size_ = captures_.window_size;
+                const undersized_ = captures_.undersized;
+                const buffer = &captures_.buffer;
+
+                // a. Let buffer be a new empty List.
+                // b. Repeat,
+                while (true) {
+                    // i. Let value be ? IteratorStepValue(iterated).
+                    // ii. If value is done, then
+                    const value = try iterated_.stepValue(agent_) orelse {
+                        defer buffer.clearAndFree(agent_.gc_allocator);
+
+                        // 1. If undersized is "allow-partial", buffer is not empty, and the number
+                        //    of elements in buffer < ℝ(windowSize), then
+                        if (undersized_ == .allow_partial and
+                            buffer.items.len != 0 and
+                            buffer.items.len < window_size_)
+                        {
+                            // a. Perform Completion(Yield(CreateArrayFromList(buffer))).
+                            const array = try createArrayFromList(agent_, buffer.items);
+                            return Value.from(&array.object);
+                        }
+
+                        // 2. Return ReturnCompletion(undefined).
+                        return null;
+                    };
+
+                    // iii. If the number of elements in buffer is ℝ(windowSize), then
+                    if (buffer.items.len == window_size_) {
+                        // 1. Remove the first element from buffer.
+                        _ = buffer.orderedRemove(0);
+                    }
+
+                    // iv. Append value to buffer.
+                    try buffer.append(agent_.gc_allocator, value);
+
+                    // v. If the number of elements in buffer is ℝ(windowSize), then
+                    if (buffer.items.len == window_size_) {
+                        // 1. Let completion be Completion(Yield(CreateArrayFromList(buffer))).
+                        const array = try createArrayFromList(agent_, buffer.items);
+
+                        // 2. IfAbruptCloseIterator(completion, iterated).
+                        return Value.from(&array.object);
+                    }
+                }
+            }
+        }.func;
+
+        // 10. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
+        //     %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        const result = try builtins.IteratorHelper.create(agent, .{
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
+            .fields = .{
+                .state = .{
+                    // 11. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
+
+                    .closure = closure,
+                    .captures = captures,
+                },
+            },
+        });
+
+        // 12. Return result.
+        return Value.from(&result.object);
     }
 
     /// 27.1.3.3.13 Iterator.prototype [ %Symbol.dispose% ] ( )
