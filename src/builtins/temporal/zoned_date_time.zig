@@ -121,7 +121,8 @@ pub const constructor = struct {
 
         // 5. Let timeZoneParse be ? ParseTimeZoneIdentifier(timeZone).
         // 6. If timeZoneParse.[[OffsetMinutes]] is empty, then
-        //     a. Let identifierRecord be GetAvailableNamedTimeZoneIdentifier(timeZoneParse.[[Name]]).
+        //     a. Let identifierRecord be GetAvailableNamedTimeZoneIdentifier(
+        //        timeZoneParse.[[Name]]).
         //     b. If identifierRecord is empty, throw a RangeError exception.
         //     c. Set timeZone to identifierRecord.[[Identifier]].
         // 7. Else,
@@ -146,7 +147,8 @@ pub const constructor = struct {
         // 10. Set calendar to ? CanonicalizeCalendar(calendar).
         const calendar = try canonicalizeCalendar(agent, calendar_value.asString());
 
-        // 11. Return ? CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar, NewTarget).
+        // 11. Return ? CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar,
+        //     NewTarget).
         const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
@@ -282,7 +284,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Return ? AddDurationToZonedDateTime(add, zonedDateTime, temporalDurationLike, options).
+        // 3. Return ? AddDurationToZonedDateTime(add, zonedDateTime, temporalDurationLike,
+        //    options).
         const new_zoned_date_time = try addDurationToZonedDateTime(
             agent,
             .add,
@@ -319,8 +322,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[Day]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[Day]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_day(zoned_date_time.fields.inner),
         );
@@ -333,36 +338,42 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DaysInMonth]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[DaysInMonth]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_days_in_month(zoned_date_time.fields.inner),
         );
     }
 
     /// 6.3.19 get Temporal.ZonedDateTime.prototype.dayOfWeek
-    /// https://tc39.es/proposal-temporal/#sec-get-temporal.zoneddatetime.prototype.dayoftheweek
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.zoneddatetime.prototype.dayofweek
     fn dayOfWeek(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let zonedDateTime be the this value.
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DayOfWeek]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[DayOfWeek]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_day_of_week(zoned_date_time.fields.inner),
         );
     }
 
     /// 6.3.20 get Temporal.ZonedDateTime.prototype.dayOfYear
-    /// https://tc39.es/proposal-temporal/#sec-get-temporal.zoneddatetime.prototype.dayoftheyear
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.zoneddatetime.prototype.dayofyear
     fn dayOfYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let zonedDateTime be the this value.
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DayOfYear]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[DayOfYear]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_day_of_year(zoned_date_time.fields.inner),
         );
@@ -375,8 +386,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DaysInWeek]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[DaysInWeek]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_days_in_week(zoned_date_time.fields.inner),
         );
@@ -389,8 +402,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[DaysInYear]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[DaysInYear]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_days_in_year(zoned_date_time.fields.inner),
         );
@@ -438,7 +453,8 @@ pub const prototype = struct {
         const other = try toTemporalZonedDateTime(agent, other_value, null);
 
         // 4. If zonedDateTime.[[EpochNanoseconds]] ≠ other.[[EpochNanoseconds]], return false.
-        // 5. If TimeZoneEquals(zonedDateTime.[[TimeZone]], other.[[TimeZone]]) is false, return false.
+        // 5. If TimeZoneEquals(zonedDateTime.[[TimeZone]], other.[[TimeZone]]) is false, return
+        //    false.
         // 6. Return CalendarEquals(zonedDateTime.[[Calendar]], other.[[Calendar]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_equals(
@@ -455,7 +471,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[Era]].
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_ZonedDateTime_era(zoned_date_time.fields.inner, &write.inner);
@@ -473,8 +490,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Let result be CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[EraYear]].
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Let result be CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[EraYear]].
         const result = temporal_rs.c.temporal_rs_ZonedDateTime_era_year(
             zoned_date_time.fields.inner,
         );
@@ -529,12 +548,15 @@ pub const prototype = struct {
 
         // 8. If IsOffsetTimeZoneIdentifier(timeZone) is true, return null.
         // 9. If direction is next, then
-        //     a. Let transition be GetNamedTimeZoneNextTransition(timeZone, zonedDateTime.[[EpochNanoseconds]]).
+        //     a. Let transition be GetNamedTimeZoneNextTransition(timeZone,
+        //        zonedDateTime.[[EpochNanoseconds]]).
         // 10. Else,
         //     a. Assert: direction is previous.
-        //     b. Let transition be GetNamedTimeZonePreviousTransition(timeZone, zonedDateTime.[[EpochNanoseconds]]).
+        //     b. Let transition be GetNamedTimeZonePreviousTransition(timeZone,
+        //        zonedDateTime.[[EpochNanoseconds]]).
         // 11. If transition is null, return null.
-        // 12. Return ! CreateTemporalZonedDateTime(transition, timeZone, zonedDateTime.[[Calendar]]).
+        // 12. Return ! CreateTemporalZonedDateTime(transition, timeZone,
+        //     zonedDateTime.[[Calendar]]).
         const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_ZonedDateTime_get_time_zone_transition(
@@ -559,7 +581,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(isoDateTime.[[Time]].[[Hour]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_hour(zoned_date_time.fields.inner),
@@ -595,8 +618,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[InLeapYear]].
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[InLeapYear]].
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_in_leap_year(zoned_date_time.fields.inner),
         );
@@ -609,7 +634,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(isoDateTime.[[Time]].[[Microsecond]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_microsecond(zoned_date_time.fields.inner),
@@ -623,7 +649,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(isoDateTime.[[Time]].[[Millisecond]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_millisecond(zoned_date_time.fields.inner),
@@ -637,7 +664,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(isoDateTime.[[Time]].[[Minute]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_minute(zoned_date_time.fields.inner),
@@ -651,8 +679,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[Month]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[Month]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_month(zoned_date_time.fields.inner),
         );
@@ -665,8 +695,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[MonthCode]].
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[MonthCode]].
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_ZonedDateTime_month_code(zoned_date_time.fields.inner, &write.inner);
         return Value.from(try String.fromAscii(agent, try write.toOwnedSlice()));
@@ -679,8 +711,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[MonthsInYear]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[MonthsInYear]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_months_in_year(zoned_date_time.fields.inner),
         );
@@ -693,7 +727,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(isoDateTime.[[Time]].[[Nanosecond]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_nanosecond(zoned_date_time.fields.inner),
@@ -707,7 +742,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let offsetNanoseconds be GetOffsetNanosecondsFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
+        // 3. Let offsetNanoseconds be GetOffsetNanosecondsFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return FormatUTCOffsetNanoseconds(offsetNanoseconds).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         // NOTE: I don't think this is actually fallible
@@ -726,7 +762,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Return 𝔽(GetOffsetNanosecondsFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]])).
+        // 3. Return 𝔽(GetOffsetNanosecondsFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]])).
         const offset_nanoseconds = temporal_rs.c.temporal_rs_ZonedDateTime_offset_nanoseconds(zoned_date_time.fields.inner);
         return Value.from(@as(f64, @floatFromInt(offset_nanoseconds)));
     }
@@ -740,9 +777,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. If roundTo is undefined, then
+        // 3. If roundTo is undefined, throw a TypeError exception.
         if (round_to.isUndefined()) {
-            // a. Throw a TypeError exception.
             return agent.throwException(.type_error, "Argument must not be undefined", .{});
         }
 
@@ -808,7 +844,8 @@ pub const prototype = struct {
         //     c. Let inclusive be false.
         // 13. Perform ? ValidateTemporalRoundingIncrement(roundingIncrement, maximum, inclusive).
         // 14. If smallestUnit is nanosecond and roundingIncrement = 1, then
-        //     a. Return ! CreateTemporalZonedDateTime(zonedDateTime.[[EpochNanoseconds]], zonedDateTime.[[TimeZone]], zonedDateTime.[[Calendar]]).
+        //     a. Return ! CreateTemporalZonedDateTime(zonedDateTime.[[EpochNanoseconds]],
+        //        zonedDateTime.[[TimeZone]], zonedDateTime.[[Calendar]]).
         // 15. Let thisNs be zonedDateTime.[[EpochNanoseconds]].
         // 16. Let timeZone be zonedDateTime.[[TimeZone]].
         // 17. Let calendar be zonedDateTime.[[Calendar]].
@@ -822,12 +859,16 @@ pub const prototype = struct {
         //     f. Assert: thisNs < endNs.
         //     g. Let dayLengthNs be ℝ(endNs - startNs).
         //     h. Let dayProgressNs be TimeDurationFromEpochNanosecondsDifference(thisNs, startNs).
-        //     i. Let roundedDayNs be ! RoundTimeDurationToIncrement(dayProgressNs, dayLengthNs, roundingMode).
+        //     i. Let roundedDayNs be ! RoundTimeDurationToIncrement(dayProgressNs, dayLengthNs,
+        //        roundingMode).
         //     j. Let epochNanoseconds be AddTimeDurationToEpochNanoseconds(roundedDayNs, startNs).
         // 20. Else,
-        //     a. Let roundResult be RoundISODateTime(isoDateTime, roundingIncrement, smallestUnit, roundingMode).
+        //     a. Let roundResult be RoundISODateTime(isoDateTime, roundingIncrement, smallestUnit,
+        //        roundingMode).
         //     b. Let offsetNanoseconds be GetOffsetNanosecondsFor(timeZone, thisNs).
-        //     c. Let epochNanoseconds be ? InterpretISODateTimeOffset(roundResult.[[ISODate]], roundResult.[[Time]], option, offsetNanoseconds, timeZone, compatible, prefer, match-exactly).
+        //     c. Let epochNanoseconds be ? InterpretISODateTimeOffset(roundResult.[[ISODate]],
+        //        roundResult.[[Time]], option, offsetNanoseconds, timeZone, compatible, prefer,
+        //        match-exactly).
         // 21. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
         const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
@@ -857,7 +898,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
         // 4. Return 𝔽(isoDateTime.[[Time]].[[Second]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_second(zoned_date_time.fields.inner),
@@ -920,7 +962,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Return ? AddDurationToZonedDateTime(subtract, zonedDateTime, temporalDurationLike, options).
+        // 3. Return ? AddDurationToZonedDateTime(subtract, zonedDateTime, temporalDurationLike,
+        //    options).
         const new_zoned_date_time = try addDurationToZonedDateTime(
             agent,
             .subtract,
@@ -1193,14 +1236,16 @@ pub const prototype = struct {
     }
 
     /// 6.3.21 get Temporal.ZonedDateTime.prototype.weekOfYear
-    /// https://tc39.es/proposal-temporal/#sec-get-temporal.zoneddatetime.prototype.weekoftheyear
+    /// https://tc39.es/proposal-temporal/#sec-get-temporal.zoneddatetime.prototype.weekofyear
     fn weekOfYear(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let zonedDateTime be the this value.
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Let result be CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[WeekOfYear]].[[Week]].
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Let result be CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[WeekOfYear]].[[Week]].
         const result = temporal_rs.c.temporal_rs_ZonedDateTime_week_of_year(
             zoned_date_time.fields.inner,
         );
@@ -1222,7 +1267,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. If ? IsPartialTemporalObject(temporalZonedDateTimeLike) is false, throw a TypeError exception.
+        // 3. If ? IsPartialTemporalObject(temporalZonedDateTimeLike) is false, throw a TypeError
+        //    exception.
         if (!try isPartialTemporalObject(agent, temporal_zoned_date_time_like)) {
             return agent.throwException(
                 .type_error,
@@ -1249,9 +1295,9 @@ pub const prototype = struct {
         // 14. Set fields.[[Microsecond]] to isoDateTime.[[Time]].[[Microsecond]].
         // 15. Set fields.[[Nanosecond]] to isoDateTime.[[Time]].[[Nanosecond]].
         // 16. Set fields.[[OffsetString]] to FormatUTCOffsetNanoseconds(offsetNanoseconds).
-        // 17. Let partialZonedDateTime be ? PrepareCalendarFields(calendar, temporalZonedDateTimeLike,
-        //     « year, month, month-code, day », « hour, minute, second, millisecond, microsecond,
-        //     nanosecond, offset », partial).
+        // 17. Let partialZonedDateTime be ? PrepareCalendarFields(calendar,
+        //     temporalZonedDateTimeLike, « year, month, month-code, day », « hour, minute, second,
+        //     millisecond, microsecond, nanosecond, offset », partial).
         // 18. Set fields to CalendarMergeFields(calendar, fields, partialZonedDateTime).
         const fields = try prepareCalendarFields(
             agent,
@@ -1369,7 +1415,8 @@ pub const prototype = struct {
             // a. Let plainTime be ? ToTemporalTime(plainTimeLike).
             break :blk try toTemporalPlainTime(agent, plain_time_like, null);
 
-            // b. Let resultISODateTime be CombineISODateAndTimeRecord(isoDateTime.[[ISODate]], plainTime.[[Time]]).
+            // b. Let resultISODateTime be CombineISODateAndTimeRecord(isoDateTime.[[ISODate]],
+            //    plainTime.[[Time]]).
             // c. Let epochNs be ? GetEpochNanosecondsFor(timeZone, resultISODateTime, compatible).
         };
 
@@ -1427,8 +1474,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[Year]]).
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Return 𝔽(CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[Year]]).
         return Value.from(
             temporal_rs.c.temporal_rs_ZonedDateTime_year(zoned_date_time.fields.inner),
         );
@@ -1441,8 +1490,10 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(zonedDateTime, [[InitializedTemporalZonedDateTime]]).
         const zoned_date_time = try this_value.requireInternalSlot(agent, ZonedDateTime);
 
-        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]], zonedDateTime.[[EpochNanoseconds]]).
-        // 4. Let result be CalendarISOToDate(zonedDateTime.[[Calendar]], isoDateTime.[[ISODate]]).[[WeekOfYear]].[[Year]].
+        // 3. Let isoDateTime be GetISODateTimeFor(zonedDateTime.[[TimeZone]],
+        //    zonedDateTime.[[EpochNanoseconds]]).
+        // 4. Let result be CalendarISOToDate(zonedDateTime.[[Calendar]],
+        //    isoDateTime.[[ISODate]]).[[WeekOfYear]].[[Year]].
         const result = temporal_rs.c.temporal_rs_ZonedDateTime_year_of_week(
             zoned_date_time.fields.inner,
         );
@@ -1480,8 +1531,8 @@ pub fn toTemporalZonedDateTime(
     // 1. If options is not present, set options to undefined.
     const options_value: Value = maybe_options_value orelse .undefined;
 
-    // 2. Let offsetBehaviour be option.
-    // 3. Let hasUTCDesignator be false.
+    // 2. Let hasUTCDesignator be false.
+    // 3. Let matchBehaviour be match-exactly.
     // 4. If item is an Object, then
     const temporal_rs_zoned_date_time = if (item.isObject()) blk: {
         // a. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
@@ -1517,9 +1568,9 @@ pub fn toTemporalZonedDateTime(
         // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
         const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, item.asObject());
 
-        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day »,
-        //    « hour, minute, second, millisecond, microsecond, nanosecond, offset, time-zone »,
-        //    « time-zone »).
+        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code,
+        //    day », « hour, minute, second, millisecond, microsecond, nanosecond, offset,
+        //    time-zone », « time-zone »).
         // d. Let timeZone be fields.[[TimeZone]].
         // e. Let offsetString be fields.[[OffsetString]].
         const fields = try prepareCalendarFields(
@@ -1661,7 +1712,7 @@ pub fn toTemporalZonedDateTime(
     // 10. If offsetBehaviour is option, then
     //     a. Set offsetNanoseconds to ! ParseDateTimeUTCOffset(offsetString).
     // 11. Let epochNanoseconds be ? InterpretISODateTimeOffset(isoDate, time, offsetBehaviour,
-    //    offsetNanoseconds, timeZone, disambiguation, offsetOption, matchBehaviour).
+    //     offsetNanoseconds, timeZone, disambiguation, offsetOption, matchBehaviour).
     // 12. Return ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
     return createTemporalZonedDateTime(
         agent,
@@ -1683,8 +1734,9 @@ pub fn createTemporalZonedDateTime(
     // 2. If newTarget is not present, set newTarget to %Temporal.ZonedDateTime%.
     const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_zoned_date_time);
 
-    // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.ZonedDateTime.prototype%",
-    //    « [[InitializedTemporalZonedDateTime]], [[EpochNanoseconds]], [[TimeZone]], [[Calendar]] »).
+    // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget,
+    //    "%Temporal.ZonedDateTime.prototype%", « [[InitializedTemporalZonedDateTime]],
+    //    [[EpochNanoseconds]], [[TimeZone]], [[Calendar]] »).
     // 4. Set object.[[EpochNanoseconds]] to epochNanoseconds.
     // 5. Set object.[[TimeZone]] to timeZone.
     // 6. Set object.[[Calendar]] to calendar.
@@ -1710,13 +1762,14 @@ fn differenceTemporalZonedDateTime(
     // 1. Set other to ? ToTemporalZonedDateTime(other).
     const other = try toTemporalZonedDateTime(agent, other_value, null);
 
-    // 2. If CalendarEquals(zonedDateTime.[[Calendar]], other.[[Calendar]]) is false, then
-    if (temporal_rs.c.temporal_rs_Calendar_kind(
-        temporal_rs.c.temporal_rs_ZonedDateTime_calendar(zoned_date_time.fields.inner),
-    ) != temporal_rs.c.temporal_rs_Calendar_kind(
-        temporal_rs.c.temporal_rs_ZonedDateTime_calendar(other.fields.inner),
-    )) {
-        // a. Throw a RangeError exception.
+    // 2. If CalendarEquals(zonedDateTime.[[Calendar]], other.[[Calendar]]) is false, throw a
+    //    RangeError exception.
+    if (blk: {
+        const zdt_calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(zoned_date_time.fields.inner);
+        const other_calendar = temporal_rs.c.temporal_rs_ZonedDateTime_calendar(other.fields.inner);
+        break :blk temporal_rs.c.temporal_rs_Calendar_kind(zdt_calendar) !=
+            temporal_rs.c.temporal_rs_Calendar_kind(other_calendar);
+    }) {
         return agent.throwException(
             .range_error,
             "Difference requires equal calendars",
@@ -1735,20 +1788,21 @@ fn differenceTemporalZonedDateTime(
     //     a. Let internalDuration be DifferenceInstant(zonedDateTime.[[EpochNanoseconds]],
     //        other.[[EpochNanoseconds]], settings.[[RoundingIncrement]], settings.[[SmallestUnit]],
     //        settings.[[RoundingMode]]).
-    //     b. Let result be ! TemporalDurationFromInternal(internalDuration, settings.[[LargestUnit]]).
+    //     b. Let result be ! TemporalDurationFromInternal(internalDuration,
+    //        settings.[[LargestUnit]]).
     //     c. If operation is since, set result to CreateNegatedTemporalDuration(result).
     //     d. Return result.
     // 6. NOTE: To calculate differences in two different time zones, settings.[[LargestUnit]] must
     //    be a time unit, because day lengths can vary between time zones due to DST and other UTC
     //    offset shifts.
-    // 7. If TimeZoneEquals(zonedDateTime.[[TimeZone]], other.[[TimeZone]]) is false, then
-    //     a. Throw a RangeError exception.
-    // 8. If zonedDateTime.[[EpochNanoseconds]] = other.[[EpochNanoseconds]], then
-    //     a. Return ! CreateTemporalDuration(0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
-    // 9. Let internalDuration be ? DifferenceZonedDateTimeWithRounding(zonedDateTime.[[EpochNanoseconds]],
-    //    other.[[EpochNanoseconds]], zonedDateTime.[[TimeZone]], zonedDateTime.[[Calendar]],
-    //    settings.[[LargestUnit]], settings.[[RoundingIncrement]], settings.[[SmallestUnit]],
-    //    settings.[[RoundingMode]]).
+    // 7. If TimeZoneEquals(zonedDateTime.[[TimeZone]], other.[[TimeZone]]) is false, throw a
+    //    RangeError exception.
+    // 8. If zonedDateTime.[[EpochNanoseconds]] = other.[[EpochNanoseconds]], return
+    //    ! CreateTemporalDuration(0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
+    // 9. Let internalDuration be ? DifferenceZonedDateTimeWithRounding(
+    //    zonedDateTime.[[EpochNanoseconds]], other.[[EpochNanoseconds]],
+    //    zonedDateTime.[[TimeZone]], zonedDateTime.[[Calendar]], settings.[[LargestUnit]],
+    //    settings.[[RoundingIncrement]], settings.[[SmallestUnit]], settings.[[RoundingMode]]).
     // 10. Let result be ! TemporalDurationFromInternal(internalDuration, hour).
     // 11. If operation is since, set result to CreateNegatedTemporalDuration(result).
     // 12. Return result.

@@ -2509,7 +2509,7 @@ pub fn coerceOptionsToObject(self: Value, agent: *Agent) Agent.Error!*Object {
     return self.toObject(agent);
 }
 
-/// 13.37 ToPositiveIntegerWithTruncation ( argument )
+/// 13.39 ToPositiveIntegerWithTruncation ( argument )
 /// https://tc39.es/proposal-temporal/#sec-topositiveintegerwithtruncation
 pub fn toPositiveIntegerWithTruncation(self: Value, agent: *Agent) Agent.Error!f64 {
     // 1. Let integer be ? ToIntegerWithTruncation(argument).
@@ -2524,13 +2524,13 @@ pub fn toPositiveIntegerWithTruncation(self: Value, agent: *Agent) Agent.Error!f
     return integer;
 }
 
-/// 13.38 ToIntegerWithTruncation ( argument )
+/// 13.40 ToIntegerWithTruncation ( argument )
 /// https://tc39.es/proposal-temporal/#sec-tointegerwithtruncation
 pub fn toIntegerWithTruncation(self: Value, agent: *Agent) Agent.Error!f64 {
     // 1. Let number be ? ToNumber(argument).
     const number = try self.toNumber(agent);
 
-    // 2. If number is NaN, +∞𝔽 or -∞𝔽, throw a RangeError exception.
+    // 2. If number is one of NaN, +∞𝔽, or -∞𝔽, throw a RangeError exception.
     if (!number.isFinite()) {
         return agent.throwException(.range_error, "{f} is not a finite number", .{self});
     }

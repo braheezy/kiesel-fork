@@ -281,7 +281,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DayOfWeek]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[DayOfWeek]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainDate_day_of_week(plain_date.fields.inner),
         );
@@ -294,7 +295,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DayOfYear]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[DayOfYear]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_day_of_year(plain_date.fields.inner));
     }
 
@@ -305,7 +307,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DaysInMonth]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[DaysInMonth]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_days_in_month(plain_date.fields.inner));
     }
 
@@ -316,7 +319,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DaysInWeek]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[DaysInWeek]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainDate_days_in_week(plain_date.fields.inner),
         );
@@ -329,7 +333,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[DaysInYear]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[DaysInYear]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_days_in_year(plain_date.fields.inner));
     }
 
@@ -379,7 +384,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Let result be CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[EraYear]].
+        // 3. Let result be CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[EraYear]].
         const result = temporal_rs.c.temporal_rs_PlainDate_era_year(plain_date.fields.inner);
 
         // 4. If result is undefined, return undefined.
@@ -396,7 +402,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[inLeapYear]].
+        // 3. Return CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[InLeapYear]].
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_in_leap_year(plain_date.fields.inner));
     }
 
@@ -431,7 +438,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[MonthsInYear]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[MonthsInYear]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainDate_months_in_year(plain_date.fields.inner));
     }
 
@@ -674,7 +682,8 @@ pub const prototype = struct {
             // a. Set temporalTime to ? ToTemporalTime(temporalTime).
             break :blk try toTemporalPlainTime(agent, plain_time_value, null);
 
-            // b. Let isoDateTime be CombineISODateAndTimeRecord(plainDate.[[ISODate]], temporalTime.[[Time]]).
+            // b. Let isoDateTime be CombineISODateAndTimeRecord(plainDate.[[ISODate]],
+            //    temporalTime.[[Time]]).
             // c. If ISODateTimeWithinLimits(isoDateTime) is false, throw a RangeError exception.
             // d. Let epochNs be ? GetEpochNanosecondsFor(timeZone, isoDateTime, compatible).
         };
@@ -736,7 +745,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Let result be CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[WeekOfYear]].[[Week]].
+        // 3. Let result be CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[WeekOfYear]].[[Week]].
         const result = temporal_rs.c.temporal_rs_PlainDate_week_of_year(plain_date.fields.inner);
 
         // 4. If result is undefined, return undefined.
@@ -852,7 +862,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDate, [[InitializedTemporalDate]]).
         const plain_date = try this_value.requireInternalSlot(agent, PlainDate);
 
-        // 3. Let result be CalendarISOToDate(plainDate.[[Calendar]], plainDate.[[ISODate]]).[[WeekOfYear]].[[Year]].
+        // 3. Let result be CalendarISOToDate(plainDate.[[Calendar]],
+        //    plainDate.[[ISODate]]).[[WeekOfYear]].[[Year]].
         const result = temporal_rs.c.temporal_rs_PlainDate_year_of_week(plain_date.fields.inner);
 
         // 4. If result is undefined, return undefined.
@@ -932,7 +943,8 @@ pub fn toTemporalPlainDate(
 
         // b. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
         if (item.asObject().cast(builtins.temporal.ZonedDateTime)) |zoned_date_time| {
-            // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]], item.[[EpochNanoseconds]]).
+            // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]],
+            //    item.[[EpochNanoseconds]]).
 
             // ii. Let resolvedOptions be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
@@ -954,7 +966,8 @@ pub fn toTemporalPlainDate(
             // ii. Perform ? GetTemporalOverflowOption(resolvedOptions).
             _ = try getTemporalOverflowOption(agent, options);
 
-            // iii. Return ! CreateTemporalDate(item.[[ISODateTime]].[[ISODate]], item.[[Calendar]]).
+            // iii. Return ! CreateTemporalDate(item.[[ISODateTime]].[[ISODate]],
+            //      item.[[Calendar]]).
             break :blk temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
                 plain_date_time.fields.inner,
             );
@@ -963,7 +976,8 @@ pub fn toTemporalPlainDate(
         // d. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
         const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, item.asObject());
 
-        // e. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day », «», «»).
+        // e. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code,
+        //    day », «», «»).
         const fields = try prepareCalendarFields(
             agent,
             calendar,
@@ -1024,7 +1038,8 @@ pub fn toTemporalPlainDate(
         // 9. Perform ? GetTemporalOverflowOption(resolvedOptions).
         _ = try getTemporalOverflowOption(agent, options);
 
-        // 10. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // 10. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]],
+        //     result.[[Day]]).
         // 11. Return ? CreateTemporalDate(isoDate, calendar).
         break :blk try builtins.temporal.extractResult(
             agent,
@@ -1040,11 +1055,10 @@ pub fn toTemporalPlainDate(
     ) catch |err| try noexcept(err);
 }
 
-/// 3.5.7 IsValidISODate ( year, month, day )
+/// 3.5.8 IsValidISODate ( year, month, day )
 /// https://tc39.es/proposal-temporal/#sec-temporal-isvalidisodate
 pub fn isValidISODate(year: f64, month: f64, day: f64) bool {
-    // 1. If month < 1 or month > 12, then
-    //     a. Return false.
+    // 1. If month < 1 or month > 12, return false.
     if (month < 1 or month > 12) return false;
 
     const year_int = std.math.lossyCast(std.time.epoch.Year, year);
@@ -1056,15 +1070,11 @@ pub fn isValidISODate(year: f64, month: f64, day: f64) bool {
         @enumFromInt(month_int),
     );
 
-    // 3. If day < 1 or day > daysInMonth, then
-    //     a. Return false.
-    if (day < 1 or day > @as(f64, @floatFromInt(days_in_month))) return false;
-
-    // 4. Return true.
-    return true;
+    // 3. If day < 1 or day > daysInMonth, return false; else return true.
+    return if (day < 1 or day > @as(f64, @floatFromInt(days_in_month))) false else true;
 }
 
-/// 3.5.13 DifferenceTemporalPlainDate ( operation, temporalDate, other, options )
+/// 3.5.14 DifferenceTemporalPlainDate ( operation, temporalDate, other, options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-differencetemporalplaindate
 fn differenceTemporalPlainDate(
     agent: *Agent,
@@ -1102,12 +1112,15 @@ fn differenceTemporalPlainDate(
     //    temporalDate.[[ISODate]], other.[[ISODate]], settings.[[LargestUnit]]).
     // 7. Let duration be CombineDateAndTimeDuration(dateDifference, 0).
     // 8. If settings.[[SmallestUnit]] is not day or settings.[[RoundingIncrement]] ≠ 1, then
-    //     a. Let isoDateTime be CombineISODateAndTimeRecord(temporalDate.[[ISODate]], MidnightTimeRecord()).
-    //     b. Let isoDateTimeOther be CombineISODateAndTimeRecord(other.[[ISODate]], MidnightTimeRecord()).
-    //     c. Let destEpochNs be GetUTCEpochNanoseconds(isoDateTimeOther).
-    //     d. Set duration to ? RoundRelativeDuration(duration, destEpochNs, isoDateTime, unset,
-    //        temporalDate.[[Calendar]], settings.[[LargestUnit]], settings.[[RoundingIncrement]],
-    //        settings.[[SmallestUnit]], settings.[[RoundingMode]]).
+    //     a. Let isoDateTime be CombineISODateAndTimeRecord(temporalDate.[[ISODate]],
+    //        MidnightTimeRecord()).
+    //     b. Let originEpochNs be GetUTCEpochNanoseconds(isoDateTime).
+    //     c. Let isoDateTimeOther be CombineISODateAndTimeRecord(other.[[ISODate]],
+    //        MidnightTimeRecord()).
+    //     d. Let destEpochNs be GetUTCEpochNanoseconds(isoDateTimeOther).
+    //     e. Set duration to ? RoundRelativeDuration(duration, originEpochNs, destEpochNs,
+    //        isoDateTime, unset, temporalDate.[[Calendar]], settings.[[LargestUnit]],
+    //        settings.[[RoundingIncrement]], settings.[[SmallestUnit]], settings.[[RoundingMode]]).
     // 9. Let result be ! TemporalDurationFromInternal(duration, day).
     // 10. If operation is since, set result to CreateNegatedTemporalDuration(result).
     // 11. Return result.
@@ -1137,7 +1150,7 @@ fn differenceTemporalPlainDate(
     ) catch |err| try noexcept(err);
 }
 
-/// 3.5.14 AddDurationToDate ( operation, temporalDate, temporalDurationLike, options )
+/// 3.5.15 AddDurationToDate ( operation, temporalDate, temporalDurationLike, options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurationtodate
 fn addDurationToDate(
     agent: *Agent,
@@ -1160,7 +1173,8 @@ fn addDurationToDate(
     // 6. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
     const overflow = try getTemporalOverflowOption(agent, options);
 
-    // 7. Let result be ? CalendarDateAdd(calendar, temporalDate.[[ISODate]], dateDuration, overflow).
+    // 7. Let result be ? CalendarDateAdd(calendar, temporalDate.[[ISODate]], dateDuration,
+    //    overflow).
     // 8. Return ! CreateTemporalDate(result, calendar).
     const temporal_rs_plain_date = switch (operation) {
         .add => try builtins.temporal.extractResult(

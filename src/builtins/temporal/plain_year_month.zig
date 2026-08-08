@@ -257,7 +257,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[DaysInMonth]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[DaysInMonth]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainYearMonth_days_in_month(plain_year_month.fields.inner));
     }
 
@@ -268,7 +269,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[DaysInYear]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[DaysInYear]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainYearMonth_days_in_year(plain_year_month.fields.inner),
         );
@@ -303,7 +305,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[Era]].
+        // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[Era]].
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainYearMonth_era(plain_year_month.fields.inner, &write.inner);
         if (write.inner.len == 0) {
@@ -320,7 +323,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Let result be CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[EraYear]].
+        // 3. Let result be CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[EraYear]].
         const result = temporal_rs.c.temporal_rs_PlainYearMonth_era_year(
             plain_year_month.fields.inner,
         );
@@ -339,7 +343,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[InLeapYear]].
+        // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[InLeapYear]].
         return Value.from(
             temporal_rs.c.temporal_rs_PlainYearMonth_in_leap_year(plain_year_month.fields.inner),
         );
@@ -352,7 +357,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[MOnth]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[Month]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainYearMonth_month(plain_year_month.fields.inner),
         );
@@ -365,7 +371,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[MonthCode]].
+        // 3. Return CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[MonthCode]].
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainYearMonth_month_code(
             plain_year_month.fields.inner,
@@ -381,7 +388,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[MonthsInYear]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[MonthsInYear]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainYearMonth_months_in_year(plain_year_month.fields.inner),
         );
@@ -418,7 +426,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return ? AddDurationToYearMonth(subtract, plainYearMonth, temporalDurationLike, options).
+        // 3. Return ? AddDurationToYearMonth(subtract, plainYearMonth, temporalDurationLike,
+        //    options).
         const new_plain_year_month = try addDurationToYearMonth(
             agent,
             .subtract,
@@ -472,9 +481,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. If item is not an Object, then
+        // 3. If item is not an Object, throw a TypeError exception.
         if (!item.isObject()) {
-            // a. Throw a TypeError exception.
             return agent.throwException(.type_error, "Item must be an object", .{});
         }
 
@@ -581,7 +589,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. If ? IsPartialTemporalObject(temporalYearMonthLike) is false, throw a TypeError exception.
+        // 3. If ? IsPartialTemporalObject(temporalYearMonthLike) is false, throw a TypeError
+        //    exception.
         if (!try isPartialTemporalObject(agent, temporal_year_month_like)) {
             return agent.throwException(
                 .type_error,
@@ -596,8 +605,8 @@ pub const prototype = struct {
         );
 
         // 5. Let fields be ISODateToFields(calendar, plainYearMonth.[[ISODate]], year-month).
-        // 6. Let partialYearMonth be ? PrepareCalendarFields(calendar, temporalYearMonthLike, «
-        //    year, month, month-code », « », partial).
+        // 6. Let partialYearMonth be ? PrepareCalendarFields(calendar, temporalYearMonthLike,
+        //    « year, month, month-code », « », partial).
         // 7. Set fields to CalendarMergeFields(calendar, fields, partialYearMonth).
         const fields = try prepareCalendarFields(
             agent,
@@ -640,7 +649,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainYearMonth, [[InitializedTemporalYearMonth]]).
         const plain_year_month = try this_value.requireInternalSlot(agent, PlainYearMonth);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]], plainYearMonth.[[ISODate]]).[[Year]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainYearMonth.[[Calendar]],
+        //    plainYearMonth.[[ISODate]]).[[Year]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainYearMonth_year(plain_year_month.fields.inner),
         );
@@ -691,7 +701,8 @@ pub fn toTemporalPlainYearMonth(
         // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
         const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, item.asObject());
 
-        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code », «», «»).
+        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code », «»,
+        //    «»).
         const fields = try prepareCalendarFields(
             agent,
             calendar,
@@ -752,12 +763,13 @@ pub fn toTemporalPlainYearMonth(
         // 9. Perform ? GetTemporalOverflowOption(resolvedOptions).
         _ = try getTemporalOverflowOption(agent, options);
 
-        // 10. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // 10. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]],
+        //     result.[[Day]]).
         // 11. If ISOYearMonthWithinLimits(isoDate) is false, throw a RangeError exception.
         // 12. Set result to ISODateToFields(calendar, isoDate, year-month).
-        // 13. NOTE: The following operation is called with constrain regardless of the value of
-        //     overflow, in order for the calendar to store a canonical value in the [[Day]] field
-        //     of the [[ISODate]] internal slot of the result.
+        // 13. NOTE: The following operation is called with constrain regardless of overflow, in
+        //     order for the calendar to store a canonical value in the [[Day]] field of the
+        //     [[ISODate]] internal slot of the result.
         // 14. Set isoDate to ? CalendarYearMonthFromFields(calendar, result, constrain).
         // 15. Return ! CreateTemporalYearMonth(isoDate, calendar).
         break :blk try builtins.temporal.extractResult(
@@ -788,8 +800,9 @@ pub fn createTemporalYearMonth(
     // 2. If newTarget is not present, set newTarget to %Temporal.PlainYearMonth%.
     const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_plain_year_month);
 
-    // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.PlainYearMonth.prototype%",
-    //    « [[InitializedTemporalYearMonth]], [[ISODate]], [[Calendar]] »).
+    // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget,
+    //    "%Temporal.PlainYearMonth.prototype%", « [[InitializedTemporalYearMonth]], [[ISODate]],
+    //    [[Calendar]] »).
     // 4. Set object.[[ISODate]] to isoDate.
     // 5. Set object.[[Calendar]] to calendar.
     // 6. Return object.
@@ -831,27 +844,30 @@ fn differenceTemporalPlainYearMonth(
     // 4. Let resolvedOptions be ? GetOptionsObject(options).
     const options = try options_value.getOptionsObject(agent);
 
-    // 5. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, date, « week, day », month, year).
+    // 5. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, date, « week, day »,
+    //    month, year).
     const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
 
-    // 6. If CompareISODate(yearMonth.[[ISODate]], other.[[ISODate]]) = 0, then
-    //     a. Return ! CreateTemporalDuration(0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
+    // 6. If CompareISODate(yearMonth.[[ISODate]], other.[[ISODate]]) = 0, return
+    //    ! CreateTemporalDuration(0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
     // 7. Let thisFields be ISODateToFields(calendar, yearMonth.[[ISODate]], year-month).
     // 8. Set thisFields.[[Day]] to 1.
     // 9. Let thisDate be ? CalendarDateFromFields(calendar, thisFields, constrain).
     // 10. Let otherFields be ISODateToFields(calendar, other.[[ISODate]], year-month).
     // 11. Set otherFields.[[Day]] to 1.
     // 12. Let otherDate be ? CalendarDateFromFields(calendar, otherFields, constrain).
-    // 13. Let dateDifference be CalendarDateUntil(calendar, thisDate, otherDate, settings.[[LargestUnit]]).
+    // 13. Let dateDifference be CalendarDateUntil(calendar, thisDate, otherDate,
+    //     settings.[[LargestUnit]]).
     // 14. Let yearsMonthsDifference be ! AdjustDateDurationRecord(dateDifference, 0, 0).
     // 15. Let duration be CombineDateAndTimeDuration(yearsMonthsDifference, 0).
     // 16. If settings.[[SmallestUnit]] is not month or settings.[[RoundingIncrement]] ≠ 1, then
     //     a. Let isoDateTime be CombineISODateAndTimeRecord(thisDate, MidnightTimeRecord()).
-    //     b. Let isoDateTimeOther be CombineISODateAndTimeRecord(otherDate, MidnightTimeRecord()).
-    //     c. Let destEpochNs be GetUTCEpochNanoseconds(isoDateTimeOther).
-    //     d. Set duration to ? RoundRelativeDuration(duration, destEpochNs, isoDateTime, unset,
-    //        calendar, settings.[[LargestUnit]], settings.[[RoundingIncrement]],
-    //        settings.[[SmallestUnit]], settings.[[RoundingMode]]).
+    //     b. Let originEpochNs be GetUTCEpochNanoseconds(isoDateTime).
+    //     c. Let isoDateTimeOther be CombineISODateAndTimeRecord(otherDate, MidnightTimeRecord()).
+    //     d. Let destEpochNs be GetUTCEpochNanoseconds(isoDateTimeOther).
+    //     e. Set duration to ? RoundRelativeDuration(duration, originEpochNs, destEpochNs,
+    //        isoDateTime, unset, calendar, settings.[[LargestUnit]],
+    //        settings.[[RoundingIncrement]], settings.[[SmallestUnit]], settings.[[RoundingMode]]).
     // 17. Let result be ! TemporalDurationFromInternal(duration, day).
     // 18. If operation is since, set result to CreateNegatedTemporalDuration(result).
     // 19. Return result.
@@ -894,30 +910,25 @@ fn addDurationToYearMonth(
     const duration = try toTemporalDuration(agent, temporal_duration_like);
 
     // 2. If operation is subtract, set duration to CreateNegatedTemporalDuration(duration).
+    // 3. Let internalDuration be ToInternalDurationRecord(duration).
 
-    // 3. Let resolvedOptions be ? GetOptionsObject(options).
+    // 4. Let resolvedOptions be ? GetOptionsObject(options).
     const options = try options_value.getOptionsObject(agent);
 
-    // 4. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
+    // 5. Let overflow be ? GetTemporalOverflowOption(resolvedOptions).
     const overflow = try getTemporalOverflowOption(agent, options);
 
-    // 5. Let sign be DurationSign(duration).
-    // 6. Let calendar be yearMonth.[[Calendar]].
-    // 7. Let fields be ISODateToFields(calendar, yearMonth.[[ISODate]], year-month).
-    // 8. Set fields.[[Day]] to 1.
-    // 9. Let intermediateDate be ? CalendarDateFromFields(calendar, fields, constrain).
-    // 10. If sign < 0, then
-    //     a. Let oneMonthDuration be ! CreateDateDurationRecord(0, 1, 0, 0).
-    //     b. Let nextMonth be ? CalendarDateAdd(calendar, intermediateDate, oneMonthDuration, constrain).
-    //     c. Let date be AddDaysToISODate(nextMonth, -1).
-    //     d. Assert: ISODateWithinLimits(date) is true.
-    // 11. Else,
-    //     a. Let date be intermediateDate.
-    // 12. Let durationToAdd be ToDateDurationRecordWithoutTime(duration).
-    // 13. Let addedDate be ? CalendarDateAdd(calendar, date, durationToAdd, overflow).
-    // 14. Let addedDateFields be ISODateToFields(calendar, addedDate, year-month).
-    // 15. Let isoDate be ? CalendarYearMonthFromFields(calendar, addedDateFields, overflow).
-    // 16. Return ! CreateTemporalYearMonth(isoDate, calendar).
+    // 6. Let durationToAdd be internalDuration.[[Date]].
+    // 7. If durationToAdd.[[Weeks]] ≠ 0, or durationToAdd.[[Days]] ≠ 0, or
+    //    internalDuration.[[Time]] ≠ 0, throw a RangeError exception.
+    // 8. Let calendar be yearMonth.[[Calendar]].
+    // 9. Let fields be ISODateToFields(calendar, yearMonth.[[ISODate]], year-month).
+    // 10. Set fields.[[Day]] to 1.
+    // 11. Let date be ? CalendarDateFromFields(calendar, fields, constrain).
+    // 12. Let addedDate be ? CalendarDateAdd(calendar, date, durationToAdd, overflow).
+    // 13. Let addedDateFields be ISODateToFields(calendar, addedDate, year-month).
+    // 14. Let isoDate be ? CalendarYearMonthFromFields(calendar, addedDateFields, overflow).
+    // 15. Return ! CreateTemporalYearMonth(isoDate, calendar).
     const temporal_rs_plain_year_month = switch (operation) {
         .add => try builtins.temporal.extractResult(
             agent,

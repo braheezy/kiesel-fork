@@ -314,9 +314,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(instant, [[InitializedTemporalInstant]]).
         const instant = try this_value.requireInternalSlot(agent, Instant);
 
-        // 3. If roundTo is undefined, then
+        // 3. If roundTo is undefined, throw a TypeError exception.
         if (round_to.isUndefined()) {
-            // a. Throw a TypeError exception.
             return agent.throwException(.type_error, "Argument must not be undefined", .{});
         }
 
@@ -540,7 +539,8 @@ pub const prototype = struct {
         }
 
         // 12. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
-        // 13. Let roundedNs be RoundTemporalInstant(instant.[[EpochNanoseconds]], precision.[[Increment]], precision.[[Unit]], roundingMode).
+        // 13. Let roundedNs be RoundTemporalInstant(instant.[[EpochNanoseconds]],
+        //     precision.[[Increment]], precision.[[Unit]], roundingMode).
         // 14. Let roundedInstant be ! CreateTemporalInstant(roundedNs).
         // 15. Return TemporalInstantToString(roundedInstant, timeZone, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
@@ -572,7 +572,8 @@ pub const prototype = struct {
         // 3. Set timeZone to ? ToTemporalTimeZoneIdentifier(timeZone).
         const time_zone = try toTemporalTimeZoneIdentifier(agent, time_zone_value);
 
-        // 4. Return ! CreateTemporalZonedDateTime(instant.[[EpochNanoseconds]], timeZone, "iso8601").
+        // 4. Return ! CreateTemporalZonedDateTime(instant.[[EpochNanoseconds]], timeZone,
+        //    "iso8601").
         const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
             temporal_rs.c.temporal_rs_Instant_to_zoned_date_time_iso(
@@ -708,17 +709,17 @@ pub fn toTemporalInstant(agent: *Agent, item_: Value) Agent.Error!*Instant {
     // 3. Let parsed be ? ParseISODateTime(item, « TemporalInstantString »).
     // 4. Assert: Either parsed.[[TimeZone]].[[OffsetString]] is not empty or
     //    parsed.[[TimeZone]].[[Z]] is true, but not both.
-    // 5. If parsed.[[TimeZone]].[[Z]] is true, let offsetNanoseconds be 0; otherwise, let
+    // 5. If parsed.[[TimeZone]].[[Z]] is true, let offsetNanoseconds be 0; else let
     //    offsetNanoseconds be ! ParseDateTimeUTCOffset(parsed.[[TimeZone]].[[OffsetString]]).
-    // 6. If parsed.[[Time]] is start-of-day, let time be MidnightTimeRecord(); else let time be
-    //    parsed.[[Time]].
-    // 7. Let balanced be BalanceISODateTime(parsed.[[Year]], parsed.[[Month]], parsed.[[Day]],
+    // 6. Let time be parsed.[[Time]].
+    // 7. Assert: time is not start-of-day.
+    // 8. Let balanced be BalanceISODateTime(parsed.[[Year]], parsed.[[Month]], parsed.[[Day]],
     //    time.[[Hour]], time.[[Minute]], time.[[Second]], time.[[Millisecond]],
     //    time.[[Microsecond]], time.[[Nanosecond]] - offsetNanoseconds).
-    // 8. Perform ? CheckISODaysRange(balanced.[[ISODate]]).
-    // 9. Let epochNanoseconds be GetUTCEpochNanoseconds(balanced).
-    // 10. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
-    // 11. Return ! CreateTemporalInstant(epochNanoseconds).
+    // 9. Perform ? CheckISODaysRange(balanced.[[ISODate]]).
+    // 10. Let epochNanoseconds be GetUTCEpochNanoseconds(balanced).
+    // 11. If IsValidEpochNanoseconds(epochNanoseconds) is false, throw a RangeError exception.
+    // 12. Return ! CreateTemporalInstant(epochNanoseconds).
     const temporal_rs_instant = switch (item.asString().asAsciiOrUtf16()) {
         .ascii => |ascii| try builtins.temporal.extractResult(
             agent,
@@ -752,8 +753,8 @@ fn differenceTemporalInstant(
     // 2. Let resolvedOptions be ? GetOptionsObject(options).
     const options = try options_value.getOptionsObject(agent);
 
-    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « »,
-    //    nanosecond, second).
+    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « », nanosecond,
+    //    second).
     const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
 
     // 4. Let internalDuration be DifferenceInstant(instant.[[EpochNanoseconds]],

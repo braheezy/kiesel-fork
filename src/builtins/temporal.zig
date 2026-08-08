@@ -160,13 +160,11 @@ pub fn toTemporalTimeZoneIdentifier(
 ) Agent.Error!temporal_rs.c.TimeZone {
     const gpa = agent.gpa;
 
-    // 1. If temporalTimeZoneLike is an Object, then
-    if (temporal_time_zone_like.isObject()) {
-        // a. If temporalTimeZoneLike has an [[InitializedTemporalZonedDateTime]] internal slot, then
-        if (temporal_time_zone_like.asObject().cast(ZonedDateTime)) |zoned_date_time_| {
-            // i. Return temporalTimeZoneLike.[[TimeZone]].
-            return temporal_rs.c.temporal_rs_ZonedDateTime_timezone(zoned_date_time_.fields.inner);
-        }
+    // 1. If temporalTimeZoneLike is an Object and temporalTimeZoneLike has an
+    //    [[InitializedTemporalZonedDateTime]] internal slot, return
+    //    temporalTimeZoneLike.[[TimeZone]].
+    if (temporal_time_zone_like.castObject(ZonedDateTime)) |zoned_date_time_| {
+        return temporal_rs.c.temporal_rs_ZonedDateTime_timezone(zoned_date_time_.fields.inner);
     }
 
     // 2. If temporalTimeZoneLike is not a String, throw a TypeError exception.
@@ -225,9 +223,7 @@ pub fn canonicalizeCalendar(
 
 /// 12.2.1 ParseMonthCode ( argument )
 /// https://tc39.es/proposal-temporal/#sec-temporal-parsemonthcode
-/// 12.2.2 CreateMonthCode ( monthNumber, isLeapMonth )
-/// https://tc39.es/proposal-temporal/#sec-temporal-createmonthcode
-fn parseAndCreateMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
+fn parseMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 1. Let monthCode be ? ToPrimitive(argument, string).
     const month_code = try argument.toPrimitive(agent, .string);
 
@@ -238,21 +234,23 @@ fn parseAndCreateMonthCode(agent: *Agent, argument: Value) Agent.Error![]const u
 
     // 3. If ParseText(StringToCodePoints(monthCode), MonthCode) is a List of errors, throw a
     //    RangeError exception.
+    const month_code_utf8 = try month_code.asString().toUtf8(agent.gc_allocator);
+    parseMonthCodeImpl(month_code_utf8) catch {
+        return agent.throwException(.range_error, "Invalid month code", .{});
+    };
+
     // 4. Let isLeapMonth be false.
-    // 5. If the length of monthCode is 4, then
+    // 5. If the length of monthCode = 4, then
     //     a. Assert: The fourth code unit of monthCode is 0x004C (LATIN CAPITAL LETTER L).
     //     b. Set isLeapMonth to true.
     // 6. Let monthCodeDigits be the substring of monthCode from 1 to 3.
     // 7. Let monthNumber be ℝ(StringToNumber(monthCodeDigits)).
     // 8. Return the Record { [[MonthNumber]]: monthNumber, [[IsLeapMonth]]: isLeapMonth }.
-    const month_code_utf8 = try month_code.asString().toUtf8(agent.gc_allocator);
-    parseMonthCode(month_code_utf8) catch {
-        return agent.throwException(.range_error, "Invalid month code", .{});
-    };
+    // NOTE: We return the string directly instead of going through CreateMonthCode.
     return month_code_utf8;
 }
 
-fn parseMonthCode(string: []const u8) error{InvalidFormat}!void {
+fn parseMonthCodeImpl(string: []const u8) error{InvalidFormat}!void {
     // MonthCode :::
     //     M00L
     //     M0 NonZeroDigit L[opt]
@@ -268,14 +266,14 @@ fn parseMonthCode(string: []const u8) error{InvalidFormat}!void {
     if (parser.peek() != null) return error.InvalidFormat;
 }
 
-test parseMonthCode {
+test parseMonthCodeImpl {
     {
         const test_cases = [_][]const u8{
             "M00L", "M01",  "M01L", "M09",  "M09L",
             "M90",  "M90L", "M99",  "M99L",
         };
         for (test_cases) |test_case| {
-            try parseMonthCode(test_case);
+            try parseMonthCodeImpl(test_case);
         }
     }
     {
@@ -284,7 +282,7 @@ test parseMonthCode {
             "M01 ", "M01L ", " M01", " M01L",
         };
         for (test_cases) |test_case| {
-            try std.testing.expectError(error.InvalidFormat, parseMonthCode(test_case));
+            try std.testing.expectError(error.InvalidFormat, parseMonthCodeImpl(test_case));
         }
     }
 }
@@ -313,7 +311,7 @@ const PrepareCalendarFieldsResult = struct {
     timezone: temporal_rs.c.TimeZone_option,
 };
 
-/// 12.2.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
+/// 12.3.3 PrepareCalendarFields ( calendar, fields, calendarFieldNames, nonCalendarFieldNames, requiredFieldNames )
 /// https://tc39.es/proposal-temporal/#sec-temporal-preparecalendarfields
 pub fn prepareCalendarFields(
     agent: *Agent,
@@ -333,7 +331,7 @@ pub fn prepareCalendarFields(
     // 4. Set fieldNames to the list-concatenation of fieldNames and extraFieldNames.
     // 5. Assert: fieldNames contains no duplicate elements.
     var field_names = calendar_and_non_calendar_field_names;
-    // https://tc39.es/proposal-intl-era-monthcode/#sec-temporal-calendarsupportsera
+    // See: https://tc39.es/proposal-intl-era-monthcode/#sec-temporal-calendarsupportsera
     const calendar_supports_era = switch (calendar) {
         temporal_rs.c.AnyCalendarKind_Chinese,
         temporal_rs.c.AnyCalendarKind_Dangi,
@@ -372,9 +370,9 @@ pub fn prepareCalendarFields(
     // 7. Let any be false.
     var any = false;
 
-    // 8. Let sortedPropertyNames be a List whose elements are the values in the Property Key
-    //    column of Table 19 corresponding to the elements of fieldNames, sorted according to
-    //    lexicographic code unit order.
+    // 8. Let sortedPropertyNames be a List whose elements are the values in the Property Key column
+    //    of Table 19 corresponding to the elements of fieldNames, sorted according to lexicographic
+    //    code unit order.
     const sorted_field_names: []const FieldName = &.{
         .day,
         .era,
@@ -431,7 +429,7 @@ pub fn prepareCalendarFields(
                         result.date.era = temporal_rs.toDiplomatStringView(era);
                     },
                     .month_code => {
-                        const month_code = try parseAndCreateMonthCode(agent, value);
+                        const month_code = try parseMonthCode(agent, value);
                         result.date.month_code = temporal_rs.toDiplomatStringView(month_code);
                     },
                     .offset => {
@@ -468,28 +466,24 @@ pub fn prepareCalendarFields(
                 }
             } else if (field_name == .time_zone and required_field_names == .time_zone) {
                 // d. Else if requiredFieldNames is a List, then
-                //     i. If requiredFieldNames contains key, then
-                //         1. Throw a TypeError exception.
+                //     i. If requiredFieldNames contains key, throw a TypeError exception.
+                //     ii. Set result's field whose name is given in the Field Name column of the
+                //         same row to the corresponding Default value of the same row.
                 return agent.throwException(.type_error, "Missing required 'timeZone' field", .{});
             }
         }
     }
 
-    // 10. If requiredFieldNames is partial and any is false, then
+    // 10. If requiredFieldNames is partial and any is false, throw a TypeError exception.
     if (required_field_names == .partial and !any) {
-        // a. Throw a TypeError exception.
-        return agent.throwException(
-            .type_error,
-            "At least one field must be present",
-            .{},
-        );
+        return agent.throwException(.type_error, "At least one field must be present", .{});
     }
 
     // 11. Return result.
     return result;
 }
 
-/// 12.2.8 ToTemporalCalendarIdentifier ( temporalCalendarLike )
+/// 12.3.10 ToTemporalCalendarIdentifier ( temporalCalendarLike )
 /// https://tc39.es/proposal-temporal/#sec-temporal-totemporalcalendaridentifier
 pub fn toTemporalCalendarIdentifier(
     agent: *Agent,
@@ -497,32 +491,31 @@ pub fn toTemporalCalendarIdentifier(
 ) Agent.Error!temporal_rs.c.AnyCalendarKind {
     const gpa = agent.gpa;
 
-    // 1. If temporalCalendarLike is an Object, then
+    // 1. If temporalCalendarLike is an Object and temporalCalendarLike has an
+    //    [[InitializedTemporalDate]], [[InitializedTemporalDateTime]],
+    //    [[InitializedTemporalMonthDay]], [[InitializedTemporalYearMonth]], or
+    //    [[InitializedTemporalZonedDateTime]] internal slot, return
+    //    temporalCalendarLike.[[Calendar]].
     if (temporal_calendar_like.isObject()) {
-        // a. If temporalCalendarLike has an [[InitializedTemporalDate]],
-        //    [[InitializedTemporalDateTime]], [[InitializedTemporalMonthDay]],
-        //    [[InitializedTemporalYearMonth]], or [[InitializedTemporalZonedDateTime]] internal
-        //    slot, then
-        const item = temporal_calendar_like.asObject();
-        if (switch (item.tag) {
+        const obj = temporal_calendar_like.asObject();
+        if (switch (obj.tag) {
             .temporal_plain_date => temporal_rs.c.temporal_rs_PlainDate_calendar(
-                item.as(builtins.temporal.PlainDate).fields.inner,
+                obj.as(builtins.temporal.PlainDate).fields.inner,
             ),
             .temporal_plain_date_time => temporal_rs.c.temporal_rs_PlainDateTime_calendar(
-                item.as(builtins.temporal.PlainDateTime).fields.inner,
+                obj.as(builtins.temporal.PlainDateTime).fields.inner,
             ),
             .temporal_plain_month_day => temporal_rs.c.temporal_rs_PlainMonthDay_calendar(
-                item.as(builtins.temporal.PlainMonthDay).fields.inner,
+                obj.as(builtins.temporal.PlainMonthDay).fields.inner,
             ),
             .temporal_plain_year_month => temporal_rs.c.temporal_rs_PlainYearMonth_calendar(
-                item.as(builtins.temporal.PlainYearMonth).fields.inner,
+                obj.as(builtins.temporal.PlainYearMonth).fields.inner,
             ),
             .temporal_zoned_date_time => temporal_rs.c.temporal_rs_ZonedDateTime_calendar(
-                item.as(builtins.temporal.ZonedDateTime).fields.inner,
+                obj.as(builtins.temporal.ZonedDateTime).fields.inner,
             ),
             else => null,
         }) |calendar| {
-            // i. Return temporalCalendarLike.[[Calendar]].
             return temporal_rs.c.temporal_rs_Calendar_kind(calendar);
         }
     }
@@ -550,7 +543,7 @@ pub fn toTemporalCalendarIdentifier(
     return calendar;
 }
 
-/// 12.2.9 GetTemporalCalendarIdentifierWithISODefault ( item )
+/// 12.3.11 GetTemporalCalendarIdentifierWithISODefault ( item )
 /// https://tc39.es/proposal-temporal/#sec-temporal-gettemporalcalendarslotvaluewithisodefault
 pub fn getTemporalCalendarIdentifierWithISODefault(
     agent: *Agent,
@@ -584,11 +577,8 @@ pub fn getTemporalCalendarIdentifierWithISODefault(
     // 2. Let calendarLike be ? Get(item, "calendar").
     const calendar_like = try item.get(agent, PropertyKey.from("calendar"));
 
-    // 3. If calendarLike is undefined, then
-    if (calendar_like.isUndefined()) {
-        // a. Return "iso8601".
-        return temporal_rs.c.AnyCalendarKind_Iso;
-    }
+    // 3. If calendarLike is undefined, return "iso8601".
+    if (calendar_like.isUndefined()) return temporal_rs.c.AnyCalendarKind_Iso;
 
     // 4. Return ? ToTemporalCalendarIdentifier(calendarLike).
     return toTemporalCalendarIdentifier(agent, calendar_like);
@@ -749,7 +739,8 @@ pub fn getTemporalShowTimeZoneNameOption(
     agent: *Agent,
     options: *Object,
 ) Agent.Error!temporal_rs.c.DisplayTimeZone {
-    // 1. Let stringValue be ? GetOption(options, "timeZoneName", string, « "auto", "never", "critical" », "auto").
+    // 1. Let stringValue be ? GetOption(options, "timeZoneName", string, « "auto", "never",
+    //    "critical" », "auto").
     const string_value = try options.getOption(
         agent,
         "timeZoneName",
@@ -869,7 +860,7 @@ pub fn getTemporalFractionalSecondDigitsOption(
         };
     }
 
-    // 4. If digitsValue is NaN, +∞𝔽, or -∞𝔽, throw a RangeError exception.
+    // 4. If digitsValue is one of NaN, +∞𝔽, or -∞𝔽, throw a RangeError exception.
     if (!digits_value.asNumber().isFinite()) {
         return agent.throwException(
             .range_error,
@@ -1024,8 +1015,8 @@ pub fn validateTemporalUnitValue(
         else => unreachable,
     };
 
-    // 4. If category is date and unitGroup is date or datetime, return unused.
-    // 5. If category is time and unitGroup is time or datetime, return unused.
+    // 4. If category is date and unitGroup is either date or datetime, return unused.
+    // 5. If category is time and unitGroup is either time or datetime, return unused.
     switch (category) {
         .date => if (unit_group == .date or unit_group == .datetime) return,
         .time => if (unit_group == .time or unit_group == .datetime) return,
@@ -1068,21 +1059,23 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
 
         // c. If value has an [[InitializedTemporalDateTime]] internal slot, then
         if (value.asObject().cast(builtins.temporal.PlainDateTime)) |plain_date_time_| {
-            // i. Let plainDate be ! CreateTemporalDate(value.[[ISODateTime]].[[ISODate]], value.[[Calendar]]).
+            // i. Let plainDate be ! CreateTemporalDate(value.[[ISODateTime]].[[ISODate]],
+            //    value.[[Calendar]]).
             const temporal_rs_plain_date = temporal_rs.c.temporal_rs_PlainDateTime_to_plain_date(
                 plain_date_time_.fields.inner,
             );
 
-            // ii. Return the Record { [[PlainRelativeTo]]: plainDate, [[ZonedRelativeTo]]: undefined }.
+            // ii. Return the Record { [[PlainRelativeTo]]: plainDate,
+            //     [[ZonedRelativeTo]]: undefined }.
             return .{ .owned_plain_date = temporal_rs_plain_date.? };
         }
 
         // d. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(value).
         const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, value.asObject());
 
-        // e. Let fields be ? PrepareCalendarFields(calendar, value, « year, month, month-code, day
-        //    », « hour, minute, second, millisecond, microsecond, nanosecond, offset, time-zone »,
-        //    «»).
+        // e. Let fields be ? PrepareCalendarFields(calendar, value, « year, month, month-code,
+        //    day », « hour, minute, second, millisecond, microsecond, nanosecond, offset,
+        //    time-zone », «»).
         const fields = try prepareCalendarFields(
             agent,
             calendar,
@@ -1191,7 +1184,8 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
     //     a. Let offsetNs be 0.
     // 10. Let epochNanoseconds be ? InterpretISODateTimeOffset(isoDate, time, offsetBehaviour,
     //     offsetNs, timeZone, compatible, reject, matchBehaviour).
-    // 11. Let zonedRelativeTo be ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone, calendar).
+    // 11. Let zonedRelativeTo be ! CreateTemporalZonedDateTime(epochNanoseconds, timeZone,
+    //     calendar).
     const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
         agent,
         temporal_rs.c.temporal_rs_ZonedDateTime_from_partial(
@@ -1202,7 +1196,8 @@ pub fn getTemporalRelativeToOption(agent: *Agent, options: *Object) Agent.Error!
         ),
     );
 
-    // 12. Return the Record { [[PlainRelativeTo]]: undefined, [[ZonedRelativeTo]]: zonedRelativeTo }.
+    // 12. Return the Record { [[PlainRelativeTo]]: undefined,
+    //     [[ZonedRelativeTo]]: zonedRelativeTo }.
     return .{ .owned_zoned_date_time = temporal_rs_zoned_date_time.? };
 }
 
@@ -1242,7 +1237,7 @@ pub fn isPartialTemporalObject(agent: *Agent, value: Value) Agent.Error!bool {
     return true;
 }
 
-/// 13.40 ToOffsetString ( argument )
+/// 13.41 ToOffsetString ( argument )
 /// https://tc39.es/proposal-temporal/#sec-temporal-tooffsetstring
 fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     // 1. Let offset be ? ToPrimitive(argument, string).
@@ -1265,7 +1260,7 @@ fn toOffsetString(agent: *Agent, argument: Value) Agent.Error![]const u8 {
     return offset_utf8;
 }
 
-/// 13.42 GetDifferenceSettings ( operation, options, unitGroup, disallowedUnits, fallbackSmallestUnit, smallestLargestDefaultUnit )
+/// 13.43 GetDifferenceSettings ( operation, options, unitGroup, disallowedUnits, fallbackSmallestUnit, smallestLargestDefaultUnit )
 /// https://tc39.es/proposal-temporal/#sec-temporal-getdifferencesettings
 pub fn getTemporalDifferenceSettingsWithoutValidation(
     agent: *Agent,
@@ -1321,7 +1316,7 @@ pub fn getTemporalDifferenceSettingsWithoutValidation(
     // NOTE: These steps are handled by temporal_rs.
 
     // 18. Return the Record { [[SmallestUnit]]: smallestUnit, [[LargestUnit]]: largestUnit,
-    //     [[RoundingMode]]: roundingMode, [[RoundingIncrement]]: roundingIncrement,  }.
+    //     [[RoundingMode]]: roundingMode, [[RoundingIncrement]]: roundingIncrement, }.
     return .{
         .largest_unit = temporal_rs.toUnitOption(largest_unit),
         .smallest_unit = temporal_rs.toUnitOption(smallest_unit),
@@ -1330,17 +1325,18 @@ pub fn getTemporalDifferenceSettingsWithoutValidation(
     };
 }
 
-/// 14.5.2.3 GetRoundingModeOption ( options, fallback )
+/// 14.5.2.2 GetRoundingModeOption ( options, fallback )
 /// https://tc39.es/proposal-temporal/#sec-temporal-getroundingmodeoption
 pub fn getTemporalRoundingModeOption(
     agent: *Agent,
     options: *Object,
     fallback: temporal_rs.c.RoundingMode,
 ) Agent.Error!temporal_rs.c.RoundingMode {
-    // 1. Let allowedStrings be the List of Strings from the "String Identifier" column of Table 27.
+    // 1. Let allowedStrings be the List of Strings from the "String Identifier" column of Table 28.
     // 2. Let stringFallback be the value from the "String Identifier" column of the row with
     //    fallback in its "Rounding Mode" column.
-    // 3. Let stringValue be ? GetOption(options, "roundingMode", string, allowedStrings, stringFallback).
+    // 3. Let stringValue be ? GetOption(options, "roundingMode", string, allowedStrings,
+    //    stringFallback).
     const rounding_mode = try options.getOption(
         agent,
         "roundingMode",
@@ -1386,7 +1382,7 @@ pub fn getTemporalRoundingModeOption(
     return rounding_mode_map.get(rounding_mode.asAscii()).?;
 }
 
-/// 14.5.2.4 GetRoundingIncrementOption ( options )
+/// 14.5.2.3 GetRoundingIncrementOption ( options )
 /// https://tc39.es/proposal-temporal/#sec-temporal-getroundingincrementoption
 pub fn getTemporalRoundingIncrementOption(agent: *Agent, options: *Object) Agent.Error!u32 {
     // 1. Let value be ? Get(options, "roundingIncrement").

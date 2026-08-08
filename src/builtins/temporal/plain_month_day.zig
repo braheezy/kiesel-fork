@@ -203,7 +203,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
-        // 3. Return 𝔽(CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[Day]]).
+        // 3. Return 𝔽(CalendarISOToDate(plainMonthDay.[[Calendar]],
+        //    plainMonthDay.[[ISODate]]).[[Day]]).
         return Value.from(temporal_rs.c.temporal_rs_PlainMonthDay_day(plain_month_day.fields.inner));
     }
 
@@ -236,7 +237,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
-        // 3. Return CalendarISOToDate(plainMonthDay.[[Calendar]], plainMonthDay.[[ISODate]]).[[MonthCode]].
+        // 3. Return CalendarISOToDate(plainMonthDay.[[Calendar]],
+        //    plainMonthDay.[[ISODate]]).[[MonthCode]].
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         temporal_rs.c.temporal_rs_PlainMonthDay_month_code(
             plain_month_day.fields.inner,
@@ -288,9 +290,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainMonthDay, [[InitializedTemporalMonthDay]]).
         const plain_month_day = try this_value.requireInternalSlot(agent, PlainMonthDay);
 
-        // 3. If item is not an Object, then
+        // 3. If item is not an Object, throw a TypeError exception.
         if (!item.isObject()) {
-            // a. Throw a TypeError exception.
             return agent.throwException(.type_error, "Item must be an object", .{});
         }
 
@@ -392,8 +393,8 @@ pub const prototype = struct {
         );
 
         // 5. Let fields be ISODateToFields(calendar, plainMonthDay.[[ISODate]], month-day).
-        // 6. Let partialMonthDay be ? PrepareCalendarFields(calendar, temporalMonthDayLike, «
-        //    year, month, month-code, day », « », partial).
+        // 6. Let partialMonthDay be ? PrepareCalendarFields(calendar, temporalMonthDayLike, « year,
+        //    month, month-code, day », « », partial).
         // 7. Set fields to CalendarMergeFields(calendar, fields, partialMonthDay).
         const fields = try prepareCalendarFields(
             agent,
@@ -455,7 +456,7 @@ pub fn toTemporalPlainMonthDay(
     // 1. If options is not present, set options to undefined.
     const options_value: Value = maybe_options_value orelse .undefined;
 
-    // 2. If item is a Object, then
+    // 2. If item is an Object, then
     const temporal_rs_plain_month_day = if (item.isObject()) blk: {
         // a. If item has an [[InitializedTemporalMonthDay]] internal slot, then
         if (item.asObject().cast(PlainMonthDay)) |plain_month_day| {
@@ -472,7 +473,8 @@ pub fn toTemporalPlainMonthDay(
         // b. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
         const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, item.asObject());
 
-        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day », «», «»).
+        // c. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code,
+        //    day », «», «»).
         const fields = try prepareCalendarFields(
             agent,
             calendar,
@@ -535,14 +537,16 @@ pub fn toTemporalPlainMonthDay(
 
         // 10. If calendar is "iso8601", then
         //     a. Let referenceISOYear be 1972 (the first ISO 8601 leap year after the epoch).
-        //     b. Let isoDate be CreateISODateRecord(referenceISOYear, result.[[Month]], result.[[Day]]).
+        //     b. Let isoDate be CreateISODateRecord(referenceISOYear, result.[[Month]],
+        //        result.[[Day]]).
         //     c. Return ! CreateTemporalMonthDay(isoDate, calendar).
-        // 11. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // 11. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]],
+        //     result.[[Day]]).
         // 12. If ISODateWithinLimits(isoDate) is false, throw a RangeError exception.
         // 13. Set result to ISODateToFields(calendar, isoDate, month-day).
-        // 14. NOTE: The following operation is called with constrain regardless of the value of
-        //     overflow, in order for the calendar to store a canonical value in the [[Year]] field of
-        //     the [[ISODate]] internal slot of the result.
+        // 14. NOTE: The following operation is called with constrain regardless of overflow, in
+        //     order for the calendar to store a canonical value in the [[Year]] field of the
+        //     [[ISODate]] internal slot of the result.
         // 15. Set isoDate to ? CalendarMonthDayFromFields(calendar, result, constrain).
         // 16. Return ! CreateTemporalMonthDay(isoDate, calendar).
         break :blk try builtins.temporal.extractResult(
@@ -573,8 +577,9 @@ pub fn createTemporalMonthDay(
     // 2. If newTarget is not present, set newTarget to %Temporal.PlainMonthDay%.
     const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_plain_month_day);
 
-    // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.PlainMonthDay.prototype%",
-    //    « [[InitializedTemporalMonthDay]], [[ISODate]], [[Calendar]] »).
+    // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget,
+    //    "%Temporal.PlainMonthDay.prototype%", « [[InitializedTemporalMonthDay]], [[ISODate]],
+    //    [[Calendar]] »).
     // 4. Set object.[[ISODate]] to isoDate.
     // 5. Set object.[[Calendar]] to calendar.
     // 6. Return object.
