@@ -887,6 +887,7 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "flatMap", flatMap, 1, realm);
         try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
         try object.defineBuiltinFunction(agent, "includes", includes, 1, realm);
+        try object.defineBuiltinFunction(agent, "join", join, 1, realm);
         try object.defineBuiltinFunction(agent, "map", map, 1, realm);
         try object.defineBuiltinFunction(agent, "reduce", reduce, 1, realm);
         try object.defineBuiltinFunction(agent, "some", some, 1, realm);
@@ -1569,6 +1570,79 @@ pub const prototype = struct {
             }
         }
         return .false;
+    }
+
+    /// 1 Iterator.prototype.join ( separator )
+    /// https://tc39.es/proposal-iterator-join/#sec-iterator.prototype.join
+    fn join(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const separator = arguments.get(0);
+
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+        const obj = this_value.asObject();
+
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
+        var iterated: types.Iterator = .{
+            .iterator = obj,
+            .next_method = .undefined,
+            .done = false,
+        };
+
+        // 4. If separator is undefined, then
+        const sep: String.Builder.Segment = if (separator.isUndefined())
+            // a. Let sep be ",".
+            .{ .char = ',' }
+        else blk: {
+            // 5. Else,
+            // a. Let sep be Completion(ToString(separator)).
+            const string = separator.toString(agent) catch |err| {
+                // b. IfAbruptCloseIterator(sep, iterated).
+                return iterated.close(agent, @as(Agent.Error!Value, err));
+            };
+            break :blk .{ .string = string };
+        };
+
+        // 6. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
+
+        // 7. Let result be the empty String.
+        var result: String.Builder = .empty;
+        defer result.deinit(agent.gc_allocator);
+
+        // 8. Let first be true.
+        var first = true;
+
+        // 9. Repeat,
+        //     a. Let value be ? IteratorStepValue(iterated).
+        //     b. If value is done, return result.
+        while (try iterated.stepValue(agent)) |value| {
+            // c. If first is true, then
+            if (first) {
+                // i. Set first to false.
+                first = false;
+            } else {
+                // d. Else,
+                // i. Set result to the string-concatenation of result and sep.
+                try result.appendSegment(agent.gc_allocator, sep);
+            }
+
+            // e. If value is neither undefined nor null, then
+            if (!value.isUndefined() and !value.isNull()) {
+                // i. Let valueString be Completion(ToString(value)).
+                const value_string = value.toString(agent) catch |err| {
+                    // ii. IfAbruptCloseIterator(valueString, iterated).
+                    return iterated.close(agent, @as(Agent.Error!Value, err));
+                };
+
+                // iii. Set result to the string-concatenation of result and valueString.
+                try result.appendString(agent.gc_allocator, value_string);
+            }
+        }
+        return Value.from(try result.build(agent));
     }
 
     /// 27.1.3.3.6 Iterator.prototype.flatMap ( mapper )
