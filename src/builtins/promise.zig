@@ -687,6 +687,33 @@ fn getPromiseResolve(agent: *Agent, promise_constructor: *Object) Agent.Error!*O
     return promise_resolve.asObject();
 }
 
+const KeyedEntry = struct {
+    /// [[Key]]
+    key: PropertyKey,
+
+    /// [[Value]]
+    value: Value,
+};
+
+/// 27.2.1.10 CreateKeyedPromiseCombinatorResultObject ( entries )
+/// https://tc39.es/proposal-await-dictionary/#sec-createkeyedpromisecombinatorresultobject
+fn createKeyedPromiseCombinatorResultObject(
+    agent: *Agent,
+    entries: []const KeyedEntry,
+) std.mem.Allocator.Error!*Object {
+    // 1. Let obj be OrdinaryObjectCreate(null).
+    const obj = try ordinaryObjectCreate(agent, null);
+
+    // 2. For each Record { [[Key]], [[Value]] } entry of entries, do
+    for (entries) |entry| {
+        // a. Perform ! CreateDataPropertyOrThrow(obj, entry.[[Key]], entry.[[Value]]).
+        try obj.createDataPropertyDirect(agent, entry.key, entry.value);
+    }
+
+    // 3. Return obj.
+    return obj;
+}
+
 const RemainingElements = struct {
     value: usize,
 };
@@ -847,6 +874,334 @@ fn performPromiseAll(
             &.{ Value.from(&on_fulfilled.object), Value.from(result_capability.reject) },
         );
     }
+}
+
+const AllKeyedVariant = enum { all, all_settled };
+
+/// 27.2.4.1.1 PerformPromiseAllKeyed ( variant, promises, ctor, resultCapability, promiseResolve )
+/// https://tc39.es/proposal-await-dictionary/#sec-performpromiseallkeyed
+fn performPromiseAllKeyed(
+    agent: *Agent,
+    variant: AllKeyedVariant,
+    promises: *Object,
+    ctor: *Object,
+    result_capability: PromiseCapability,
+    promise_resolve: *Object,
+) Agent.Error!*Object {
+    // 1. Let allKeys be ? promises.[[OwnPropertyKeys]]().
+    const all_keys = try promises.internalMethods().ownPropertyKeys(agent, promises);
+    defer agent.gc_allocator.free(all_keys);
+
+    // 2. Let entries be a new empty List.
+    var entries = try agent.gc_allocator.create(std.ArrayList(KeyedEntry));
+    entries.* = .empty;
+
+    // 3. Let remainingElementsCount be the Record { [[Value]]: 1 }.
+    var remaining_elements_count = try agent.gc_allocator.create(RemainingElements);
+    remaining_elements_count.* = .{ .value = 1 };
+
+    // 4. Let index be 0.
+    var index: usize = 0;
+
+    // 5. For each element key of allKeys, do
+    for (all_keys) |key| {
+        // a. Let propertyDesc be ? promises.[[GetOwnProperty]](key).
+        const property_desc = try promises.internalMethods().getOwnProperty(agent, promises, key);
+
+        // b. If propertyDesc is not undefined and propertyDesc.[[Enumerable]] is true, then
+        if (property_desc != null and property_desc.?.enumerable == true) {
+            // i. Let propertyValue be ? Get(promises, key).
+            const property_value = try promises.get(agent, key);
+
+            // ii. Append the Record { [[Key]]: key, [[Value]]: undefined } to entries.
+            try entries.append(agent.gc_allocator, .{ .key = key, .value = .undefined });
+
+            // iii. Let nextPromise be ? Call(promiseResolve, ctor, « propertyValue »).
+            const next_promise = try Value.from(promise_resolve).callAssumeCallable(
+                agent,
+                Value.from(ctor),
+                &.{property_value},
+            );
+
+            const AlreadyCalled = struct { value: bool };
+
+            // iv. Let alreadyCalled be the Record { [[Value]]: false }.
+            const already_called = try agent.gc_allocator.create(AlreadyCalled);
+            already_called.* = .{ .value = false };
+
+            const AdditionalFields = struct {
+                /// [[AlreadyCalled]]
+                already_called: *AlreadyCalled,
+
+                /// [[Index]]
+                index: usize,
+
+                // Captures
+                variant: AllKeyedVariant,
+                entries: *std.ArrayList(KeyedEntry),
+                result_capability: PromiseCapability,
+                remaining_elements_count: *RemainingElements,
+            };
+
+            // v. Let fulfilledSteps be a new Abstract Closure with parameters (value) that captures
+            //    variant, entries, resultCapability, and remainingElementsCount and performs the
+            //    following steps when called:
+            const fulfilled_steps = struct {
+                fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
+                    const realm = agent_.currentRealm();
+                    const value = arguments_.get(0);
+
+                    // 1. Let activeFunc be the active function object.
+                    const active_func = agent_.activeFunctionObject();
+
+                    const additional_fields_ = active_func.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
+                    const variant_ = additional_fields_.variant;
+                    const entries_ = additional_fields_.entries;
+                    const result_capability_ = additional_fields_.result_capability;
+                    const remaining_elements_count_ = additional_fields_.remaining_elements_count;
+
+                    // 2. If activeFunc.[[AlreadyCalled]].[[Value]] is true, return undefined.
+                    if (additional_fields_.already_called.value) return .undefined;
+
+                    // 3. Set activeFunc.[[AlreadyCalled]].[[Value]] to true.
+                    additional_fields_.already_called.value = true;
+
+                    // 4. Let thisIndex be activeFunc.[[Index]].
+                    const this_index = additional_fields_.index;
+
+                    switch (variant_) {
+                        // 5. If variant is all, then
+                        .all => {
+                            // a. Set entries[thisIndex].[[Value]] to value.
+                            entries_.items[this_index].value = value;
+                        },
+                        // 6. Else,
+                        //     a. Assert: variant is all-settled.
+                        .all_settled => {
+                            // b. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+                            const obj = try ordinaryObjectCreate(
+                                agent_,
+                                try realm.intrinsic(.object_prototype),
+                            );
+
+                            // c. Perform ! CreateDataPropertyOrThrow(obj, "status", "fulfilled").
+                            try obj.createDataPropertyDirect(
+                                agent_,
+                                PropertyKey.from("status"),
+                                Value.from("fulfilled"),
+                            );
+
+                            // d. Perform ! CreateDataPropertyOrThrow(obj, "value", value).
+                            try obj.createDataPropertyDirect(
+                                agent_,
+                                PropertyKey.from("value"),
+                                value,
+                            );
+
+                            // e. Set entries[thisIndex].[[Value]] to obj.
+                            entries_.items[this_index].value = Value.from(obj);
+                        },
+                    }
+
+                    // 7. Set remainingElementsCount.[[Value]] to
+                    //    remainingElementsCount.[[Value]] - 1.
+                    remaining_elements_count_.value -= 1;
+
+                    // 8. If remainingElementsCount.[[Value]] = 0, then
+                    if (remaining_elements_count_.value == 0) {
+                        // a. Let result be CreateKeyedPromiseCombinatorResultObject(entries).
+                        const result = try createKeyedPromiseCombinatorResultObject(
+                            agent_,
+                            entries_.items,
+                        );
+
+                        // b. Return ? Call(resultCapability.[[Resolve]], undefined, « result »).
+                        return Value.from(result_capability_.resolve).callAssumeCallable(
+                            agent_,
+                            .undefined,
+                            &.{Value.from(result)},
+                        );
+                    }
+
+                    // 9. Return undefined.
+                    return .undefined;
+                }
+            }.func;
+
+            // vi. Let onFulfilled be CreateBuiltinFunction(fulfilledSteps, 1, "",
+            //     « [[AlreadyCalled]], [[Index]] »).
+            const on_fulfilled_additional_fields = try agent.gc_allocator.create(AdditionalFields);
+            const on_fulfilled = try createBuiltinFunction(
+                agent,
+                .{ .function = fulfilled_steps },
+                1,
+                "",
+                .{ .additional_fields = on_fulfilled_additional_fields },
+            );
+
+            on_fulfilled_additional_fields.* = .{
+                // vii. Set onFulfilled.[[AlreadyCalled]] to alreadyCalled.
+                .already_called = already_called,
+
+                // viii. Set onFulfilled.[[Index]] to index.
+                .index = index,
+
+                // Captures
+                .variant = variant,
+                .entries = entries,
+                .result_capability = result_capability,
+                .remaining_elements_count = remaining_elements_count,
+            };
+
+            const on_rejected = switch (variant) {
+                // ix. If variant is all, then
+                .all => blk: {
+                    // 1. Let onRejected be resultCapability.[[Reject]].
+                    break :blk result_capability.reject;
+                },
+                // x. Else,
+                //     1. Assert: variant is all-settled.
+                .all_settled => blk: {
+                    // 2. Let rejectedSteps be a new Abstract Closure with parameters (error) that
+                    //    captures entries, resultCapability, and remainingElementsCount and
+                    //    performs the following steps when called:
+                    const rejected_steps = struct {
+                        fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
+                            const realm = agent_.currentRealm();
+                            const @"error" = arguments_.get(0);
+
+                            // a. Let activeFunc be the active function object.
+                            const active_func = agent_.activeFunctionObject();
+
+                            const additional_fields_ = active_func.as(builtins.BuiltinFunction).fields.additionalFieldsAs(AdditionalFields);
+                            const entries_ = additional_fields_.entries;
+                            const result_capability_ = additional_fields_.result_capability;
+                            const remaining_elements_count_ = additional_fields_.remaining_elements_count;
+
+                            // b. If activeFunc.[[AlreadyCalled]].[[Value]] is true, return
+                            //    undefined.
+                            if (additional_fields_.already_called.value) return .undefined;
+
+                            // c. Set activeFunc.[[AlreadyCalled]].[[Value]] to true.
+                            additional_fields_.already_called.value = true;
+
+                            // d. Let thisIndex be activeFunc.[[Index]].
+                            const this_index = additional_fields_.index;
+
+                            // e. Let obj be OrdinaryObjectCreate(%Object.prototype%).
+                            const obj = try ordinaryObjectCreate(
+                                agent_,
+                                try realm.intrinsic(.object_prototype),
+                            );
+
+                            // f. Perform ! CreateDataPropertyOrThrow(obj, "status", "rejected").
+                            try obj.createDataPropertyDirect(
+                                agent_,
+                                PropertyKey.from("status"),
+                                Value.from("rejected"),
+                            );
+
+                            // g. Perform ! CreateDataPropertyOrThrow(obj, "reason", error).
+                            try obj.createDataPropertyDirect(
+                                agent_,
+                                PropertyKey.from("reason"),
+                                @"error",
+                            );
+
+                            // h. Set entries[thisIndex].[[Value]] to obj.
+                            entries_.items[this_index].value = Value.from(obj);
+
+                            // i. Set remainingElementsCount.[[Value]] to
+                            //    remainingElementsCount.[[Value]] - 1.
+                            remaining_elements_count_.value -= 1;
+
+                            // j. If remainingElementsCount.[[Value]] = 0, then
+                            if (remaining_elements_count_.value == 0) {
+                                // i. Let result be CreateKeyedPromiseCombinatorResultObject(
+                                //    entries).
+                                const result = try createKeyedPromiseCombinatorResultObject(
+                                    agent_,
+                                    entries_.items,
+                                );
+
+                                // ii. Return ? Call(resultCapability.[[Resolve]], undefined,
+                                //     « result »).
+                                return Value.from(result_capability_.resolve).callAssumeCallable(
+                                    agent_,
+                                    .undefined,
+                                    &.{Value.from(result)},
+                                );
+                            }
+
+                            // k. Return undefined.
+                            return .undefined;
+                        }
+                    }.func;
+
+                    // 3. Let onRejected be CreateBuiltinFunction(rejectedSteps, 1, "",
+                    //    « [[AlreadyCalled]], [[Index]] »).
+                    const on_rejected_additional_fields = try agent.gc_allocator.create(AdditionalFields);
+                    const on_rejected = try createBuiltinFunction(
+                        agent,
+                        .{ .function = rejected_steps },
+                        1,
+                        "",
+                        .{ .additional_fields = on_rejected_additional_fields },
+                    );
+
+                    on_rejected_additional_fields.* = .{
+                        // 4. Set onRejected.[[AlreadyCalled]] to alreadyCalled.
+                        .already_called = already_called,
+
+                        // 5. Set onRejected.[[Index]] to index.
+                        .index = index,
+
+                        // Captures
+                        .variant = variant,
+                        .entries = entries,
+                        .result_capability = result_capability,
+                        .remaining_elements_count = remaining_elements_count,
+                    };
+
+                    break :blk &on_rejected.object;
+                },
+            };
+
+            // xi. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] + 1.
+            remaining_elements_count.value += 1;
+
+            // xii. Perform ? Invoke(nextPromise, "then", « onFulfilled, onRejected »).
+            _ = try next_promise.invoke(
+                agent,
+                PropertyKey.from("then"),
+                &.{ Value.from(&on_fulfilled.object), Value.from(on_rejected) },
+            );
+
+            // xiii. Set index to index + 1.
+            index += 1;
+        }
+    }
+
+    // 6. Set remainingElementsCount.[[Value]] to remainingElementsCount.[[Value]] - 1.
+    remaining_elements_count.value -= 1;
+
+    // 7. If remainingElementsCount.[[Value]] = 0, then
+    if (remaining_elements_count.value == 0) {
+        // a. NOTE: This can happen even if entries is non-empty if an ill-behaved thenable
+        //    synchronously invoked the callback passed to its "then" method.
+        // b. Let result be CreateKeyedPromiseCombinatorResultObject(entries).
+        const result = try createKeyedPromiseCombinatorResultObject(agent, entries.items);
+
+        // c. Perform ? Call(resultCapability.[[Resolve]], undefined, « result »).
+        _ = try Value.from(result_capability.resolve).callAssumeCallable(
+            agent,
+            .undefined,
+            &.{Value.from(result)},
+        );
+    }
+
+    // 8. Return resultCapability.[[Promise]].
+    return result_capability.promise;
 }
 
 /// 27.5.4.2.1 PerformPromiseAllSettled ( iteratorRecord, ctor, resultCapability, promiseResolve )
@@ -1464,7 +1819,9 @@ pub const constructor = struct {
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
         try object.defineBuiltinFunction(agent, "all", all, 1, realm);
+        try object.defineBuiltinFunction(agent, "allKeyed", allKeyed, 1, realm);
         try object.defineBuiltinFunction(agent, "allSettled", allSettled, 1, realm);
+        try object.defineBuiltinFunction(agent, "allSettledKeyed", allSettledKeyed, 1, realm);
         try object.defineBuiltinFunction(agent, "any", any, 1, realm);
         try object.defineBuiltinFunction(agent, "race", race, 1, realm);
         try object.defineBuiltinFunction(agent, "reject", reject, 1, realm);
@@ -1610,6 +1967,63 @@ pub const constructor = struct {
         return Value.from(result catch unreachable);
     }
 
+    /// 27.2.4.1 Promise.allKeyed ( promises )
+    /// https://tc39.es/proposal-await-dictionary/#sec-promise.allkeyed
+    fn allKeyed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const promises = arguments.get(0);
+
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
+
+        // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
+
+        // 3. Let promiseResolve be Completion(GetPromiseResolve(ctor)).
+        const promise_resolve = getPromiseResolve(agent, ctor.asObject()) catch |err| {
+            // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        // 5. If promises is not an Object, then
+        if (!promises.isObject()) {
+            // a. Let error be a newly created TypeError object.
+            const type_error = try agent.createErrorObject(
+                .type_error,
+                "{f} is not an Object",
+                .{promises},
+            );
+
+            // b. Perform ? Call(promiseCapability.[[Reject]], undefined, « error »).
+            _ = try Value.from(promise_capability.reject).callAssumeCallable(
+                agent,
+                .undefined,
+                &.{Value.from(&type_error.object)},
+            );
+
+            // c. Return promiseCapability.[[Promise]].
+            return Value.from(promise_capability.promise);
+        }
+
+        // 6. Let result be Completion(PerformPromiseAllKeyed(all, promises, ctor,
+        //    promiseCapability, promiseResolve)).
+        const result = performPromiseAllKeyed(
+            agent,
+            .all,
+            promises.asObject(),
+            ctor.asObject(),
+            promise_capability,
+            promise_resolve,
+        );
+
+        // 7. IfAbruptRejectPromise(result, promiseCapability).
+        _ = result catch |err| {
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        // 8. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
+    }
+
     /// 27.5.4.2 Promise.allSettled ( iterable )
     /// https://tc39.es/ecma262/#sec-promise.allsettled
     fn allSettled(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
@@ -1657,6 +2071,59 @@ pub const constructor = struct {
 
         // 9. Return ! result.
         return Value.from(result catch unreachable);
+    }
+
+    /// 27.2.4.2 Promise.allSettledKeyed ( promises )
+    /// https://tc39.es/proposal-await-dictionary/#sec-promise.allsettledkeyed
+    fn allSettledKeyed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const promises = arguments.get(0);
+
+        // 1. Let ctor be the this value.
+        const ctor = this_value;
+
+        // 2. Let promiseCapability be ? NewPromiseCapability(ctor).
+        const promise_capability = try newPromiseCapability(agent, ctor);
+
+        // 3. Let promiseResolve be Completion(GetPromiseResolve(ctor)).
+        const promise_resolve = getPromiseResolve(agent, ctor.asObject()) catch |err| {
+            // 4. IfAbruptRejectPromise(promiseResolve, promiseCapability).
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        // 5. If promises is not an Object, then
+        if (!promises.isObject()) {
+            // a. Let error be a newly created TypeError object.
+            const type_error = try agent.createErrorObject(.type_error, "{f} is not an Object", .{promises});
+
+            // b. Perform ? Call(promiseCapability.[[Reject]], undefined, « error »).
+            _ = try Value.from(promise_capability.reject).callAssumeCallable(
+                agent,
+                .undefined,
+                &.{Value.from(&type_error.object)},
+            );
+
+            // c. Return promiseCapability.[[Promise]].
+            return Value.from(promise_capability.promise);
+        }
+
+        // 6. Let result be Completion(PerformPromiseAllKeyed(all-settled, promises, ctor,
+        //    promiseCapability, promiseResolve)).
+        const result = performPromiseAllKeyed(
+            agent,
+            .all_settled,
+            promises.asObject(),
+            ctor.asObject(),
+            promise_capability,
+            promise_resolve,
+        );
+
+        // 7. IfAbruptRejectPromise(result, promiseCapability).
+        _ = result catch |err| {
+            return Value.from(try promise_capability.rejectPromise(agent, err));
+        };
+
+        // 8. Return promiseCapability.[[Promise]].
+        return Value.from(promise_capability.promise);
     }
 
     /// 27.5.4.3 Promise.any ( iterable )
