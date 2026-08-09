@@ -705,6 +705,9 @@ fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
     };
     try writer.print("Kiesel {f}\n\n", .{kiesel.version});
     try writer.print("Zig version        {s}\n", .{builtin.zig_version_string});
+    if (kiesel.build_options.enable_intl or kiesel.build_options.enable_temporal) {
+        try writer.print("Rust version       {s}\n", .{kiesel.zement.rustcVersion()});
+    }
     try writer.print("Target             {t}-{t}-{t}\n", .{ builtin.target.cpu.arch, builtin.target.os.tag, builtin.target.abi });
     try writer.print("Optimize mode      {t}\n", .{builtin.mode});
     if (enabled_features.len > 0) {
