@@ -10,6 +10,8 @@ const types = @import("../../types.zig");
 const Object = types.Object;
 const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
+const String = types.String;
+const Symbol = types.Symbol;
 
 const Intrinsics = @This();
 
@@ -85,6 +87,7 @@ intl_display_names: ?*Object,
 intl_display_names_prototype: ?*Object,
 intl_duration_format: ?*Object,
 intl_duration_format_prototype: ?*Object,
+intl_fallback_symbol: ?*const Symbol,
 intl_list_format: ?*Object,
 intl_list_format_prototype: ?*Object,
 intl_locale: ?*Object,
@@ -191,7 +194,14 @@ pub const init: Intrinsics = blk: {
     break :blk intrinsics;
 };
 
-fn Type(comptime field: std.meta.FieldEnum(Intrinsics)) type {
+pub fn Result(comptime field: std.meta.FieldEnum(Intrinsics)) type {
+    return switch (field) {
+        .intl_fallback_symbol => *const Symbol,
+        else => *Object,
+    };
+}
+
+fn IntrinsicObject(comptime field: std.meta.FieldEnum(Intrinsics)) type {
     return switch (field) {
         .aggregate_error => builtins.aggregate_error.constructor,
         .aggregate_error_prototype => builtins.aggregate_error.prototype,
@@ -363,6 +373,7 @@ fn Type(comptime field: std.meta.FieldEnum(Intrinsics)) type {
         .array_prototype_to_string,
         .array_prototype_values,
         .object_prototype_to_string,
+        .intl_fallback_symbol,
         => unreachable,
     };
 }
@@ -371,12 +382,13 @@ pub fn getOrCreate(
     intrinsics: *Intrinsics,
     realm: *Realm,
     comptime field: std.meta.FieldEnum(Intrinsics),
-) std.mem.Allocator.Error!*Object {
+) std.mem.Allocator.Error!Result(field) {
     return @field(intrinsics, @tagName(field)) orelse blk: {
         const intrinsic = switch (field) {
             .array_prototype_to_string => try createProperty(intrinsics, realm, .array_prototype, "toString"),
             .array_prototype_values => try createProperty(intrinsics, realm, .array_prototype, "values"),
             .object_prototype_to_string => try createProperty(intrinsics, realm, .object_prototype, "toString"),
+            .intl_fallback_symbol => try Symbol.init(realm.agent, String.fromLiteral("IntlLegacyConstructedSymbol")),
             else => try create(intrinsics, realm, field),
         };
         @field(intrinsics, @tagName(field)) = intrinsic;
@@ -389,7 +401,7 @@ fn create(
     realm: *Realm,
     comptime field: std.meta.FieldEnum(Intrinsics),
 ) std.mem.Allocator.Error!*Object {
-    const T = Type(field);
+    const T = IntrinsicObject(field);
     const agent = realm.agent;
     const object = try T.create(agent, realm);
     object.shape = try object.shape.makeUnique(agent.gc_allocator);

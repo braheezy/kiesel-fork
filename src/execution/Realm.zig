@@ -54,7 +54,7 @@ shapes: Shapes,
 
 pub const Intrinsic = std.meta.FieldEnum(Intrinsics);
 
-pub fn intrinsic(realm: *Realm, comptime field: Intrinsic) std.mem.Allocator.Error!*Object {
+pub fn intrinsic(realm: *Realm, comptime field: Intrinsic) std.mem.Allocator.Error!Intrinsics.Result(field) {
     return realm.intrinsics.getOrCreate(realm, field);
 }
 

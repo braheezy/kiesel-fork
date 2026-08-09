@@ -7,6 +7,7 @@ const icu4zig = @import("icu4zig");
 const temporal_rs = @import("temporal_rs");
 
 const abstract_operations = @import("abstract_operations.zig");
+const build_options = @import("build-options");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -26,6 +27,46 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const resolveOptions = abstract_operations.resolveOptions;
 const systemTimeZoneIdentifier = builtins.systemTimeZoneIdentifier;
+
+/// 11.1.1.1 ChainDateTimeFormat ( dateTimeFormat, newTarget, this )
+/// https://tc39.es/ecma402/#sec-chaindatetimeformat
+fn chainDateTimeFormat(
+    agent: *Agent,
+    date_time_format: *DateTimeFormat,
+    new_target: ?*Object,
+    this: ?Value,
+) Agent.Error!Value {
+    const realm = agent.currentRealm();
+
+    // 1. If newTarget is undefined and ? OrdinaryHasInstance(%Intl.DateTimeFormat%, this) is true,
+    //    then
+    if (new_target == null and
+        try Value.from(try realm.intrinsic(.intl_date_time_format)).ordinaryHasInstance(
+            agent,
+            this.?,
+        ))
+    {
+        // a. Perform ? DefinePropertyOrThrow(this, %Intl%.[[FallbackSymbol]], PropertyDescriptor {
+        //    [[Value]]: dateTimeFormat, [[Writable]]: false, [[Enumerable]]: false,
+        //    [[Configurable]]: false }).
+        try this.?.asObject().definePropertyOrThrow(
+            agent,
+            PropertyKey.from(try realm.intrinsic(.intl_fallback_symbol)),
+            .{
+                .value = Value.from(&date_time_format.object),
+                .writable = false,
+                .enumerable = false,
+                .configurable = false,
+            },
+        );
+
+        // b. Return this.
+        return this.?;
+    }
+
+    // 2. Return dateTimeFormat.
+    return Value.from(&date_time_format.object);
+}
 
 /// 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults )
 /// https://tc39.es/ecma402/#sec-createdatetimeformat
@@ -388,7 +429,7 @@ pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         const builtin_function = try createBuiltinFunction(
             agent,
-            .{ .constructor = impl },
+            .{ .constructor_with_this = impl },
             0,
             "DateTimeFormat",
             .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
@@ -409,7 +450,12 @@ pub const constructor = struct {
 
     /// 11.1.1 Intl.DateTimeFormat ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.datetimeformat
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
+    fn impl(
+        agent: *Agent,
+        this_value: ?Value,
+        arguments: Arguments,
+        new_target: ?*Object,
+    ) Agent.Error!Value {
         const locales = arguments.get(0);
         const options = arguments.get(1);
 
@@ -429,8 +475,11 @@ pub const constructor = struct {
 
         // 3. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
-        //    a. Let this be the this value.
-        //    b. Return ? ChainDateTimeFormat(dateTimeFormat, NewTarget, this).
+        if (build_options.enable_annex_b) {
+            // a. Let this be the this value.
+            // b. Return ? ChainDateTimeFormat(dateTimeFormat, NewTarget, this).
+            return chainDateTimeFormat(agent, date_time_format, new_target, this_value);
+        }
 
         // 4. Return dateTimeFormat.
         return Value.from(&date_time_format.object);
@@ -480,8 +529,13 @@ pub const prototype = struct {
         // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
         //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
+        const date_time_format_value = if (build_options.enable_annex_b)
+            try unwrapDateTimeFormat(agent, this_value)
+        else
+            this_value;
+
         // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
-        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
+        const date_time_format = try date_time_format_value.requireInternalSlot(agent, DateTimeFormat);
 
         // 4. Let options be OrdinaryObjectCreate(%Object.prototype%).
         const options = try ordinaryObjectCreate(
@@ -565,8 +619,13 @@ pub const prototype = struct {
         // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
         //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
+        const date_time_format_value = if (build_options.enable_annex_b)
+            try unwrapDateTimeFormat(agent, this_value)
+        else
+            this_value;
+
         // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
-        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
+        const date_time_format = try date_time_format_value.requireInternalSlot(agent, DateTimeFormat);
 
         // 4. If dtf.[[BoundFormat]] is undefined, then
         if (date_time_format.fields.bound_format == null) {
@@ -851,4 +910,34 @@ pub fn formatDateTimeRange(agent: *Agent, date_time_format: *const DateTimeForma
         const result = try std.mem.concat(agent.gc_allocator, u8, &.{ result_x, " – ", result_y });
         return Value.from(try String.fromUtf8(agent, result));
     }
+}
+
+/// 11.5.14 UnwrapDateTimeFormat ( dtf )
+/// https://tc39.es/ecma402/#sec-unwrapdatetimeformat
+fn unwrapDateTimeFormat(agent: *Agent, date_time_format_value: Value) Agent.Error!Value {
+    const realm = agent.currentRealm();
+
+    // 1. If dtf is not an Object, throw a TypeError exception.
+    if (!date_time_format_value.isObject()) {
+        return agent.throwException(.type_error, "this value must be an object", .{});
+    }
+    const date_time_format = date_time_format_value.asObject();
+
+    // 2. If dtf does not have an [[InitializedDateTimeFormat]] internal slot and
+    //    ? OrdinaryHasInstance(%Intl.DateTimeFormat%, dtf) is true, then
+    if (!date_time_format.is(DateTimeFormat) and
+        try Value.from(try realm.intrinsic(.intl_date_time_format)).ordinaryHasInstance(
+            agent,
+            date_time_format_value,
+        ))
+    {
+        // a. Return ? Get(dtf, %Intl%.[[FallbackSymbol]]).
+        return date_time_format.get(
+            agent,
+            PropertyKey.from(try realm.intrinsic(.intl_fallback_symbol)),
+        );
+    }
+
+    // 3. Return dtf.
+    return date_time_format_value;
 }
