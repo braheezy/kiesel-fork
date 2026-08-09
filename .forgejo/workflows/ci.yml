@@ -28,10 +28,9 @@ jobs:
           version: 0.16.0
           cache-size-limit: 10240 # 10 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@master
+        uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2026-04-16 # 1.95.0
-          components: "rust-src"
+          targets: aarch64-unknown-linux-musl,arm-unknown-linux-musleabihf,i686-unknown-linux-musl,loongarch64-unknown-linux-musl,powerpc64-unknown-linux-musl,riscv64gc-unknown-linux-musl,x86_64-unknown-linux-musl
       - name: Build kiesel-linux-aarch64
         run: |
           # Verify building without NaN-boxing on aarch64.
@@ -52,15 +51,18 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-loongarch64
       - name: Build kiesel-linux-mips
         run: |
-          zig build -Dtarget=mips-linux-musleabi -Doptimize=ReleaseSafe
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=mips-linux-musleabi -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips
       - name: Build kiesel-linux-mips64
         run: |
-          zig build -Dtarget=mips64-linux-muslabi64 -Doptimize=ReleaseSafe
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=mips64-linux-muslabi64 -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips64
       - name: Build kiesel-linux-powerpc
         run: |
-          zig build -Dtarget=powerpc-linux-musleabihf -Doptimize=ReleaseSafe
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=powerpc-linux-musleabihf -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-powerpc
       - name: Build kiesel-linux-powerpc64
         run: |
@@ -72,7 +74,8 @@ jobs:
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-riscv64
       - name: Build kiesel-linux-s390x
         run: |
-          zig build -Dtarget=s390x-linux-musl -Doptimize=ReleaseSafe
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=s390x-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-s390x
       - name: Build kiesel-linux-x86
         run: |
@@ -109,10 +112,9 @@ jobs:
           version: 0.16.0
           cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@master
+        uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2026-04-16 # 1.95.0
-          components: "rust-src"
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Build kiesel-macos-aarch64
         run: |
           zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseSafe
@@ -146,10 +148,9 @@ jobs:
           version: 0.16.0
           cache-size-limit: 5120 # 5 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@master
+        uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2026-04-16 # 1.95.0
-          components: "rust-src"
+          targets: aarch64-pc-windows-gnullvm,i686-pc-windows-gnu,x86_64-pc-windows-gnu
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -191,10 +192,9 @@ jobs:
           version: 0.16.0
           cache-size-limit: 10240 # 10 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@master
+        uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
-          toolchain: nightly-2026-04-16 # 1.95.0
-          components: "rust-src"
+          targets: wasm32-wasip1,x86_64-unknown-freebsd,x86_64-unknown-netbsd
       - name: Build kiesel.wasm
         run: |
           # Building with Intl and Temporal adds nearly 10MB to the binary, so we build it twice:
@@ -205,7 +205,8 @@ jobs:
           # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
       - name: Build kiesel-freebsd-aarch64
         run: |
-          zig build -Dtarget=aarch64-freebsd-none -Doptimize=ReleaseSafe
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=aarch64-freebsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-aarch64
       - name: Build kiesel-freebsd-x86_64
         run: |
@@ -214,11 +215,13 @@ jobs:
       # TODO: Re-enable once https://codeberg.org/ziglang/translate-c/issues/323 is fixed
       # - name: Build kiesel-netbsd-aarch64
       #   run: |
-      #     zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe
+      #     # No prebuilt rust-std, build without Intl/Temporal
+      #     zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
       #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
       # - name: Build kiesel-netbsd-x86
       #   run: |
-      #     zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe
+      #     # No prebuilt rust-std, build without Intl/Temporal
+      #     zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
       #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
       # - name: Build kiesel-netbsd-x86_64
       #   run: |
@@ -276,10 +279,7 @@ jobs:
           version: 0.16.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-04-16 # 1.95.0
-          components: "rust-src"
+        uses: https://github.com/dtolnay/rust-toolchain@stable
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -379,10 +379,7 @@ jobs:
         with:
           version: 0.16.0
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly-2026-04-16 # 1.95.0
-          components: "rust-src"
+        uses: https://github.com/dtolnay/rust-toolchain@stable
       - name: Install Node.js
         uses: https://github.com/actions/setup-node@v6
       - name: Install dependencies
