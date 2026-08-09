@@ -40,11 +40,11 @@ pub fn build(b: *std.Build) void {
         },
     );
 
-    // Exporting a static library as a build system artifact here would be nicer but linking a
-    // static "system" library (libtemporal_capi.a) to another static library (the artifact) causes
-    // issues: https://github.com/ziglang/zig/issues/20476
-    // So for now we export the paths and do a bit of manual setup in the main build.zig.
-    b.addNamedLazyPath("lib", build_dir);
+    const zement = b.addModule("zement", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const unwind_stubs = b.addLibrary(.{
         .linkage = .static,
@@ -55,5 +55,21 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    b.installArtifact(unwind_stubs);
+
+    // NOTE: Rust outputs 'libzement.a' instead of 'zement.lib' when targeting
+    // *-pc-windows-gnu, so we can hardcode the name here instead of using
+    // `std.zig.binNameAlloc()` to select a target-dependent prefix and extension.
+    // See: https://github.com/rust-lang/rust/pull/70937
+    zement.addObjectFile(build_dir.path(b, "libzement.a"));
+    // icu4zig provides its own copies of these symbols so we link them as a
+    // static library which will only include them if needed.
+    zement.linkLibrary(unwind_stubs);
+
+    // NOTE: Empirically these are not needed in release builds, presumably due to LTO.
+    if (target.result.os.tag == .windows and optimize == .Debug) {
+        // For GetUserProfileDirectoryW
+        zement.linkSystemLibrary("userenv", .{});
+        // For a bunch of networking APIs
+        zement.linkSystemLibrary("ws2_32", .{});
+    }
 }
