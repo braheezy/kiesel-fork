@@ -36,8 +36,8 @@
             .hash = "parser_toolkit-0.1.0-baYGPdpDEwBQQ2__YEalqGB09TAjP7vpoe2DFkwg6mRa",
         },
         .stackinfo = .{
-            .url = "git+https://codeberg.org/linus/zig-stackinfo#08bc113a9f8e85689ef536b6e5516c658bf4703e",
-            .hash = "stackinfo-0.1.0-NZ2qTk8iAAC6y9NJVJ55kzDGmuGMoqGhlmHiG1baZKi3",
+            .url = "git+https://codeberg.org/linus/zig-stackinfo#8fcab6807f44e95e95047a734ce0a05abf310d1c",
+            .hash = "stackinfo-0.1.0-NZ2qTqEkAAAO6eY7NS0yscBsG9vOSAapNfr72g7VTVsi",
         },
         .temporal_rs = .{
             .path = "./pkg/temporal_rs",
