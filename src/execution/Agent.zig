@@ -41,6 +41,9 @@ iterator_record_shape: ?*Object.Shape,
 string_cache: String.Cache,
 platform: *const Platform,
 active_vm: ?*interpreter.Vm,
+interrupt_handler: ?InterruptHandler,
+interrupt_context: ?*anyopaque,
+execution_interrupted: bool,
 
 /// [[LittleEndian]]
 little_endian: bool = builtin.cpu.arch.endian() == .little,
@@ -51,6 +54,11 @@ module_async_evaluation_count: u32 = 0,
 pub const Exception = @import("Agent/Exception.zig");
 pub const Platform = @import("Agent/Platform.zig");
 pub const WellKnownSymbols = @import("Agent/WellKnownSymbols.zig");
+
+/// Called from the JavaScript execution thread at VM safe points. Returning
+/// true terminates the current execution. The callback must not re-enter this
+/// Agent.
+pub const InterruptHandler = *const fn (context: ?*anyopaque) bool;
 
 pub const Options = struct {
     debug: struct {
@@ -94,7 +102,61 @@ pub fn init(
         .string_cache = .empty,
         .platform = platform,
         .active_vm = null,
+        .interrupt_handler = null,
+        .interrupt_context = null,
+        .execution_interrupted = false,
     };
+}
+
+/// Installs a host callback that is polled while JavaScript bytecode executes.
+/// The host must keep `context` alive until the handler is cleared or the Agent
+/// is deinitialized.
+pub fn setInterruptHandler(
+    self: *Agent,
+    context: ?*anyopaque,
+    handler: InterruptHandler,
+) void {
+    self.interrupt_context = context;
+    self.interrupt_handler = handler;
+}
+
+/// Removes the current execution interrupt callback.
+pub fn clearInterruptHandler(self: *Agent) void {
+    self.interrupt_handler = null;
+    self.interrupt_context = null;
+}
+
+/// Returns whether the host has requested termination at this safe point.
+pub fn shouldInterrupt(self: *Agent) bool {
+    const handler = self.interrupt_handler orelse return false;
+    return handler(self.interrupt_context);
+}
+
+/// Checks the host interrupt callback and starts an uncatchable abrupt
+/// completion when termination was requested.
+pub fn checkInterrupt(self: *Agent) error{ExceptionThrown}!void {
+    if (!self.shouldInterrupt()) return;
+    self.execution_interrupted = true;
+    self.exception = .{
+        .value = Value.from("Execution interrupted"),
+        .stack_trace = &.{},
+    };
+    return error.ExceptionThrown;
+}
+
+/// Reports and clears a completed host interruption. Embedders should call
+/// this after an entry point returns `error.ExceptionThrown` to distinguish a
+/// host termination request from a JavaScript exception.
+pub fn takeExecutionInterrupt(self: *Agent) bool {
+    if (!self.execution_interrupted) return false;
+    self.execution_interrupted = false;
+    self.exception = null;
+    return true;
+}
+
+/// Returns whether an uncatchable host interruption is currently unwinding.
+pub fn executionInterrupted(self: *const Agent) bool {
+    return self.execution_interrupted;
 }
 
 pub fn deinit(self: *Agent) void {

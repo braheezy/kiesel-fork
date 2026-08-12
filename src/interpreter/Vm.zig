@@ -190,6 +190,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
     loop: switch (Bytecode.Inst.decodeTag(code[@intFromEnum(pc)..])) {
         inline else => |tag| {
             @setEvalBranchQuota(3_000);
+            try vm.agent.checkInterrupt();
             const data = Bytecode.Inst.decodeData(code[@intFromEnum(pc) + 1 ..], tag);
             const inst_size = comptime Bytecode.Inst.encodedSize(tag);
             const inst_pc = pc;
@@ -367,6 +368,7 @@ fn handleError(vm: *Vm, err: Agent.Error, inst_pc: Pc, pc: *Pc) Agent.Error!void
     switch (err) {
         error.OutOfMemory => return err,
         error.ExceptionThrown => {
+            if (vm.agent.executionInterrupted()) return err;
             const execution_context = vm.agent.runningExecutionContext();
             const maybe_handler = vm.frame.bytecode.findExceptionHandler(@intFromEnum(inst_pc));
             const target_scope_depth = if (maybe_handler) |handler| handler.scope_depth else 0;
