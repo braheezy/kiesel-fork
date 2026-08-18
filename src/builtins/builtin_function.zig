@@ -274,7 +274,7 @@ pub fn createBuiltinFunction(
     //    described by behaviour using the provided arguments as the values of the corresponding
     //    parameters specified by behaviour. The new function object has internal slots whose names
     //    are the elements of internalSlotsList, and an [[InitialName]] internal slot.
-    const function = try BuiltinFunction.create(agent, .{
+    const func = try BuiltinFunction.create(agent, .{
         .internal_methods = switch (behaviour) {
             .function => internal_methods,
             .constructor, .constructor_with_this => internal_methods_constructor,
@@ -304,7 +304,7 @@ pub fn createBuiltinFunction(
     });
 
     // 12. Perform SetFunctionLength(func, length).
-    try setFunctionLength(agent, &function.object, @floatFromInt(length));
+    try setFunctionLength(agent, &func.object, @floatFromInt(length));
 
     // 13. If prefix is not present, then
     //     a. Perform SetFunctionName(func, name).
@@ -315,9 +315,9 @@ pub fn createBuiltinFunction(
     //       ensure it only gets called once. It's the caller's responsibility to install the
     //       function name after the fact.
     if (maybe_name) |name| {
-        try setFunctionName(agent, &function.object, PropertyKey.from(name), args.prefix);
+        try setFunctionName(agent, &func.object, PropertyKey.from(name), args.prefix);
     }
 
     // 15. Return func.
-    return function;
+    return func;
 }

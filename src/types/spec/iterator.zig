@@ -272,11 +272,11 @@ pub fn getIteratorDirect(agent: *Agent, obj: *Object) Agent.Error!Iterator {
 
 /// 7.4.3 GetIteratorFromMethod ( obj, method )
 /// https://tc39.es/ecma262/#sec-getiteratorfrommethod
-pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: *Object) Agent.Error!Iterator {
+pub fn getIteratorFromMethod(agent: *Agent, obj: Value, method: *Object) Agent.Error!Iterator {
     std.debug.assert(method.internalMethods().call != null);
 
     // 1. Let iterator be ? Call(method, obj).
-    const iterator = try method.call(agent, object, &.{});
+    const iterator = try method.call(agent, obj, &.{});
 
     // 2. If iterator is not an Object, throw a TypeError exception.
     if (!iterator.isObject()) {
@@ -291,15 +291,11 @@ pub const IteratorKind = enum { sync, async };
 
 /// 7.4.4 GetIterator ( obj, kind )
 /// https://tc39.es/ecma262/#sec-getiterator
-pub fn getIterator(
-    agent: *Agent,
-    object: Value,
-    kind: IteratorKind,
-) Agent.Error!Iterator {
+pub fn getIterator(agent: *Agent, obj: Value, kind: IteratorKind) Agent.Error!Iterator {
     // 1. If kind is async, then
     const method = (if (kind == .async) blk: {
         // a. Let method be ? GetMethod(obj, %Symbol.asyncIterator%).
-        const method = try object.getMethod(
+        const method = try obj.getMethod(
             agent,
             PropertyKey.from(agent.well_known_symbols.async_iterator),
         );
@@ -307,7 +303,7 @@ pub fn getIterator(
         // b. If method is undefined, then
         if (method == null) {
             // i. Let syncMethod be ? GetMethod(obj, %Symbol.iterator%).
-            const sync_method = try object.getMethod(
+            const sync_method = try obj.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.iterator),
             ) orelse {
@@ -320,7 +316,7 @@ pub fn getIterator(
             };
 
             // iii. Let syncIteratorRecord be ? GetIteratorFromMethod(obj, syncMethod).
-            const sync_iterator = try getIteratorFromMethod(agent, object, sync_method);
+            const sync_iterator = try getIteratorFromMethod(agent, obj, sync_method);
 
             // iv. Return CreateAsyncFromSyncIterator(syncIteratorRecord).
             return createAsyncFromSyncIterator(agent, sync_iterator);
@@ -330,7 +326,7 @@ pub fn getIterator(
     } else blk: {
         // 2. Else,
         // a. Let method be ? GetMethod(obj, %Symbol.iterator%).
-        break :blk try object.getMethod(
+        break :blk try obj.getMethod(
             agent,
             PropertyKey.from(agent.well_known_symbols.iterator),
         );
@@ -340,39 +336,39 @@ pub fn getIterator(
     };
 
     // 4. Return ? GetIteratorFromMethod(obj, method).
-    return getIteratorFromMethod(agent, object, method);
+    return getIteratorFromMethod(agent, obj, method);
 }
 
 /// 7.4.5 GetIteratorFlattenable ( obj, primitiveHandling )
 /// https://tc39.es/ecma262/#sec-getiteratorflattenable
 pub fn getIteratorFlattenable(
     agent: *Agent,
-    object: Value,
+    obj: Value,
     primitive_handling: enum {
         iterate_string_primitives,
         reject_primitives,
     },
 ) Agent.Error!Iterator {
     // 1. If obj is not an Object, then
-    if (!object.isObject()) {
+    if (!obj.isObject()) {
         switch (primitive_handling) {
             // a. If primitiveHandling is reject-primitives, throw a TypeError exception.
             .reject_primitives => {
-                return agent.throwException(.type_error, "{f} is not an Object", .{object});
+                return agent.throwException(.type_error, "{f} is not an Object", .{obj});
             },
 
             // b. Assert: primitiveHandling is iterate-string-primitives.
             .iterate_string_primitives => {
                 // c. If obj is not a String, throw a TypeError exception.
-                if (!object.isString()) {
-                    return agent.throwException(.type_error, "{f} is not a string", .{object});
+                if (!obj.isString()) {
+                    return agent.throwException(.type_error, "{f} is not a string", .{obj});
                 }
             },
         }
     }
 
     // 2. Let method be ? GetMethod(obj, %Symbol.iterator%).
-    const maybe_method = try object.getMethod(
+    const maybe_method = try obj.getMethod(
         agent,
         PropertyKey.from(agent.well_known_symbols.iterator),
     );
@@ -380,11 +376,11 @@ pub fn getIteratorFlattenable(
     // 3. If method is undefined, then
     const iterator = if (maybe_method == null) blk: {
         // a. Let iterator be obj.
-        break :blk object;
+        break :blk obj;
     } else blk: {
         // 4. Else,
         // a. Let iterator be ? Call(method, obj).
-        break :blk try maybe_method.?.call(agent, object, &.{});
+        break :blk try maybe_method.?.call(agent, obj, &.{});
     };
 
     // 5. If iterator is not an Object, throw a TypeError exception.

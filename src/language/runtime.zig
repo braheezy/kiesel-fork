@@ -2283,27 +2283,27 @@ pub fn classDefinitionEvaluation(
                     //    not.
 
                     // 2. Let func be ! ctorFunc.[[GetPrototypeOf]]().
-                    const prototype_function = ctor_func.internalMethods().getPrototypeOf(
+                    const proto_func = ctor_func.internalMethods().getPrototypeOf(
                         agent_,
                         ctor_func,
                     ) catch |err| try noexcept(err);
 
                     // 3. If IsConstructor(func) is false, throw a TypeError exception.
-                    if (prototype_function == null or !Value.from(prototype_function.?).isConstructor()) {
+                    if (proto_func == null or !Value.from(proto_func.?).isConstructor()) {
                         return agent_.throwException(
                             .type_error,
                             "{f} is not a constructor",
                             .{
-                                if (prototype_function == null)
+                                if (proto_func == null)
                                     Value.undefined
                                 else
-                                    Value.from(prototype_function.?),
+                                    Value.from(proto_func.?),
                             },
                         );
                     }
 
                     // 4. Let result be ? Construct(func, args, NewTarget).
-                    break :blk try prototype_function.?.construct(agent_, args, new_target.?);
+                    break :blk try proto_func.?.construct(agent_, args, new_target.?);
                 } else blk: {
                     // v. Else,
                     // 1. NOTE: This branch behaves similarly to `constructor() {}`.

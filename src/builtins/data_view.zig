@@ -42,11 +42,11 @@ const DataViewWithBufferWitness = struct {
 /// 25.3.1.2 MakeDataViewWithBufferWitnessRecord ( obj, order )
 /// https://tc39.es/ecma262/#sec-makedataviewwithbufferwitnessrecord
 fn makeDataViewWithBufferWitnessRecord(
-    object: *const DataView,
+    obj: *const DataView,
     order: Order,
 ) DataViewWithBufferWitness {
     // 1. Let buffer be obj.[[ViewedArrayBuffer]].
-    const buffer = object.fields.viewed_array_buffer;
+    const buffer = obj.fields.viewed_array_buffer;
 
     // 2. If IsDetachedBuffer(buffer) is true, then
     const byte_length: DetachedByteLength = if (isDetachedBuffer(buffer)) blk: {
@@ -60,7 +60,7 @@ fn makeDataViewWithBufferWitnessRecord(
 
     // 4. Return the DataView With Buffer Witness Record { [[Object]]: obj,
     //    [[CachedBufferByteLength]]: byteLength }.
-    return .{ .object = object, .cached_buffer_byte_length = byte_length };
+    return .{ .object = obj, .cached_buffer_byte_length = byte_length };
 }
 
 /// 25.3.1.3 GetViewByteLength ( viewRecord )

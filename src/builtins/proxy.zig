@@ -44,15 +44,15 @@ fn getPrototypeOf(agent: *Agent, obj: *Object) Agent.Error!?*Object {
     };
 
     // 7. Let handlerProto be ? Call(trap, handler, « target »).
-    const handler_prototype = try trap.call(agent, Value.from(handler), &.{Value.from(target)});
+    const handler_proto = try trap.call(agent, Value.from(handler), &.{Value.from(target)});
 
     // 8. If handlerProto is not an Object and handlerProto is not null, throw a TypeError
     //    exception.
-    if (!handler_prototype.isObject() and !handler_prototype.isNull()) {
+    if (!handler_proto.isObject() and !handler_proto.isNull()) {
         return agent.throwException(
             .type_error,
             "{f} is not an Object or null",
-            .{handler_prototype},
+            .{handler_proto},
         );
     }
 
@@ -61,16 +61,16 @@ fn getPrototypeOf(agent: *Agent, obj: *Object) Agent.Error!?*Object {
 
     // 10. If extensibleTarget is true, return handlerProto.
     if (extensible_target) {
-        return if (handler_prototype.isObject()) handler_prototype.asObject() else null;
+        return if (handler_proto.isObject()) handler_proto.asObject() else null;
     }
 
     // 11. Let targetProto be ? target.[[GetPrototypeOf]]().
-    const target_prototype = try target.internalMethods().getPrototypeOf(agent, target);
+    const target_proto = try target.internalMethods().getPrototypeOf(agent, target);
 
     // 12. If SameValue(handlerProto, targetProto) is false, throw a TypeError exception.
     if (!sameValue(
-        handler_prototype,
-        if (target_prototype != null) Value.from(target_prototype.?) else .null,
+        handler_proto,
+        if (target_proto != null) Value.from(target_proto.?) else .null,
     )) {
         return agent.throwException(
             .type_error,
@@ -80,7 +80,7 @@ fn getPrototypeOf(agent: *Agent, obj: *Object) Agent.Error!?*Object {
     }
 
     // 13. Return handlerProto.
-    return if (handler_prototype.isObject()) handler_prototype.asObject() else null;
+    return if (handler_proto.isObject()) handler_proto.asObject() else null;
 }
 
 /// 10.5.2 [[SetPrototypeOf]] ( proto )
