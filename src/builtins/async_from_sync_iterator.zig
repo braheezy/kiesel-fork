@@ -143,7 +143,7 @@ pub const prototype = struct {
 
         // 5. Let syncIterator be syncIteratorRecord.[[Iterator]].
         // 6. Let return be Completion(GetMethod(syncIterator, "return")).
-        const return_ = Value.from(sync_iterator.iterator).getMethod(agent, PropertyKey.from("return")) catch |err| {
+        const return_ = sync_iterator.iterator.getMethod(agent, PropertyKey.from("return")) catch |err| {
             // 7. IfAbruptRejectPromise(return, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         } orelse {
@@ -233,7 +233,7 @@ pub const prototype = struct {
 
         // 5. Let syncIterator be syncIteratorRecord.[[Iterator]].
         // 6. Let throw be Completion(GetMethod(syncIterator, "throw")).
-        const throw_ = Value.from(sync_iterator.iterator).getMethod(agent, PropertyKey.from("throw")) catch |err| {
+        const throw_ = sync_iterator.iterator.getMethod(agent, PropertyKey.from("throw")) catch |err| {
             // 7. IfAbruptRejectPromise(throw, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         } orelse {

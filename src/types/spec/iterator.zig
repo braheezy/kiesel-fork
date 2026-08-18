@@ -142,10 +142,7 @@ pub const Iterator = struct {
         const iterator = self.iterator;
 
         // 3. Let innerResult be Completion(GetMethod(iterator, "return")).
-        const inner_result_object = Value.from(iterator).getMethod(
-            agent,
-            PropertyKey.from("return"),
-        );
+        const inner_result_object = iterator.getMethod(agent, PropertyKey.from("return"));
 
         // 4. If innerResult is a normal completion, then
         const inner_result = if (inner_result_object) |maybe_return| blk: {
@@ -201,10 +198,7 @@ pub const Iterator = struct {
         const iterator = self.iterator;
 
         // 3. Let innerResult be Completion(GetMethod(iterator, "return")).
-        const inner_result_object = Value.from(iterator).getMethod(
-            agent,
-            PropertyKey.from("return"),
-        );
+        const inner_result_object = iterator.getMethod(agent, PropertyKey.from("return"));
 
         // 4. If innerResult is a normal completion, then
         const inner_result = if (inner_result_object) |maybe_return| blk: {

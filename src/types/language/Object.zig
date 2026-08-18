@@ -1068,6 +1068,24 @@ pub fn deletePropertyOrThrow(obj: *Object, agent: *Agent, property_key: Property
     // 3. Return unused.
 }
 
+/// 7.3.10 GetMethod ( value, propertyKey )
+/// https://tc39.es/ecma262/#sec-getmethod
+pub fn getMethod(obj: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!?*Object {
+    // 1. Let func be ? GetV(value, propertyKey).
+    const func = try obj.get(agent, property_key);
+
+    // 2. If func is either undefined or null, return undefined.
+    if (func.isUndefined() or func.isNull()) return null;
+
+    // 3. If IsCallable(func) is false, throw a TypeError exception.
+    if (!func.isCallable()) {
+        return agent.throwException(.type_error, "{f} is not callable", .{Value.from(obj)});
+    }
+
+    // 4. Return func.
+    return func.asObject();
+}
+
 /// 7.3.11 HasProperty ( obj, propertyKey )
 /// https://tc39.es/ecma262/#sec-hasproperty
 pub fn hasProperty(obj: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!bool {

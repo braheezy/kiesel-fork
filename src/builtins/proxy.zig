@@ -37,7 +37,7 @@ fn getPrototypeOf(agent: *Agent, obj: *Object) Agent.Error!?*Object {
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "getPrototypeOf").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("getPrototypeOf")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("getPrototypeOf")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[GetPrototypeOf]]().
         return target.internalMethods().getPrototypeOf(agent, target);
@@ -99,7 +99,7 @@ fn setPrototypeOf(agent: *Agent, obj: *Object, proto: ?*Object) Agent.Error!bool
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "setPrototypeOf").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("setPrototypeOf")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("setPrototypeOf")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[SetPrototypeOf]](proto).
         return target.internalMethods().setPrototypeOf(agent, target, proto);
@@ -153,7 +153,7 @@ fn isExtensible(agent: *Agent, obj: *Object) Agent.Error!bool {
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "isExtensible").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("isExtensible")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("isExtensible")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? IsExtensible(target).
         return target.isExtensible(agent);
@@ -198,7 +198,7 @@ fn preventExtensions(agent: *Agent, obj: *Object) Agent.Error!bool {
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "preventExtensions").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("preventExtensions")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("preventExtensions")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[PreventExtensions]]().
         return target.internalMethods().preventExtensions(agent, target);
@@ -250,7 +250,7 @@ fn getOwnProperty(
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "getOwnPropertyDescriptor").
-    const trap = try Value.from(handler).getMethod(
+    const trap = try handler.getMethod(
         agent,
         PropertyKey.from("getOwnPropertyDescriptor"),
     ) orelse {
@@ -391,7 +391,7 @@ fn defineOwnProperty(
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "defineProperty").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("defineProperty")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("defineProperty")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[DefineOwnProperty]](propertyKey, propertyDesc).
         return target.internalMethods().defineOwnProperty(
@@ -515,7 +515,7 @@ fn hasProperty(agent: *Agent, obj: *Object, property_key: PropertyKey) Agent.Err
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "has").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("has")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("has")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[HasProperty]](propertyKey).
         return target.internalMethods().hasProperty(agent, target, property_key);
@@ -587,7 +587,7 @@ fn get(
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "get").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("get")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("get")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[Get]](propertyKey, receiver).
         return target.internalMethods().get(agent, target, property_key, receiver);
@@ -662,7 +662,7 @@ fn set(
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "set").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("set")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("set")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[Set]](propertyKey, value, receiver).
         return target.internalMethods().set(agent, target, property_key, value, receiver);
@@ -733,7 +733,7 @@ fn delete(agent: *Agent, obj: *Object, property_key: PropertyKey) Agent.Error!bo
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "deleteProperty").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("deleteProperty")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("deleteProperty")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[Delete]](propertyKey).
         return target.internalMethods().delete(agent, target, property_key);
@@ -800,7 +800,7 @@ fn ownPropertyKeys(agent: *Agent, obj: *Object) Agent.Error![]PropertyKey {
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "ownKeys").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("ownKeys")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("ownKeys")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? target.[[OwnPropertyKeys]]().
         return target.internalMethods().ownPropertyKeys(agent, target);
@@ -943,7 +943,7 @@ fn call(
     const handler = proxy.fields.proxy_handler.?;
 
     // 5. Let trap be ? GetMethod(handler, "apply").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("apply")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("apply")) orelse {
         // 6. If trap is undefined, then
         //     a. Return ? Call(target, thisArg, argList).
         return target.call(agent, this_arg, arg_list.values);
@@ -984,7 +984,7 @@ fn construct(
     const handler = proxy.fields.proxy_handler.?;
 
     // 6. Let trap be ? GetMethod(handler, "construct").
-    const trap = try Value.from(handler).getMethod(agent, PropertyKey.from("construct")) orelse {
+    const trap = try handler.getMethod(agent, PropertyKey.from("construct")) orelse {
         // 7. If trap is undefined, then
         //     a. Return ? Construct(target, argList, newTarget).
         return target.construct(agent, arg_list.values, new_target);

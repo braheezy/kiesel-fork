@@ -53,10 +53,7 @@ pub const prototype = struct {
         const iterator = wrap_for_valid_iterator.fields.iterated.iterator;
 
         // 5. Let returnMethod be ? GetMethod(iterator, "return").
-        const return_method = try Value.from(iterator).getMethod(
-            agent,
-            PropertyKey.from("return"),
-        ) orelse {
+        const return_method = try iterator.getMethod(agent, PropertyKey.from("return")) orelse {
             // 6. If returnMethod is undefined, then
             //     a. Return CreateIteratorResultObject(undefined, true).
             return Value.from(try createIteratorResultObject(agent, .undefined, true));

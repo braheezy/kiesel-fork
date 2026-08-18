@@ -1531,10 +1531,7 @@ pub fn evaluateYieldStar(
         // b. Else if received is a throw completion, then
         .throw => |value| {
             // i. Let throw be ? GetMethod(iterator, "throw").
-            const maybe_throw = try Value.from(iterator.iterator).getMethod(
-                agent,
-                PropertyKey.from("throw"),
-            );
+            const maybe_throw = try iterator.iterator.getMethod(agent, PropertyKey.from("throw"));
 
             // ii. If throw is not undefined, then
             if (maybe_throw) |throw| {
@@ -1611,10 +1608,7 @@ pub fn evaluateYieldStar(
         .@"return" => |value| {
             // i. Assert: received is a return completion.
             // ii. Let return be ? GetMethod(iterator, "return").
-            const maybe_return = try Value.from(iterator.iterator).getMethod(
-                agent,
-                PropertyKey.from("return"),
-            );
+            const maybe_return = try iterator.iterator.getMethod(agent, PropertyKey.from("return"));
 
             // iii. If return is undefined, then
             const @"return" = maybe_return orelse {
