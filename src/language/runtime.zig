@@ -138,7 +138,7 @@ pub fn evaluateCall(
     agent: *Agent,
     func: Value,
     this_value: Value,
-    arguments: []const Value,
+    arg_list: []const Value,
 ) Agent.Error!Value {
     // 1-2.
     // NOTE: These are done in the function above, which is called by the prepare_call instruction.
@@ -158,7 +158,7 @@ pub fn evaluateCall(
 
     // 6. If tailPosition is true, perform PrepareForTailCall().
     // 7. Return ? Call(func, thisValue, argList).
-    return func.callAssumeCallable(agent, this_value, arguments);
+    return func.asObject().call(agent, this_value, arg_list);
 }
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
@@ -284,7 +284,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
             // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&@"error".object)},
@@ -312,7 +312,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
                 // 1. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
                 //    TypeError object »).
-                _ = Value.from(promise_capability.reject).callAssumeCallable(
+                _ = promise_capability.reject.call(
                     agent,
                     .undefined,
                     &.{Value.from(&@"error".object)},
@@ -352,7 +352,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
                         // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly
                         //    created TypeError object »).
-                        _ = Value.from(promise_capability.reject).callAssumeCallable(
+                        _ = promise_capability.reject.call(
                             agent,
                             .undefined,
                             &.{Value.from(&@"error".object)},
@@ -382,7 +382,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
             // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&@"error".object)},
@@ -1539,7 +1539,7 @@ pub fn evaluateYieldStar(
             // ii. If throw is not undefined, then
             if (maybe_throw) |throw| {
                 // 1. Let innerResult be ? Call(throw, iterator, « received.[[Value]] »).
-                var inner_result = try Value.from(throw).call(
+                var inner_result = try throw.call(
                     agent,
                     Value.from(iterator.iterator),
                     &.{value},
@@ -1632,7 +1632,7 @@ pub fn evaluateYieldStar(
             };
 
             // iv. Let innerReturnResult be ? Call(return, iterator, « received.[[Value]] »).
-            var inner_return_result = try Value.from(@"return").call(
+            var inner_return_result = try @"return".call(
                 agent,
                 Value.from(iterator.iterator),
                 &.{value},
@@ -2591,7 +2591,7 @@ pub fn classDefinitionEvaluation(
                 // i. Assert: elementRecord is a ClassStaticBlockDefinition Record.
                 // ii. Let result be Completion(Call(elementRecord.[[BodyFunction]], ctorFunc)).
                 const body_function = &class_static_block_definition.body_function.object;
-                _ = Value.from(body_function).callAssumeCallable(
+                _ = body_function.call(
                     agent,
                     Value.from(ctor_func),
                     &.{},

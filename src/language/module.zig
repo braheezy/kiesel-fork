@@ -267,7 +267,7 @@ fn continueDynamicImport(
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined,
             //    « moduleCompletion.[[Value]] »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{exception.value},
@@ -297,7 +297,7 @@ fn continueDynamicImport(
             const reason = arguments_.get(0);
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « reason »).
-            _ = Value.from(promise_capability_.reject).callAssumeCallable(
+            _ = promise_capability_.reject.call(
                 agent_,
                 .undefined,
                 &.{reason},
@@ -351,7 +351,7 @@ fn continueDynamicImport(
 
                     // i. Perform ! Call(promiseCapability.[[Reject]], undefined,
                     //    « link.[[Value]] »).
-                    _ = Value.from(promise_capability_.reject).callAssumeCallable(
+                    _ = promise_capability_.reject.call(
                         agent_,
                         .undefined,
                         &.{exception.value},
@@ -388,7 +388,7 @@ fn continueDynamicImport(
                     const namespace = try getModuleNamespace(agent__, module__);
 
                     // ii. Perform ! Call(promiseCapability.[[Resolve]], undefined, « namespace »).
-                    _ = Value.from(promise_capability__.resolve).callAssumeCallable(
+                    _ = promise_capability__.resolve.call(
                         agent__,
                         .undefined,
                         &.{Value.from(&namespace.object)},

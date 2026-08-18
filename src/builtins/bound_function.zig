@@ -32,7 +32,7 @@ fn call(agent: *Agent, obj: *Object, _: Value, arg_list: Arguments) Agent.Error!
     defer gpa.free(args);
 
     // 5. Return ? Call(target, boundThis, args).
-    return Value.from(target).callAssumeCallable(agent, bound_this, args);
+    return target.call(agent, bound_this, args);
 }
 
 /// 10.4.1.2 [[Construct]] ( argList, newTarget )

@@ -148,17 +148,13 @@ pub const Iterator = struct {
         );
 
         // 4. If innerResult is a normal completion, then
-        const inner_result = if (inner_result_object) |@"return"| blk: {
+        const inner_result = if (inner_result_object) |maybe_return| blk: {
             // a. Let return be innerResult.[[Value]].
             // b. If return is undefined, return ? completion.
-            if (@"return" == null) return try completion;
+            const @"return" = maybe_return orelse return try completion;
 
             // c. Set innerResult to Completion(Call(return, iterator)).
-            break :blk Value.from(@"return".?).callAssumeCallable(
-                agent,
-                Value.from(iterator),
-                &.{},
-            );
+            break :blk @"return".call(agent, Value.from(iterator), &.{});
         } else |err| err;
 
         // 5. If completion is a throw completion, return ? completion.
@@ -211,17 +207,13 @@ pub const Iterator = struct {
         );
 
         // 4. If innerResult is a normal completion, then
-        const inner_result = if (inner_result_object) |@"return"| blk: {
+        const inner_result = if (inner_result_object) |maybe_return| blk: {
             // a. Let return be innerResult.[[Value]].
             // b. If return is undefined, return ? completion.
-            if (@"return" == null) return try completion;
+            const @"return" = maybe_return orelse return try completion;
 
             // c. Set innerResult to Completion(Call(return, iterator)).
-            const inner_result = Value.from(@"return".?).callAssumeCallable(
-                agent,
-                Value.from(iterator),
-                &.{},
-            );
+            const inner_result = @"return".call(agent, Value.from(iterator), &.{});
 
             // d. If innerResult is a normal completion, set innerResult to Completion(Await(
             //    innerResult.[[Value]])).
@@ -287,8 +279,10 @@ pub fn getIteratorDirect(agent: *Agent, obj: *Object) Agent.Error!Iterator {
 /// 7.4.3 GetIteratorFromMethod ( obj, method )
 /// https://tc39.es/ecma262/#sec-getiteratorfrommethod
 pub fn getIteratorFromMethod(agent: *Agent, object: Value, method: *Object) Agent.Error!Iterator {
+    std.debug.assert(method.internalMethods().call != null);
+
     // 1. Let iterator be ? Call(method, obj).
-    const iterator = try Value.from(method).call(agent, object, &.{});
+    const iterator = try method.call(agent, object, &.{});
 
     // 2. If iterator is not an Object, throw a TypeError exception.
     if (!iterator.isObject()) {
@@ -384,19 +378,19 @@ pub fn getIteratorFlattenable(
     }
 
     // 2. Let method be ? GetMethod(obj, %Symbol.iterator%).
-    const method = try object.getMethod(
+    const maybe_method = try object.getMethod(
         agent,
         PropertyKey.from(agent.well_known_symbols.iterator),
     );
 
     // 3. If method is undefined, then
-    const iterator = if (method == null) blk: {
+    const iterator = if (maybe_method == null) blk: {
         // a. Let iterator be obj.
         break :blk object;
     } else blk: {
         // 4. Else,
         // a. Let iterator be ? Call(method, obj).
-        break :blk try Value.from(method.?).callAssumeCallable(agent, object, &.{});
+        break :blk try maybe_method.?.call(agent, object, &.{});
     };
 
     // 5. If iterator is not an Object, throw a TypeError exception.

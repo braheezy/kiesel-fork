@@ -48,12 +48,13 @@ fn toF64(value: Value) ?f64 {
 fn cb(
     agent: *Agent,
     obj: *Object,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
     value: Value,
     index: usize,
 ) Agent.Error!void {
-    _ = try callback.callAssumeCallable(
+    std.debug.assert(callback.internalMethods().call != null);
+    _ = try callback.call(
         agent,
         this_arg,
         &.{ value, Value.from(@as(u53, @intCast(index))), Value.from(obj) },
@@ -63,12 +64,13 @@ fn cb(
 fn cbToBool(
     agent: *Agent,
     obj: *Object,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
     value: Value,
     index: usize,
 ) Agent.Error!bool {
-    const result = try callback.callAssumeCallable(
+    std.debug.assert(callback.internalMethods().call != null);
+    const result = try callback.call(
         agent,
         this_arg,
         &.{ value, Value.from(@as(u53, @intCast(index))), Value.from(obj) },
@@ -88,7 +90,7 @@ pub fn every(
     agent: *Agent,
     obj: *Object,
     length: u53,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done: bool,
@@ -218,7 +220,7 @@ pub fn findViaPredicate(
     obj: *Object,
     length: u53,
     comptime direction: FindViaPredicateDirection,
-    predicate: Value,
+    predicate: *Object,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done: FindViaPredicateResult,
@@ -317,7 +319,7 @@ pub fn forEach(
     agent: *Agent,
     obj: *Object,
     length: u53,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done,
@@ -708,7 +710,7 @@ pub fn some(
     agent: *Agent,
     obj: *Object,
     length: u53,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done: bool,

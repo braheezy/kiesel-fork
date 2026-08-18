@@ -156,7 +156,7 @@ pub const prototype = struct {
             );
 
             // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
-            _ = Value.from(promise_capability.resolve).callAssumeCallable(
+            _ = promise_capability.resolve.call(
                 agent,
                 .undefined,
                 &.{Value.from(iterator_result)},
@@ -169,19 +169,11 @@ pub const prototype = struct {
         // 9. If value is present, then
         const result = (if (maybe_value) |value| blk: {
             // a. Let result be Completion(Call(return, syncIterator, « value »)).
-            break :blk Value.from(return_).callAssumeCallable(
-                agent,
-                Value.from(sync_iterator.iterator),
-                &.{value},
-            );
+            break :blk return_.call(agent, Value.from(sync_iterator.iterator), &.{value});
         } else blk: {
             // 10. Else,
             // a. Let result be Completion(Call(return, syncIterator)).
-            break :blk Value.from(return_).callAssumeCallable(
-                agent,
-                Value.from(sync_iterator.iterator),
-                &.{},
-            );
+            break :blk return_.call(agent, Value.from(sync_iterator.iterator), &.{});
         }) catch |err| {
             // 11. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
@@ -197,7 +189,7 @@ pub const prototype = struct {
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&type_error.object)},
@@ -270,7 +262,7 @@ pub const prototype = struct {
 
             // g. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&type_error.object)},
@@ -283,19 +275,11 @@ pub const prototype = struct {
         // 9. If value is present, then
         const result = (if (maybe_value) |value| blk: {
             // a. Let result be Completion(Call(throw, syncIterator, « value »)).
-            break :blk Value.from(throw_).callAssumeCallable(
-                agent,
-                Value.from(sync_iterator.iterator),
-                &.{value},
-            );
+            break :blk throw_.call(agent, Value.from(sync_iterator.iterator), &.{value});
         } else blk: {
             // 10. Else,
             // a. Let result be Completion(Call(throw, syncIterator)).
-            break :blk Value.from(throw_).callAssumeCallable(
-                agent,
-                Value.from(sync_iterator.iterator),
-                &.{},
-            );
+            break :blk throw_.call(agent, Value.from(sync_iterator.iterator), &.{});
         }) catch |err| {
             // 11. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
@@ -311,7 +295,7 @@ pub const prototype = struct {
 
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&type_error.object)},

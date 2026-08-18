@@ -47,11 +47,7 @@ pub const PromiseCapability = struct {
                 const exception = agent.clearException();
 
                 // a. Perform ? Call(capability.[[Reject]], undefined, « value.[[Value]] »).
-                _ = try Value.from(self.reject).callAssumeCallable(
-                    agent,
-                    .undefined,
-                    &.{exception.value},
-                );
+                _ = try self.reject.call(agent, .undefined, &.{exception.value});
 
                 // b. Return capability.[[Promise]].
                 return self.promise;
@@ -443,7 +439,7 @@ pub fn promiseResolve(agent: *Agent, ctor: *Object, resolution: Value) Agent.Err
     const promise_capability = try newPromiseCapability(agent, Value.from(ctor));
 
     // 3. Perform ? Call(promiseCapability.[[Resolve]], undefined, « resolution »).
-    _ = try Value.from(promise_capability.resolve).callAssumeCallable(agent, .undefined, &.{resolution});
+    _ = try promise_capability.resolve.call(agent, .undefined, &.{resolution});
 
     // 4. Return promiseCapability.[[Promise]].
     return promise_capability.promise;
@@ -538,20 +534,12 @@ pub fn newPromiseReactionJob(
                 .reject => |value| {
                     // i. Return ? Call(promiseCapability.[[Reject]], undefined,
                     //    « handlerResult.[[Value]] »).
-                    return Value.from(promise_capability.reject).callAssumeCallable(
-                        agent_,
-                        .undefined,
-                        &.{value},
-                    );
+                    return promise_capability.reject.call(agent_, .undefined, &.{value});
                 },
                 .resolve => |value| {
                     // i. Return ? Call(promiseCapability.[[Resolve]], undefined,
                     //    « handlerResult.[[Value]] »).
-                    return Value.from(promise_capability.resolve).callAssumeCallable(
-                        agent_,
-                        .undefined,
-                        &.{value},
-                    );
+                    return promise_capability.resolve.call(agent_, .undefined, &.{value});
                 },
             }
         }
@@ -640,7 +628,7 @@ pub fn newPromiseResolveThenableJob(
 
                     // i. Return ? Call(resolvingFuncs.[[Reject]], undefined,
                     //    « thenCallResult.[[Value]] »).
-                    return Value.from(&resolving_funcs.reject.object).callAssumeCallable(
+                    return resolving_funcs.reject.object.call(
                         agent_,
                         .undefined,
                         &.{exception.value},
@@ -755,7 +743,7 @@ fn performPromiseAll(
                 const values_array = try createArrayFromList(agent, values.items);
 
                 // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
-                _ = try Value.from(result_capability.resolve).callAssumeCallable(
+                _ = try result_capability.resolve.call(
                     agent,
                     .undefined,
                     &.{Value.from(&values_array.object)},
@@ -770,11 +758,7 @@ fn performPromiseAll(
         try values.append(agent.gc_allocator, .undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, ctor, « next »).
-        const next_promise = try Value.from(promise_resolve).callAssumeCallable(
-            agent,
-            Value.from(ctor),
-            &.{next},
-        );
+        const next_promise = try promise_resolve.call(agent, Value.from(ctor), &.{next});
 
         const AdditionalFields = struct {
             /// [[AlreadyCalled]]
@@ -825,7 +809,7 @@ fn performPromiseAll(
                     const values_array = try createArrayFromList(agent_, values_.items);
 
                     // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
-                    return Value.from(result_capability_.resolve).callAssumeCallable(
+                    return result_capability_.resolve.call(
                         agent_,
                         .undefined,
                         &.{Value.from(&values_array.object)},
@@ -917,7 +901,7 @@ fn performPromiseAllKeyed(
             try entries.append(agent.gc_allocator, .{ .key = key, .value = .undefined });
 
             // iii. Let nextPromise be ? Call(promiseResolve, ctor, « propertyValue »).
-            const next_promise = try Value.from(promise_resolve).callAssumeCallable(
+            const next_promise = try promise_resolve.call(
                 agent,
                 Value.from(ctor),
                 &.{property_value},
@@ -1016,7 +1000,7 @@ fn performPromiseAllKeyed(
                         );
 
                         // b. Return ? Call(resultCapability.[[Resolve]], undefined, « result »).
-                        return Value.from(result_capability_.resolve).callAssumeCallable(
+                        return result_capability_.resolve.call(
                             agent_,
                             .undefined,
                             &.{Value.from(result)},
@@ -1126,7 +1110,7 @@ fn performPromiseAllKeyed(
 
                                 // ii. Return ? Call(resultCapability.[[Resolve]], undefined,
                                 //     « result »).
-                                return Value.from(result_capability_.resolve).callAssumeCallable(
+                                return result_capability_.resolve.call(
                                     agent_,
                                     .undefined,
                                     &.{Value.from(result)},
@@ -1193,11 +1177,7 @@ fn performPromiseAllKeyed(
         const result = try createKeyedPromiseCombinatorResultObject(agent, entries.items);
 
         // c. Perform ? Call(resultCapability.[[Resolve]], undefined, « result »).
-        _ = try Value.from(result_capability.resolve).callAssumeCallable(
-            agent,
-            .undefined,
-            &.{Value.from(result)},
-        );
+        _ = try result_capability.resolve.call(agent, .undefined, &.{Value.from(result)});
     }
 
     // 8. Return resultCapability.[[Promise]].
@@ -1241,7 +1221,7 @@ fn performPromiseAllSettled(
                 const values_array = try createArrayFromList(agent, values.items);
 
                 // 2. Perform ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
-                _ = try Value.from(result_capability.resolve).callAssumeCallable(
+                _ = try result_capability.resolve.call(
                     agent,
                     .undefined,
                     &.{Value.from(&values_array.object)},
@@ -1256,11 +1236,7 @@ fn performPromiseAllSettled(
         try values.append(agent.gc_allocator, .undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, ctor, « next »).
-        const next_promise = try Value.from(promise_resolve).callAssumeCallable(
-            agent,
-            Value.from(ctor),
-            &.{next},
-        );
+        const next_promise = try promise_resolve.call(agent, Value.from(ctor), &.{next});
 
         const AlreadyCalled = struct { value: bool };
 
@@ -1334,7 +1310,7 @@ fn performPromiseAllSettled(
                     const values_array = try createArrayFromList(agent_, values_.items);
 
                     // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
-                    return Value.from(result_capability_.resolve).callAssumeCallable(
+                    return result_capability_.resolve.call(
                         agent_,
                         .undefined,
                         &.{Value.from(&values_array.object)},
@@ -1423,7 +1399,7 @@ fn performPromiseAllSettled(
                     const values_array = try createArrayFromList(agent_, values_.items);
 
                     // 2. Return ? Call(resultCapability.[[Resolve]], undefined, « valuesArray »).
-                    return Value.from(result_capability_.resolve).callAssumeCallable(
+                    return result_capability_.resolve.call(
                         agent_,
                         .undefined,
                         &.{Value.from(&values_array.object)},
@@ -1526,7 +1502,7 @@ fn performPromiseAny(
                 });
 
                 // 3. Perform ? Call(resultCapability.[[Reject]], undefined, « aggregateError »).
-                _ = try Value.from(result_capability.reject).callAssumeCallable(
+                _ = try result_capability.reject.call(
                     agent,
                     .undefined,
                     &.{Value.from(&aggregate_error.object)},
@@ -1541,11 +1517,7 @@ fn performPromiseAny(
         try errors.append(agent.gc_allocator, .undefined);
 
         // d. Let nextPromise be ? Call(promiseResolve, ctor, « next »).
-        const next_promise = try Value.from(promise_resolve).callAssumeCallable(
-            agent,
-            Value.from(ctor),
-            &.{next},
-        );
+        const next_promise = try promise_resolve.call(agent, Value.from(ctor), &.{next});
 
         const AdditionalFields = struct {
             /// [[AlreadyCalled]]
@@ -1611,7 +1583,7 @@ fn performPromiseAny(
                     });
 
                     // 3. Return ? Call(resultCapability.[[Reject]], undefined, « aggregateError »).
-                    return Value.from(promise_capability.reject).callAssumeCallable(
+                    return promise_capability.reject.call(
                         agent_,
                         .undefined,
                         &.{Value.from(&aggregate_error.object)},
@@ -1681,11 +1653,7 @@ fn performPromiseRace(
         };
 
         // c. Let nextPromise be ? Call(promiseResolve, ctor, « next »).
-        const next_promise = try Value.from(promise_resolve).callAssumeCallable(
-            agent,
-            Value.from(ctor),
-            &.{next},
-        );
+        const next_promise = try promise_resolve.call(agent, Value.from(ctor), &.{next});
 
         // d. Perform ? Invoke(nextPromise, "then", « resultCapability.[[Resolve]],
         //    resultCapability.[[Reject]] »).
@@ -1843,7 +1811,7 @@ pub const constructor = struct {
     /// 27.5.3.1 Promise ( executor )
     /// https://tc39.es/ecma262/#sec-promise-executor
     fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
-        const executor = arguments.get(0);
+        const executor_value = arguments.get(0);
 
         // 1. If NewTarget is undefined, throw a TypeError exception.
         if (new_target == null) {
@@ -1855,9 +1823,10 @@ pub const constructor = struct {
         }
 
         // 2. If IsCallable(executor) is false, throw a TypeError exception.
-        if (!executor.isCallable()) {
-            return agent.throwException(.type_error, "{f} is not callable", .{executor});
+        if (!executor_value.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not callable", .{executor_value});
         }
+        const executor = executor_value.asObject();
 
         // 3. Let promise be ? OrdinaryCreateFromConstructor(NewTarget, "%Promise.prototype%",
         //    « [[PromiseState]], [[PromiseResult]], [[PromiseFulfillReactions]],
@@ -1890,7 +1859,7 @@ pub const constructor = struct {
 
         // 10. Let completion be Completion(Call(executor, undefined, « resolvingFuncs.[[Resolve]],
         //     resolvingFuncs.[[Reject]] »)).
-        _ = executor.callAssumeCallable(
+        _ = executor.call(
             agent,
             .undefined,
             &.{
@@ -1906,11 +1875,7 @@ pub const constructor = struct {
 
                 // a. Perform ? Call(resolvingFuncs.[[Reject]], undefined,
                 //    « completion.[[Value]] »).
-                _ = try Value.from(&resolving_funcs.reject.object).callAssumeCallable(
-                    agent,
-                    .undefined,
-                    &.{exception.value},
-                );
+                _ = try resolving_funcs.reject.object.call(agent, .undefined, &.{exception.value});
             },
         };
 
@@ -1994,7 +1959,7 @@ pub const constructor = struct {
             );
 
             // b. Perform ? Call(promiseCapability.[[Reject]], undefined, « error »).
-            _ = try Value.from(promise_capability.reject).callAssumeCallable(
+            _ = try promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&type_error.object)},
@@ -2096,7 +2061,7 @@ pub const constructor = struct {
             const type_error = try agent.createErrorObject(.type_error, "{f} is not an Object", .{promises});
 
             // b. Perform ? Call(promiseCapability.[[Reject]], undefined, « error »).
-            _ = try Value.from(promise_capability.reject).callAssumeCallable(
+            _ = try promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&type_error.object)},
@@ -2236,7 +2201,7 @@ pub const constructor = struct {
         const promise_capability = try newPromiseCapability(agent, ctor);
 
         // 3. Perform ? Call(promiseCapability.[[Reject]], undefined, « reason »).
-        _ = try Value.from(promise_capability.reject).call(agent, .undefined, &.{reason});
+        _ = try promise_capability.reject.call(agent, .undefined, &.{reason});
 
         // 4. Return promiseCapability.[[Promise]].
         return Value.from(promise_capability.promise);
@@ -2284,20 +2249,12 @@ pub const constructor = struct {
         // 6. Else,
         //     a. Perform ? Call(promiseCapability.[[Resolve]], undefined, « status.[[Value]] »).
         if (status) |value| {
-            _ = try Value.from(promise_capability.resolve).callAssumeCallable(
-                agent,
-                .undefined,
-                &.{value},
-            );
+            _ = try promise_capability.resolve.call(agent, .undefined, &.{value});
         } else |err| switch (err) {
             error.OutOfMemory => |e| return e,
             error.ExceptionThrown => {
                 const exception = agent.clearException();
-                _ = try Value.from(promise_capability.reject).callAssumeCallable(
-                    agent,
-                    .undefined,
-                    &.{exception.value},
-                );
+                _ = try promise_capability.reject.call(agent, .undefined, &.{exception.value});
             },
         }
 
@@ -2437,11 +2394,11 @@ pub const prototype = struct {
         } else {
             // 6. Else,
             const Captures = struct {
-                on_finally: Value,
+                on_finally: *Object,
                 ctor: *Object,
             };
             const captures = try agent.gc_allocator.create(Captures);
-            captures.* = .{ .on_finally = on_finally, .ctor = ctor };
+            captures.* = .{ .on_finally = on_finally.asObject(), .ctor = ctor };
 
             // a. Let thenFinallyClosure be a new Abstract Closure with parameters (value) that
             //    captures onFinally and ctor and performs the following steps when called:
@@ -2454,7 +2411,7 @@ pub const prototype = struct {
                     const value = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
-                    const result = try on_finally_.callAssumeCallable(agent_, .undefined, &.{});
+                    const result = try on_finally_.call(agent_, .undefined, &.{});
 
                     // ii. Let p be ? PromiseResolve(ctor, result).
                     const new_promise = try promiseResolve(agent_, ctor_, result);
@@ -2513,7 +2470,7 @@ pub const prototype = struct {
                     const reason = arguments_.get(0);
 
                     // i. Let result be ? Call(onFinally, undefined).
-                    const result = try on_finally_.callAssumeCallable(agent_, .undefined, &.{});
+                    const result = try on_finally_.call(agent_, .undefined, &.{});
 
                     // ii. Let p be ? PromiseResolve(ctor, result).
                     const new_promise = try promiseResolve(agent_, ctor_, result);

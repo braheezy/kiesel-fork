@@ -155,7 +155,7 @@ pub const constructor = struct {
 
                         // i. Let iterator be ? Call(iterable.[[OpenMethod]],
                         //    iterable.[[Iterable]]).
-                        const iterator = try Value.from(iterable.open_method).callAssumeCallable(
+                        const iterator = try iterable.open_method.call(
                             agent_,
                             Value.from(iterable.iterable),
                             &.{},
@@ -1235,7 +1235,7 @@ pub const prototype = struct {
     /// 27.1.3.3.3 Iterator.prototype.every ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.every
     fn every(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const predicate = arguments.get(0);
+        const predicate_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1253,17 +1253,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(predicate) is false, then
-        if (!predicate.isCallable()) {
+        if (!predicate_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{predicate},
+                .{predicate_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const predicate = predicate_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1276,7 +1277,7 @@ pub const prototype = struct {
         //     b. If value is done, return true.
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
-            const result = predicate.callAssumeCallable(
+            const result = predicate.call(
                 agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
@@ -1301,7 +1302,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-iterator.prototype.filter
     fn filter(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
-        const predicate = arguments.get(0);
+        const predicate_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1319,17 +1320,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(predicate) is false, then
-        if (!predicate.isCallable()) {
+        if (!predicate_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{predicate},
+                .{predicate_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const predicate = predicate_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1339,7 +1341,7 @@ pub const prototype = struct {
 
         const Captures = struct {
             iterated: *types.Iterator,
-            predicate: Value,
+            predicate: *Object,
             counter: u53,
         };
         const captures = try agent.gc_allocator.create(Captures);
@@ -1366,7 +1368,7 @@ pub const prototype = struct {
                 while (try iterated_.stepValue(agent_)) |value| {
                     // iii. Let selected be Completion(Call(predicate, undefined, « value,
                     //      𝔽(counter) »)).
-                    const selected = predicate_.callAssumeCallable(
+                    const selected = predicate_.call(
                         agent_,
                         .undefined,
                         &.{ value, Value.from(counter.*) },
@@ -1411,7 +1413,7 @@ pub const prototype = struct {
     /// 27.1.3.3.5 Iterator.prototype.find ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.find
     fn find(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const predicate = arguments.get(0);
+        const predicate_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1429,17 +1431,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(predicate) is false, then
-        if (!predicate.isCallable()) {
+        if (!predicate_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{predicate},
+                .{predicate_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const predicate = predicate_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1452,7 +1455,7 @@ pub const prototype = struct {
         //     b. If value is done, return undefined.
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
-            const result = predicate.callAssumeCallable(
+            const result = predicate.call(
                 agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
@@ -1649,7 +1652,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-iterator.prototype.flatmap
     fn flatMap(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
-        const mapper = arguments.get(0);
+        const mapper_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1667,17 +1670,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(mapper) is false, then
-        if (!mapper.isCallable()) {
+        if (!mapper_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{mapper},
+                .{mapper_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const mapper = mapper_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1687,7 +1691,7 @@ pub const prototype = struct {
 
         const Captures = struct {
             iterated: *types.Iterator,
-            mapper: Value,
+            mapper: *Object,
             counter: u53,
             inner_iterator: ?types.Iterator,
         };
@@ -1726,7 +1730,7 @@ pub const prototype = struct {
 
                         // iii. Let mapped be Completion(Call(mapper, undefined, « value,
                         //      𝔽(counter) »)).
-                        const mapped = mapper_.callAssumeCallable(
+                        const mapped = mapper_.call(
                             agent_,
                             .undefined,
                             &.{ value, Value.from(counter_.*) },
@@ -1814,7 +1818,7 @@ pub const prototype = struct {
     /// 27.1.3.3.7 Iterator.prototype.forEach ( procedure )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const procedure = arguments.get(0);
+        const procedure_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1832,17 +1836,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(procedure) is false, then
-        if (!procedure.isCallable()) {
+        if (!procedure_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{procedure},
+                .{procedure_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const procedure = procedure_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1855,11 +1860,7 @@ pub const prototype = struct {
         //     b. If value is done, return undefined.
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(procedure, undefined, « value, 𝔽(counter) »)).
-            _ = procedure.callAssumeCallable(
-                agent,
-                .undefined,
-                &.{ value, Value.from(counter) },
-            ) catch |err| {
+            _ = procedure.call(agent, .undefined, &.{ value, Value.from(counter) }) catch |err| {
                 // d. IfAbruptCloseIterator(result, iterated).
                 return iterated.close(agent, @as(Agent.Error!Value, err));
             };
@@ -1874,7 +1875,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-iterator.prototype.map
     fn map(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
-        const mapper = arguments.get(0);
+        const mapper_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1892,17 +1893,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(mapper) is false, then
-        if (!mapper.isCallable()) {
+        if (!mapper_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{mapper},
+                .{mapper_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const mapper = mapper_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1912,7 +1914,7 @@ pub const prototype = struct {
 
         const Captures = struct {
             iterated: *types.Iterator,
-            mapper: Value,
+            mapper: *Object,
             counter: u53,
         };
         const captures = try agent.gc_allocator.create(Captures);
@@ -1940,7 +1942,7 @@ pub const prototype = struct {
                 const value = (try iterated_.stepValue(agent_)) orelse return null;
 
                 // iii. Let mapped be Completion(Call(mapper, undefined, « value, 𝔽(counter) »)).
-                const mapped = mapper_.callAssumeCallable(
+                const mapped = mapper_.call(
                     agent_,
                     .undefined,
                     &.{ value, Value.from(counter.*) },
@@ -1980,7 +1982,7 @@ pub const prototype = struct {
     /// 27.1.3.3.9 Iterator.prototype.reduce ( reducer [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.reduce
     fn reduce(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const reducer = arguments.get(0);
+        const reducer_value = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
         // 1. Let obj be the this value.
@@ -1999,17 +2001,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(reducer) is false, then
-        if (!reducer.isCallable()) {
+        if (!reducer_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{reducer},
+                .{reducer_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const reducer = reducer_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -2046,7 +2049,7 @@ pub const prototype = struct {
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(reducer, undefined, « accumulator, value,
             //    𝔽(counter) »)).
-            const result = reducer.callAssumeCallable(
+            const result = reducer.call(
                 agent,
                 .undefined,
                 &.{ accumulator, value, Value.from(counter) },
@@ -2067,7 +2070,7 @@ pub const prototype = struct {
     /// 27.1.3.3.10 Iterator.prototype.some ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.some
     fn some(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const predicate = arguments.get(0);
+        const predicate_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -2085,17 +2088,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(predicate) is false, then
-        if (!predicate.isCallable()) {
+        if (!predicate_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{predicate},
+                .{predicate_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const predicate = predicate_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -2108,7 +2112,7 @@ pub const prototype = struct {
         //     b. If value is done, return false.
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
-            const result = predicate.callAssumeCallable(
+            const result = predicate.call(
                 agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
@@ -2459,7 +2463,7 @@ pub const prototype = struct {
         // 3. If return is not undefined, then
         if (maybe_return) |@"return"| {
             // a. Perform ? Call(return, obj).
-            _ = try Value.from(@"return").callAssumeCallable(agent, this_value, &.{});
+            _ = try @"return".call(agent, this_value, &.{});
         }
 
         // 4. Return undefined.

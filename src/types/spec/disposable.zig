@@ -177,13 +177,13 @@ pub fn getDisposeMethod(
             ) catch |err| try noexcept(err);
 
             // c. Let result be Completion(Call(syncMethod, obj)).
-            _ = Value.from(sync_method_).callAssumeCallable(agent_, obj, &.{}) catch |err| {
+            _ = sync_method_.call(agent_, obj, &.{}) catch |err| {
                 // d. IfAbruptRejectPromise(result, promiseCapability).
                 return Value.from(try promise_capability.rejectPromise(agent_, err));
             };
 
             // e. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
-            _ = Value.from(promise_capability.resolve).callAssumeCallable(
+            _ = promise_capability.resolve.call(
                 agent_,
                 .undefined,
                 &.{.undefined},
@@ -253,7 +253,7 @@ pub fn disposeResources(
         // e. If method is not undefined, then
         if (maybe_method) |method| {
             // i. Let result be Completion(Call(method, value)).
-            var result = Value.from(method).callAssumeCallable(agent, value, &.{});
+            var result = method.call(agent, value, &.{});
 
             // ii. If result is a normal completion and kind is async-dispose, then
             if (kind == .async_dispose) {

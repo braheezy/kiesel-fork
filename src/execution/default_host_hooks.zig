@@ -51,7 +51,7 @@ pub fn hostCallJobCallback(
     std.debug.assert(Value.from(job_callback.callback).isCallable());
 
     // 2. Return ? Call(jobCallback.[[Callback]], thisValue, argList).
-    return Value.from(job_callback.callback).callAssumeCallable(agent, this_value, arg_list);
+    return job_callback.callback.call(agent, this_value, arg_list);
 }
 
 /// 9.5.4 HostEnqueueGenericJob ( job, realm )

@@ -304,6 +304,7 @@ fn internalizeJSONProperty(
     reviver: *Object,
     maybe_parse_record: ?JSONParseRecord,
 ) Agent.Error!Value {
+    std.debug.assert(reviver.internalMethods().call != null);
     const realm = agent.currentRealm();
 
     // 1. Let value be ? Get(holder, name).
@@ -462,7 +463,7 @@ fn internalizeJSONProperty(
     }
 
     // 6. Return ? Call(reviver, holder, « name, value, context »).
-    return Value.from(reviver).callAssumeCallable(agent, Value.from(holder), &.{
+    return reviver.call(agent, Value.from(holder), &.{
         name.toValue(agent) catch unreachable,
         value,
         Value.from(context),
@@ -509,14 +510,14 @@ fn serializeJSONProperty(
         // b. If IsCallable(toJSON) is true, then
         if (to_json.isCallable()) {
             // i. Set value to ? Call(toJSON, value, « key »).
-            value = try to_json.callAssumeCallable(agent, value, &.{try key.toValue(agent)});
+            value = try to_json.asObject().call(agent, value, &.{try key.toValue(agent)});
         }
     }
 
     // 3. If state.[[ReplacerFunction]] is not undefined, then
     if (state.replacer_function) |replacer_function| {
         // a. Set value to ? Call(state.[[ReplacerFunction]], holder, « key, value »).
-        value = try Value.from(replacer_function).callAssumeCallable(
+        value = try replacer_function.call(
             agent,
             Value.from(holder),
             &.{ try key.toValue(agent), value },

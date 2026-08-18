@@ -285,7 +285,7 @@ fn innerModuleLoading(
         }
 
         // c. Perform ! Call(state.[[PromiseCapability]].[[Resolve]], undefined, « undefined »).
-        _ = Value.from(state.promise_capability.resolve).callAssumeCallable(
+        _ = state.promise_capability.resolve.call(
             agent,
             .undefined,
             &.{.undefined},
@@ -322,7 +322,7 @@ pub fn continueModuleLoading(
 
             // b. Perform ! Call(state.[[PromiseCapability]].[[Reject]], undefined,
             //    « moduleCompletion.[[Value]] »).
-            _ = Value.from(state.promise_capability.reject).callAssumeCallable(
+            _ = state.promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{exception.value},
@@ -714,7 +714,7 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
             // c. Assert: module.[[EvaluationError]] and result are the same Completion Record.
 
             // d. Perform ! Call(promiseCapability.[[Reject]], undefined, « result.[[Value]] »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{exception.value},
@@ -742,7 +742,7 @@ pub fn evaluate(module_arg: *SourceTextModule, agent: *Agent) std.mem.Allocator.
             });
 
             // iii. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
-            _ = Value.from(promise_capability.resolve).callAssumeCallable(
+            _ = promise_capability.resolve.call(
                 agent,
                 .undefined,
                 &.{.undefined},
@@ -1106,7 +1106,7 @@ fn asyncModuleExecutionFulfilled(
         std.debug.assert(module.cycle_root == module);
 
         // b. Perform ! Call(module.[[TopLevelCapability]].[[Resolve]], undefined, « undefined »).
-        _ = Value.from(top_level_capability.resolve).callAssumeCallable(
+        _ = top_level_capability.resolve.call(
             agent,
             .undefined,
             &.{.undefined},
@@ -1180,7 +1180,7 @@ fn asyncModuleExecutionFulfilled(
 
                 // b. Perform ! Call(ancestorModule.[[TopLevelCapability]].[[Resolve]], undefined,
                 //    « undefined »).
-                _ = Value.from(top_level_capability.resolve).callAssumeCallable(
+                _ = top_level_capability.resolve.call(
                     agent,
                     .undefined,
                     &.{.undefined},
@@ -1236,7 +1236,7 @@ fn asyncModuleExecutionRejected(
         std.debug.assert(module.cycle_root == module);
 
         // b. Perform ! Call(module.[[TopLevelCapability]].[[Reject]], undefined, « error »).
-        _ = Value.from(top_level_capability.reject).callAssumeCallable(
+        _ = top_level_capability.reject.call(
             agent,
             .undefined,
             &.{@"error".value},

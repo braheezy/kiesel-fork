@@ -217,7 +217,7 @@ pub fn asyncBlockStart(
                 // g. Else if result is a return completion, then
                 //     i. Perform ! Call(promiseCapability.[[Resolve]], undefined,
                 //        « result.[[Value]] »).
-                _ = Value.from(promise_capability_.resolve).callAssumeCallable(
+                _ = promise_capability_.resolve.call(
                     agent_,
                     .undefined,
                     &.{value},
@@ -233,7 +233,7 @@ pub fn asyncBlockStart(
 
                     // ii. Perform ! Call(promiseCapability.[[Reject]], undefined,
                     //     « result.[[Value]] »).
-                    _ = Value.from(promise_capability_.reject).callAssumeCallable(
+                    _ = promise_capability_.reject.call(
                         agent_,
                         .undefined,
                         &.{exception.value},

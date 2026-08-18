@@ -910,7 +910,7 @@ pub fn ordinaryToPrimitive(obj: *Object, agent: *Agent, hint: PreferredType) Age
         // b. If IsCallable(method) is true, then
         if (method.isCallable()) {
             // i. Let result be ? Call(method, obj).
-            const result = try method.callAssumeCallable(agent, Value.from(obj), &.{});
+            const result = try method.asObject().call(agent, Value.from(obj), &.{});
 
             // ii. If result is not an Object, return result.
             if (!result.isObject()) return result;
@@ -1084,6 +1084,16 @@ pub fn hasOwnProperty(obj: *Object, agent: *Agent, property_key: PropertyKey) Ag
     // 2. If propertyDesc is undefined, return false.
     // 3. Return true.
     return property_desc != null;
+}
+
+// Like `Value.call()` but eliding the callable check.
+pub fn call(
+    func: *Object,
+    agent: *Agent,
+    this_value: Value,
+    arg_list: []const Value,
+) Agent.Error!Value {
+    return func.internalMethods().call.?(agent, func, this_value, Arguments.from(arg_list));
 }
 
 /// 7.3.14 Construct ( ctor [ , argList [ , newTarget ] ] )
@@ -1505,7 +1515,7 @@ pub fn privateGet(obj: *Object, agent: *Agent, private_name: PrivateName) Agent.
             };
 
             // 7. Return ? Call(getter, obj).
-            return Value.from(getter).callAssumeCallable(agent, Value.from(obj), &.{});
+            return getter.call(agent, Value.from(obj), &.{});
         },
     }
 }
@@ -1553,11 +1563,7 @@ pub fn privateSet(obj: *Object, agent: *Agent, private_name: PrivateName, value:
             };
 
             // d. Perform ? Call(setter, obj, « value »).
-            _ = try Value.from(setter).callAssumeCallable(
-                agent,
-                Value.from(obj),
-                &.{value},
-            );
+            _ = try setter.call(agent, Value.from(obj), &.{value});
         },
     }
 
@@ -1573,11 +1579,7 @@ pub fn defineField(receiver: *Object, agent: *Agent, field: ClassFieldDefinition
     // 3. If initializer is not empty, then
     const init_value: Value = if (field.initializer) |initializer| blk: {
         // a. Let initValue be ? Call(initializer, receiver).
-        break :blk try Value.from(&initializer.object).callAssumeCallable(
-            agent,
-            Value.from(receiver),
-            &.{},
-        );
+        break :blk try initializer.object.call(agent, Value.from(receiver), &.{});
     } else blk: {
         // 4. Else,
         // a. Let initValue be undefined.

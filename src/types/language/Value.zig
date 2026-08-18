@@ -811,11 +811,7 @@ fn toPrimitiveImpl(self: Value, agent: *Agent, preferred_type: ?PreferredType) A
             };
 
             // iv. Let result be ? Call(exoticToPrimitive, input, « hint »).
-            const result = try from(exotic_to_primitive).callAssumeCallable(
-                agent,
-                self,
-                &.{from(hint)},
-            );
+            const result = try exotic_to_primitive.call(agent, self, &.{from(hint)});
 
             // v. If result is not an Object, return result.
             if (!result.isObject()) return result;
@@ -1579,21 +1575,6 @@ pub fn call(
     );
 }
 
-pub fn callAssumeCallable(
-    self: Value,
-    agent: *Agent,
-    this_value: Value,
-    arg_list: []const Value,
-) Agent.Error!Value {
-    const object = self.asObject();
-    return object.internalMethods().call.?(
-        agent,
-        object,
-        this_value,
-        Arguments.from(arg_list),
-    );
-}
-
 const ValidElementTypes = enum {
     all,
     property_key,
@@ -1756,16 +1737,17 @@ fn GroupByContainer(comptime key_coercion: KeyCoercion) type {
 pub fn groupBy(
     self: Value,
     agent: *Agent,
-    callback: Value,
+    callback_value: Value,
     comptime key_coercion: KeyCoercion,
 ) Agent.Error!GroupByContainer(key_coercion) {
     // 1. Perform ? RequireObjectCoercible(items).
     try self.requireObjectCoercible(agent);
 
     // 2. If IsCallable(callback) is false, throw a TypeError exception.
-    if (!callback.isCallable()) {
-        return agent.throwException(.type_error, "{f} is not callable", .{callback});
+    if (!callback_value.isCallable()) {
+        return agent.throwException(.type_error, "{f} is not callable", .{callback_value});
     }
+    const callback = callback_value.asObject();
 
     // 3. Let groups be a new empty List.
     var groups: GroupByContainer(key_coercion) = .empty;
@@ -1800,11 +1782,7 @@ pub fn groupBy(
         const value = next orelse return groups;
 
         // e. Let key be Completion(Call(callback, undefined, « value, 𝔽(k) »)).
-        const key = callback.callAssumeCallable(
-            agent,
-            @"undefined",
-            &.{ value, from(k) },
-        ) catch |err| {
+        const key = callback.call(agent, @"undefined", &.{ value, from(k) }) catch |err| {
             // f. IfAbruptCloseIterator(key, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!GroupByContainer(key_coercion), err));
         };

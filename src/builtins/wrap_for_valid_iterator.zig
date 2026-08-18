@@ -63,7 +63,7 @@ pub const prototype = struct {
         };
 
         // 7. Return ? Call(returnMethod, iterator).
-        return Value.from(return_method).callAssumeCallable(agent, Value.from(iterator), &.{});
+        return return_method.call(agent, Value.from(iterator), &.{});
     }
 };
 

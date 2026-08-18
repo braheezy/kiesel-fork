@@ -96,7 +96,7 @@ pub const prototype = struct {
             const iterator_result = try createIteratorResultObject(agent, .undefined, true);
 
             // b. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
-            _ = Value.from(promise_capability.resolve).callAssumeCallable(
+            _ = promise_capability.resolve.call(
                 agent,
                 .undefined,
                 &.{Value.from(iterator_result)},
@@ -214,7 +214,7 @@ pub const prototype = struct {
         // 7. If state is completed, then
         if (state == .completed) {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « exception »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{exception},
@@ -498,7 +498,7 @@ pub fn asyncGeneratorCompleteStep(
         // 6. If completion is a throw completion, then
         .throw => |value| {
             // a. Perform ! Call(promiseCapability.[[Reject]], undefined, « value »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{value},
@@ -527,7 +527,7 @@ pub fn asyncGeneratorCompleteStep(
             };
 
             // d. Perform ! Call(promiseCapability.[[Resolve]], undefined, « iteratorResult »).
-            _ = Value.from(promise_capability.resolve).callAssumeCallable(
+            _ = promise_capability.resolve.call(
                 agent,
                 .undefined,
                 &.{Value.from(iterator_result)},
