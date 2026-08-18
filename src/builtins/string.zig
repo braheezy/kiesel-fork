@@ -1306,7 +1306,7 @@ pub const prototype = struct {
         const regexp = try regExpCreate(agent, regexp_or_pattern, .undefined);
 
         // 6. Return ? Invoke(regexp, %Symbol.match%, « string »).
-        return Value.from(&regexp.object).invoke(
+        return regexp.object.invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.match),
             &.{Value.from(string)},
@@ -1369,7 +1369,7 @@ pub const prototype = struct {
         const regexp = try regExpCreate(agent, regexp_or_pattern, Value.from("g"));
 
         // 6. Return ? Invoke(regexp, %Symbol.matchAll%, « string »).
-        return Value.from(&regexp.object).invoke(
+        return regexp.object.invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.match_all),
             &.{Value.from(string)},
@@ -1820,7 +1820,7 @@ pub const prototype = struct {
         const regexp = try regExpCreate(agent, regexp_or_pattern, .undefined);
 
         // 6. Return ? Invoke(regexp, %Symbol.search%, « string »).
-        return Value.from(&regexp.object).invoke(
+        return regexp.object.invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.search),
             &.{Value.from(string)},

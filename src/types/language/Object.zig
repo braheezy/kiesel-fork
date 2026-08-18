@@ -1222,6 +1222,17 @@ pub fn lengthOfArrayLike(obj: *Object, agent: *Agent) Agent.Error!u53 {
     return (try obj.get(agent, PropertyKey.from("length"))).toLength(agent);
 }
 
+// Like `Value.invoke()` but eliding the object check.
+pub fn invoke(
+    obj: *Object,
+    agent: *Agent,
+    property_key: PropertyKey,
+    arg_list: []const Value,
+) Agent.Error!Value {
+    const func = try obj.get(agent, property_key);
+    return func.call(agent, Value.from(obj), arg_list);
+}
+
 /// 7.3.22 SpeciesConstructor ( obj, defaultCtor )
 /// https://tc39.es/ecma262/#sec-speciesconstructor
 pub fn speciesConstructor(obj: *Object, agent: *Agent, default_ctor: *Object) Agent.Error!*Object {

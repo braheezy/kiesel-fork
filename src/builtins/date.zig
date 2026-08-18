@@ -2228,7 +2228,7 @@ pub const prototype = struct {
         if (tv.isNumber() and !tv.asNumber().isFinite()) return .null;
 
         // 4. Return ? Invoke(obj, "toISOString").
-        return Value.from(obj).invoke(agent, PropertyKey.from("toISOString"), &.{});
+        return obj.invoke(agent, PropertyKey.from("toISOString"), &.{});
     }
 
     /// 21.4.4.38 Date.prototype.toLocaleDateString ( [ reserved1 [ , reserved2 ] ] )

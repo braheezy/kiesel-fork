@@ -2365,18 +2365,14 @@ pub const prototype = struct {
         const on_finally = arguments.get(0);
 
         // 1. Let promise be the this value.
-        const promise = this_value;
-
         // 2. If promise is not an Object, throw a TypeError exception.
-        if (!promise.isObject()) {
-            return agent.throwException(.type_error, "{f} is not an Object", .{promise});
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
+        const promise = this_value.asObject();
 
         // 3. Let ctor be ? SpeciesConstructor(promise, %Promise%).
-        const ctor = try promise.asObject().speciesConstructor(
-            agent,
-            try realm.intrinsic(.promise),
-        );
+        const ctor = try promise.speciesConstructor(agent, try realm.intrinsic(.promise));
 
         // 4. Assert: IsConstructor(ctor) is true.
         std.debug.assert(Value.from(ctor).isConstructor());
@@ -2441,7 +2437,7 @@ pub const prototype = struct {
                     );
 
                     // v. Return ? Invoke(p, "then", « valueThunk »).
-                    return Value.from(new_promise).invoke(
+                    return new_promise.invoke(
                         agent_,
                         PropertyKey.from("then"),
                         &.{Value.from(&value_thunk.object)},
@@ -2504,7 +2500,7 @@ pub const prototype = struct {
                     );
 
                     // v. Return ? Invoke(p, "then", « thrower »).
-                    return Value.from(new_promise).invoke(
+                    return new_promise.invoke(
                         agent_,
                         PropertyKey.from("then"),
                         &.{Value.from(&thrower.object)},
