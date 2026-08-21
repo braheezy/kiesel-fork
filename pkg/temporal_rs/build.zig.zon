@@ -5,8 +5,8 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .temporal_rs = .{
-            .url = "git+https://github.com/boa-dev/temporal#v0.2.4",
-            .hash = "N-V-__8AALjnOQBiCk4NffYgEewZ5v9qlLlDyXO22FIyzNdf",
+            .url = "git+https://github.com/boa-dev/temporal#v0.2.6",
+            .hash = "N-V-__8AAMbwOQCO0EZvYBsVhaoQKm4xPCMGTpt16ekd9WXT",
         },
     },
     .paths = .{

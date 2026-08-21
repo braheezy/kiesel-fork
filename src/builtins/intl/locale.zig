@@ -135,6 +135,36 @@ fn updateLanguageId(
     return new_tag;
 }
 
+/// Add Likely Subtags
+/// https://unicode.org/reports/tr35/#Likely_Subtags
+fn addLikelySubtags(gpa: std.mem.Allocator, input_locale: icu4zig.Locale) std.mem.Allocator.Error!icu4zig.Locale {
+    var cloned = input_locale.clone();
+    const locale_expander = icu4zig.LocaleExpander.init();
+    defer locale_expander.deinit();
+    _ = locale_expander.maximize(&cloned);
+    const language = try cloned.language(gpa);
+    defer gpa.free(language);
+    if (!std.mem.eql(u8, language, "und")) return cloned;
+    // NOTE: As of ICU4X 2.3.0, LocaleExpander no longer expands "und" to "en-Latn-US"
+    cloned.setLanguage("en") catch unreachable;
+    cloned.setScript("Latn") catch unreachable;
+    if (try cloned.region(gpa)) |region|
+        gpa.free(region)
+    else
+        cloned.setRegion("US") catch unreachable;
+    return cloned;
+}
+
+/// Remove Likely Subtags
+/// https://unicode.org/reports/tr35/#Likely_Subtags
+fn removeLikelySubtags(gpa: std.mem.Allocator, input_locale: icu4zig.Locale) std.mem.Allocator.Error!icu4zig.Locale {
+    var cloned = try addLikelySubtags(gpa, input_locale);
+    const locale_expander = icu4zig.LocaleExpander.init();
+    defer locale_expander.deinit();
+    _ = locale_expander.minimize(&cloned);
+    return cloned;
+}
+
 /// 15.2 Properties of the Intl.Locale Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-locale-constructor
 pub const constructor = struct {
@@ -620,6 +650,7 @@ pub const prototype = struct {
     /// 15.3.9 Intl.Locale.prototype.maximize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.maximize
     fn maximize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
         const realm = agent.currentRealm();
 
         // 1. Let loc be the this value.
@@ -628,10 +659,7 @@ pub const prototype = struct {
 
         // 3. Let maximal be the result of the Add Likely Subtags algorithm applied to
         //    loc.[[Locale]]. If an error is signaled, set maximal to loc.[[Locale]].
-        const locale_expander = icu4zig.LocaleExpander.init();
-        defer locale_expander.deinit();
-        var maximal = locale.fields.locale.clone();
-        _ = locale_expander.maximize(&maximal);
+        const maximal = try addLikelySubtags(gpa, locale.fields.locale);
 
         // 4. Return ! Construct(%Intl.Locale%, « maximal »).
         const new_locale = ordinaryCreateFromConstructor(
@@ -647,6 +675,7 @@ pub const prototype = struct {
     /// 15.3.10 Intl.Locale.prototype.minimize ( )
     /// https://tc39.es/ecma402/#sec-Intl.Locale.prototype.minimize
     fn minimize(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
+        const gpa = agent.gpa;
         const realm = agent.currentRealm();
 
         // 1. Let loc be the this value.
@@ -655,10 +684,7 @@ pub const prototype = struct {
 
         // 3. Let minimal be the result of the Remove Likely Subtags algorithm applied to
         //    loc.[[Locale]]. If an error is signaled, set minimal to loc.[[Locale]].
-        const locale_expander = icu4zig.LocaleExpander.init();
-        defer locale_expander.deinit();
-        var minimal = locale.fields.locale.clone();
-        _ = locale_expander.minimize(&minimal);
+        const minimal = try removeLikelySubtags(gpa, locale.fields.locale);
 
         // 4. Return ! Construct(%Intl.Locale%, « minimal »).
         const new_locale = ordinaryCreateFromConstructor(
