@@ -311,10 +311,19 @@ pub fn msFromTime(tv: f64) Millisecond {
 
 /// 21.4.1.21 GetNamedTimeZoneOffsetNanoseconds ( timeZoneIdentifier, epochNanoseconds )
 /// https://tc39.es/ecma262/#sec-getnamedtimezoneoffsetnanoseconds
-pub fn getNamedTimeZoneOffsetNanoseconds(time_zone: temporal_rs.c.TimeZone, _: f64) i64 {
-    // TODO: Implement named time zone offset resolution
-    _ = time_zone;
-    return 0;
+pub fn getNamedTimeZoneOffsetNanoseconds(
+    time_zone: temporal_rs.c.TimeZone,
+    epoch_nanoseconds: i128,
+) i64 {
+    const zoned_date_time = temporal_rs.success(
+        temporal_rs.c.temporal_rs_ZonedDateTime_try_new(
+            temporal_rs.toI128Nanoseconds(epoch_nanoseconds),
+            temporal_rs.c.AnyCalendarKind_Iso,
+            time_zone,
+        ),
+    ).?;
+    defer temporal_rs.c.temporal_rs_ZonedDateTime_destroy(zoned_date_time);
+    return temporal_rs.c.temporal_rs_ZonedDateTime_offset_nanoseconds(zoned_date_time);
 }
 
 /// 21.4.1.24 SystemTimeZoneIdentifier ( )
@@ -343,7 +352,7 @@ pub fn localTime(platform: *const Agent.Platform, tv: f64) f64 {
         // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
         //    ℤ(ℝ(tv) × nsPerMillisecond)).
-        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, tv * std.time.ns_per_ms);
+        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, @intFromFloat(tv * std.time.ns_per_ms));
     };
 
     // 4. Let offsetMs be truncate(offsetNs / nsPerMillisecond).
@@ -785,7 +794,7 @@ pub fn formatTimeZoneString(data: FormatTimeZoneStringData, writer: *std.Io.Writ
         // 3. Else,
         // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
         //    ℤ(ℝ(tv) × nsPerMillisecond)).
-        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, time_value * std.time.ns_per_ms);
+        break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, @intFromFloat(time_value * std.time.ns_per_ms));
     };
 
     // 4. Let offset be 𝔽(truncate(offsetNs / nsPerMillisecond)).
