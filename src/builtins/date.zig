@@ -702,13 +702,13 @@ pub fn parseOtherString(string: []const u8) error{InvalidFormat}!f64 {
 
 /// 21.4.1.33.1 IsTimeZoneOffsetString ( offsetString )
 /// https://tc39.es/ecma262/#sec-istimezoneoffsetstring
-fn isTimeZoneOffsetString(time_zone: temporal_rs.c.TimeZone) bool {
+pub fn isTimeZoneOffsetString(time_zone: temporal_rs.c.TimeZone) bool {
     return !time_zone.is_iana_id;
 }
 
 /// 21.4.1.33.2 ParseTimeZoneOffsetString ( offsetString )
 /// https://tc39.es/ecma262/#sec-parsetimezoneoffsetstring
-fn parseTimeZoneOffsetString(time_zone: temporal_rs.c.TimeZone) i64 {
+pub fn parseTimeZoneOffsetString(time_zone: temporal_rs.c.TimeZone) i64 {
     std.debug.assert(!time_zone.is_iana_id);
     return @as(i64, @intCast(time_zone.offset_minutes)) * std.time.ns_per_min;
 }
