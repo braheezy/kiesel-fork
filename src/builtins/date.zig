@@ -2143,7 +2143,7 @@ pub const prototype = struct {
         );
 
         // 9. Let v be TimeClip(date).
-        const date_value = timeClip(utc(agent.platform, date));
+        const date_value = timeClip(date);
 
         // 10. Set dateObj.[[DateValue]] to v.
         date_object.fields.date_value = date_value;
