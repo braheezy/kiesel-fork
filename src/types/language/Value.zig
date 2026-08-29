@@ -973,7 +973,63 @@ fn toIntegerOrInfinityImpl(arg: Value, agent: *Agent) Agent.Error!f64 {
     return if (truncated == 0) 0 else truncated;
 }
 
-/// 7.1.6 ToFixedSizeInteger ( int, signed, bitWidth )
+/// 7.1.6 SnapToInteger ( arg, nonIntHandling [ , minimum [ , maximum ] ] )
+/// https://tc39.es/ecma262/#sec-snaptointeger
+pub fn snapToInteger(
+    arg: Value,
+    agent: *Agent,
+    non_int_handling: enum { reject, truncate },
+    comptime maybe_minimum: ?comptime_int,
+    comptime maybe_maximum: ?comptime_int,
+) Agent.Error!f64 {
+    // 1. Let number be ? ToNumber(arg).
+    const number = try arg.toNumber(agent);
+
+    // 2. If number is one of NaN, +∞𝔽, or -∞𝔽, throw a RangeError exception.
+    if (!number.isFinite()) {
+        return agent.throwException(.range_error, "Value must be a finite number", .{});
+    }
+
+    // 3. Let mv be ℝ(number).
+    var mv = number.asFloat();
+
+    // 4. If nonIntHandling is truncate, set mv to truncate(mv).
+    if (non_int_handling == .truncate) {
+        mv = @trunc(mv);
+    }
+
+    // 5. If mv is not an integer, throw a RangeError exception.
+    if (mv != @trunc(mv)) {
+        return agent.throwException(.range_error, "Value must be an integer", .{});
+    }
+
+    // 6. If minimum is present and mv < minimum, throw a RangeError exception.
+    if (maybe_minimum) |minimum| {
+        if (mv < minimum) {
+            return agent.throwException(
+                .range_error,
+                "Value must not be less than {}",
+                .{minimum},
+            );
+        }
+    }
+
+    // 7. If maximum is present and mv > maximum, throw a RangeError exception.
+    if (maybe_maximum) |maximum| {
+        if (mv > maximum) {
+            return agent.throwException(
+                .range_error,
+                "Value must not be greater than {}",
+                .{maximum},
+            );
+        }
+    }
+
+    // 8. Return mv.
+    return mv;
+}
+
+/// 7.1.7 ToFixedSizeInteger ( int, signed, bitWidth )
 /// https://tc39.es/ecma262/#sec-tofixedsizeinteger
 pub fn toFixedSizeInteger(int: f64, comptime T: type) T {
     const info = @typeInfo(T).int;
@@ -1004,7 +1060,7 @@ pub fn toFixedSizeInteger(int: f64, comptime T: type) T {
     return @bitCast(fixed_int);
 }
 
-/// 7.1.7 ToInt32 ( arg )
+/// 7.1.8 ToInt32 ( arg )
 /// https://tc39.es/ecma262/#sec-toint32
 pub fn toInt32(arg: Value, agent: *Agent) Agent.Error!i32 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1019,7 +1075,7 @@ pub fn toInt32(arg: Value, agent: *Agent) Agent.Error!i32 {
     return number.toInt32();
 }
 
-/// 7.1.8 ToUint32 ( arg )
+/// 7.1.9 ToUint32 ( arg )
 /// https://tc39.es/ecma262/#sec-touint32
 pub fn toUint32(arg: Value, agent: *Agent) Agent.Error!u32 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1035,7 +1091,7 @@ pub fn toUint32(arg: Value, agent: *Agent) Agent.Error!u32 {
     return toFixedSizeInteger(int, u32);
 }
 
-/// 7.1.9 ToInt16 ( arg )
+/// 7.1.10 ToInt16 ( arg )
 /// https://tc39.es/ecma262/#sec-toint16
 pub fn toInt16(arg: Value, agent: *Agent) Agent.Error!i16 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1052,7 +1108,7 @@ pub fn toInt16(arg: Value, agent: *Agent) Agent.Error!i16 {
     return toFixedSizeInteger(int, i16);
 }
 
-/// 7.1.10 ToUint16 ( arg )
+/// 7.1.11 ToUint16 ( arg )
 /// https://tc39.es/ecma262/#sec-touint16
 pub fn toUint16(arg: Value, agent: *Agent) Agent.Error!u16 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1068,7 +1124,7 @@ pub fn toUint16(arg: Value, agent: *Agent) Agent.Error!u16 {
     return toFixedSizeInteger(int, u16);
 }
 
-/// 7.1.11 ToInt8 ( arg )
+/// 7.1.12 ToInt8 ( arg )
 /// https://tc39.es/ecma262/#sec-toint8
 pub fn toInt8(arg: Value, agent: *Agent) Agent.Error!i8 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1085,7 +1141,7 @@ pub fn toInt8(arg: Value, agent: *Agent) Agent.Error!i8 {
     return toFixedSizeInteger(int, i8);
 }
 
-/// 7.1.12 ToUint8 ( arg )
+/// 7.1.13 ToUint8 ( arg )
 /// https://tc39.es/ecma262/#sec-touint8
 pub fn toUint8(arg: Value, agent: *Agent) Agent.Error!u8 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1101,7 +1157,7 @@ pub fn toUint8(arg: Value, agent: *Agent) Agent.Error!u8 {
     return toFixedSizeInteger(int, u8);
 }
 
-/// 7.1.13 ToUint8Clamp ( arg )
+/// 7.1.14 ToUint8Clamp ( arg )
 /// https://tc39.es/ecma262/#sec-touint8clamp
 pub fn toUint8Clamp(arg: Value, agent: *Agent) Agent.Error!u8 {
     // 1. Let number be ? ToNumber(arg).
@@ -1140,7 +1196,7 @@ pub inline fn toBigInt(arg: Value, agent: *Agent) Agent.Error!*const BigInt {
     return arg.toBigIntImpl(agent);
 }
 
-/// 7.1.14 ToBigInt ( arg )
+/// 7.1.15 ToBigInt ( arg )
 /// https://tc39.es/ecma262/#sec-tobigint
 fn toBigIntImpl(arg: Value, agent: *Agent) Agent.Error!*const BigInt {
     // 1. Let prim be ? ToPrimitive(argument, number).
@@ -1181,7 +1237,7 @@ fn toBigIntImpl(arg: Value, agent: *Agent) Agent.Error!*const BigInt {
     };
 }
 
-/// 7.1.16 ToBigInt64 ( arg )
+/// 7.1.17 ToBigInt64 ( arg )
 /// https://tc39.es/ecma262/#sec-tobigint64
 pub fn toBigInt64(arg: Value, agent: *Agent) Agent.Error!i64 {
     // 1. Let int be ℝ(? ToBigInt(arg)).
@@ -1193,7 +1249,7 @@ pub fn toBigInt64(arg: Value, agent: *Agent) Agent.Error!i64 {
     return int64bit.toInt(i64) catch unreachable;
 }
 
-/// 7.1.17 ToBigUint64 ( arg )
+/// 7.1.18 ToBigUint64 ( arg )
 /// https://tc39.es/ecma262/#sec-tobiguint64
 pub fn toBigUint64(arg: Value, agent: *Agent) Agent.Error!u64 {
     // 1. Let int be ℝ(? ToBigInt(arg)).
@@ -1214,7 +1270,7 @@ pub inline fn toString(arg: Value, agent: *Agent) Agent.Error!*const String {
     return arg.toStringImpl(agent);
 }
 
-/// 7.1.18 ToString ( arg )
+/// 7.1.19 ToString ( arg )
 /// https://tc39.es/ecma262/#sec-tostring
 fn toStringImpl(arg: Value, agent: *Agent) Agent.Error!*const String {
     return switch (arg.type()) {
@@ -1271,7 +1327,7 @@ pub inline fn toObject(arg: Value, agent: *Agent) Agent.Error!*Object {
     return arg.toObjectImpl(agent);
 }
 
-/// 7.1.19 ToObject ( arg )
+/// 7.1.20 ToObject ( arg )
 /// https://tc39.es/ecma262/#sec-toobject
 fn toObjectImpl(arg: Value, agent: *Agent) Agent.Error!*Object {
     const realm = agent.currentRealm();
@@ -1338,7 +1394,7 @@ fn toObjectImpl(arg: Value, agent: *Agent) Agent.Error!*Object {
     };
 }
 
-/// 7.1.20 ToPropertyKey ( arg )
+/// 7.1.21 ToPropertyKey ( arg )
 /// https://tc39.es/ecma262/#sec-topropertykey
 pub fn toPropertyKey(arg: Value, agent: *Agent) Agent.Error!PropertyKey {
     // 1. Let key be ? ToPrimitive(arg, string).
@@ -1368,7 +1424,7 @@ pub fn toPropertyKey(arg: Value, agent: *Agent) Agent.Error!PropertyKey {
     return PropertyKey.from(string);
 }
 
-/// 7.1.21 ToLength ( arg )
+/// 7.1.22 ToLength ( arg )
 /// https://tc39.es/ecma262/#sec-tolength
 pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1380,14 +1436,14 @@ pub fn toLength(self: Value, agent: *Agent) Agent.Error!u53 {
     // 1. Let length be ? ToIntegerOrInfinity(arg).
     const length = try self.toIntegerOrInfinity(agent);
 
-    // 2. Let clampedLen be the result of clamping length between 0 and 2**53 - 1.
+    // 2. Let clampedLength be the result of clamping length between 0 and 2**53 - 1.
     const clamped_length = std.math.clamp(length, 0, std.math.maxInt(u53));
 
-    // 3. Return 𝔽(clampedLen).
+    // 3. Return 𝔽(clampedLength).
     return @intFromFloat(clamped_length);
 }
 
-/// 7.1.23 ToIndex ( arg )
+/// 7.1.24 ToIndex ( arg )
 /// https://tc39.es/ecma262/#sec-toindex
 pub fn toIndex(arg: Value, agent: *Agent) Agent.Error!u53 {
     // OPTIMIZATION: Fast path for i32 values
@@ -1407,7 +1463,7 @@ pub fn toIndex(arg: Value, agent: *Agent) Agent.Error!u53 {
     return @intFromFloat(int);
 }
 
-/// 7.1.24 ToAbsoluteIndex ( value, length )
+/// 7.1.25 ToAbsoluteIndex ( value, length )
 /// https://tc39.es/ecma262/#sec-toabsoluteindex
 pub fn toAbsoluteIndex(value: Value, agent: *Agent, length: u53) Agent.Error!f64 {
     // 1. Let int be ? ToIntegerOrInfinity(value).
@@ -1422,7 +1478,7 @@ pub fn toAbsoluteIndex(value: Value, agent: *Agent, length: u53) Agent.Error!f64
     return int;
 }
 
-/// 7.1.25 ToClampedIndex ( value, length )
+/// 7.1.26 ToClampedIndex ( value, length )
 /// https://tc39.es/ecma262/#sec-toclampedindex
 pub fn toClampedIndex(value: Value, agent: *Agent, length: u53) Agent.Error!u53 {
     // 1. Let index be ? ToAbsoluteIndex(value, length).
@@ -2014,7 +2070,7 @@ pub fn stringToNumber(
         return Number.from(std.math.nan(f64));
 }
 
-/// 7.1.15 StringToBigInt ( string )
+/// 7.1.16 StringToBigInt ( string )
 /// https://tc39.es/ecma262/#sec-stringtobigint
 pub fn stringToBigInt(
     agent: *Agent,

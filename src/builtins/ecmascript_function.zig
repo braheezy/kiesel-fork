@@ -228,9 +228,9 @@ fn call(
     //    running execution context.
     _ = agent.execution_context_stack.pop().?;
 
-    // 8. If result is a return completion, return result.[[Value]].
-    // 9. Assert: result is a throw completion.
-    // 10. Return ? result.
+    // 8. If result is a throw completion, return ? result.
+    // 9. Assert: result is a return completion.
+    // 10. Return result.[[Value]].
     return result;
 }
 
@@ -622,8 +622,7 @@ fn construct(
     //    running execution context.
     _ = agent.execution_context_stack.pop().?;
 
-    // 10. If result is a throw completion, then
-    //     a. Return ? result.
+    // 10. If result is a throw completion, return ? result.
     // 11. Assert: result is a return completion.
     const value = try result;
 
@@ -1017,11 +1016,8 @@ pub fn setFunctionName(
         },
     };
 
-    // 4. If func has an [[InitialName]] internal slot, then
-    if (func.cast(BuiltinFunction)) |builtin_function| {
-        // a. Set func.[[InitialName]] to name.
-        builtin_function.fields.initial_name = name;
-    }
+    // 4. Let initialName be name.
+    var initial_name = name;
 
     // 5. If prefix is present, then
     if (prefix != null) {
@@ -1033,20 +1029,22 @@ pub fn setFunctionName(
             name,
         });
 
-        // b. If func has an [[InitialName]] internal slot, then
-        if (func.cast(BuiltinFunction)) |builtin_function| {
-            // i. NOTE: The choice in the following step is made independently each time this
-            //    Abstract Operation is invoked.
-            // ii. Set func.[[InitialName]] to an implementation-defined choice of either name or
-            //     prefixedName.
-            builtin_function.fields.initial_name = prefixed_name;
-        }
+        // b. Set initialName to prefixedName.
+        initial_name = prefixed_name;
 
-        // c. Set name to prefixedName.
+        // Normative Optional, Legacy
+        // c. Set initialName to an implementation-defined choice of either name or prefixedName.
+
+        // d. Set name to prefixedName.
         name = prefixed_name;
     }
 
-    // 6. Perform ! DefinePropertyOrThrow(func, "name", PropertyDescriptor { [[Value]]: name,
+    // 6. If func has an [[InitialName]] internal slot, set func.[[InitialName]] to initialName.
+    if (func.cast(BuiltinFunction)) |builtin_function| {
+        builtin_function.fields.initial_name = initial_name;
+    }
+
+    // 7. Perform ! DefinePropertyOrThrow(func, "name", PropertyDescriptor { [[Value]]: name,
     //    [[Writable]]: false, [[Enumerable]]: false, [[Configurable]]: true }).
     try func.definePropertyDirect(agent, PropertyKey.from("name"), .{
         .value_or_accessor = .{
@@ -1059,7 +1057,7 @@ pub fn setFunctionName(
         },
     });
 
-    // 7. Return unused.
+    // 8. Return unused.
 }
 
 /// 10.2.10 SetFunctionLength ( func, length )

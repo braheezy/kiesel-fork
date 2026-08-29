@@ -1605,12 +1605,12 @@ pub const prototype = struct {
         // 2. Let targetIndex be start.
         var target_index = start;
 
-        // 3. Let sourceIndex be +0𝔽.
+        // 3. Let sourceIndex be 0.
         var source_index: u53 = 0;
 
-        // 4. Repeat, while ℝ(sourceIndex) < sourceLength,
+        // 4. Repeat, while sourceIndex < sourceLength,
         while (source_index < source_length) : (source_index += 1) {
-            // a. Let propertyKey be ! ToString(sourceIndex).
+            // a. Let propertyKey be ! ToString(𝔽(sourceIndex)).
             const property_key = PropertyKey.from(source_index);
 
             // b. Let exists be ? HasProperty(source, propertyKey).
@@ -1623,7 +1623,7 @@ pub const prototype = struct {
 
                 // ii. If mapperFunc is present, then
                 if (maybe_mapper_func) |mapper_func| {
-                    // 1. Set element to ? Call(mapperFunc, thisArg, « element, sourceIndex,
+                    // 1. Set element to ? Call(mapperFunc, thisArg, « element, 𝔽(sourceIndex),
                     //    source »).
                     element = try mapper_func.call(
                         agent,
@@ -1690,7 +1690,7 @@ pub const prototype = struct {
                 }
             }
 
-            // d. Set sourceIndex to sourceIndex + 1𝔽.
+            // d. Set sourceIndex to sourceIndex + 1.
         }
 
         // 5. Return targetIndex.
@@ -3249,14 +3249,14 @@ pub const prototype = struct {
                 // vi. Set k to k - 1.
             }
 
-            // d. Let j be +0𝔽.
+            // d. Let j be 0.
             // e. For each element item of items, do
             for (arguments.values, 0..) |item, j| {
-                // i. Perform ? Set(obj, ! ToString(j), item, true).
+                // i. Perform ? Set(obj, ! ToString(𝔽(j)), item, true).
                 const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(j)));
                 try obj.set(agent, property_key, item, .throw);
 
-                // ii. Set j to j + 1𝔽.
+                // ii. Set j to j + 1.
             }
         }
 

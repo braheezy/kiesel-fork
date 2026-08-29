@@ -74,7 +74,7 @@ pub const PropertyKey = union(enum) {
         return self == .string and self.string.eql(String.fromLiteral("length"));
     }
 
-    /// 7.1.22 CanonicalNumericIndexString ( arg )
+    /// 7.1.23 CanonicalNumericIndexString ( arg )
     /// https://tc39.es/ecma262/#sec-canonicalnumericindexstring
     pub fn canonicalNumericIndex(
         self: PropertyKey,

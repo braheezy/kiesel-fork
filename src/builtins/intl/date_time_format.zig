@@ -1248,9 +1248,9 @@ fn toLocalTime(
     );
     const time: icu4zig.Time = try .init(
         builtins.date.hourFromTime(@floatFromInt(epoch_milliseconds_local)),
-        builtins.date.minFromTime(@floatFromInt(epoch_milliseconds_local)),
-        builtins.date.secFromTime(@floatFromInt(epoch_milliseconds_local)),
-        @as(u32, @intCast(builtins.date.msFromTime(@floatFromInt(epoch_milliseconds_local)))) * std.time.ns_per_ms,
+        builtins.date.minuteFromTime(@floatFromInt(epoch_milliseconds_local)),
+        builtins.date.secondFromTime(@floatFromInt(epoch_milliseconds_local)),
+        @as(u32, @intCast(builtins.date.millisecondFromTime(@floatFromInt(epoch_milliseconds_local)))) * std.time.ns_per_ms,
     );
     return .{
         .iso_date = iso_date,

@@ -46,7 +46,6 @@ const Minute = std.math.IntFittingRange(0, 59);
 const Second = std.math.IntFittingRange(0, 59);
 const Millisecond = std.math.IntFittingRange(0, 999);
 const WeekDay = std.math.IntFittingRange(0, 6);
-const DaysInYear = std.math.IntFittingRange(365, 366);
 const DayWithinYear = std.math.IntFittingRange(0, 365);
 
 /// Simplified infallible variant of `Value.toIntegerOrInfinity()`
@@ -86,94 +85,86 @@ fn daysFromCivil(y_: i64, m: i32, d: i32) i64 {
 /// 21.4.1.3 Day ( tv )
 /// https://tc39.es/ecma262/#sec-day
 pub fn day(tv: f64) f64 {
-    // 1. Return 𝔽(floor(ℝ(tv / msPerDay))).
+    // 1. Return floor(ℝ(tv) / MillisecondsPerDay).
     return std.math.floor(tv / std.time.ms_per_day);
 }
 
 /// 21.4.1.4 TimeWithinDay ( tv )
 /// https://tc39.es/ecma262/#sec-timewithinday
 pub fn timeWithinDay(tv: f64) f64 {
-    // 1. Return 𝔽(ℝ(tv) modulo ℝ(msPerDay)).
+    // 1. Return ℝ(tv) modulo MillisecondsPerDay.
     return @mod(tv, std.time.ms_per_day);
 }
 
-/// 21.4.1.5 DaysInYear ( y )
-/// https://tc39.es/ecma262/#sec-daysinyear
-pub fn daysInYear(year: Year) DaysInYear {
-    // 1. Let ry be ℝ(y).
-
-    // 2. If (ry modulo 400) = 0, return 366𝔽.
-    if (@mod(year, 400) == 0) return 366;
-
-    // 3. If (ry modulo 100) = 0, return 365𝔽.
-    if (@mod(year, 100) == 0) return 365;
-
-    // 4. If (ry modulo 4) = 0, return 366𝔽.
-    if (@mod(year, 4) == 0) return 366;
-
-    // 5. Return 365𝔽.
-    return 365;
-}
-
-/// 21.4.1.6 DayFromYear ( y )
+/// 21.4.1.5 DayFromYear ( y )
 /// https://tc39.es/ecma262/#sec-dayfromyear
 pub fn dayFromYear(year: Year) f64 {
-    // 1. Let ry be ℝ(y).
-    // 2. NOTE: In the following steps, numberYears1, numberYears4, numberYears100, and
+    // 1. NOTE: In the following steps, numberYears1, numberYears4, numberYears100, and
     //    numberYears400 represent the number of years divisible by 1, 4, 100, and 400,
     //    respectively, that occur between the epoch and the start of year y. The number is negative
     //    if y is before the epoch.
 
-    // 3. Let numberYears1 be (ry - 1970).
+    // 2. Let numberYears1 be (y - 1970).
     const number_years_1: f64 = @floatFromInt(year - 1970);
 
-    // 4. Let numberYears4 be floor((ry - 1969) / 4).
+    // 3. Let numberYears4 be floor((y - 1969) / 4).
     const number_years_4: f64 = @floatFromInt(@divFloor(year - 1969, 4));
 
-    // 5. Let numberYears100 be floor((ry - 1901) / 100).
+    // 4. Let numberYears100 be floor((y - 1901) / 100).
     const number_years_100: f64 = @floatFromInt(@divFloor(year - 1901, 100));
 
-    // 6. Let numberYears400 be floor((ry - 1601) / 400).
+    // 5. Let numberYears400 be floor((y - 1601) / 400).
     const number_years_400: f64 = @floatFromInt(@divFloor(year - 1601, 400));
 
-    // 7. Return 𝔽(365 × numberYears1 + numberYears4 - numberYears100 + numberYears400).
+    // 6. Return 365 × numberYears1 + numberYears4 - numberYears100 + numberYears400.
     return 365 * number_years_1 + number_years_4 - number_years_100 + number_years_400;
 }
 
-/// 21.4.1.7 TimeFromYear ( y )
+/// 21.4.1.6 TimeFromYear ( y )
 /// https://tc39.es/ecma262/#sec-timefromyear
 pub fn timeFromYear(year: Year) f64 {
-    // 1. Return msPerDay × DayFromYear(y).
+    // 1. Return 𝔽(MillisecondsPerDay × DayFromYear(y)).
     return std.time.ms_per_day * dayFromYear(year);
 }
 
-/// 21.4.1.8 YearFromTime ( tv )
+/// 21.4.1.7 YearFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-yearfromtime
 pub fn yearFromTime(tv: f64) Year {
-    // 1. Return the largest integral Number y (closest to +∞) such that TimeFromYear(y) ≤ tv.
+    // 1. Return the largest integer y (closest to +∞) such that TimeFromYear(y) ≤ tv.
     const year: Year = @intFromFloat(@divFloor(tv, (365.2425 * std.time.ms_per_day)) + 1970);
     const t2 = timeFromYear(year);
     if (t2 > tv) return year - 1;
-    if (t2 + @as(f64, @floatFromInt(daysInYear(year))) * std.time.ms_per_day <= tv) return year + 1;
+    if (timeFromYear(year + 1) <= tv) return year + 1;
     return year;
 }
 
-/// 21.4.1.9 DayWithinYear ( tv )
+/// 21.4.1.8 DayWithinYear ( tv )
 /// https://tc39.es/ecma262/#sec-daywithinyear
 pub fn dayWithinYear(tv: f64) DayWithinYear {
     // 1. Return Day(tv) - DayFromYear(YearFromTime(tv)).
     return @intFromFloat(day(tv) - dayFromYear(yearFromTime(tv)));
 }
 
-/// 21.4.1.10 InLeapYear ( tv )
+/// 21.4.1.9 InLeapYear ( tv )
 /// https://tc39.es/ecma262/#sec-inleapyear
 pub fn inLeapYear(tv: f64) bool {
-    // 1. If DaysInYear(YearFromTime(tv)) is 366𝔽, return 1𝔽.
-    // 2. Return +0𝔽.
-    return daysInYear(yearFromTime(tv)) == 366;
+    // 1. Let y be YearFromTime(tv).
+    const year = yearFromTime(tv);
+
+    // 2. If (y modulo 400) = 0, return 1.
+    if (@mod(year, 400) == 0) return true;
+
+    // 3. If (y modulo 100) = 0, return 0.
+    if (@mod(year, 100) == 0) return false;
+
+    // 4. If (y modulo 4) = 0, return 1.
+    if (@mod(year, 4) == 0) return true;
+
+    // 5. Return 0.
+    return false;
 }
 
-/// 21.4.1.11 MonthFromTime ( tv )
+/// 21.4.1.10 MonthFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-monthfromtime
 pub fn monthFromTime(tv: f64) Month {
     // 1. Let inLeapYear be InLeapYear(tv).
@@ -182,47 +173,47 @@ pub fn monthFromTime(tv: f64) Month {
     // 2. Let dayWithinYear be DayWithinYear(tv).
     const day_within_year = dayWithinYear(tv);
 
-    // 3. If dayWithinYear < 31𝔽, return +0𝔽.
+    // 3. If dayWithinYear < 31, return 0.
     if (day_within_year < 31) return 0;
 
-    // 4. If dayWithinYear < 59𝔽 + inLeapYear, return 1𝔽.
+    // 4. If dayWithinYear < 59 + inLeapYear, return 1.
     if (day_within_year < 59 + in_leap_year) return 1;
 
-    // 5. If dayWithinYear < 90𝔽 + inLeapYear, return 2𝔽.
+    // 5. If dayWithinYear < 90 + inLeapYear, return 2.
     if (day_within_year < 90 + in_leap_year) return 2;
 
-    // 6. If dayWithinYear < 120𝔽 + inLeapYear, return 3𝔽.
+    // 6. If dayWithinYear < 120 + inLeapYear, return 3.
     if (day_within_year < 120 + in_leap_year) return 3;
 
-    // 7. If dayWithinYear < 151𝔽 + inLeapYear, return 4𝔽.
+    // 7. If dayWithinYear < 151 + inLeapYear, return 4.
     if (day_within_year < 151 + in_leap_year) return 4;
 
-    // 8. If dayWithinYear < 181𝔽 + inLeapYear, return 5𝔽.
+    // 8. If dayWithinYear < 181 + inLeapYear, return 5.
     if (day_within_year < 181 + in_leap_year) return 5;
 
-    // 9. If dayWithinYear < 212𝔽 + inLeapYear, return 6𝔽.
+    // 9. If dayWithinYear < 212 + inLeapYear, return 6.
     if (day_within_year < 212 + in_leap_year) return 6;
 
-    // 10. If dayWithinYear < 243𝔽 + inLeapYear, return 7𝔽.
+    // 10. If dayWithinYear < 243 + inLeapYear, return 7.
     if (day_within_year < 243 + in_leap_year) return 7;
 
-    // 11. If dayWithinYear < 273𝔽 + inLeapYear, return 8𝔽.
+    // 11. If dayWithinYear < 273 + inLeapYear, return 8.
     if (day_within_year < 273 + in_leap_year) return 8;
 
-    // 12. If dayWithinYear < 304𝔽 + inLeapYear, return 9𝔽.
+    // 12. If dayWithinYear < 304 + inLeapYear, return 9.
     if (day_within_year < 304 + in_leap_year) return 9;
 
-    // 13. If dayWithinYear < 334𝔽 + inLeapYear, return 10𝔽.
+    // 13. If dayWithinYear < 334 + inLeapYear, return 10.
     if (day_within_year < 334 + in_leap_year) return 10;
 
-    // 14. Assert: dayWithinYear < 365𝔽 + inLeapYear.
+    // 14. Assert: dayWithinYear < 365 + inLeapYear.
     std.debug.assert(day_within_year < 365 + in_leap_year);
 
-    // 15. Return 11𝔽.
+    // 15. Return 11.
     return 11;
 }
 
-/// 21.4.1.12 DateFromTime ( tv )
+/// 21.4.1.11 DateFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-datefromtime
 pub fn dateFromTime(tv: f64) Date_ {
     // 1. Let inLeapYear be InLeapYear(tv).
@@ -234,78 +225,78 @@ pub fn dateFromTime(tv: f64) Date_ {
     // 3. Let month be MonthFromTime(tv).
     const month = monthFromTime(tv);
 
-    // 4. If month is +0𝔽, return dayWithinYear + 1𝔽.
+    // 4. If month = 0, return dayWithinYear + 1.
     if (month == 0) return @intCast(day_within_year + 1);
 
-    // 5. If month is 1𝔽, return dayWithinYear - 30𝔽.
+    // 5. If month = 1, return dayWithinYear - 30.
     if (month == 1) return @intCast(day_within_year - 30);
 
-    // 6. If month is 2𝔽, return dayWithinYear - 58𝔽 - inLeapYear.
+    // 6. If month = 2, return dayWithinYear - 58 - inLeapYear.
     if (month == 2) return @intCast(day_within_year - 58 - in_leap_year);
 
-    // 7. If month is 3𝔽, return dayWithinYear - 89𝔽 - inLeapYear.
+    // 7. If month = 3, return dayWithinYear - 89 - inLeapYear.
     if (month == 3) return @intCast(day_within_year - 89 - in_leap_year);
 
-    // 8. If month is 4𝔽, return dayWithinYear - 119𝔽 - inLeapYear.
+    // 8. If month = 4, return dayWithinYear - 119 - inLeapYear.
     if (month == 4) return @intCast(day_within_year - 119 - in_leap_year);
 
-    // 9. If month is 5𝔽, return dayWithinYear - 150𝔽 - inLeapYear.
+    // 9. If month = 5, return dayWithinYear - 150 - inLeapYear.
     if (month == 5) return @intCast(day_within_year - 150 - in_leap_year);
 
-    // 10. If month is 6𝔽, return dayWithinYear - 180𝔽 - inLeapYear.
+    // 10. If month = 6, return dayWithinYear - 180 - inLeapYear.
     if (month == 6) return @intCast(day_within_year - 180 - in_leap_year);
 
-    // 11. If month is 7𝔽, return dayWithinYear - 211𝔽 - inLeapYear.
+    // 11. If month = 7, return dayWithinYear - 211 - inLeapYear.
     if (month == 7) return @intCast(day_within_year - 211 - in_leap_year);
 
-    // 12. If month is 8𝔽, return dayWithinYear - 242𝔽 - inLeapYear.
+    // 12. If month = 8, return dayWithinYear - 242 - inLeapYear.
     if (month == 8) return @intCast(day_within_year - 242 - in_leap_year);
 
-    // 13. If month is 9𝔽, return dayWithinYear - 272𝔽 - inLeapYear.
+    // 13. If month = 9, return dayWithinYear - 272 - inLeapYear.
     if (month == 9) return @intCast(day_within_year - 272 - in_leap_year);
 
-    // 14. If month is 10𝔽, return dayWithinYear - 303𝔽 - inLeapYear.
+    // 14. If month = 10, return dayWithinYear - 303 - inLeapYear.
     if (month == 10) return @intCast(day_within_year - 303 - in_leap_year);
 
-    // 15. Assert: month is 11𝔽.
+    // 15. Assert: month = 11.
     std.debug.assert(month == 11);
 
-    // 16. Return dayWithinYear - 333𝔽 - inLeapYear.
+    // 16. Return dayWithinYear - 333 - inLeapYear.
     return @intCast(day_within_year - 333 - in_leap_year);
 }
 
-/// 21.4.1.13 WeekDay ( tv )
+/// 21.4.1.12 WeekDay ( tv )
 /// https://tc39.es/ecma262/#sec-weekday
 pub fn weekDay(tv: f64) WeekDay {
-    // 1. Return 𝔽(ℝ(Day(tv) + 4𝔽) modulo 7).
+    // 1. Return (Day(tv) + 4) modulo 7.
     return @intFromFloat(@mod(day(tv) + 4, 7));
 }
 
-/// 21.4.1.14 HourFromTime ( tv )
+/// 21.4.1.13 HourFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-hourfromtime
 pub fn hourFromTime(tv: f64) Hour {
-    // 1. Return 𝔽(floor(ℝ(tv / msPerHour)) modulo HoursPerDay).
+    // 1. Return floor(ℝ(tv) / MillisecondsPerHour) modulo HoursPerDay.
     return @intFromFloat(@mod(std.math.floor(tv / std.time.ms_per_hour), hours_per_day));
 }
 
-/// 21.4.1.15 MinFromTime ( tv )
-/// https://tc39.es/ecma262/#sec-minfromtime
-pub fn minFromTime(tv: f64) Minute {
-    // 1. Return 𝔽(floor(ℝ(tv / msPerMinute)) modulo MinutesPerHour).
+/// 21.4.1.14 MinuteFromTime ( tv )
+/// https://tc39.es/ecma262/#sec-minutefromtime
+pub fn minuteFromTime(tv: f64) Minute {
+    // 1. Return floor(ℝ(tv) / MillisecondsPerMinute) modulo MinutesPerHour.
     return @intFromFloat(@mod(std.math.floor(tv / std.time.ms_per_min), minutes_per_hour));
 }
 
-/// 21.4.1.16 SecFromTime ( tv )
-/// https://tc39.es/ecma262/#sec-secfromtime
-pub fn secFromTime(tv: f64) Second {
-    // 1. Return 𝔽(floor(ℝ(tv / msPerSecond)) modulo SecondsPerMinute).
+/// 21.4.1.15 SecondFromTime ( tv )
+/// https://tc39.es/ecma262/#sec-secondfromtime
+pub fn secondFromTime(tv: f64) Second {
+    // 1. Return floor(ℝ(tv) / MillisecondsPerSecond) modulo SecondsPerMinute.
     return @intFromFloat(@mod(std.math.floor(tv / std.time.ms_per_s), std.time.s_per_min));
 }
 
-/// 21.4.1.17 msFromTime ( tv )
-/// https://tc39.es/ecma262/#sec-msfromtime
-pub fn msFromTime(tv: f64) Millisecond {
-    // 1. Return 𝔽(ℝ(tv) modulo ℝ(msPerSecond)).
+/// 21.4.1.16 MillisecondFromTime ( tv )
+/// https://tc39.es/ecma262/#sec-millisecondfromtime
+pub fn millisecondFromTime(tv: f64) Millisecond {
+    // 1. Return ℝ(tv) modulo MillisecondsPerSecond.
     return @intFromFloat(@mod(tv, std.time.ms_per_s));
 }
 
@@ -343,23 +334,23 @@ pub fn localTime(platform: *const Agent.Platform, tv: f64) f64 {
     const time_zone = systemTimeZoneIdentifier(platform);
 
     // 2. If IsTimeZoneOffsetString(systemTimeZoneIdentifier) is true, then
-    const offset_ns = if (@TypeOf(time_zone) == void) blk: {
+    const offset_nanoseconds = if (@TypeOf(time_zone) == void) blk: {
         break :blk 0;
     } else if (isTimeZoneOffsetString(time_zone)) blk: {
-        // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
+        // a. Let offsetNanoseconds be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
         break :blk parseTimeZoneOffsetString(time_zone);
     } else blk: {
         // 3. Else,
-        // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
-        //    ℤ(ℝ(tv) × nsPerMillisecond)).
+        // a. Let offsetNanoseconds be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
+        //    ℝ(tv) × NanosecondsPerMillisecond).
         break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, @intFromFloat(tv * std.time.ns_per_ms));
     };
 
-    // 4. Let offsetMs be truncate(offsetNs / nsPerMillisecond).
-    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / std.time.ns_per_ms);
+    // 4. Let offsetMilliseconds be truncate(offsetNanoseconds / NanosecondsPerMillisecond).
+    const offset_milliseconds = @trunc(@as(f64, @floatFromInt(offset_nanoseconds)) / std.time.ns_per_ms);
 
-    // 5. Return tv + 𝔽(offsetMs).
-    return tv + offset_ms;
+    // 5. Return tv + 𝔽(offsetMilliseconds).
+    return tv + offset_milliseconds;
 }
 
 /// 21.4.1.26 UTC ( t )
@@ -372,10 +363,10 @@ pub fn utc(platform: *const Agent.Platform, t: f64) f64 {
     const time_zone = systemTimeZoneIdentifier(platform);
 
     // 3. If IsTimeZoneOffsetString(systemTimeZoneIdentifier) is true, then
-    const offset_ns = if (@TypeOf(time_zone) == void) blk: {
+    const offset_nanoseconds = if (@TypeOf(time_zone) == void) blk: {
         break :blk 0;
     } else if (isTimeZoneOffsetString(time_zone)) blk: {
-        // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
+        // a. Let offsetNanoseconds be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
         break :blk parseTimeZoneOffsetString(time_zone);
     } else blk: {
         // 4. Else,
@@ -384,18 +375,18 @@ pub fn utc(platform: *const Agent.Platform, t: f64) f64 {
         break :blk 0;
     };
 
-    // 5. Let offsetMs be truncate(offsetNs / nsPerMillisecond).
-    const offset_ms = @trunc(@as(f64, @floatFromInt(offset_ns)) / std.time.ns_per_ms);
+    // 5. Let offsetMilliseconds be truncate(offsetNanoseconds / NanosecondsPerMillisecond).
+    const offset_milliseconds = @trunc(@as(f64, @floatFromInt(offset_nanoseconds)) / std.time.ns_per_ms);
 
-    // 6. Return t - 𝔽(offsetMs).
-    return t - offset_ms;
+    // 6. Return t - 𝔽(offsetMilliseconds).
+    return t - offset_milliseconds;
 }
 
-/// 21.4.1.27 MakeTime ( hour, min, sec, ms )
+/// 21.4.1.27 MakeTime ( hour, minute, second, millisecond )
 /// https://tc39.es/ecma262/#sec-maketime
 pub fn makeTime(hour: f64, minute: f64, second: f64, millisecond: f64) f64 {
-    // 1. If hour is not finite, min is not finite, sec is not finite, or ms is not finite, return
-    //    NaN.
+    // 1. If hour is not finite, minute is not finite, second is not finite, or millisecond is not
+    //    finite, return NaN.
     if (!std.math.isFinite(hour) or
         !std.math.isFinite(minute) or
         !std.math.isFinite(second) or
@@ -404,67 +395,68 @@ pub fn makeTime(hour: f64, minute: f64, second: f64, millisecond: f64) f64 {
         return std.math.nan(f64);
     }
 
-    // 2. Let h be 𝔽(! ToIntegerOrInfinity(hour)).
-    const h = toIntegerOrInfinity(hour);
+    // 2. Let hourMV be ! ToIntegerOrInfinity(hour).
+    const hour_mv = toIntegerOrInfinity(hour);
 
-    // 3. Let m be 𝔽(! ToIntegerOrInfinity(min)).
-    const m = toIntegerOrInfinity(minute);
+    // 3. Let minuteMV be ! ToIntegerOrInfinity(minute).
+    const minute_mv = toIntegerOrInfinity(minute);
 
-    // 4. Let s be 𝔽(! ToIntegerOrInfinity(sec)).
-    const s = toIntegerOrInfinity(second);
+    // 4. Let secondMV be ! ToIntegerOrInfinity(second).
+    const second_mv = toIntegerOrInfinity(second);
 
-    // 5. Let milli be 𝔽(! ToIntegerOrInfinity(ms)).
-    const ms = toIntegerOrInfinity(millisecond);
+    // 5. Let millisecondMV be ! ToIntegerOrInfinity(millisecond).
+    const millisecond_mv = toIntegerOrInfinity(millisecond);
 
-    // 6. Return ((h × msPerHour + m × msPerMinute) + s × msPerSecond) + milli.
-    return ((h * std.time.ms_per_hour + m * std.time.ms_per_min) + s * std.time.ms_per_s) + ms;
+    // 6. Return
+    //    ((𝔽(hourMV) × 𝔽(MillisecondsPerHour) + 𝔽(minuteMV) × 𝔽(MillisecondsPerMinute)) + 𝔽(secondMV) × 𝔽(MillisecondsPerSecond)) + 𝔽(millisecondMV).
+    return ((hour_mv * std.time.ms_per_hour + minute_mv * std.time.ms_per_min) + second_mv * std.time.ms_per_s) + millisecond_mv;
 }
 
-/// 21.4.1.28 MakeDay ( year, month, date )
+/// 21.4.1.28 MakeDay ( year, month, day )
 /// https://tc39.es/ecma262/#sec-makeday
-pub fn makeDay(year: f64, month: f64, date: f64) f64 {
-    // 1. If year is not finite, month is not finite, or date is not finite, return NaN.
-    if (!std.math.isFinite(year) or !std.math.isFinite(month) or !std.math.isFinite(date)) {
+pub fn makeDay(year: f64, month: f64, day_: f64) f64 {
+    // 1. If year is not finite, month is not finite, or day is not finite, return NaN.
+    if (!std.math.isFinite(year) or !std.math.isFinite(month) or !std.math.isFinite(day_)) {
         return std.math.nan(f64);
     }
 
-    // 2. Let y be 𝔽(! ToIntegerOrInfinity(year)).
-    const y = toIntegerOrInfinity(year);
+    // 2. Let yearMV be ! ToIntegerOrInfinity(year).
+    const year_mv = toIntegerOrInfinity(year);
 
-    // 3. Let m be 𝔽(! ToIntegerOrInfinity(month)).
-    const m = toIntegerOrInfinity(month);
+    // 3. Let monthMV be ! ToIntegerOrInfinity(month).
+    const month_mv = toIntegerOrInfinity(month);
 
-    // 4. Let dt be 𝔽(! ToIntegerOrInfinity(date)).
-    const dt = toIntegerOrInfinity(date);
+    // 4. Let dayMV be ! ToIntegerOrInfinity(day).
+    const day_mv = toIntegerOrInfinity(day_);
 
-    // 5. Let ym be y + 𝔽(floor(ℝ(m) / 12)).
-    const ym = y + std.math.floor(m / 12);
+    // 5. Let balancedYear be 𝔽(yearMV) + 𝔽(floor(monthMV / 12)).
+    const balanced_year = year_mv + std.math.floor(month_mv / 12);
 
-    // 6. If ym is not finite, return NaN.
-    if (!std.math.isFinite(ym)) return std.math.nan(f64);
+    // 6. If balancedYear is not finite, return NaN.
+    if (!std.math.isFinite(balanced_year)) return std.math.nan(f64);
 
-    // 7. Let mn be 𝔽(ℝ(m) modulo 12).
-    const mn = @mod(m, 12);
+    // 7. Let balancedMonthMV be monthMV modulo 12.
+    const balanced_month_mv = @mod(month_mv, 12);
 
-    // 8. Find a finite time value tv such that YearFromTime(tv) is ym, MonthFromTime(tv) is mn, and
-    //    DateFromTime(tv) is 1𝔽; but if this is not possible (because some argument is out of
-    //    range), return NaN.
-    if (ym < @as(f64, @floatFromInt(std.math.minInt(i64))) or
-        ym > @as(f64, @floatFromInt(std.math.maxInt(i64))) or
-        (mn + 1) > std.math.maxInt(i32))
+    // 8. Find a finite time value tv such that YearFromTime(tv) = ℝ(balancedYear), MonthFromTime(
+    //    tv) = balancedMonthMV, and DateFromTime(tv) = 1; but if this is not possible (because some
+    //    argument is out of range), return NaN.
+    if (balanced_year < @as(f64, @floatFromInt(std.math.minInt(i64))) or
+        balanced_year > @as(f64, @floatFromInt(std.math.maxInt(i64))) or
+        (balanced_month_mv + 1) > std.math.maxInt(i32))
     {
         return std.math.nan(f64);
     }
     const tv = @as(f64, @floatFromInt(
         daysFromCivil(
-            @intFromFloat(ym),
-            @intFromFloat(mn + 1),
+            @intFromFloat(balanced_year),
+            @intFromFloat(balanced_month_mv + 1),
             1,
         ),
     )) * std.time.ms_per_day;
 
-    // 9. Return Day(tv) + dt - 1𝔽.
-    return day(tv) + dt - 1;
+    // 9. Return 𝔽(Day(tv)) + 𝔽(dayMV) - 1𝔽.
+    return day(tv) + day_mv - 1;
 }
 
 /// 21.4.1.29 MakeDate ( day, time )
@@ -473,7 +465,7 @@ pub fn makeDate(day_: f64, time: f64) f64 {
     // 1. If day is not finite or time is not finite, return NaN.
     if (!std.math.isFinite(day_) or !std.math.isFinite(time)) return std.math.nan(f64);
 
-    // 2. Let tv be day × msPerDay + time.
+    // 2. Let tv be day × 𝔽(MillisecondsPerDay) + time.
     const time_value = day_ * std.time.ms_per_day + time;
 
     // 3. If tv is not finite, return NaN.
@@ -720,15 +712,15 @@ pub fn fmtTimeString(time_value: f64) std.fmt.Alt(f64, formatTimeString) {
 /// 21.4.4.41.1 TimeString ( tv )
 /// https://tc39.es/ecma262/#sec-timestring
 fn formatTimeString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    // 1. Let hour be ToZeroPaddedDecimalString(ℝ(HourFromTime(tv)), 2).
-    // 2. Let minute be ToZeroPaddedDecimalString(ℝ(MinFromTime(tv)), 2).
-    // 3. Let second be ToZeroPaddedDecimalString(ℝ(SecFromTime(tv)), 2).
+    // 1. Let hour be ToZeroPaddedDecimalString(HourFromTime(tv), 2).
+    // 2. Let minute be ToZeroPaddedDecimalString(MinuteFromTime(tv), 2).
+    // 3. Let second be ToZeroPaddedDecimalString(SecondFromTime(tv), 2).
     // 4. Return the string-concatenation of hour, ":", minute, ":", second, the code unit 0x0020
     //    (SPACE), and "GMT".
     try writer.print("{d:0>2}:{d:0>2}:{d:0>2} GMT", .{
         hourFromTime(time_value),
-        minFromTime(time_value),
-        secFromTime(time_value),
+        minuteFromTime(time_value),
+        secondFromTime(time_value),
     });
 }
 
@@ -739,22 +731,22 @@ pub fn fmtDateString(time_value: f64) std.fmt.Alt(f64, formatDateString) {
 /// 21.4.4.41.2 DateString ( tv )
 /// https://tc39.es/ecma262/#sec-datestring
 fn formatDateString(time_value: f64, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    // 1. Let weekday be the Name of the entry in Table 61 with the Number WeekDay(tv).
+    // 1. Let weekday be the Name of the entry in Table 61 whose WeekDay Index = WeekDay(tv).
     const weekday = week_day_names[weekDay(time_value)];
 
-    // 2. Let month be the Name of the entry in Table 62 with the Number MonthFromTime(tv).
+    // 2. Let month be the Name of the entry in Table 62 whose Month Index = MonthFromTime(tv).
     const month = month_names[monthFromTime(time_value)];
 
-    // 3. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).
+    // 3. Let day be ToZeroPaddedDecimalString(DateFromTime(tv), 2).
     const day_ = dateFromTime(time_value);
 
     // 4. Let yv be YearFromTime(tv).
     const year = yearFromTime(time_value);
 
-    // 5. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; else let yearSign be "-".
+    // 5. If yv ≥ 0, let yearSign be the empty String; else let yearSign be "-".
     const year_sign = if (year >= 0) "" else "-";
 
-    // 6. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).
+    // 6. Let paddedYear be ToZeroPaddedDecimalString(abs(yv), 4).
     var buf: [6]u8 = undefined;
     const padded_year = toZeroPaddedDecimalString(&buf, @abs(year), 4);
 
@@ -785,44 +777,45 @@ pub fn formatTimeZoneString(data: FormatTimeZoneStringData, writer: *std.Io.Writ
     const time_zone = systemTimeZoneIdentifier(platform);
 
     // 2. If IsTimeZoneOffsetString(systemTimeZoneIdentifier) is true, then
-    const offset_ns = if (@TypeOf(time_zone) == void) blk: {
+    const offset_nanoseconds = if (@TypeOf(time_zone) == void) blk: {
         break :blk 0;
     } else if (isTimeZoneOffsetString(time_zone)) blk: {
-        // a. Let offsetNs be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
+        // a. Let offsetNanoseconds be ParseTimeZoneOffsetString(systemTimeZoneIdentifier).
         break :blk parseTimeZoneOffsetString(time_zone);
     } else blk: {
         // 3. Else,
-        // a. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
-        //    ℤ(ℝ(tv) × nsPerMillisecond)).
+        // a. Let offsetNanoseconds be GetNamedTimeZoneOffsetNanoseconds(systemTimeZoneIdentifier,
+        //    ℝ(tv) × NanosecondsPerMillisecond).
         break :blk getNamedTimeZoneOffsetNanoseconds(time_zone, @intFromFloat(time_value * std.time.ns_per_ms));
     };
 
-    // 4. Let offset be 𝔽(truncate(offsetNs / nsPerMillisecond)).
-    const offset = @trunc(@as(f64, @floatFromInt(offset_ns)) / std.time.ns_per_ms);
+    // 4. Let offsetMilliseconds be truncate(offsetNanoseconds / NanosecondsPerMillisecond).
+    const offset_milliseconds = @trunc(@as(f64, @floatFromInt(offset_nanoseconds)) / std.time.ns_per_ms);
 
-    // 5. If offset is +0𝔽 or offset > +0𝔽, then
+    // 5. If offsetMilliseconds ≥ 0, then
     //     a. Let offsetSign be "+".
-    //     b. Let absOffset be offset.
+    //     b. Let absOffsetMilliseconds be offsetMilliseconds.
     // 6. Else,
     //     a. Let offsetSign be "-".
-    //     b. Let absOffset be -offset.
-    const offset_sign: u8 = if (offset >= 0) '+' else '-';
-    const abs_offset = @abs(offset);
+    //     b. Let absOffsetMilliseconds be -offsetMilliseconds.
+    const offset_sign: u8 = if (offset_milliseconds >= 0) '+' else '-';
+    const abs_offset_milliseconds = @abs(offset_milliseconds);
 
-    // 7. Let offsetMin be ToZeroPaddedDecimalString(ℝ(MinFromTime(absOffset)), 2).
-    const offset_min = minFromTime(abs_offset);
+    // 7. Let offsetMinute be ToZeroPaddedDecimalString(MinuteFromTime(𝔽(absOffsetMilliseconds)),
+    //    2).
+    const offset_minute = minuteFromTime(abs_offset_milliseconds);
 
-    // 8. Let offsetHour be ToZeroPaddedDecimalString(ℝ(HourFromTime(absOffset)), 2).
-    const offset_hour = hourFromTime(abs_offset);
+    // 8. Let offsetHour be ToZeroPaddedDecimalString(HourFromTime(𝔽(absOffsetMilliseconds)), 2).
+    const offset_hour = hourFromTime(abs_offset_milliseconds);
 
     // 9. Let tzName be an implementation-defined string that is either the empty String or the
     //    string-concatenation of the code unit 0x0020 (SPACE), the code unit 0x0028 (LEFT
     //    PARENTHESIS), an implementation-defined timezone name, and the code unit 0x0029 (RIGHT
     //    PARENTHESIS).
-    const tz_name = if (offset == 0) " (GMT)" else "";
+    const tz_name = if (offset_milliseconds == 0) " (GMT)" else "";
 
-    // 10. Return the string-concatenation of offsetSign, offsetHour, offsetMin, and tzName.
-    try writer.print("{c}{d:0>2}{d:0>2}{s}", .{ offset_sign, offset_hour, offset_min, tz_name });
+    // 10. Return the string-concatenation of offsetSign, offsetHour, offsetMinute, and tzName.
+    try writer.print("{c}{d:0>2}{d:0>2}{s}", .{ offset_sign, offset_hour, offset_minute, tz_name });
 }
 
 pub fn fmtToDateString(
@@ -952,34 +945,40 @@ pub const constructor = struct {
             // a. Assert: numberOfArgs ≥ 2.
             std.debug.assert(number_of_args >= 2);
 
-            // b. Let y be ? ToNumber(values[0]).
-            var year = (try arguments.get(0).toNumber(agent)).asFloat();
+            // b. Let yearNumber be ? ToNumber(values[0]).
+            var year_number = (try arguments.get(0).toNumber(agent)).asFloat();
 
-            // c. Let m be ? ToNumber(values[1]).
-            const month = (try arguments.get(1).toNumber(agent)).asFloat();
+            // c. Let monthNumber be ? ToNumber(values[1]).
+            const month_number = (try arguments.get(1).toNumber(agent)).asFloat();
 
-            // d. If numberOfArgs > 2, let dt be ? ToNumber(values[2]); else let dt be 1𝔽.
-            const date = if (number_of_args > 2) (try arguments.get(2).toNumber(agent)).asFloat() else 1;
+            // d. If numberOfArgs > 2, let dayNumber be ? ToNumber(values[2]); else let dayNumber be
+            //    1𝔽.
+            const day_number = if (number_of_args > 2) (try arguments.get(2).toNumber(agent)).asFloat() else 1;
 
-            // e. If numberOfArgs > 3, let h be ? ToNumber(values[3]); else let h be +0𝔽.
-            const hour = if (number_of_args > 3) (try arguments.get(3).toNumber(agent)).asFloat() else 0;
+            // e. If numberOfArgs > 3, let hourNumber be ? ToNumber(values[3]); else let hourNumber
+            //    be +0𝔽.
+            const hour_number = if (number_of_args > 3) (try arguments.get(3).toNumber(agent)).asFloat() else 0;
 
-            // f. If numberOfArgs > 4, let min be ? ToNumber(values[4]); else let min be +0𝔽.
-            const minute = if (number_of_args > 4) (try arguments.get(4).toNumber(agent)).asFloat() else 0;
+            // f. If numberOfArgs > 4, let minuteNumber be ? ToNumber(values[4]); else let
+            //    minuteNumber be +0𝔽.
+            const minute_number = if (number_of_args > 4) (try arguments.get(4).toNumber(agent)).asFloat() else 0;
 
-            // g. If numberOfArgs > 5, let s be ? ToNumber(values[5]); else let s be +0𝔽.
-            const second = if (number_of_args > 5) (try arguments.get(5).toNumber(agent)).asFloat() else 0;
+            // g. If numberOfArgs > 5, let secondNumber be ? ToNumber(values[5]); else let
+            //    secondNumber be +0𝔽.
+            const second_number = if (number_of_args > 5) (try arguments.get(5).toNumber(agent)).asFloat() else 0;
 
-            // h. If numberOfArgs > 6, let milli be ? ToNumber(values[6]); else let milli be +0𝔽.
-            const millisecond = if (number_of_args > 6) (try arguments.get(6).toNumber(agent)).asFloat() else 0;
+            // h. If numberOfArgs > 6, let millisecondNumber be ? ToNumber(values[6]); else let
+            //    millisecondNumber be +0𝔽.
+            const millisecond_number = if (number_of_args > 6) (try arguments.get(6).toNumber(agent)).asFloat() else 0;
 
-            // i. Let yr be MakeFullYear(y).
-            year = makeFullYear(year);
+            // i. Set yearNumber to MakeFullYear(yearNumber).
+            year_number = makeFullYear(year_number);
 
-            // j. Let finalDate be MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli)).
+            // j. Let finalDate be MakeDate(MakeDay(yearNumber, monthNumber, dayNumber), MakeTime(
+            //    hourNumber, minuteNumber, secondNumber, millisecondNumber)).
             const final_date = makeDate(
-                makeDay(year, month, date),
-                makeTime(hour, minute, second, millisecond),
+                makeDay(year_number, month_number, day_number),
+                makeTime(hour_number, minute_number, second_number, millisecond_number),
             );
 
             // k. Let dv be TimeClip(UTC(finalDate)).
@@ -1030,37 +1029,42 @@ pub const constructor = struct {
             std.math.nan(f64);
     }
 
-    /// 21.4.3.4 Date.UTC ( year [ , month [ , date [ , hours [ , minutes [ , seconds [ , ms ] ] ] ] ] ] )
+    /// 21.4.3.4 Date.UTC ( year [ , month [ , day [ , hour [ , minute [ , second [ , millisecond ] ] ] ] ] ] )
     /// https://tc39.es/ecma262/#sec-date.utc
     fn UTC(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-        // 1. Let y be ? ToNumber(year).
-        var year = (try arguments.get(0).toNumber(agent)).asFloat();
+        // 1. Let yearNumber be ? ToNumber(year).
+        var year_number = (try arguments.get(0).toNumber(agent)).asFloat();
 
-        // 2. If month is present, let m be ? ToNumber(month); else let m be +0𝔽.
-        const month = if (arguments.getOrNull(1)) |month| (try month.toNumber(agent)).asFloat() else 0;
+        // 2. If month is present, let monthNumber be ? ToNumber(month); else let monthNumber be
+        //    +0𝔽.
+        const month_number = if (arguments.getOrNull(1)) |month| (try month.toNumber(agent)).asFloat() else 0;
 
-        // 3. If date is present, let dt be ? ToNumber(date); else let dt be 1𝔽.
-        const date = if (arguments.getOrNull(2)) |date| (try date.toNumber(agent)).asFloat() else 1;
+        // 3. If day is present, let dayNumber be ? ToNumber(day); else let dayNumber be 1𝔽.
+        const day_number = if (arguments.getOrNull(2)) |date| (try date.toNumber(agent)).asFloat() else 1;
 
-        // 4. If hours is present, let h be ? ToNumber(hours); else let h be +0𝔽.
-        const hour = if (arguments.getOrNull(3)) |hours| (try hours.toNumber(agent)).asFloat() else 0;
+        // 4. If hour is present, let hourNumber be ? ToNumber(hour); else let hourNumber be +0𝔽.
+        const hour_number = if (arguments.getOrNull(3)) |hours| (try hours.toNumber(agent)).asFloat() else 0;
 
-        // 5. If minutes is present, let min be ? ToNumber(minutes); else let min be +0𝔽.
-        const minute = if (arguments.getOrNull(4)) |minutes| (try minutes.toNumber(agent)).asFloat() else 0;
+        // 5. If minute is present, let minuteNumber be ? ToNumber(minute); else let minuteNumber be
+        //    +0𝔽.
+        const minute_number = if (arguments.getOrNull(4)) |minutes| (try minutes.toNumber(agent)).asFloat() else 0;
 
-        // 6. If seconds is present, let s be ? ToNumber(seconds); else let s be +0𝔽.
-        const second = if (arguments.getOrNull(5)) |seconds| (try seconds.toNumber(agent)).asFloat() else 0;
+        // 6. If second is present, let secondNumber be ? ToNumber(second); else let secondNumber be
+        //    +0𝔽.
+        const second_number = if (arguments.getOrNull(5)) |seconds| (try seconds.toNumber(agent)).asFloat() else 0;
 
-        // 7. If ms is present, let milli be ? ToNumber(ms); else let milli be +0𝔽.
-        const millisecond = if (arguments.getOrNull(6)) |ms| (try ms.toNumber(agent)).asFloat() else 0;
+        // 7. If millisecond is present, let millisecondNumber be ? ToNumber(millisecond); else let
+        //    millisecondNumber be +0𝔽.
+        const millisecond_number = if (arguments.getOrNull(6)) |ms| (try ms.toNumber(agent)).asFloat() else 0;
 
-        // 8. Let yr be MakeFullYear(y).
-        year = makeFullYear(year);
+        // 8. Set yearNumber to MakeFullYear(yearNumber).
+        year_number = makeFullYear(year_number);
 
-        // 9. Return TimeClip(MakeDate(MakeDay(yr, m, dt), MakeTime(h, min, s, milli))).
+        // 9. Return TimeClip(MakeDate(MakeDay(yearNumber, monthNumber, dayNumber), MakeTime(
+        //    hourNumber, minuteNumber, secondNumber, millisecondNumber))).
         return Value.from(timeClip(makeDate(
-            makeDay(year, month, date),
-            makeTime(hour, minute, second, millisecond),
+            makeDay(year_number, month_number, day_number),
+            makeTime(hour_number, minute_number, second_number, millisecond_number),
         )));
     }
 };
@@ -1165,7 +1169,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return DateFromTime(LocalTime(tv)).
+        // 5. Return 𝔽(DateFromTime(LocalTime(tv))).
         return Value.from(dateFromTime(localTime(agent.platform, tv)));
     }
 
@@ -1182,7 +1186,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return WeekDay(LocalTime(tv)).
+        // 5. Return 𝔽(WeekDay(LocalTime(tv))).
         return Value.from(weekDay(localTime(agent.platform, tv)));
     }
 
@@ -1199,7 +1203,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return YearFromTime(LocalTime(tv)).
+        // 5. Return 𝔽(YearFromTime(LocalTime(tv))).
         return Value.from(yearFromTime(localTime(agent.platform, tv)));
     }
 
@@ -1216,7 +1220,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return HourFromTime(LocalTime(tv)).
+        // 5. Return 𝔽(HourFromTime(LocalTime(tv))).
         return Value.from(hourFromTime(localTime(agent.platform, tv)));
     }
 
@@ -1233,8 +1237,8 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return msFromTime(LocalTime(tv)).
-        return Value.from(msFromTime(localTime(agent.platform, tv)));
+        // 5. Return 𝔽(MillisecondFromTime(LocalTime(tv))).
+        return Value.from(millisecondFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.7 Date.prototype.getMinutes ( )
@@ -1250,8 +1254,8 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return MinFromTime(LocalTime(tv)).
-        return Value.from(minFromTime(localTime(agent.platform, tv)));
+        // 5. Return 𝔽(MinuteFromTime(LocalTime(tv))).
+        return Value.from(minuteFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.8 Date.prototype.getMonth ( )
@@ -1267,7 +1271,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return MonthFromTime(LocalTime(tv)).
+        // 5. Return 𝔽(MonthFromTime(LocalTime(tv))).
         return Value.from(monthFromTime(localTime(agent.platform, tv)));
     }
 
@@ -1284,8 +1288,8 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return SecFromTime(LocalTime(tv)).
-        return Value.from(secFromTime(localTime(agent.platform, tv)));
+        // 5. Return 𝔽(SecondFromTime(LocalTime(tv))).
+        return Value.from(secondFromTime(localTime(agent.platform, tv)));
     }
 
     /// 21.4.4.10 Date.prototype.getTime ( )
@@ -1312,7 +1316,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return (tv - LocalTime(tv)) / msPerMinute.
+        // 5. Return (tv - LocalTime(tv)) / 𝔽(MillisecondsPerMinute).
         return Value.from((tv - localTime(agent.platform, tv)) / std.time.ms_per_min);
     }
 
@@ -1329,7 +1333,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return DateFromTime(tv).
+        // 5. Return 𝔽(DateFromTime(tv)).
         return Value.from(dateFromTime(tv));
     }
 
@@ -1346,7 +1350,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return WeekDay(tv).
+        // 5. Return 𝔽(WeekDay(tv)).
         return Value.from(weekDay(tv));
     }
 
@@ -1363,7 +1367,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return YearFromTime(tv).
+        // 5. Return 𝔽(YearFromTime(tv)).
         return Value.from(yearFromTime(tv));
     }
 
@@ -1380,7 +1384,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return HourFromTime(tv).
+        // 5. Return 𝔽(HourFromTime(tv)).
         return Value.from(hourFromTime(tv));
     }
 
@@ -1397,8 +1401,8 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return msFromTime(tv).
-        return Value.from(msFromTime(tv));
+        // 5. Return 𝔽(MillisecondFromTime(tv)).
+        return Value.from(millisecondFromTime(tv));
     }
 
     /// 21.4.4.17 Date.prototype.getUTCMinutes ( )
@@ -1414,8 +1418,8 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return MinFromTime(tv).
-        return Value.from(minFromTime(tv));
+        // 5. Return 𝔽(MinuteFromTime(tv)).
+        return Value.from(minuteFromTime(tv));
     }
 
     /// 21.4.4.18 Date.prototype.getUTCMonth ( )
@@ -1431,7 +1435,7 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return MonthFromTime(tv).
+        // 5. Return 𝔽(MonthFromTime(tv)).
         return Value.from(monthFromTime(tv));
     }
 
@@ -1448,14 +1452,14 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return SecFromTime(tv).
-        return Value.from(secFromTime(tv));
+        // 5. Return 𝔽(SecondFromTime(tv)).
+        return Value.from(secondFromTime(tv));
     }
 
-    /// 21.4.4.20 Date.prototype.setDate ( date )
+    /// 21.4.4.20 Date.prototype.setDate ( day )
     /// https://tc39.es/ecma262/#sec-date.prototype.setdate
     fn setDate(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const date_value = arguments.get(0);
+        const day_ = arguments.get(0);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1464,8 +1468,8 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         var tv = date_object.fields.date_value;
 
-        // 4. Let dt be ? ToNumber(date).
-        const date = (try date_value.toNumber(agent)).asFloat();
+        // 4. Let dayNumber be ? ToNumber(day).
+        const day_number = try day_.toNumber(agent);
 
         // 5. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
@@ -1473,13 +1477,13 @@ pub const prototype = struct {
         // 6. Set tv to LocalTime(tv).
         tv = localTime(agent.platform, tv);
 
-        // 7. Let newDate be MakeDate(MakeDay(YearFromTime(tv), MonthFromTime(tv), dt),
-        //    TimeWithinDay(tv)).
+        // 7. Let newDate be MakeDate(MakeDay(𝔽(YearFromTime(tv)), 𝔽(MonthFromTime(tv)), dayNumber),
+        //    𝔽(TimeWithinDay(tv))).
         const new_date = makeDate(
             makeDay(
                 @floatFromInt(yearFromTime(tv)),
                 @floatFromInt(monthFromTime(tv)),
-                date,
+                day_number.asFloat(),
             ),
             timeWithinDay(tv),
         );
@@ -1494,12 +1498,12 @@ pub const prototype = struct {
         return Value.from(date_value_utc);
     }
 
-    /// 21.4.4.21 Date.prototype.setFullYear ( year [ , month [ , date ] ] )
+    /// 21.4.4.21 Date.prototype.setFullYear ( year [ , month [ , day ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setfullyear
     fn setFullYear(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const year_value = arguments.get(0);
-        const month_value = arguments.getOrNull(1);
-        const date_value = arguments.getOrNull(2);
+        const year = arguments.get(0);
+        const maybe_month = arguments.getOrNull(1);
+        const maybe_day = arguments.getOrNull(2);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1508,26 +1512,32 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         var tv = date_object.fields.date_value;
 
-        // 4. Let y be ? ToNumber(year).
-        const year = (try year_value.toNumber(agent)).asFloat();
+        // 4. Let yearNumber be ? ToNumber(year).
+        const year_number = (try year.toNumber(agent)).asFloat();
 
         // 5. If tv is NaN, set tv to +0𝔽; else set tv to LocalTime(tv).
         tv = if (std.math.isNan(tv)) 0 else localTime(agent.platform, tv);
 
-        // 6. If month is present, let m be ? ToNumber(month); else let m be MonthFromTime(tv).
-        const month = if (month_value) |month|
+        // 6. If month is present, let monthNumber be ? ToNumber(month); else let monthNumber be
+        //    𝔽(MonthFromTime(tv)).
+        const month_number = if (maybe_month) |month|
             (try month.toNumber(agent)).asFloat()
         else
             @as(f64, @floatFromInt(monthFromTime(tv)));
 
-        // 7. If date is present, let dt be ? ToNumber(date); else let dt be DateFromTime(tv).
-        const date = if (date_value) |date|
-            (try date.toNumber(agent)).asFloat()
+        // 7. If day is present, let dayNumber be ? ToNumber(day); else let dayNumber be
+        //    𝔽(DateFromTime(tv)).
+        const day_number = if (maybe_day) |day_|
+            (try day_.toNumber(agent)).asFloat()
         else
             @as(f64, @floatFromInt(dateFromTime(tv)));
 
-        // 8. Let newDate be MakeDate(MakeDay(y, m, dt), TimeWithinDay(tv)).
-        const new_date = makeDate(makeDay(year, month, date), timeWithinDay(tv));
+        // 8. Let newDate be MakeDate(MakeDay(yearNumber, monthNumber, dayNumber), 𝔽(TimeWithinDay(
+        //    tv))).
+        const new_date = makeDate(
+            makeDay(year_number, month_number, day_number),
+            timeWithinDay(tv),
+        );
 
         // 9. Let u be TimeClip(UTC(newDate)).
         const date_value_utc = timeClip(utc(agent.platform, new_date));
@@ -1539,13 +1549,13 @@ pub const prototype = struct {
         return Value.from(date_value_utc);
     }
 
-    /// 21.4.4.22 Date.prototype.setHours ( hour [ , min [ , sec [ , ms ] ] ] )
+    /// 21.4.4.22 Date.prototype.setHours ( hour [ , minute [ , second [ , millisecond ] ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.sethours
     fn setHours(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const hour_value = arguments.get(0);
-        const minute_value = arguments.getOrNull(1);
-        const second_value = arguments.getOrNull(2);
-        const millisecond_value = arguments.getOrNull(3);
+        const hour = arguments.get(0);
+        const maybe_minute = arguments.getOrNull(1);
+        const maybe_second = arguments.getOrNull(2);
+        const maybe_millisecond = arguments.getOrNull(3);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1554,23 +1564,23 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         var tv = date_object.fields.date_value;
 
-        // 4. Let h be ? ToNumber(hour).
-        const hour = (try hour_value.toNumber(agent)).asFloat();
+        // 4. Let hourNumber be ? ToNumber(hour).
+        const hour_number = (try hour.toNumber(agent)).asFloat();
 
-        // 5. If min is present, let m be ? ToNumber(min).
-        var minute = if (minute_value) |minute|
+        // 5. If minute is present, let minuteNumber be ? ToNumber(minute).
+        var minute_number = if (maybe_minute) |minute|
             (try minute.toNumber(agent)).asFloat()
         else
             undefined;
 
-        // 6. If sec is present, let s be ? ToNumber(sec).
-        var second = if (second_value) |second|
+        // 6. If second is present, let secondNumber be ? ToNumber(second).
+        var second_number = if (maybe_second) |second|
             (try second.toNumber(agent)).asFloat()
         else
             undefined;
 
-        // 7. If ms is present, let milli be ? ToNumber(ms).
-        var millisecond = if (millisecond_value) |millisecond|
+        // 7. If millisecond is present, let millisecondNumber be ? ToNumber(millisecond).
+        var millisecond_number = if (maybe_millisecond) |millisecond|
             (try millisecond.toNumber(agent)).asFloat()
         else
             undefined;
@@ -1581,17 +1591,21 @@ pub const prototype = struct {
         // 9. Set tv to LocalTime(tv).
         tv = localTime(agent.platform, tv);
 
-        // 10. If min is not present, let m be MinFromTime(tv).
-        if (minute_value == null) minute = @floatFromInt(minFromTime(tv));
+        // 10. If minute is not present, let minuteNumber be 𝔽(MinuteFromTime(tv)).
+        if (maybe_minute == null) minute_number = @floatFromInt(minuteFromTime(tv));
 
-        // 11. If sec is not present, let s be SecFromTime(tv).
-        if (second_value == null) second = @floatFromInt(secFromTime(tv));
+        // 11. If second is not present, let secondNumber be 𝔽(SecondFromTime(tv)).
+        if (maybe_second == null) second_number = @floatFromInt(secondFromTime(tv));
 
-        // 12. If ms is not present, let milli be msFromTime(tv).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
+        // 12. If millisecond is not present, let millisecondNumber be 𝔽(MillisecondFromTime(tv)).
+        if (maybe_millisecond == null) millisecond_number = @floatFromInt(millisecondFromTime(tv));
 
-        // 13. Let date be MakeDate(Day(tv), MakeTime(h, m, s, milli)).
-        const date = makeDate(day(tv), makeTime(hour, minute, second, millisecond));
+        // 13. Let date be MakeDate(𝔽(Day(tv)), MakeTime(hourNumber, minuteNumber, secondNumber,
+        //     millisecondNumber)).
+        const date = makeDate(
+            day(tv),
+            makeTime(hour_number, minute_number, second_number, millisecond_number),
+        );
 
         // 14. Let u be TimeClip(UTC(date)).
         const date_value_utc = timeClip(utc(agent.platform, date));
@@ -1603,10 +1617,10 @@ pub const prototype = struct {
         return Value.from(date_value_utc);
     }
 
-    /// 21.4.4.23 Date.prototype.setMilliseconds ( ms )
+    /// 21.4.4.23 Date.prototype.setMilliseconds ( millisecond )
     /// https://tc39.es/ecma262/#sec-date.prototype.setmilliseconds
     fn setMilliseconds(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const millisecond_value = arguments.get(0);
+        const millisecond = arguments.get(0);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1615,8 +1629,8 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         var tv = date_object.fields.date_value;
 
-        // 4. Set ms to ? ToNumber(ms).
-        const millisecond = (try millisecond_value.toNumber(agent)).asFloat();
+        // 4. Let millisecondNumber be ? ToNumber(millisecond).
+        const millisecond_number = (try millisecond.toNumber(agent)).asFloat();
 
         // 5. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
@@ -1624,15 +1638,16 @@ pub const prototype = struct {
         // 6. Set tv to LocalTime(tv).
         tv = localTime(agent.platform, tv);
 
-        // 7. Let time be MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms).
+        // 7. Let time be MakeTime(𝔽(HourFromTime(tv)), 𝔽(MinuteFromTime(tv)), 𝔽(SecondFromTime(
+        //    tv)), millisecondNumber).
         const time = makeTime(
             @floatFromInt(hourFromTime(tv)),
-            @floatFromInt(minFromTime(tv)),
-            @floatFromInt(secFromTime(tv)),
-            millisecond,
+            @floatFromInt(minuteFromTime(tv)),
+            @floatFromInt(secondFromTime(tv)),
+            millisecond_number,
         );
 
-        // 8. Let u be TimeClip(UTC(MakeDate(Day(tv), time))).
+        // 8. Let u be TimeClip(UTC(MakeDate(𝔽(Day(tv)), time))).
         const date_value_utc = timeClip(utc(agent.platform, makeDate(day(tv), time)));
 
         // 9. Set dateObj.[[DateValue]] to u.
@@ -1642,12 +1657,12 @@ pub const prototype = struct {
         return Value.from(date_value_utc);
     }
 
-    /// 21.4.4.24 Date.prototype.setMinutes ( min [ , sec [ , ms ] ] )
+    /// 21.4.4.24 Date.prototype.setMinutes ( minute [ , second [ , millisecond ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setminutes
     fn setMinutes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const minute_value = arguments.get(0);
-        const second_value = arguments.getOrNull(1);
-        const millisecond_value = arguments.getOrNull(2);
+        const minute = arguments.get(0);
+        const maybe_second = arguments.getOrNull(1);
+        const maybe_millisecond = arguments.getOrNull(2);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1656,17 +1671,17 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         var tv = date_object.fields.date_value;
 
-        // 4. Let m be ? ToNumber(min).
-        const minute = (try minute_value.toNumber(agent)).asFloat();
+        // 4. Let minuteNumber be ? ToNumber(minute).
+        const minute_number = (try minute.toNumber(agent)).asFloat();
 
-        // 5. If sec is present, let s be ? ToNumber(sec).
-        var second = if (second_value) |second|
+        // 5. If second is present, let secondNumber be ? ToNumber(second).
+        var second_number = if (maybe_second) |second|
             (try second.toNumber(agent)).asFloat()
         else
             undefined;
 
-        // 6. If ms is present, let milli be ? ToNumber(ms).
-        var millisecond = if (millisecond_value) |millisecond|
+        // 6. If millisecond is present, let millisecondNumber be ? ToNumber(millisecond).
+        var millisecond_number = if (maybe_millisecond) |millisecond|
             (try millisecond.toNumber(agent)).asFloat()
         else
             undefined;
@@ -1677,16 +1692,17 @@ pub const prototype = struct {
         // 8. Set tv to LocalTime(tv).
         tv = localTime(agent.platform, tv);
 
-        // 9. If sec is not present, let s be SecFromTime(tv).
-        if (second_value == null) second = @floatFromInt(secFromTime(tv));
+        // 9. If second is not present, let secondNumber be 𝔽(SecondFromTime(tv)).
+        if (maybe_second == null) second_number = @floatFromInt(secondFromTime(tv));
 
-        // 10. If ms is not present, let milli be msFromTime(tv).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
+        // 10. If millisecond is not present, let millisecondNumber be 𝔽(MillisecondFromTime(tv)).
+        if (maybe_millisecond == null) millisecond_number = @floatFromInt(millisecondFromTime(tv));
 
-        // 11. Let date be MakeDate(Day(tv), MakeTime(HourFromTime(tv), m, s, milli)).
+        // 11. Let date be MakeDate(𝔽(Day(tv)), MakeTime(𝔽(HourFromTime(tv)), minuteNumber,
+        //     secondNumber, millisecondNumber)).
         const date = makeDate(
             day(tv),
-            makeTime(@floatFromInt(hourFromTime(tv)), minute, second, millisecond),
+            makeTime(@floatFromInt(hourFromTime(tv)), minute_number, second_number, millisecond_number),
         );
 
         // 12. Let u be TimeClip(UTC(date)).
@@ -1699,11 +1715,11 @@ pub const prototype = struct {
         return Value.from(date_value_utc);
     }
 
-    /// 21.4.4.25 Date.prototype.setMonth ( month [ , date ] )
+    /// 21.4.4.25 Date.prototype.setMonth ( month [ , day ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setmonth
     fn setMonth(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const month_value = arguments.get(0);
-        const date_value = arguments.getOrNull(1);
+        const month = arguments.get(0);
+        const maybe_day = arguments.getOrNull(1);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1712,12 +1728,12 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         var tv = date_object.fields.date_value;
 
-        // 4. Let m be ? ToNumber(month).
-        const month = (try month_value.toNumber(agent)).asFloat();
+        // 4. Let monthNumber be ? ToNumber(month).
+        const month_number = (try month.toNumber(agent)).asFloat();
 
-        // 5. If date is present, let dt be ? ToNumber(date).
-        var date = if (date_value) |date|
-            (try date.toNumber(agent)).asFloat()
+        // 5. If day is present, let dayNumber be ? ToNumber(day).
+        var day_number = if (maybe_day) |day_|
+            (try day_.toNumber(agent)).asFloat()
         else
             undefined;
 
@@ -1727,12 +1743,13 @@ pub const prototype = struct {
         // 7. Set tv to LocalTime(tv).
         tv = localTime(agent.platform, tv);
 
-        // 8. If date is not present, let dt be DateFromTime(tv).
-        if (date_value == null) date = @floatFromInt(dateFromTime(tv));
+        // 8. If day is not present, let dayNumber be 𝔽(DateFromTime(tv)).
+        if (maybe_day == null) day_number = @floatFromInt(dateFromTime(tv));
 
-        // 9. Let newDate be MakeDate(MakeDay(YearFromTime(tv), m, dt), TimeWithinDay(tv)).
+        // 9. Let newDate be MakeDate(MakeDay(𝔽(YearFromTime(tv)), monthNumber, dayNumber),
+        //    𝔽(TimeWithinDay(tv))).
         const new_date = makeDate(
-            makeDay(@floatFromInt(yearFromTime(tv)), month, date),
+            makeDay(@floatFromInt(yearFromTime(tv)), month_number, day_number),
             timeWithinDay(tv),
         );
 
@@ -1746,11 +1763,11 @@ pub const prototype = struct {
         return Value.from(date_value_utc);
     }
 
-    /// 21.4.4.26 Date.prototype.setSeconds ( sec [ , ms ] )
+    /// 21.4.4.26 Date.prototype.setSeconds ( second [ , millisecond ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setseconds
     fn setSeconds(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const second_value = arguments.get(0);
-        const millisecond_value = arguments.getOrNull(1);
+        const second = arguments.get(0);
+        const maybe_millisecond = arguments.getOrNull(1);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1759,11 +1776,11 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         var tv = date_object.fields.date_value;
 
-        // 4. Let s be ? ToNumber(sec).
-        const second = (try second_value.toNumber(agent)).asFloat();
+        // 4. Let secondNumber be ? ToNumber(second).
+        const second_number = (try second.toNumber(agent)).asFloat();
 
-        // 5. If ms is present, let milli be ? ToNumber(ms).
-        var millisecond = if (millisecond_value) |millisecond|
+        // 5. If millisecond is present, let millisecondNumber be ? ToNumber(millisecond).
+        var millisecond_number = if (maybe_millisecond) |millisecond|
             (try millisecond.toNumber(agent)).asFloat()
         else
             undefined;
@@ -1774,17 +1791,18 @@ pub const prototype = struct {
         // 7. Set tv to LocalTime(tv).
         tv = localTime(agent.platform, tv);
 
-        // 8. If ms is not present, let milli be msFromTime(tv).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
+        // 8. If millisecond is not present, let millisecondNumber be 𝔽(MillisecondFromTime(tv)).
+        if (maybe_millisecond == null) millisecond_number = @floatFromInt(millisecondFromTime(tv));
 
-        // 9. Let date be MakeDate(Day(tv), MakeTime(HourFromTime(tv), MinFromTime(tv), s, milli)).
+        // 9. Let date be MakeDate(𝔽(Day(tv)), MakeTime(𝔽(HourFromTime(tv)), 𝔽(MinuteFromTime(tv)),
+        //    secondNumber, millisecondNumber)).
         const date = makeDate(
             day(tv),
             makeTime(
                 @floatFromInt(hourFromTime(tv)),
-                @floatFromInt(minFromTime(tv)),
-                second,
-                millisecond,
+                @floatFromInt(minuteFromTime(tv)),
+                second_number,
+                millisecond_number,
             ),
         );
 
@@ -1820,10 +1838,10 @@ pub const prototype = struct {
         return Value.from(date_value);
     }
 
-    /// 21.4.4.28 Date.prototype.setUTCDate ( date )
+    /// 21.4.4.28 Date.prototype.setUTCDate ( day )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcdate
     fn setUTCDate(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const date_value = arguments.get(0);
+        const day_ = arguments.get(0);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1832,19 +1850,19 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         const tv = date_object.fields.date_value;
 
-        // 4. Let dt be ? ToNumber(date).
-        const date = (try date_value.toNumber(agent)).asFloat();
+        // 4. Let dayNumber be ? ToNumber(day).
+        const day_number = (try day_.toNumber(agent)).asFloat();
 
         // 5. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 6. Let newDate be MakeDate(MakeDay(YearFromTime(tv), MonthFromTime(tv), dt),
-        //    TimeWithinDay(tv)).
+        // 6. Let newDate be MakeDate(MakeDay(𝔽(YearFromTime(tv)), 𝔽(MonthFromTime(tv)), dayNumber),
+        //    𝔽(TimeWithinDay(tv))).
         const new_date = makeDate(
             makeDay(
                 @floatFromInt(yearFromTime(tv)),
                 @floatFromInt(monthFromTime(tv)),
-                date,
+                day_number,
             ),
             timeWithinDay(tv),
         );
@@ -1859,12 +1877,12 @@ pub const prototype = struct {
         return Value.from(date_value_);
     }
 
-    /// 21.4.4.29 Date.prototype.setUTCFullYear ( year [ , month [ , date ] ] )
+    /// 21.4.4.29 Date.prototype.setUTCFullYear ( year [ , month [ , day ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcfullyear
     fn setUTCFullYear(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const year_value = arguments.get(0);
-        const month_value = arguments.getOrNull(1);
-        const date_value = arguments.getOrNull(2);
+        const year = arguments.get(0);
+        const maybe_month = arguments.getOrNull(1);
+        const maybe_day = arguments.getOrNull(2);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1876,23 +1894,26 @@ pub const prototype = struct {
         // 4. If tv is NaN, set tv to +0𝔽.
         if (std.math.isNan(tv)) tv = 0;
 
-        // 5. Let y be ? ToNumber(year).
-        const year = (try year_value.toNumber(agent)).asFloat();
+        // 5. Let yearNumber be ? ToNumber(year).
+        const year_number = (try year.toNumber(agent)).asFloat();
 
-        // 6. If month is present, let m be ? ToNumber(month); else let m be MonthFromTime(tv).
-        const month = if (month_value) |month|
+        // 6. If month is present, let monthNumber be ? ToNumber(month); else let monthNumber be
+        //    𝔽(MonthFromTime(tv)).
+        const month_number = if (maybe_month) |month|
             (try month.toNumber(agent)).asFloat()
         else
             @as(f64, @floatFromInt(monthFromTime(tv)));
 
-        // 7. If date is present, let dt be ? ToNumber(date); else let dt be DateFromTime(tv).
-        const date = if (date_value) |date|
-            (try date.toNumber(agent)).asFloat()
+        // 7. If day is present, let dayNumber be ? ToNumber(day); else let dayNumber be
+        //    𝔽(DateFromTime(tv)).
+        const day_number = if (maybe_day) |day_|
+            (try day_.toNumber(agent)).asFloat()
         else
             @as(f64, @floatFromInt(dateFromTime(tv)));
 
-        // 8. Let newDate be MakeDate(MakeDay(y, m, dt), TimeWithinDay(tv)).
-        const new_date = makeDate(makeDay(year, month, date), timeWithinDay(tv));
+        // 8. Let newDate be MakeDate(MakeDay(yearNumber, monthNumber, dayNumber), 𝔽(TimeWithinDay(
+        //    tv))).
+        const new_date = makeDate(makeDay(year_number, month_number, day_number), timeWithinDay(tv));
 
         // 9. Let v be TimeClip(newDate).
         const date_value_ = timeClip(new_date);
@@ -1904,13 +1925,13 @@ pub const prototype = struct {
         return Value.from(date_value_);
     }
 
-    /// 21.4.4.30 Date.prototype.setUTCHours ( hour [ , min [ , sec [ , ms ] ] ] )
+    /// 21.4.4.30 Date.prototype.setUTCHours ( hour [ , minute [ , second [ , millisecond ] ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutchours
     fn setUTCHours(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const hour_value = arguments.get(0);
-        const minute_value = arguments.getOrNull(1);
-        const second_value = arguments.getOrNull(2);
-        const millisecond_value = arguments.getOrNull(3);
+        const hour = arguments.get(0);
+        const maybe_minute = arguments.getOrNull(1);
+        const maybe_second = arguments.getOrNull(2);
+        const maybe_millisecond = arguments.getOrNull(3);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1919,23 +1940,23 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         const tv = date_object.fields.date_value;
 
-        // 4. Let h be ? ToNumber(hour).
-        const hour = (try hour_value.toNumber(agent)).asFloat();
+        // 4. Let hourNumber be ? ToNumber(hour).
+        const hour_number = (try hour.toNumber(agent)).asFloat();
 
-        // 5. If min is present, let m be ? ToNumber(min).
-        var minute = if (minute_value) |minute|
+        // 5. If minute is present, let minuteNumber be ? ToNumber(minute).
+        var minute_number = if (maybe_minute) |minute|
             (try minute.toNumber(agent)).asFloat()
         else
             undefined;
 
-        // 6. If sec is present, let s be ? ToNumber(sec).
-        var second = if (second_value) |second|
+        // 6. If second is present, let secondNumber be ? ToNumber(second).
+        var second_number = if (maybe_second) |second|
             (try second.toNumber(agent)).asFloat()
         else
             undefined;
 
-        // 7. If ms is present, let milli be ? ToNumber(ms).
-        var millisecond = if (millisecond_value) |millisecond|
+        // 7. If millisecond is present, let millisecondNumber be ? ToNumber(millisecond).
+        var millisecond_number = if (maybe_millisecond) |millisecond|
             (try millisecond.toNumber(agent)).asFloat()
         else
             undefined;
@@ -1943,17 +1964,18 @@ pub const prototype = struct {
         // 8. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 9. If min is not present, let m be MinFromTime(tv).
-        if (minute_value == null) minute = @floatFromInt(minFromTime(tv));
+        // 9. If minute is not present, let minuteNumber be 𝔽(MinuteFromTime(tv)).
+        if (maybe_minute == null) minute_number = @floatFromInt(minuteFromTime(tv));
 
-        // 10. If sec is not present, let s be SecFromTime(tv).
-        if (second_value == null) second = @floatFromInt(secFromTime(tv));
+        // 10. If second is not present, let secondNumber be 𝔽(SecondFromTime(tv)).
+        if (maybe_second == null) second_number = @floatFromInt(secondFromTime(tv));
 
-        // 11. If ms is not present, let milli be msFromTime(tv).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
+        // 11. If millisecond is not present, let millisecondNumber be 𝔽(MillisecondFromTime(tv)).
+        if (maybe_millisecond == null) millisecond_number = @floatFromInt(millisecondFromTime(tv));
 
-        // 12. Let date be MakeDate(Day(tv), MakeTime(h, m, s, milli)).
-        const date = makeDate(day(tv), makeTime(hour, minute, second, millisecond));
+        // 12. Let date be MakeDate(𝔽(Day(tv)), MakeTime(hourNumber, minuteNumber, secondNumber,
+        //     millisecondNumber)).
+        const date = makeDate(day(tv), makeTime(hour_number, minute_number, second_number, millisecond_number));
 
         // 13. Let v be TimeClip(date).
         const date_value = timeClip(date);
@@ -1965,14 +1987,14 @@ pub const prototype = struct {
         return Value.from(date_value);
     }
 
-    /// 21.4.4.31 Date.prototype.setUTCMilliseconds ( ms )
+    /// 21.4.4.31 Date.prototype.setUTCMilliseconds ( millisecond )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcmilliseconds
     fn setUTCMilliseconds(
         agent: *Agent,
         this_value: Value,
         arguments: Arguments,
     ) Agent.Error!Value {
-        const millisecond_value = arguments.get(0);
+        const millisecond = arguments.get(0);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -1981,21 +2003,22 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         const tv = date_object.fields.date_value;
 
-        // 4. Set ms to ? ToNumber(ms).
-        const millisecond = (try millisecond_value.toNumber(agent)).asFloat();
+        // 4. Let millisecondNumber be ? ToNumber(millisecond).
+        const millisecond_number = (try millisecond.toNumber(agent)).asFloat();
 
         // 5. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 6. Let time be MakeTime(HourFromTime(tv), MinFromTime(tv), SecFromTime(tv), ms).
+        // 6. Let time be MakeTime(𝔽(HourFromTime(tv)), 𝔽(MinuteFromTime(tv)), 𝔽(SecondFromTime(
+        //    tv)), millisecondNumber).
         const time = makeTime(
             @floatFromInt(hourFromTime(tv)),
-            @floatFromInt(minFromTime(tv)),
-            @floatFromInt(secFromTime(tv)),
-            millisecond,
+            @floatFromInt(minuteFromTime(tv)),
+            @floatFromInt(secondFromTime(tv)),
+            millisecond_number,
         );
 
-        // 7. Let v be TimeClip(MakeDate(Day(tv), time)).
+        // 7. Let v be TimeClip(MakeDate(𝔽(Day(tv)), time)).
         const date_value = timeClip(makeDate(day(tv), time));
 
         // 8. Set dateObj.[[DateValue]] to v.
@@ -2005,12 +2028,12 @@ pub const prototype = struct {
         return Value.from(date_value);
     }
 
-    /// 21.4.4.32 Date.prototype.setUTCMinutes ( min [ , sec [ , ms ] ] )
+    /// 21.4.4.32 Date.prototype.setUTCMinutes ( minute [ , second [ , millisecond ] ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcminutes
     fn setUTCMinutes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const minute_value = arguments.get(0);
-        const second_value = arguments.getOrNull(1);
-        const millisecond_value = arguments.getOrNull(2);
+        const minute = arguments.get(0);
+        const maybe_second = arguments.getOrNull(1);
+        const maybe_millisecond = arguments.getOrNull(2);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -2019,17 +2042,17 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         const tv = date_object.fields.date_value;
 
-        // 4. Let m be ? ToNumber(min).
-        const minute = (try minute_value.toNumber(agent)).asFloat();
+        // 4. Let minuteNumber be ? ToNumber(minute).
+        const minute_number = (try minute.toNumber(agent)).asFloat();
 
-        // 5. If sec is present, let s be ? ToNumber(sec).
-        var second = if (second_value) |second|
+        // 5. If second is present, let secondNumber be ? ToNumber(second).
+        var second_number = if (maybe_second) |second|
             (try second.toNumber(agent)).asFloat()
         else
             undefined;
 
-        // 6. If ms is present, let milli be ? ToNumber(ms).
-        var millisecond = if (millisecond_value) |millisecond|
+        // 6. If millisecond is present, let millisecondNumber be ? ToNumber(millisecond).
+        var millisecond_number = if (maybe_millisecond) |millisecond|
             (try millisecond.toNumber(agent)).asFloat()
         else
             undefined;
@@ -2037,16 +2060,17 @@ pub const prototype = struct {
         // 7. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 8. If sec is not present, let s be SecFromTime(tv).
-        if (second_value == null) second = @floatFromInt(secFromTime(tv));
+        // 8. If second is not present, let secondNumber be 𝔽(SecondFromTime(tv)).
+        if (maybe_second == null) second_number = @floatFromInt(secondFromTime(tv));
 
-        // 9. If ms is not present, let milli be msFromTime(tv).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
+        // 9. If millisecond is not present, let millisecondNumber be 𝔽(MillisecondFromTime(tv)).
+        if (maybe_millisecond == null) millisecond_number = @floatFromInt(millisecondFromTime(tv));
 
-        // 10. Let date be MakeDate(Day(tv), MakeTime(HourFromTime(tv), m, s, milli)).
+        // 10. Let date be MakeDate(𝔽(Day(tv)), MakeTime(𝔽(HourFromTime(tv)), minuteNumber,
+        //     secondNumber, millisecondNumber)).
         const date = makeDate(
             day(tv),
-            makeTime(@floatFromInt(hourFromTime(tv)), minute, second, millisecond),
+            makeTime(@floatFromInt(hourFromTime(tv)), minute_number, second_number, millisecond_number),
         );
 
         // 11. Let v be TimeClip(date).
@@ -2059,11 +2083,11 @@ pub const prototype = struct {
         return Value.from(date_value);
     }
 
-    /// 21.4.4.33 Date.prototype.setUTCMonth ( month [ , date ] )
+    /// 21.4.4.33 Date.prototype.setUTCMonth ( month [ , day ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcmonth
     fn setUTCMonth(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const month_value = arguments.get(0);
-        const date_value = arguments.getOrNull(1);
+        const month = arguments.get(0);
+        const maybe_day = arguments.getOrNull(1);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -2072,24 +2096,25 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         const tv = date_object.fields.date_value;
 
-        // 4. Let m be ? ToNumber(month).
-        const month = (try month_value.toNumber(agent)).asFloat();
+        // 4. Let monthNumber be ? ToNumber(month).
+        const month_number = (try month.toNumber(agent)).asFloat();
 
-        // 5. If date is present, let dt be ? ToNumber(date).
-        var date = if (date_value) |date|
-            (try date.toNumber(agent)).asFloat()
+        // 5. If day is present, let dayNumber be ? ToNumber(day).
+        var day_number = if (maybe_day) |day_|
+            (try day_.toNumber(agent)).asFloat()
         else
             undefined;
 
         // 6. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 7. If date is not present, let dt be DateFromTime(tv).
-        if (date_value == null) date = @floatFromInt(dateFromTime(tv));
+        // 7. If day is not present, let dayNumber be 𝔽(DateFromTime(tv)).
+        if (maybe_day == null) day_number = @floatFromInt(dateFromTime(tv));
 
-        // 8. Let newDate be MakeDate(MakeDay(YearFromTime(tv), m, dt), TimeWithinDay(tv)).
+        // 8. Let newDate be MakeDate(MakeDay(𝔽(YearFromTime(tv)), monthNumber, dayNumber),
+        //    𝔽(TimeWithinDay(tv))).
         const new_date = makeDate(
-            makeDay(@floatFromInt(yearFromTime(tv)), month, date),
+            makeDay(@floatFromInt(yearFromTime(tv)), month_number, day_number),
             timeWithinDay(tv),
         );
 
@@ -2103,11 +2128,11 @@ pub const prototype = struct {
         return Value.from(date_value_);
     }
 
-    /// 21.4.4.34 Date.prototype.setUTCSeconds ( sec [ , ms ] )
+    /// 21.4.4.34 Date.prototype.setUTCSeconds ( second [ , millisecond ] )
     /// https://tc39.es/ecma262/#sec-date.prototype.setutcseconds
     fn setUTCSeconds(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const second_value = arguments.get(0);
-        const millisecond_value = arguments.getOrNull(1);
+        const second = arguments.get(0);
+        const maybe_millisecond = arguments.getOrNull(1);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -2116,11 +2141,11 @@ pub const prototype = struct {
         // 3. Let tv be dateObj.[[DateValue]].
         const tv = date_object.fields.date_value;
 
-        // 4. Let s be ? ToNumber(sec).
-        const second = (try second_value.toNumber(agent)).asFloat();
+        // 4. Let secondNumber be ? ToNumber(second).
+        const second_number = (try second.toNumber(agent)).asFloat();
 
-        // 5. If ms is present, let milli be ? ToNumber(ms).
-        var millisecond = if (millisecond_value) |millisecond|
+        // 5. If millisecond is present, let millisecondNumber be ? ToNumber(millisecond).
+        var millisecond_number = if (maybe_millisecond) |millisecond|
             (try millisecond.toNumber(agent)).asFloat()
         else
             undefined;
@@ -2128,17 +2153,18 @@ pub const prototype = struct {
         // 6. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 7. If ms is not present, let milli be msFromTime(tv).
-        if (millisecond_value == null) millisecond = @floatFromInt(msFromTime(tv));
+        // 7. If millisecond is not present, let millisecondNumber be 𝔽(MillisecondFromTime(tv)).
+        if (maybe_millisecond == null) millisecond_number = @floatFromInt(millisecondFromTime(tv));
 
-        // 8. Let date be MakeDate(Day(tv), MakeTime(HourFromTime(tv), MinFromTime(tv), s, milli)).
+        // 8. Let date be MakeDate(𝔽(Day(tv)), MakeTime(𝔽(HourFromTime(tv)), 𝔽(MinuteFromTime(tv)),
+        //    secondNumber, millisecondNumber)).
         const date = makeDate(
             day(tv),
             makeTime(
                 @floatFromInt(hourFromTime(tv)),
-                @floatFromInt(minFromTime(tv)),
-                second,
-                millisecond,
+                @floatFromInt(minuteFromTime(tv)),
+                second_number,
+                millisecond_number,
             ),
         );
 
@@ -2215,9 +2241,9 @@ pub const prototype = struct {
                 monthFromTime(tv) + 1,
                 dateFromTime(tv),
                 hourFromTime(tv),
-                minFromTime(tv),
-                secFromTime(tv),
-                msFromTime(tv),
+                minuteFromTime(tv),
+                secondFromTime(tv),
+                millisecondFromTime(tv),
             },
         )));
     }
@@ -2480,22 +2506,22 @@ pub const prototype = struct {
         // 4. If tv is NaN, return "Invalid Date".
         if (std.math.isNan(tv)) return Value.from("Invalid Date");
 
-        // 5. Let weekday be the Name of the entry in Table 61 with the Number WeekDay(tv).
+        // 5. Let weekday be the Name of the entry in Table 61 whose WeekDay Index = WeekDay(tv).
         const weekday = week_day_names[weekDay(tv)];
 
-        // 6. Let month be the Name of the entry in Table 62 with the Number MonthFromTime(tv).
+        // 6. Let month be the Name of the entry in Table 62 whose Month Index = MonthFromTime(tv).
         const month = month_names[monthFromTime(tv)];
 
-        // 7. Let day be ToZeroPaddedDecimalString(ℝ(DateFromTime(tv)), 2).
+        // 7. Let day be ToZeroPaddedDecimalString(DateFromTime(tv), 2).
         const day_ = dateFromTime(tv);
 
         // 8. Let yv be YearFromTime(tv).
         const year = yearFromTime(tv);
 
-        // 9. If yv is +0𝔽 or yv > +0𝔽, let yearSign be the empty String; else let yearSign be "-".
+        // 9. If yv ≥ 0, let yearSign be the empty String; else let yearSign be "-".
         const year_sign = if (year >= 0) "" else "-";
 
-        // 10. Let paddedYear be ToZeroPaddedDecimalString(abs(ℝ(yv)), 4).
+        // 10. Let paddedYear be ToZeroPaddedDecimalString(abs(yv), 4).
         var buf: [6]u8 = undefined;
         const padded_year = toZeroPaddedDecimalString(&buf, @abs(year), 4);
 
@@ -2579,14 +2605,14 @@ pub const prototype = struct {
         // 4. If tv is NaN, return NaN.
         if (std.math.isNan(tv)) return .nan;
 
-        // 5. Return YearFromTime(LocalTime(tv)) - 1900𝔽.
+        // 5. Return 𝔽(YearFromTime(LocalTime(tv))) - 1900𝔽.
         return Value.from(yearFromTime(localTime(agent.platform, tv)) - 1900);
     }
 
     /// B.2.3.2 Date.prototype.setYear ( year )
     /// https://tc39.es/ecma262/#sec-date.prototype.setyear
     fn setYear(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const year_value = arguments.get(0);
+        const year = arguments.get(0);
 
         // 1. Let dateObj be the this value.
         // 2. Perform ? RequireInternalSlot(dateObj, [[DateValue]]).
@@ -2595,32 +2621,29 @@ pub const prototype = struct {
         // 3. Let time be dateObj.[[DateValue]].
         var time = date_object.fields.date_value;
 
-        // 4. Let year be ? ToNumber(year).
-        const year = try year_value.toNumber(agent);
-
-        // 5. If time is NaN, set time to +0𝔽; else set time to LocalTime(time).
+        // 4. If time is NaN, set time to +0𝔽; else set time to LocalTime(time).
         time = if (std.math.isNan(time)) 0 else localTime(agent.platform, time);
 
-        // 6. Let fullYear be MakeFullYear(year).
-        const full_year = makeFullYear(year.asFloat());
+        // 5. Let fullYear be MakeFullYear(? ToNumber(year)).
+        const full_year = makeFullYear((try year.toNumber(agent)).asFloat());
 
-        // 7. Let day be MakeDay(fullYear, MonthFromTime(time), DateFromTime(time)).
+        // 6. Let day be MakeDay(fullYear, 𝔽(MonthFromTime(time)), 𝔽(DateFromTime(time))).
         const day_ = makeDay(
             full_year,
             @floatFromInt(monthFromTime(time)),
             @floatFromInt(dateFromTime(time)),
         );
 
-        // 8. Let date be MakeDate(day, TimeWithinDay(time)).
+        // 7. Let date be MakeDate(day, 𝔽(TimeWithinDay(time))).
         const date = makeDate(day_, timeWithinDay(time));
 
-        // 9. Let utcTimestamp be TimeClip(UTC(date)).
+        // 8. Let utcTimestamp be TimeClip(UTC(date)).
         const utc_timestamp = timeClip(utc(agent.platform, date));
 
-        // 10. Set dateObj.[[DateValue]] to utcTimestamp.
+        // 9. Set dateObj.[[DateValue]] to utcTimestamp.
         date_object.fields.date_value = utc_timestamp;
 
-        // 11. Return utcTimestamp.
+        // 10. Return utcTimestamp.
         return Value.from(utc_timestamp);
     }
 };

@@ -1482,14 +1482,14 @@ pub const prototype = struct {
         const search_element = arguments.get(0);
         const skipped_elements = arguments.get(1);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = obj,
@@ -1554,7 +1554,7 @@ pub const prototype = struct {
         // 8. Let skipped be +0𝔽.
         var skipped: f64 = 0;
 
-        // 9. Set iterated to ? GetIteratorDirect(O).
+        // 9. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
         // 10. Repeat,

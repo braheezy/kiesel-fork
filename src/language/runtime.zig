@@ -68,9 +68,9 @@ pub fn getTemplateObject(
 
     const template = cooked;
 
-    // 4. Let rawStrings be the TemplateStrings of templateLiteral with argument true.
+    // 4. Let rawStrings be the TemplateStrings of templateLiteral with argument raw.
     // 5. Assert: rawStrings is a List of Strings.
-    // 6. Let cookedStrings be the TemplateStrings of templateLiteral with argument false.
+    // 6. Let cookedStrings be the TemplateStrings of templateLiteral with argument cooked.
     // 7. Let count be the number of elements in the List cookedStrings.
     // 8. Assert: count ≤ 2**32 - 1.
     // 9. Let template be ! ArrayCreate(count).

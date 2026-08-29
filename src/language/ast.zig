@@ -554,25 +554,20 @@ pub const TemplateLiteral = struct {
             return String.fromUtf8Alloc(allocator, cloned);
         }
 
-        /// 13.2.8.3 Static Semantics: TemplateString ( templateToken, raw )
+        /// 13.2.8.3 Static Semantics: TemplateString ( templateToken, escapes )
         /// https://tc39.es/ecma262/#sec-templatestring
         pub fn templateString(
             self: Span,
             allocator: std.mem.Allocator,
-            raw: bool,
+            escapes: enum { raw, cooked },
         ) std.mem.Allocator.Error!*const String {
-            // 1. If raw is true, then
-            const string = if (raw) blk: {
-                // a. Let string be the TRV of templateToken.
-                break :blk try self.templateRawValue(allocator);
-            } else blk: {
-                // 2. Else,
-                // a. Let string be the TV of templateToken.
-                break :blk try self.templateValue(allocator);
-            };
+            return switch (escapes) {
+                // 1. If escapes is raw, return the TRV of templateToken.
+                .raw => try self.templateRawValue(allocator),
 
-            // 3. Return string.
-            return string;
+                // 2. Return the TV of templateToken.
+                .cooked => try self.templateValue(allocator),
+            };
         }
     };
 

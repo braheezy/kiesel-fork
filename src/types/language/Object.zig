@@ -1104,13 +1104,17 @@ pub fn hasOwnProperty(obj: *Object, agent: *Agent, property_key: PropertyKey) Ag
     return property_desc != null;
 }
 
-// Like `Value.call()` but eliding the callable check.
+/// 7.3.13 Call ( func, thisValue [ , argList ] )
+/// https://tc39.es/ecma262/#sec-call
 pub fn call(
     func: *Object,
     agent: *Agent,
     this_value: Value,
     arg_list: []const Value,
 ) Agent.Error!Value {
+    // 1. If argList is not present, set argList to a new empty List.
+    // 2. If IsCallable(func) is false, throw a TypeError exception.
+    // 3. Return ? func.[[Call]](thisValue, argList).
     return func.internalMethods().call.?(agent, func, this_value, Arguments.from(arg_list));
 }
 
@@ -1240,14 +1244,20 @@ pub fn lengthOfArrayLike(obj: *Object, agent: *Agent) Agent.Error!u53 {
     return (try obj.get(agent, PropertyKey.from("length"))).toLength(agent);
 }
 
-// Like `Value.invoke()` but eliding the object check.
+/// 7.3.20 Invoke ( value, propertyKey [ , argList ] )
+/// https://tc39.es/ecma262/#sec-invoke
 pub fn invoke(
     obj: *Object,
     agent: *Agent,
     property_key: PropertyKey,
     arg_list: []const Value,
 ) Agent.Error!Value {
+    // 1. If argList is not present, set argList to a new empty List.
+
+    // 2. Let func be ? GetV(value, propertyKey).
     const func = try obj.get(agent, property_key);
+
+    // 3. Return ? Call(func, value, argList).
     return func.call(agent, Value.from(obj), arg_list);
 }
 

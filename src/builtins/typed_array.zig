@@ -864,37 +864,34 @@ pub const constructor = struct {
             );
 
             // d. Let k be 0.
-            var k: u53 = 0;
-
             // e. Repeat, while k < length,
-            while (k < @intFromEnum(length)) : (k += 1) {
+            for (values, 0..) |k_value, k| {
                 // i. Let propertyKey be ! ToString(𝔽(k)).
-                const property_key = PropertyKey.from(k);
+                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
 
-                // ii. Let kValue be the first element of values.
-                const k_value = values[@intCast(k)];
+                // ii. Let kValue be values[k].
 
-                // iii. Remove the first element from values.
-                // NOTE: `values` is a slice, so we're not doing this.
-
-                // iv. If mapping is true, then
+                // iii. If mapping is true, then
                 const mapped_value = if (maybe_mapper) |mapper| blk: {
                     // 1. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
-                    break :blk try mapper.call(agent, this_arg, &.{ k_value, Value.from(k) });
+                    break :blk try mapper.call(
+                        agent,
+                        this_arg,
+                        &.{ k_value, Value.from(@as(u53, @intCast(k))) },
+                    );
                 } else blk: {
-                    // v. Else,
+                    // iv. Else,
                     // 1. Let mappedValue be kValue.
                     break :blk k_value;
                 };
 
-                // vi. Perform ? Set(targetObj, propertyKey, mappedValue, true).
+                // v. Perform ? Set(targetObj, propertyKey, mappedValue, true).
                 try typed_array.object.set(agent, property_key, mapped_value, .throw);
 
-                // vii. Set k to k + 1.
+                // vi. Set k to k + 1.
             }
 
-            // f. Assert: values is now an empty List.
-            // g. Return targetObj.
+            // f. Return targetObj.
             return Value.from(&typed_array.object);
         }
 
@@ -3612,18 +3609,15 @@ fn initializeTypedArrayFromList(
         // a. Let propertyKey be ! ToString(𝔽(k)).
         const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
 
-        // b. Let kValue be the first element of values.
-        // c. Remove the first element from values.
-        // NOTE: The caller retains ownership over `values`, so we're not doing this.
+        // b. Let kValue be values[k].
 
-        // d. Perform ? Set(obj, propertyKey, kValue, true).
+        // c. Perform ? Set(obj, propertyKey, kValue, true).
         try typed_array.object.set(agent, property_key, k_value, .throw);
 
-        // e. Set k to k + 1.
+        // d. Set k to k + 1.
     }
 
-    // 5. Assert: values is now an empty List.
-    // 6. Return unused.
+    // 5. Return unused.
 }
 
 /// 23.2.5.1.5 InitializeTypedArrayFromArrayLike ( obj, arrayLike )

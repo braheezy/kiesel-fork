@@ -194,16 +194,13 @@ pub const prototype = struct {
         const x = try thisBigIntValue(agent, this_value);
 
         // 2. If radix is undefined, let radixMV be 10.
-        // 3. Else, let radixMV be ? ToIntegerOrInfinity(radix).
-        const radix_mv = if (radix.isUndefined()) 10 else try radix.toIntegerOrInfinity(agent);
+        // 3. Else, let radixMV be ? SnapToInteger(radix, truncate, 2, 36).
+        const radix_mv = if (radix.isUndefined())
+            10
+        else
+            try radix.snapToInteger(agent, .truncate, 2, 36);
 
-        // 4. If radixMV is not in the inclusive interval from 2 to 36, throw a RangeError
-        //    exception.
-        if (radix_mv < 2 or radix_mv > 36) {
-            return agent.throwException(.range_error, "Radix must be in range 2-36", .{});
-        }
-
-        // 5. Return BigInt::toString(x, radixMV).
+        // 4. Return BigInt::toString(x, radixMV).
         return Value.from(try x.toString(agent, @intFromFloat(radix_mv)));
     }
 
