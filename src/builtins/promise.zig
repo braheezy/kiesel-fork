@@ -2238,28 +2238,28 @@ pub const constructor = struct {
             return agent.throwException(.type_error, "{f} is not an Object", .{ctor});
         }
 
-        // 3. Let promiseCapability be ? NewPromiseCapability(ctor).
-        const promise_capability = try newPromiseCapability(agent, ctor);
-
-        // 4. Let status be Completion(Call(callback, undefined, args)).
-        const status = callback.call(agent, .undefined, args);
-
-        // 5. If status is an abrupt completion, then
-        //     a. Perform ? Call(promiseCapability.[[Reject]], undefined, « status.[[Value]] »).
-        // 6. Else,
-        //     a. Perform ? Call(promiseCapability.[[Resolve]], undefined, « status.[[Value]] »).
-        if (status) |value| {
-            _ = try promise_capability.resolve.call(agent, .undefined, &.{value});
-        } else |err| switch (err) {
+        // 3. Let status be Completion(Call(callback, undefined, args)).
+        const status = callback.call(agent, .undefined, args) catch |err| switch (err) {
             error.OutOfMemory => |e| return e,
+
+            // 4. If status is an abrupt completion, then
             error.ExceptionThrown => {
                 const exception = agent.clearException();
-                _ = try promise_capability.reject.call(agent, .undefined, &.{exception.value});
-            },
-        }
 
-        // 7. Return promiseCapability.[[Promise]].
-        return Value.from(promise_capability.promise);
+                // a. Let promiseCapability be ? NewPromiseCapability(ctor).
+                const promise_capability = try newPromiseCapability(agent, ctor);
+
+                // b. Perform ? Call(promiseCapability.[[Reject]], undefined, « status.[[Value]] »).
+                _ = try promise_capability.reject.call(agent, .undefined, &.{exception.value});
+
+                // c. Return promiseCapability.[[Promise]].
+                return Value.from(promise_capability.promise);
+            },
+        };
+
+        // 5. Else,
+        // a. Return ? PromiseResolve(ctor, ! status).
+        return Value.from(try promiseResolve(agent, ctor.asObject(), status));
     }
 
     /// 27.5.4.9 Promise.withResolvers ( )
