@@ -110,8 +110,8 @@ pub const GetProperty = struct {
                     @branchHint(.unlikely);
                     return .undefined;
                 }
-                std.debug.assert(getter_value.isObject());
-                return try getter_value.callAssumeCallable(agent, base_value, &.{});
+                const getter = getter_value.asObject();
+                return try getter.call(agent, base_value, &.{});
             },
         }
     }
@@ -206,8 +206,8 @@ pub const GetPropertyComputed = struct {
                     @branchHint(.unlikely);
                     return .undefined;
                 }
-                std.debug.assert(getter_value.isObject());
-                return try getter_value.callAssumeCallable(agent, base_value, &.{});
+                const getter = getter_value.asObject();
+                return try getter.call(agent, base_value, &.{});
             },
         }
     }
@@ -301,8 +301,8 @@ pub const SetProperty = struct {
                     @branchHint(.unlikely);
                     return false;
                 }
-                std.debug.assert(setter_value.isObject());
-                _ = try setter_value.callAssumeCallable(agent, base_value, &.{value});
+                const setter = setter_value.asObject();
+                _ = try setter.call(agent, base_value, &.{value});
                 return true;
             },
         }
@@ -390,8 +390,8 @@ pub const SetPropertyComputed = struct {
                     @branchHint(.unlikely);
                     return false;
                 }
-                std.debug.assert(setter_value.isObject());
-                _ = try setter_value.callAssumeCallable(agent, base_value, &.{value});
+                const setter = setter_value.asObject();
+                _ = try setter.call(agent, base_value, &.{value});
                 return true;
             },
         }

@@ -6,6 +6,7 @@ const std = @import("std");
 const icu4zig = @import("icu4zig");
 
 const abstract_operations = @import("abstract_operations.zig");
+const build_options = @import("build-options");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -28,13 +29,53 @@ const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const resolveOptions = abstract_operations.resolveOptions;
 
+/// 16.1.1.1 ChainNumberFormat ( numberFormat, newTarget, this )
+/// https://tc39.es/ecma402/#sec-chainnumberformat
+fn chainNumberFormat(
+    agent: *Agent,
+    number_format: *NumberFormat,
+    new_target: ?*Object,
+    this: ?Value,
+) Agent.Error!Value {
+    const realm = agent.currentRealm();
+
+    // 1. If newTarget is undefined and ? OrdinaryHasInstance(%Intl.NumberFormat%, this) is true,
+    //    then
+    if (new_target == null and
+        try Value.from(try realm.intrinsic(.intl_number_format)).ordinaryHasInstance(
+            agent,
+            this.?,
+        ))
+    {
+        // a. Perform ? DefinePropertyOrThrow(this, %Intl%.[[FallbackSymbol]], PropertyDescriptor {
+        //    [[Value]]: numberFormat, [[Writable]]: false, [[Enumerable]]: false,
+        //    [[Configurable]]: false }).
+        try this.?.asObject().definePropertyOrThrow(
+            agent,
+            PropertyKey.from(try realm.intrinsic(.intl_fallback_symbol)),
+            .{
+                .value = Value.from(&number_format.object),
+                .writable = false,
+                .enumerable = false,
+                .configurable = false,
+            },
+        );
+
+        // b. Return this.
+        return this.?;
+    }
+
+    // 2. Return numberFormat.
+    return Value.from(&number_format.object);
+}
+
 /// 16.2 Properties of the Intl.NumberFormat Constructor
 /// https://tc39.es/ecma402/#sec-properties-of-intl-numberformat-constructor
 pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         const builtin_function = try createBuiltinFunction(
             agent,
-            .{ .constructor = impl },
+            .{ .constructor_with_this = impl },
             0,
             "NumberFormat",
             .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
@@ -55,7 +96,12 @@ pub const constructor = struct {
 
     /// 16.1.1 Intl.NumberFormat ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.numberformat
-    fn impl(agent: *Agent, arguments: Arguments, maybe_new_target: ?*Object) Agent.Error!Value {
+    fn impl(
+        agent: *Agent,
+        this_value: ?Value,
+        arguments: Arguments,
+        maybe_new_target: ?*Object,
+    ) Agent.Error!Value {
         const locales = arguments.get(0);
         const options_value = arguments.get(1);
 
@@ -312,8 +358,11 @@ pub const constructor = struct {
 
         // 26. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //     then
-        //     a. Let this be the this value.
-        //     b. Return ? ChainNumberFormat(numberFormat, NewTarget, this).
+        if (build_options.enable_annex_b) {
+            // a. Let this be the this value.
+            // b. Return ? ChainNumberFormat(numberFormat, NewTarget, this).
+            return chainNumberFormat(agent, number_format, maybe_new_target, this_value);
+        }
 
         // 27. Return numberFormat.
         return Value.from(&number_format.object);
@@ -840,8 +889,13 @@ pub const prototype = struct {
         // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
         //     a. Set nf to ? UnwrapNumberFormat(nf).
+        const number_format_value = if (build_options.enable_annex_b)
+            try unwrapNumberFormat(agent, this_value)
+        else
+            this_value;
+
         // 3. Perform ? RequireInternalSlot(nf, [[InitializedNumberFormat]]).
-        const number_format = try this_value.requireInternalSlot(agent, NumberFormat);
+        const number_format = try number_format_value.requireInternalSlot(agent, NumberFormat);
 
         // 4. Let options be OrdinaryObjectCreate(%Object.prototype%).
         const options = try ordinaryObjectCreate(
@@ -1004,8 +1058,13 @@ pub const prototype = struct {
         // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
         //     a. Set nf to ? UnwrapNumberFormat(nf).
+        const number_format_value = if (build_options.enable_annex_b)
+            try unwrapNumberFormat(agent, this_value)
+        else
+            this_value;
+
         // 3. Perform ? RequireInternalSlot(nf, [[InitializedNumberFormat]]).
-        const number_format = try this_value.requireInternalSlot(agent, NumberFormat);
+        const number_format = try number_format_value.requireInternalSlot(agent, NumberFormat);
 
         // 4. If nf.[[BoundFormat]] is undefined, then
         if (number_format.fields.bound_format == null) {
@@ -1369,6 +1428,36 @@ fn formatNumericImpl(
     );
     defer decimal_formatter.deinit();
     return decimal_formatter.format(allocator, decimal);
+}
+
+/// 16.5.10 UnwrapNumberFormat ( nf )
+/// https://tc39.es/ecma402/#sec-unwrapnumberformat
+fn unwrapNumberFormat(agent: *Agent, number_format_value: Value) Agent.Error!Value {
+    const realm = agent.currentRealm();
+
+    // 1. If nf is not an Object, throw a TypeError exception.
+    if (!number_format_value.isObject()) {
+        return agent.throwException(.type_error, "Intl receiver must be an object", .{});
+    }
+    const number_format = number_format_value.asObject();
+
+    // 2. If nf does not have an [[InitializedNumberFormat]] internal slot and
+    //    ? OrdinaryHasInstance(%Intl.NumberFormat%, nf) is true, then
+    if (!number_format.is(NumberFormat) and
+        try Value.from(try realm.intrinsic(.intl_number_format)).ordinaryHasInstance(
+            agent,
+            number_format_value,
+        ))
+    {
+        // a. Return ? Get(nf, %Intl%.[[FallbackSymbol]]).
+        return number_format.get(
+            agent,
+            PropertyKey.from(try realm.intrinsic(.intl_fallback_symbol)),
+        );
+    }
+
+    // 3. Return nf.
+    return number_format_value;
 }
 
 /// https://tc39.es/ecma402/#intl-mathematical-value

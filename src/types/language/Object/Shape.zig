@@ -53,7 +53,7 @@ pub const Transition = union(enum) {
         };
     }
 
-    pub fn HashMapUnmanaged(comptime V: type) type {
+    pub fn HashMap(comptime V: type) type {
         return std.HashMapUnmanaged(Transition, V, struct {
             pub fn hash(_: @This(), transition: Transition) u64 {
                 return transition.hash();
@@ -128,8 +128,8 @@ const TransitionCount = enum(u8) {
 
 transition_count: TransitionCount,
 next_offset: Property.Offset,
-transitions: Transition.HashMapUnmanaged(*Shape),
-properties: PropertyKey.ArrayHashMapUnmanaged(Property),
+transitions: Transition.HashMap(*Shape),
+properties: PropertyKey.ArrayHashMap(Property),
 internal_methods: *const InternalMethods,
 
 /// [[Prototype]]

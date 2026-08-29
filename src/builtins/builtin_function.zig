@@ -30,9 +30,11 @@ const setFunctionName = builtins.setFunctionName;
 pub const Behaviour = union(enum) {
     pub const Function = fn (*Agent, Value, Arguments) Agent.Error!Value;
     pub const Constructor = fn (*Agent, Arguments, ?*Object) Agent.Error!Value;
+    pub const ConstructorWithThis = fn (*Agent, ?Value, Arguments, ?*Object) Agent.Error!Value;
 
     function: *const Function,
     constructor: *const Constructor,
+    constructor_with_this: *const ConstructorWithThis,
 };
 
 pub const Flags = packed struct(u2) {
@@ -195,6 +197,7 @@ pub fn builtinCallOrConstruct(
                 const result = switch (builtin_function_.fields.behaviour) {
                     .function => |function| function(agent_, this_arg_.?, arg_list_),
                     .constructor => |constructor| constructor(agent_, arg_list_, new_target_),
+                    .constructor_with_this => |constructor| constructor(agent_, this_arg_, arg_list_, new_target_),
                 };
 
                 // iii. Return Completion(result).
@@ -227,6 +230,7 @@ pub fn builtinCallOrConstruct(
     const result = switch (builtin_function.fields.behaviour) {
         .function => |function| function(agent, this_arg.?, arg_list),
         .constructor => |constructor| constructor(agent, arg_list, new_target),
+        .constructor_with_this => |constructor| constructor(agent, this_arg, arg_list, new_target),
     };
 
     // 13. Remove calleeContext from the execution context stack and restore callerContext as the
@@ -270,10 +274,10 @@ pub fn createBuiltinFunction(
     //    described by behaviour using the provided arguments as the values of the corresponding
     //    parameters specified by behaviour. The new function object has internal slots whose names
     //    are the elements of internalSlotsList, and an [[InitialName]] internal slot.
-    const function = try BuiltinFunction.create(agent, .{
+    const func = try BuiltinFunction.create(agent, .{
         .internal_methods = switch (behaviour) {
             .function => internal_methods,
-            .constructor => internal_methods_constructor,
+            .constructor, .constructor_with_this => internal_methods_constructor,
         },
 
         // 7. Set func.[[Async]] to async.
@@ -300,7 +304,7 @@ pub fn createBuiltinFunction(
     });
 
     // 12. Perform SetFunctionLength(func, length).
-    try setFunctionLength(agent, &function.object, @floatFromInt(length));
+    try setFunctionLength(agent, &func.object, @floatFromInt(length));
 
     // 13. If prefix is not present, then
     //     a. Perform SetFunctionName(func, name).
@@ -311,9 +315,9 @@ pub fn createBuiltinFunction(
     //       ensure it only gets called once. It's the caller's responsibility to install the
     //       function name after the fact.
     if (maybe_name) |name| {
-        try setFunctionName(agent, &function.object, PropertyKey.from(name), args.prefix);
+        try setFunctionName(agent, &func.object, PropertyKey.from(name), args.prefix);
     }
 
     // 15. Return func.
-    return function;
+    return func;
 }

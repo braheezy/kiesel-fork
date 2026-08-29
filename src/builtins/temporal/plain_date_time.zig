@@ -113,19 +113,24 @@ pub const constructor = struct {
         // 5. If hour is undefined, set hour to 0; else set hour to ? ToIntegerWithTruncation(hour).
         const hour = if (hour_value.isUndefined()) 0 else try hour_value.toIntegerWithTruncation(agent);
 
-        // 6. If minute is undefined, set minute to 0; else set minute to ? ToIntegerWithTruncation(minute).
+        // 6. If minute is undefined, set minute to 0; else set minute to ? ToIntegerWithTruncation(
+        //    minute).
         const minute = if (minute_value.isUndefined()) 0 else try minute_value.toIntegerWithTruncation(agent);
 
-        // 7. If second is undefined, set second to 0; else set second to ? ToIntegerWithTruncation(second).
+        // 7. If second is undefined, set second to 0; else set second to ? ToIntegerWithTruncation(
+        //    second).
         const second = if (second_value.isUndefined()) 0 else try second_value.toIntegerWithTruncation(agent);
 
-        // 8. If millisecond is undefined, set millisecond to 0; else set millisecond to ? ToIntegerWithTruncation(millisecond).
+        // 8. If millisecond is undefined, set millisecond to 0; else set millisecond to
+        //    ? ToIntegerWithTruncation(millisecond).
         const millisecond = if (millisecond_value.isUndefined()) 0 else try millisecond_value.toIntegerWithTruncation(agent);
 
-        // 9. If microsecond is undefined, set microsecond to 0; else set microsecond to ? ToIntegerWithTruncation(microsecond).
+        // 9. If microsecond is undefined, set microsecond to 0; else set microsecond to
+        //    ? ToIntegerWithTruncation(microsecond).
         const microsecond = if (microsecond_value.isUndefined()) 0 else try microsecond_value.toIntegerWithTruncation(agent);
 
-        // 10. If nanosecond is undefined, set nanosecond to 0; else set nanosecond to ? ToIntegerWithTruncation(nanosecond).
+        // 10. If nanosecond is undefined, set nanosecond to 0; else set nanosecond to
+        //     ? ToIntegerWithTruncation(nanosecond).
         const nanosecond = if (nanosecond_value.isUndefined()) 0 else try nanosecond_value.toIntegerWithTruncation(agent);
 
         // 11. If calendar is undefined, set calendar to "iso8601".
@@ -152,7 +157,8 @@ pub const constructor = struct {
             return agent.throwException(.range_error, "Invalid time", .{});
         }
 
-        // 17. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
+        // 17. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond,
+        //     nanosecond).
         // 18. Let isoDateTime be CombineISODateAndTimeRecord(isoDate, time).
         // 19. Return ? CreateTemporalDateTime(isoDateTime, calendar, NewTarget).
         const temporal_rs_plain_date_time = try builtins.temporal.extractResult(
@@ -413,7 +419,8 @@ pub const prototype = struct {
         // 3. Set other to ? ToTemporalDateTime(other).
         const other = try toTemporalPlainDateTime(agent, other_value, null);
 
-        // 4. If CompareISODateTime(plainDateTime.[[ISODateTime]], other.[[ISODateTime]]) ≠ 0, return false.
+        // 4. If CompareISODateTime(plainDateTime.[[ISODateTime]], other.[[ISODateTime]]) ≠ 0,
+        //    return false.
         // 5. Return CalendarEquals(plainDateTime.[[Calendar]], other.[[Calendar]]).
         return Value.from(
             temporal_rs.c.temporal_rs_PlainDateTime_equals(
@@ -594,9 +601,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. If roundTo is undefined, then
+        // 3. If roundTo is undefined, throw a TypeError exception.
         if (round_to.isUndefined()) {
-            // a. Throw a TypeError exception.
             return agent.throwException(.type_error, "Argument must not be undefined", .{});
         }
 
@@ -732,7 +738,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. Return ? AddDurationToDateTime(subtract, plainDateTime, temporalDurationLike, options).
+        // 3. Return ? AddDurationToDateTime(subtract, plainDateTime, temporalDurationLike,
+        //    options).
         const new_plain_time = try addDurationToDateTime(
             agent,
             .subtract,
@@ -921,7 +928,8 @@ pub const prototype = struct {
         // 5. Let disambiguation be ? GetTemporalDisambiguationOption(resolvedOptions).
         const disambiguation = try getTemporalDisambiguationOption(agent, options);
 
-        // 6. Let epochNs be ? GetEpochNanosecondsFor(timeZone, plainDateTime.[[ISODateTime]], disambiguation).
+        // 6. Let epochNs be ? GetEpochNanosecondsFor(timeZone, plainDateTime.[[ISODateTime]],
+        //    disambiguation).
         // 7. Return ! CreateTemporalZonedDateTime(epochNs, timeZone, plainDateTime.[[Calendar]]).
         const temporal_rs_zoned_date_time = try builtins.temporal.extractResult(
             agent,
@@ -1002,7 +1010,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainDateTime, [[InitializedTemporalDateTime]]).
         const plain_date_time = try this_value.requireInternalSlot(agent, PlainDateTime);
 
-        // 3. If ? IsPartialTemporalObject(temporalDateTimeLike) is false, throw a TypeError exception.
+        // 3. If ? IsPartialTemporalObject(temporalDateTimeLike) is false, throw a TypeError
+        //    exception.
         if (!try isPartialTemporalObject(agent, temporal_date_time_like)) {
             return agent.throwException(
                 .type_error,
@@ -1016,15 +1025,16 @@ pub const prototype = struct {
             temporal_rs.c.temporal_rs_PlainDateTime_calendar(plain_date_time.fields.inner),
         );
 
-        // 5. Let fields be ISODateToFields(calendar, plainDateTime.[[ISODateTime]].[[ISODate]], date).
+        // 5. Let fields be ISODateToFields(calendar, plainDateTime.[[ISODateTime]].[[ISODate]],
+        //    date).
         // 6. Set fields.[[Hour]] to plainDateTime.[[ISODateTime]].[[Time]].[[Hour]].
         // 7. Set fields.[[Minute]] to plainDateTime.[[ISODateTime]].[[Time]].[[Minute]].
         // 8. Set fields.[[Second]] to plainDateTime.[[ISODateTime]].[[Time]].[[Second]].
         // 9. Set fields.[[Millisecond]] to plainDateTime.[[ISODateTime]].[[Time]].[[Millisecond]].
         // 10. Set fields.[[Microsecond]] to plainDateTime.[[ISODateTime]].[[Time]].[[Microsecond]].
         // 11. Set fields.[[Nanosecond]] to plainDateTime.[[ISODateTime]].[[Time]].[[Nanosecond]].
-        // 12. Let partialDateTime be ? PrepareCalendarFields(calendar, temporalDateTimeLike, «
-        //     year, month, month-code, day », « hour, minute, second, millisecond, microsecond,
+        // 12. Let partialDateTime be ? PrepareCalendarFields(calendar, temporalDateTimeLike,
+        //     « year, month, month-code, day », « hour, minute, second, millisecond, microsecond,
         //     nanosecond », partial).
         // 13. Set fields to CalendarMergeFields(calendar, fields, partialDateTime).
         const fields = try prepareCalendarFields(
@@ -1113,7 +1123,8 @@ pub const prototype = struct {
         // 3. Let time be ? ToTimeRecordOrMidnight(plainTimeLike).
         const maybe_time = try toTimeRecordOrMidnight(agent, plain_time_like);
 
-        // 4. Let isoDateTime be CombineISODateAndTimeRecord(plainDateTime.[[ISODateTime]].[[ISODate]], time).
+        // 4. Let isoDateTime be CombineISODateAndTimeRecord(
+        //    plainDateTime.[[ISODateTime]].[[ISODate]], time).
         // 5. Return ? CreateTemporalDateTime(isoDateTime, plainDateTime.[[Calendar]]).
         const temporal_rs_plain_date_time = try builtins.temporal.extractResult(
             agent,
@@ -1190,14 +1201,14 @@ pub fn createTemporalDateTime(
 ) Agent.Error!*PlainDateTime {
     const realm = agent.currentRealm();
 
-    // 1. If ISODateTimeWithinLimits(isoDateTime) is false, then
-    //     a. Throw a RangeError exception.
+    // 1. If ISODateTimeWithinLimits(isoDateTime) is false, throw a RangeError exception.
 
     // 2. If newTarget is not present, set newTarget to %Temporal.PlainDateTime%.
     const new_target = maybe_new_target orelse try realm.intrinsic(.temporal_plain_date_time);
 
-    // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget, "%Temporal.PlainDateTime.prototype%",
-    //    « [[InitializedTemporalDateTime]], [[ISODateTime]], [[Calendar]] »).
+    // 3. Let object be ? OrdinaryCreateFromConstructor(newTarget,
+    //    "%Temporal.PlainDateTime.prototype%", « [[InitializedTemporalDateTime]], [[ISODateTime]],
+    //    [[Calendar]] »).
     // 4. Set object.[[ISODateTime]] to isoDateTime.
     // 5. Set object.[[Calendar]] to calendar.
     // 6. Return object.
@@ -1236,7 +1247,8 @@ pub fn toTemporalPlainDateTime(
 
         // b. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
         if (item.asObject().cast(builtins.temporal.ZonedDateTime)) |zoned_date_time| {
-            // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]], item.[[EpochNanoseconds]]).
+            // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]],
+            //    item.[[EpochNanoseconds]]).
 
             // ii. Let resolvedOptions be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
@@ -1258,7 +1270,8 @@ pub fn toTemporalPlainDateTime(
             // ii. Perform ? GetTemporalOverflowOption(resolvedOptions).
             _ = try getTemporalOverflowOption(agent, options);
 
-            // iii. Let isoDateTime be CombineISODateAndTimeRecord(item.[[ISODate]], MidnightTimeRecord()).
+            // iii. Let isoDateTime be CombineISODateAndTimeRecord(item.[[ISODate]],
+            //      MidnightTimeRecord()).
             // iv. Return ? CreateTemporalDateTime(isoDateTime, item.[[Calendar]]).
             const midnight = try builtins.temporal.extractResult(
                 agent,
@@ -1277,8 +1290,8 @@ pub fn toTemporalPlainDateTime(
         // d. Let calendar be ? GetTemporalCalendarIdentifierWithISODefault(item).
         const calendar = try getTemporalCalendarIdentifierWithISODefault(agent, item.asObject());
 
-        // e. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code, day »,
-        //    « hour, minute, second, millisecond, microsecond, nanosecond », «»).
+        // e. Let fields be ? PrepareCalendarFields(calendar, item, « year, month, month-code,
+        //    day », « hour, minute, second, millisecond, microsecond, nanosecond », «»).
         const fields = try prepareCalendarFields(
             agent,
             calendar,
@@ -1328,8 +1341,8 @@ pub fn toTemporalPlainDateTime(
         }
 
         // 4. Let result be ? ParseISODateTime(item, « TemporalDateTimeString[~Zoned] »).
-        // 5. If result.[[Time]] is start-of-day, let time be MidnightTimeRecord(); else let time
-        //    be result.[[Time]].
+        // 5. If result.[[Time]] is start-of-day, let time be MidnightTimeRecord(); else let time be
+        //    result.[[Time]].
         // 6. Let calendar be result.[[Calendar]].
         // 7. If calendar is empty, set calendar to "iso8601".
         // 8. Set calendar to ? CanonicalizeCalendar(calendar).
@@ -1355,7 +1368,8 @@ pub fn toTemporalPlainDateTime(
         // 10. Perform ? GetTemporalOverflowOption(resolvedOptions).
         _ = try getTemporalOverflowOption(agent, options);
 
-        // 11. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]], result.[[Day]]).
+        // 11. Let isoDate be CreateISODateRecord(result.[[Year]], result.[[Month]],
+        //     result.[[Day]]).
         // 12. Let isoDateTime be CombineISODateAndTimeRecord(isoDate, time).
         // 13. Return ? CreateTemporalDateTime(isoDateTime, calendar).
         break :blk try builtins.temporal.extractResult(
@@ -1405,8 +1419,8 @@ fn differenceTemporalPlainDateTime(
     //    nanosecond, day).
     const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
 
-    // 5. If CompareISODateTime(dateTime.[[ISODateTime]], other.[[ISODateTime]]) = 0, then
-    //     a. Return ! CreateTemporalDuration(0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
+    // 5. If CompareISODateTime(dateTime.[[ISODateTime]], other.[[ISODateTime]]) = 0, return
+    //    ! CreateTemporalDuration(0, 0, 0, 0, 0, 0, 0, 0, 0, 0).
     // 6. Let internalDuration be ? DifferencePlainDateTimeWithRounding(dateTime.[[ISODateTime]],
     //    other.[[ISODateTime]], dateTime.[[Calendar]], settings.[[LargestUnit]],
     //    settings.[[RoundingIncrement]], settings.[[SmallestUnit]], settings.[[RoundingMode]]).
@@ -1461,8 +1475,10 @@ fn addDurationToDateTime(
 
     // 5. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
     // 6. Let timeResult be AddTime(dateTime.[[ISODateTime]].[[Time]], internalDuration.[[Time]]).
-    // 7. Let dateDuration be ? AdjustDateDurationRecord(internalDuration.[[Date]], timeResult.[[Days]]).
-    // 8. Let addedDate be ? CalendarDateAdd(dateTime.[[Calendar]], dateTime.[[ISODateTime]].[[ISODate]], dateDuration, overflow).
+    // 7. Let dateDuration be ? AdjustDateDurationRecord(internalDuration.[[Date]],
+    //    timeResult.[[Days]]).
+    // 8. Let addedDate be ? CalendarDateAdd(dateTime.[[Calendar]],
+    //    dateTime.[[ISODateTime]].[[ISODate]], dateDuration, overflow).
     // 9. Let result be CombineISODateAndTimeRecord(addedDate, timeResult).
     // 10. Return ? CreateTemporalDateTime(result, dateTime.[[Calendar]]).
     const temporal_rs_plain_date_time = switch (operation) {

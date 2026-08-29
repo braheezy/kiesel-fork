@@ -23,8 +23,8 @@ const SourceTextModule = language.SourceTextModule;
 const String = types.String;
 const Value = types.Value;
 
-pub const ImportMetaProperties = PropertyKey.ArrayHashMapUnmanaged(Value);
-pub const SupportedImportAttributes = String.ArrayHashMapUnmanaged(void);
+pub const ImportMetaProperties = PropertyKey.ArrayHashMap(Value);
+pub const SupportedImportAttributes = String.ArrayHashMap(void);
 
 pub const ResizeArrayBufferHandled = enum {
     handled,

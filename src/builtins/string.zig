@@ -1295,11 +1295,7 @@ pub const prototype = struct {
             // b. If matcher is not undefined, then
             if (maybe_matcher) |matcher| {
                 // i. Return ? Call(matcher, regexpOrPattern, « thisValue »).
-                return Value.from(matcher).callAssumeCallable(
-                    agent,
-                    regexp_or_pattern,
-                    &.{this_value},
-                );
+                return matcher.call(agent, regexp_or_pattern, &.{this_value});
             }
         }
 
@@ -1310,7 +1306,7 @@ pub const prototype = struct {
         const regexp = try regExpCreate(agent, regexp_or_pattern, .undefined);
 
         // 6. Return ? Invoke(regexp, %Symbol.match%, « string »).
-        return Value.from(&regexp.object).invoke(
+        return regexp.object.invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.match),
             &.{Value.from(string)},
@@ -1362,11 +1358,7 @@ pub const prototype = struct {
             // d. If matcher is not undefined, then
             if (maybe_matcher) |matcher| {
                 // i. Return ? Call(matcher, regexpOrPattern, « thisValue »).
-                return Value.from(matcher).callAssumeCallable(
-                    agent,
-                    regexp_or_pattern,
-                    &.{this_value},
-                );
+                return matcher.call(agent, regexp_or_pattern, &.{this_value});
             }
         }
 
@@ -1377,7 +1369,7 @@ pub const prototype = struct {
         const regexp = try regExpCreate(agent, regexp_or_pattern, Value.from("g"));
 
         // 6. Return ? Invoke(regexp, %Symbol.matchAll%, « string »).
-        return Value.from(&regexp.object).invoke(
+        return regexp.object.invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.match_all),
             &.{Value.from(string)},
@@ -1576,11 +1568,7 @@ pub const prototype = struct {
             // b. If replacer is not undefined, then
             if (maybe_replacer) |replacer| {
                 // i. Return ? Call(replacer, searchValue, « thisValue, replaceValue »).
-                return Value.from(replacer).callAssumeCallable(
-                    agent,
-                    search_value,
-                    &.{ this_value, replace_value },
-                );
+                return replacer.call(agent, search_value, &.{ this_value, replace_value });
             }
         }
 
@@ -1695,11 +1683,7 @@ pub const prototype = struct {
             // d. If replacer is not undefined, then
             if (maybe_replacer) |replacer| {
                 // i. Return ? Call(replacer, searchValue, « thisValue, replaceValue »).
-                return Value.from(replacer).callAssumeCallable(
-                    agent,
-                    search_value,
-                    &.{ this_value, replace_value },
-                );
+                return replacer.call(agent, search_value, &.{ this_value, replace_value });
             }
         }
 
@@ -1755,7 +1739,7 @@ pub const prototype = struct {
             const replacement = if (functional_replace) blk: {
                 // i. Let replacement be ? ToString(? Call(replaceValue, undefined, « searchString,
                 //    𝔽(matchPosition), string »)).
-                break :blk try (try replace_value.callAssumeCallable(
+                break :blk try (try replace_value.asObject().call(
                     agent,
                     .undefined,
                     &.{
@@ -1825,7 +1809,7 @@ pub const prototype = struct {
             // b. If searcher is not undefined, then
             if (maybe_searcher) |searcher| {
                 // i. Return ? Call(searcher, regexpOrPattern, « thisValue »).
-                return Value.from(searcher).callAssumeCallable(agent, regexp_or_pattern, &.{this_value});
+                return searcher.call(agent, regexp_or_pattern, &.{this_value});
             }
         }
 
@@ -1836,7 +1820,7 @@ pub const prototype = struct {
         const regexp = try regExpCreate(agent, regexp_or_pattern, .undefined);
 
         // 6. Return ? Invoke(regexp, %Symbol.search%, « string »).
-        return Value.from(&regexp.object).invoke(
+        return regexp.object.invoke(
             agent,
             PropertyKey.from(agent.well_known_symbols.search),
             &.{Value.from(string)},
@@ -1899,11 +1883,7 @@ pub const prototype = struct {
             // b. If splitter is not undefined, then
             if (maybe_splitter) |splitter| {
                 // i. Return ? Call(splitter, separator, « thisValue, limit »).
-                return Value.from(splitter).callAssumeCallable(
-                    agent,
-                    separator_value,
-                    &.{ this_value, limit_value },
-                );
+                return splitter.call(agent, separator_value, &.{ this_value, limit_value });
             }
         }
 

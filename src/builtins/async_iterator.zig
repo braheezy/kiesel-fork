@@ -52,7 +52,7 @@ pub const prototype = struct {
         // 5. If return is undefined, then
         const @"return" = maybe_return orelse {
             // a. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
-            _ = Value.from(promise_capability.resolve).callAssumeCallable(
+            _ = promise_capability.resolve.call(
                 agent,
                 .undefined,
                 &.{.undefined},
@@ -63,7 +63,7 @@ pub const prototype = struct {
 
         // 6. Else,
         // a. Let result be Completion(Call(return, obj, « »)).
-        const result = Value.from(@"return").callAssumeCallable(agent, this_value, &.{}) catch |err| {
+        const result = @"return".call(agent, this_value, &.{}) catch |err| {
             // b. IfAbruptRejectPromise(result, promiseCapability).
             return Value.from(try promise_capability.rejectPromise(agent, err));
         };

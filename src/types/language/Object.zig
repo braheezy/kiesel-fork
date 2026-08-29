@@ -50,8 +50,8 @@ pub const Properties = union(enum) {
 
 pub const ExtraData = struct {
     /// [[PrivateElements]]
-    private_elements: PrivateName.HashMapUnmanaged(PrivateElement),
-    lazy_properties: PropertyKey.HashMapUnmanaged(LazyProperty),
+    private_elements: PrivateName.HashMap(PrivateElement),
+    lazy_properties: PropertyKey.HashMap(LazyProperty),
     indexed_properties: Object.IndexedProperties,
 };
 
@@ -910,7 +910,7 @@ pub fn ordinaryToPrimitive(obj: *Object, agent: *Agent, hint: PreferredType) Age
         // b. If IsCallable(method) is true, then
         if (method.isCallable()) {
             // i. Let result be ? Call(method, obj).
-            const result = try method.callAssumeCallable(agent, Value.from(obj), &.{});
+            const result = try method.asObject().call(agent, Value.from(obj), &.{});
 
             // ii. If result is not an Object, return result.
             if (!result.isObject()) return result;
@@ -1068,6 +1068,24 @@ pub fn deletePropertyOrThrow(obj: *Object, agent: *Agent, property_key: Property
     // 3. Return unused.
 }
 
+/// 7.3.10 GetMethod ( value, propertyKey )
+/// https://tc39.es/ecma262/#sec-getmethod
+pub fn getMethod(obj: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!?*Object {
+    // 1. Let func be ? GetV(value, propertyKey).
+    const func = try obj.get(agent, property_key);
+
+    // 2. If func is either undefined or null, return undefined.
+    if (func.isUndefined() or func.isNull()) return null;
+
+    // 3. If IsCallable(func) is false, throw a TypeError exception.
+    if (!func.isCallable()) {
+        return agent.throwException(.type_error, "{f} is not callable", .{Value.from(obj)});
+    }
+
+    // 4. Return func.
+    return func.asObject();
+}
+
 /// 7.3.11 HasProperty ( obj, propertyKey )
 /// https://tc39.es/ecma262/#sec-hasproperty
 pub fn hasProperty(obj: *Object, agent: *Agent, property_key: PropertyKey) Agent.Error!bool {
@@ -1084,6 +1102,20 @@ pub fn hasOwnProperty(obj: *Object, agent: *Agent, property_key: PropertyKey) Ag
     // 2. If propertyDesc is undefined, return false.
     // 3. Return true.
     return property_desc != null;
+}
+
+/// 7.3.13 Call ( func, thisValue [ , argList ] )
+/// https://tc39.es/ecma262/#sec-call
+pub fn call(
+    func: *Object,
+    agent: *Agent,
+    this_value: Value,
+    arg_list: []const Value,
+) Agent.Error!Value {
+    // 1. If argList is not present, set argList to a new empty List.
+    // 2. If IsCallable(func) is false, throw a TypeError exception.
+    // 3. Return ? func.[[Call]](thisValue, argList).
+    return func.internalMethods().call.?(agent, func, this_value, Arguments.from(arg_list));
 }
 
 /// 7.3.14 Construct ( ctor [ , argList [ , newTarget ] ] )
@@ -1210,6 +1242,23 @@ pub fn testIntegrityLevel(obj: *Object, agent: *Agent, level: IntegrityLevel) Ag
 pub fn lengthOfArrayLike(obj: *Object, agent: *Agent) Agent.Error!u53 {
     // 1. Return ℝ(? ToLength(? Get(obj, "length"))).
     return (try obj.get(agent, PropertyKey.from("length"))).toLength(agent);
+}
+
+/// 7.3.20 Invoke ( value, propertyKey [ , argList ] )
+/// https://tc39.es/ecma262/#sec-invoke
+pub fn invoke(
+    obj: *Object,
+    agent: *Agent,
+    property_key: PropertyKey,
+    arg_list: []const Value,
+) Agent.Error!Value {
+    // 1. If argList is not present, set argList to a new empty List.
+
+    // 2. Let func be ? GetV(value, propertyKey).
+    const func = try obj.get(agent, property_key);
+
+    // 3. Return ? Call(func, value, argList).
+    return func.call(agent, Value.from(obj), arg_list);
 }
 
 /// 7.3.22 SpeciesConstructor ( obj, defaultCtor )
@@ -1505,7 +1554,7 @@ pub fn privateGet(obj: *Object, agent: *Agent, private_name: PrivateName) Agent.
             };
 
             // 7. Return ? Call(getter, obj).
-            return Value.from(getter).callAssumeCallable(agent, Value.from(obj), &.{});
+            return getter.call(agent, Value.from(obj), &.{});
         },
     }
 }
@@ -1553,11 +1602,7 @@ pub fn privateSet(obj: *Object, agent: *Agent, private_name: PrivateName, value:
             };
 
             // d. Perform ? Call(setter, obj, « value »).
-            _ = try Value.from(setter).callAssumeCallable(
-                agent,
-                Value.from(obj),
-                &.{value},
-            );
+            _ = try setter.call(agent, Value.from(obj), &.{value});
         },
     }
 
@@ -1573,11 +1618,7 @@ pub fn defineField(receiver: *Object, agent: *Agent, field: ClassFieldDefinition
     // 3. If initializer is not empty, then
     const init_value: Value = if (field.initializer) |initializer| blk: {
         // a. Let initValue be ? Call(initializer, receiver).
-        break :blk try Value.from(&initializer.object).callAssumeCallable(
-            agent,
-            Value.from(receiver),
-            &.{},
-        );
+        break :blk try initializer.object.call(agent, Value.from(receiver), &.{});
     } else blk: {
         // 4. Else,
         // a. Let initValue be undefined.

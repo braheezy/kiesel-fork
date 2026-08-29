@@ -87,19 +87,24 @@ pub const constructor = struct {
         // 2. If hour is undefined, set hour to 0; else set hour to ? ToIntegerWithTruncation(hour).
         const hour = if (hour_value.isUndefined()) 0 else try hour_value.toIntegerWithTruncation(agent);
 
-        // 3. If minute is undefined, set minute to 0; else set minute to ? ToIntegerWithTruncation(minute).
+        // 3. If minute is undefined, set minute to 0; else set minute to ? ToIntegerWithTruncation(
+        //    minute).
         const minute = if (minute_value.isUndefined()) 0 else try minute_value.toIntegerWithTruncation(agent);
 
-        // 4. If second is undefined, set second to 0; else set second to ? ToIntegerWithTruncation(second).
+        // 4. If second is undefined, set second to 0; else set second to ? ToIntegerWithTruncation(
+        //    second).
         const second = if (second_value.isUndefined()) 0 else try second_value.toIntegerWithTruncation(agent);
 
-        // 5. If millisecond is undefined, set millisecond to 0; else set millisecond to ? ToIntegerWithTruncation(millisecond).
+        // 5. If millisecond is undefined, set millisecond to 0; else set millisecond to
+        //    ? ToIntegerWithTruncation(millisecond).
         const millisecond = if (millisecond_value.isUndefined()) 0 else try millisecond_value.toIntegerWithTruncation(agent);
 
-        // 6. If microsecond is undefined, set microsecond to 0; else set microsecond to ? ToIntegerWithTruncation(microsecond).
+        // 6. If microsecond is undefined, set microsecond to 0; else set microsecond to
+        //    ? ToIntegerWithTruncation(microsecond).
         const microsecond = if (microsecond_value.isUndefined()) 0 else try microsecond_value.toIntegerWithTruncation(agent);
 
-        // 7. If nanosecond is undefined, set nanosecond to 0; else set nanosecond to ? ToIntegerWithTruncation(nanosecond).
+        // 7. If nanosecond is undefined, set nanosecond to 0; else set nanosecond to
+        //    ? ToIntegerWithTruncation(nanosecond).
         const nanosecond = if (nanosecond_value.isUndefined()) 0 else try nanosecond_value.toIntegerWithTruncation(agent);
 
         // 8. If IsValidTime(hour, minute, second, millisecond, microsecond, nanosecond) is false,
@@ -108,7 +113,8 @@ pub const constructor = struct {
             return agent.throwException(.range_error, "Invalid time", .{});
         }
 
-        // 9. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
+        // 9. Let time be CreateTimeRecord(hour, minute, second, millisecond, microsecond,
+        //    nanosecond).
         // 10. Return ? CreateTemporalTime(time, NewTarget).
         const temporal_rs_plain_time = try builtins.temporal.extractResult(
             agent,
@@ -312,9 +318,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(plainTime, [[InitializedTemporalTime]]).
         const plain_time = try this_value.requireInternalSlot(agent, PlainTime);
 
-        // 3. If roundTo is undefined, then
+        // 3. If roundTo is undefined, throw a TypeError exception.
         if (round_to.isUndefined()) {
-            // a. Throw a TypeError exception.
             return agent.throwException(.type_error, "Argument must not be undefined", .{});
         }
 
@@ -742,7 +747,8 @@ pub fn toTemporalPlainTime(
 
         // c. If item has an [[InitializedTemporalZonedDateTime]] internal slot, then
         if (item.asObject().cast(builtins.temporal.ZonedDateTime)) |zoned_date_time| {
-            // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]], item.[[EpochNanoseconds]]).
+            // i. Let isoDateTime be GetISODateTimeFor(item.[[TimeZone]],
+            //    item.[[EpochNanoseconds]]).
 
             // ii. Let resolvedOptions be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
@@ -788,10 +794,10 @@ pub fn toTemporalPlainTime(
         }
 
         // b. Let parseResult be ? ParseISODateTime(item, « TemporalTimeString »).
-        // c. If ParseText(StringToCodePoints(item), AmbiguousTemporalTimeString) is a Parse Node,
-        //    throw a RangeError exception.
-        // d. Assert: parseResult.[[Time]] is not start-of-day.
-        // e. Set result to parseResult.[[Time]].
+        // c. Assert: parseResult.[[Time]] is not start-of-day.
+        // d. Set result to parseResult.[[Time]].
+        // e. NOTE: A successful parse using TemporalTimeString guarantees absence of ambiguity with
+        //    respect to any ISO 8601 date-only, year-month, or month-day representation.
         const temporal_rs_plain_time = switch (item.asString().asAsciiOrUtf16()) {
             .ascii => |ascii| try builtins.temporal.extractResult(
                 agent,
@@ -911,8 +917,8 @@ const TemporalTimeLike = struct {
             // a. Assert: overflow is reject.
             std.debug.assert(overflow == temporal_rs.c.ArithmeticOverflow_Reject);
 
-            // b. If IsValidTime(hour, minute, second, millisecond, microsecond, nanosecond) is false,
-            //    throw a RangeError exception.
+            // b. If IsValidTime(hour, minute, second, millisecond, microsecond, nanosecond) is
+            //    false, throw a RangeError exception.
             if (!isValidTime(
                 self.hour orelse 0,
                 self.minute orelse 0,
@@ -944,7 +950,7 @@ const TemporalTimeLike = struct {
             }
         }
 
-        // 3. Return CreateTimeRecord(hour, minute, second, millisecond, microsecond, nanosecond).
+        // 3. Return CreateTimeRecord(hour, minute, second, millisecond, microsecond,nanosecond).
         return partial;
     }
 };
@@ -959,28 +965,22 @@ pub fn isValidTime(
     microsecond: f64,
     nanosecond: f64,
 ) bool {
-    // 1. If hour < 0 or hour > 23, then
-    //     a. Return false.
+    // 1. If hour < 0 or hour > 23, return false.
     if (hour < 0 or hour > 23) return false;
 
-    // 2. If minute < 0 or minute > 59, then
-    //     a. Return false.
+    // 2. If minute < 0 or minute > 59, return false.
     if (minute < 0 or minute > 59) return false;
 
-    // 3. If second < 0 or second > 59, then
-    //     a. Return false.
+    // 3. If second < 0 or second > 59, return false.
     if (second < 0 or second > 59) return false;
 
-    // 4. If millisecond < 0 or millisecond > 999, then
-    //     a. Return false.
+    // 4. If millisecond < 0 or millisecond > 999, return false.
     if (millisecond < 0 or millisecond > 999) return false;
 
-    // 5. If microsecond < 0 or microsecond > 999, then
-    //     a. Return false.
+    // 5. If microsecond < 0 or microsecond > 999, return false.
     if (microsecond < 0 or microsecond > 999) return false;
 
-    // 6. If nanosecond < 0 or nanosecond > 999, then
-    //     a. Return false.
+    // 6. If nanosecond < 0 or nanosecond > 999, return false.
     if (nanosecond < 0 or nanosecond > 999) return false;
 
     // 7. Return true.
@@ -1118,8 +1118,8 @@ fn differenceTemporalPlainTime(
     // 2. Let resolvedOptions be ? GetOptionsObject(options).
     const options = try options_value.getOptionsObject(agent);
 
-    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « »,
-    //    nanosecond, hour).
+    // 3. Let settings be ? GetDifferenceSettings(operation, resolvedOptions, time, « », nanosecond,
+    //    hour).
     const settings = try getTemporalDifferenceSettingsWithoutValidation(agent, options);
 
     // 4. Let timeDuration be DifferenceTime(temporalTime.[[Time]], other.[[Time]]).

@@ -153,7 +153,7 @@ fn collectLocals(b: *Builder) Error!void {
         .all => 0,
     };
     var past_prologue = std.mem.findScalar(Ir.Inst.Tag, b.ir.instructions.items(.tag), .get_argument) == null;
-    var bindings: std.AutoArrayHashMapUnmanaged(Ir.StringIndex, void) = .empty;
+    var bindings: std.array_hash_map.Auto(Ir.StringIndex, void) = .empty;
     defer bindings.deinit(b.gpa);
     for (b.ir.instructions.items(.tag)[start..], b.ir.instructions.items(.data)[start..], 0..) |tag, data, i| {
         const index: Ir.Inst.Index = @enumFromInt(i);

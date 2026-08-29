@@ -231,12 +231,13 @@ pub const constructor = struct {
         if (iterable.isUndefined() or iterable.isNull()) return Value.from(&set.object);
 
         // 5. Let adder be ? Get(set, "add").
-        const adder = try set.object.get(agent, PropertyKey.from("add"));
+        const adder_value = try set.object.get(agent, PropertyKey.from("add"));
 
         // 6. If IsCallable(adder) is false, throw a TypeError exception.
-        if (!adder.isCallable()) {
-            return agent.throwException(.type_error, "{f} is not callable", .{adder});
+        if (!adder_value.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not callable", .{adder_value});
         }
+        const adder = adder_value.asObject();
 
         // 7. Let iteratorRecord be ? GetIterator(iterable, sync).
         var iterator = try getIterator(agent, iterable, .sync);
@@ -246,7 +247,7 @@ pub const constructor = struct {
         //     b. If next is done, return set.
         while (try iterator.stepValue(agent)) |next| {
             // c. Let status be Completion(Call(adder, set, « next »)).
-            _ = adder.callAssumeCallable(agent, Value.from(&set.object), &.{next}) catch |err| {
+            _ = adder.call(agent, Value.from(&set.object), &.{next}) catch |err| {
                 // d. IfAbruptCloseIterator(status, iteratorRecord).
                 return iterator.close(agent, @as(Agent.Error!Value, err));
             };
@@ -427,7 +428,7 @@ pub const prototype = struct {
                 // ii. If entry is not empty, then
                 // 1. Let inOther be ToBoolean(? Call(otherRecord.[[Has]],
                 //    otherRecord.[[SetObject]], « entry »)).
-                const in_other = (try Value.from(other_record.has).callAssumeCallable(
+                const in_other = (try other_record.has.call(
                     agent,
                     Value.from(other_record.set_object),
                     &.{entry.key},
@@ -517,7 +518,7 @@ pub const prototype = struct {
     /// 24.2.4.7 Set.prototype.forEach ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-set.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback = arguments.get(0);
+        const callback_value = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let set be the this value.
@@ -525,9 +526,10 @@ pub const prototype = struct {
         const set = try this_value.requireInternalSlot(agent, Set);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
-        if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{f} is not callable", .{callback});
+        if (!callback_value.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not callable", .{callback_value});
         }
+        const callback = callback_value.asObject();
 
         // 4. Let entries be set.[[SetData]].
         const entries_ = &set.fields.set_data;
@@ -551,7 +553,7 @@ pub const prototype = struct {
             // c. If entry is not empty, then
             if (!entry.key.isUninitialized()) {
                 // i. Perform ? Call(callback, thisArg, « entry, entry, set »).
-                _ = try callback.callAssumeCallable(
+                _ = try callback.call(
                     agent,
                     this_arg,
                     &.{ entry.key, entry.key, Value.from(&set.object) },
@@ -619,7 +621,7 @@ pub const prototype = struct {
 
                 // 1. Let inOther be ToBoolean(? Call(otherRecord.[[Has]],
                 //    otherRecord.[[SetObject]], « entry »)).
-                const in_other = (try Value.from(other_record.has).callAssumeCallable(
+                const in_other = (try other_record.has.call(
                     agent,
                     Value.from(other_record.set_object),
                     &.{entry.key},
@@ -719,7 +721,7 @@ pub const prototype = struct {
 
                 // 1. Let inOther be ToBoolean(? Call(otherRecord.[[Has]],
                 //    otherRecord.[[SetObject]], « entry »)).
-                const in_other = (try Value.from(other_record.has).callAssumeCallable(
+                const in_other = (try other_record.has.call(
                     agent,
                     Value.from(other_record.set_object),
                     &.{entry.key},
@@ -798,7 +800,7 @@ pub const prototype = struct {
 
             // i. Let inOther be ToBoolean(? Call(otherRecord.[[Has]], otherRecord.[[SetObject]],
             //    « entry »)).
-            const in_other = (try Value.from(other_record.has).callAssumeCallable(
+            const in_other = (try other_record.has.call(
                 agent,
                 Value.from(other_record.set_object),
                 &.{entry.key},

@@ -74,7 +74,7 @@ pub const PropertyKey = union(enum) {
         return self == .string and self.string.eql(String.fromLiteral("length"));
     }
 
-    /// 7.1.22 CanonicalNumericIndexString ( arg )
+    /// 7.1.23 CanonicalNumericIndexString ( arg )
     /// https://tc39.es/ecma262/#sec-canonicalnumericindexstring
     pub fn canonicalNumericIndex(
         self: PropertyKey,
@@ -183,7 +183,7 @@ pub const PropertyKey = union(enum) {
         };
     }
 
-    pub fn HashMapUnmanaged(comptime V: type) type {
+    pub fn HashMap(comptime V: type) type {
         return std.HashMapUnmanaged(PropertyKey, V, struct {
             pub fn hash(_: anytype, property_key: PropertyKey) u64 {
                 return property_key.hash();
@@ -195,7 +195,7 @@ pub const PropertyKey = union(enum) {
         }, std.hash_map.default_max_load_percentage);
     }
 
-    pub fn ArrayHashMapUnmanaged(comptime V: type) type {
+    pub fn ArrayHashMap(comptime V: type) type {
         return std.array_hash_map.Custom(PropertyKey, V, struct {
             pub fn hash(_: @This(), property_key: PropertyKey) u32 {
                 return @truncate(property_key.hash());

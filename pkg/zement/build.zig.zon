@@ -10,6 +10,7 @@
         },
     },
     .paths = .{
+        "build.rs",
         "build.zig",
         "build.zig.zon",
         "Cargo.lock",

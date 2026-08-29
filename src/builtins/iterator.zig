@@ -22,6 +22,7 @@ const getIteratorDirect = types.getIteratorDirect;
 const getIteratorFlattenable = types.getIteratorFlattenable;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
+const sameValueZero = types.sameValueZero;
 
 /// 27.1.3.1 The Iterator Constructor
 /// https://tc39.es/ecma262/#sec-iterator-constructor
@@ -154,7 +155,7 @@ pub const constructor = struct {
 
                         // i. Let iterator be ? Call(iterable.[[OpenMethod]],
                         //    iterable.[[Iterable]]).
-                        const iterator = try Value.from(iterable.open_method).callAssumeCallable(
+                        const iterator = try iterable.open_method.call(
                             agent_,
                             Value.from(iterable.iterable),
                             &.{},
@@ -878,17 +879,21 @@ pub const prototype = struct {
     }
 
     pub fn init(agent: *Agent, realm: *Realm, object: *Object) std.mem.Allocator.Error!void {
+        try object.defineBuiltinFunction(agent, "chunks", chunks, 1, realm);
         try object.defineBuiltinFunction(agent, "drop", drop, 1, realm);
         try object.defineBuiltinFunction(agent, "every", every, 1, realm);
         try object.defineBuiltinFunction(agent, "filter", filter, 1, realm);
         try object.defineBuiltinFunction(agent, "find", find, 1, realm);
         try object.defineBuiltinFunction(agent, "flatMap", flatMap, 1, realm);
         try object.defineBuiltinFunction(agent, "forEach", forEach, 1, realm);
+        try object.defineBuiltinFunction(agent, "includes", includes, 1, realm);
+        try object.defineBuiltinFunction(agent, "join", join, 1, realm);
         try object.defineBuiltinFunction(agent, "map", map, 1, realm);
         try object.defineBuiltinFunction(agent, "reduce", reduce, 1, realm);
         try object.defineBuiltinFunction(agent, "some", some, 1, realm);
         try object.defineBuiltinFunction(agent, "take", take, 1, realm);
         try object.defineBuiltinFunction(agent, "toArray", toArray, 0, realm);
+        try object.defineBuiltinFunction(agent, "windows", windows, 1, realm);
         try object.defineBuiltinFunction(agent, "Symbol.dispose", @"Symbol.dispose", 0, realm);
         try object.defineBuiltinFunction(agent, "Symbol.iterator", @"Symbol.iterator", 0, realm);
 
@@ -967,6 +972,138 @@ pub const prototype = struct {
         );
     }
 
+    /// 1 Iterator.prototype.chunks ( chunkSize )
+    /// https://tc39.es/proposal-iterator-chunking/#sec-iterator.prototype.chunks
+    fn chunks(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const chunk_size_value = arguments.get(0);
+
+        // 1. Let O be the this value.
+        // 2. If O is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+        const obj = this_value.asObject();
+
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
+        var iterated: types.Iterator = .{
+            .iterator = obj,
+            .next_method = .undefined,
+            .done = false,
+        };
+
+        // 4. If chunkSize is not an integral Number, then
+        if (!chunk_size_value.isNumber() or !chunk_size_value.asNumber().isIntegral()) {
+            // a. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Chunk size must be an integral number",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 5. If chunkSize is not in the inclusive interval from 1𝔽 to 𝔽(2**32 - 1), then
+        const chunk_size_float = chunk_size_value.asNumber().asFloat();
+        if (chunk_size_float < 1 or chunk_size_float > std.math.maxInt(u32)) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Chunk size must be in the inclusive interval from 1 to 2^32 - 1",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+        const chunk_size: u32 = @intFromFloat(chunk_size_float);
+
+        // 6. Set iterated to ? GetIteratorDirect(O).
+        iterated = try getIteratorDirect(agent, obj);
+
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
+        const Captures = struct {
+            iterated: *types.Iterator,
+            chunk_size: u32,
+            buffer: std.ArrayList(Value),
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .chunk_size = chunk_size,
+            .buffer = .empty,
+        };
+
+        // 7. Let closure be a new Abstract Closure with no parameters that captures iterated and
+        //    chunkSize and performs the following steps when called:
+        const closure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
+                const iterated_ = captures_.iterated;
+                const chunk_size_ = captures_.chunk_size;
+                const buffer = &captures_.buffer;
+
+                // a. Let buffer be a new empty List.
+                // b. Repeat,
+                while (true) {
+                    // i. Let value be ? IteratorStepValue(iterated).
+                    // ii. If value is done, then
+                    const value = try iterated_.stepValue(agent_) orelse {
+                        // 1. If buffer is not empty, then
+                        if (buffer.items.len != 0) {
+                            defer buffer.clearAndFree(agent_.gc_allocator);
+
+                            // a. Perform Completion(Yield(CreateArrayFromList(buffer))).
+                            const array = try createArrayFromList(agent_, buffer.items);
+                            return Value.from(&array.object);
+                        }
+
+                        // 2. Return ReturnCompletion(undefined).
+                        return null;
+                    };
+
+                    // iii. Append value to buffer.
+                    try buffer.append(agent_.gc_allocator, value);
+
+                    // iv. If the number of elements in buffer is ℝ(chunkSize), then
+                    if (buffer.items.len == chunk_size_) {
+                        defer buffer.clearRetainingCapacity();
+
+                        // 1. Let completion be Completion(Yield(CreateArrayFromList(buffer))).
+                        const array = try createArrayFromList(agent_, buffer.items);
+
+                        // 2. IfAbruptCloseIterator(completion, iterated).
+                        // 3. Set buffer to a new empty List.
+                        return Value.from(&array.object);
+                    }
+                }
+            }
+        }.func;
+
+        // 8. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
+        //    %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        const result = try builtins.IteratorHelper.create(agent, .{
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
+            .fields = .{
+                .state = .{
+                    // 9. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
+
+                    .closure = closure,
+                    .captures = captures,
+                },
+            },
+        });
+
+        // 10. Return result.
+        return Value.from(&result.object);
+    }
+
     /// 27.1.3.3.2 Iterator.prototype.drop ( limit )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.drop
     fn drop(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
@@ -1007,10 +1144,23 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 7. Let intLimit be ! ToIntegerOrInfinity(numberLimit).
+        // 7. If numberLimit is finite and numberLimit > 𝔽(2**53 - 1), then
+        if (number_limit.isFinite() and number_limit.asFloat() > std.math.maxInt(u53)) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Limit must not exceed 2^53-1",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 8. Let intLimit be ! ToIntegerOrInfinity(numberLimit).
         const int_limit = Value.from(number_limit).toIntegerOrInfinity(agent) catch unreachable;
 
-        // 8. If intLimit < 0, then
+        // 9. If intLimit < 0, then
         if (int_limit < 0) {
             // a. Let error be ThrowCompletion(a newly created RangeError object).
             const @"error" = agent.throwException(
@@ -1023,7 +1173,7 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 9. Set iterated to ? GetIteratorDirect(obj).
+        // 10. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
@@ -1039,23 +1189,20 @@ pub const prototype = struct {
             .int_limit = int_limit,
         };
 
-        // 10. Let closure be a new Abstract Closure with no parameters that captures iterated and
+        // 11. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //     intLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
 
-                // a. Let remaining be intLimit.
+                // a. Let remaining be 𝔽(intLimit).
                 const remaining = &captures_.int_limit;
 
-                // b. Repeat, while remaining > 0,
+                // b. Repeat, while remaining > +0𝔽,
                 while (remaining.* > 0) {
-                    // i. If remaining ≠ +∞, then
-                    if (!std.math.isInf(remaining.*)) {
-                        // 1. Set remaining to remaining - 1.
-                        remaining.* -= 1;
-                    }
+                    // i. Set remaining to remaining - 1𝔽.
+                    remaining.* -= 1;
 
                     // ii. Let next be ? IteratorStep(iterated).
                     _ = try iterated_.step(agent_) orelse {
@@ -1076,13 +1223,13 @@ pub const prototype = struct {
             }
         }.func;
 
-        // 11. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
+        // 12. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
         //     %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
-                    // 12. Set result.[[UnderlyingIterators]] to « iterated ».
+                    // 13. Set result.[[UnderlyingIterators]] to « iterated ».
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
@@ -1091,14 +1238,14 @@ pub const prototype = struct {
             },
         });
 
-        // 13. Return result.
+        // 14. Return result.
         return Value.from(&result.object);
     }
 
     /// 27.1.3.3.3 Iterator.prototype.every ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.every
     fn every(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const predicate = arguments.get(0);
+        const predicate_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1116,30 +1263,31 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(predicate) is false, then
-        if (!predicate.isCallable()) {
+        if (!predicate_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{predicate},
+                .{predicate_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const predicate = predicate_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
-        // 6. Let counter be 0.
-        var counter: u53 = 0;
+        // 6. Let counter be +0𝔽.
+        var counter: f64 = 0;
 
         // 7. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return true.
         while (try iterated.stepValue(agent)) |value| {
-            // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
-            const result = predicate.callAssumeCallable(
+            // c. Let result be Completion(Call(predicate, undefined, « value, counter »)).
+            const result = predicate.call(
                 agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
@@ -1154,7 +1302,8 @@ pub const prototype = struct {
                 return try iterated.close(agent, @as(Agent.Error!Value, .false));
             }
 
-            // f. Set counter to counter + 1.
+            // f. NOTE: The following step will not change counter once it reaches 2**53𝔽.
+            // g. Set counter to counter + 1𝔽.
             counter += 1;
         }
         return .true;
@@ -1164,7 +1313,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-iterator.prototype.filter
     fn filter(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
-        const predicate = arguments.get(0);
+        const predicate_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1182,17 +1331,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(predicate) is false, then
-        if (!predicate.isCallable()) {
+        if (!predicate_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{predicate},
+                .{predicate_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const predicate = predicate_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1202,8 +1352,8 @@ pub const prototype = struct {
 
         const Captures = struct {
             iterated: *types.Iterator,
-            predicate: Value,
-            counter: u53,
+            predicate: *Object,
+            counter: f64,
         };
         const captures = try agent.gc_allocator.create(Captures);
         captures.* = .{
@@ -1220,7 +1370,7 @@ pub const prototype = struct {
                 const iterated_ = captures_.iterated;
                 const predicate_ = captures_.predicate;
 
-                // a. Let counter be 0.
+                // a. Let counter be +0𝔽.
                 const counter = &captures_.counter;
 
                 // b. Repeat,
@@ -1228,8 +1378,8 @@ pub const prototype = struct {
                 //     ii. If value is done, return ReturnCompletion(undefined).
                 while (try iterated_.stepValue(agent_)) |value| {
                     // iii. Let selected be Completion(Call(predicate, undefined, « value,
-                    //      𝔽(counter) »)).
-                    const selected = predicate_.callAssumeCallable(
+                    //      counter »)).
+                    const selected = predicate_.call(
                         agent_,
                         .undefined,
                         &.{ value, Value.from(counter.*) },
@@ -1238,7 +1388,8 @@ pub const prototype = struct {
                         return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                     };
 
-                    // vi. Set counter to counter + 1.
+                    // vi. NOTE: The following step will not change counter once it reaches 2**53𝔽.
+                    // vii. Set counter to counter + 1𝔽.
                     defer counter.* += 1;
 
                     // v. If ToBoolean(selected) is true, then
@@ -1274,7 +1425,7 @@ pub const prototype = struct {
     /// 27.1.3.3.5 Iterator.prototype.find ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.find
     fn find(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const predicate = arguments.get(0);
+        const predicate_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1292,30 +1443,31 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(predicate) is false, then
-        if (!predicate.isCallable()) {
+        if (!predicate_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{predicate},
+                .{predicate_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const predicate = predicate_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
-        // 6. Let counter be 0.
-        var counter: u53 = 0;
+        // 6. Let counter be +0𝔽.
+        var counter: f64 = 0;
 
         // 7. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return undefined.
         while (try iterated.stepValue(agent)) |value| {
-            // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
-            const result = predicate.callAssumeCallable(
+            // c. Let result be Completion(Call(predicate, undefined, « value, counter »)).
+            const result = predicate.call(
                 agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
@@ -1330,17 +1482,190 @@ pub const prototype = struct {
                 return iterated.close(agent, @as(Agent.Error!Value, value));
             }
 
-            // f. Set counter to counter + 1.
+            // f. NOTE: The following step will not change counter once it reaches 2**53𝔽.
+            // g. Set counter to counter + 1𝔽.
             counter += 1;
         }
         return .undefined;
+    }
+
+    /// 1 Iterator.prototype.includes ( searchElement [ , skippedElements ] )
+    /// https://tc39.es/proposal-iterator-includes/#sec-iterator.prototype.includes
+    fn includes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const search_element = arguments.get(0);
+        const skipped_elements = arguments.get(1);
+
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+        const obj = this_value.asObject();
+
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
+        var iterated: types.Iterator = .{
+            .iterator = obj,
+            .next_method = .undefined,
+            .done = false,
+        };
+
+        const to_skip: f64 = blk: {
+            // 4. If skippedElements is undefined, then
+            //     a. Let toSkip be +0𝔽.
+            if (skipped_elements.isUndefined()) break :blk 0;
+
+            // 5. Else,
+            //     a. If skippedElements is not one of +∞𝔽, -∞𝔽, or an integral Number, then
+            if (skipped_elements.isNumber() and
+                (skipped_elements.asNumber().isPositiveInf() or
+                    skipped_elements.asNumber().isNegativeInf() or
+                    skipped_elements.asNumber().isIntegral()))
+            {
+                break :blk skipped_elements.asNumber().asFloat();
+            }
+
+            // i. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Skipped elements must be an integral number",
+                .{},
+            );
+
+            // ii. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+
+            // b. Let toSkip be skippedElements.
+        };
+
+        // 6. If toSkip < -0𝔽, then
+        if (to_skip < 0) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Skipped elements must not be negative",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 7. If toSkip is finite and toSkip > 𝔽(2**53 - 1), then
+        if (std.math.isFinite(to_skip) and to_skip > std.math.maxInt(u53)) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Skipped elements must not exceed 2^53 - 1",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 8. Let skipped be +0𝔽.
+        var skipped: f64 = 0;
+
+        // 9. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
+
+        // 10. Repeat,
+        //     a. Let value be ? IteratorStepValue(iterated).
+        //     b. If value is done, return false.
+        while (try iterated.stepValue(agent)) |value| {
+            // c. If skipped < toSkip, then
+            if (skipped < to_skip) {
+                // i. Set skipped to skipped + 1𝔽.
+                skipped += 1;
+            }
+            // d. Else if SameValueZero(value, searchElement) is true, then
+            else if (sameValueZero(value, search_element)) {
+                // i. Return ? IteratorClose(iterated, NormalCompletion(true)).
+                return iterated.close(agent, @as(Agent.Error!Value, .true));
+            }
+        }
+        return .false;
+    }
+
+    /// 1 Iterator.prototype.join ( separator )
+    /// https://tc39.es/proposal-iterator-join/#sec-iterator.prototype.join
+    fn join(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const separator = arguments.get(0);
+
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+        const obj = this_value.asObject();
+
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
+        var iterated: types.Iterator = .{
+            .iterator = obj,
+            .next_method = .undefined,
+            .done = false,
+        };
+
+        // 4. If separator is undefined, then
+        const sep: String.Builder.Segment = if (separator.isUndefined())
+            // a. Let sep be ",".
+            .{ .char = ',' }
+        else blk: {
+            // 5. Else,
+            // a. Let sep be Completion(ToString(separator)).
+            const string = separator.toString(agent) catch |err| {
+                // b. IfAbruptCloseIterator(sep, iterated).
+                return iterated.close(agent, @as(Agent.Error!Value, err));
+            };
+            break :blk .{ .string = string };
+        };
+
+        // 6. Set iterated to ? GetIteratorDirect(obj).
+        iterated = try getIteratorDirect(agent, obj);
+
+        // 7. Let result be the empty String.
+        var result: String.Builder = .empty;
+        defer result.deinit(agent.gc_allocator);
+
+        // 8. Let first be true.
+        var first = true;
+
+        // 9. Repeat,
+        //     a. Let value be ? IteratorStepValue(iterated).
+        //     b. If value is done, return result.
+        while (try iterated.stepValue(agent)) |value| {
+            // c. If first is true, then
+            if (first) {
+                // i. Set first to false.
+                first = false;
+            } else {
+                // d. Else,
+                // i. Set result to the string-concatenation of result and sep.
+                try result.appendSegment(agent.gc_allocator, sep);
+            }
+
+            // e. If value is neither undefined nor null, then
+            if (!value.isUndefined() and !value.isNull()) {
+                // i. Let valueString be Completion(ToString(value)).
+                const value_string = value.toString(agent) catch |err| {
+                    // ii. IfAbruptCloseIterator(valueString, iterated).
+                    return iterated.close(agent, @as(Agent.Error!Value, err));
+                };
+
+                // iii. Set result to the string-concatenation of result and valueString.
+                try result.appendString(agent.gc_allocator, value_string);
+            }
+        }
+        return Value.from(try result.build(agent));
     }
 
     /// 27.1.3.3.6 Iterator.prototype.flatMap ( mapper )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.flatmap
     fn flatMap(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
-        const mapper = arguments.get(0);
+        const mapper_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1358,17 +1683,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(mapper) is false, then
-        if (!mapper.isCallable()) {
+        if (!mapper_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{mapper},
+                .{mapper_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const mapper = mapper_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1378,8 +1704,8 @@ pub const prototype = struct {
 
         const Captures = struct {
             iterated: *types.Iterator,
-            mapper: Value,
-            counter: u53,
+            mapper: *Object,
+            counter: f64,
             inner_iterator: ?types.Iterator,
         };
         const captures = try agent.gc_allocator.create(Captures);
@@ -1399,7 +1725,7 @@ pub const prototype = struct {
                 const mapper_ = captures_.mapper;
                 const inner_iterator_ = &captures_.inner_iterator;
 
-                // a. Let counter be 0.
+                // a. Let counter be +0𝔽.
                 const counter_ = &captures_.counter;
 
                 const State = enum { outer, inner };
@@ -1416,8 +1742,8 @@ pub const prototype = struct {
                         const value = (try iterated_.stepValue(agent_)) orelse return null;
 
                         // iii. Let mapped be Completion(Call(mapper, undefined, « value,
-                        //      𝔽(counter) »)).
-                        const mapped = mapper_.callAssumeCallable(
+                        //      counter »)).
+                        const mapped = mapper_.call(
                             agent_,
                             .undefined,
                             &.{ value, Value.from(counter_.*) },
@@ -1460,7 +1786,9 @@ pub const prototype = struct {
                         //         iii. Return ? IteratorClose(iterated, completion).
                         if (inner_value) |value| return value;
 
-                        // ix. Set counter to counter + 1.
+                        // ix. NOTE: The following step will not change counter once it reaches
+                        //     2**53𝔽.
+                        // x. Set counter to counter + 1𝔽.
                         counter_.* += 1;
 
                         continue :loop .outer;
@@ -1505,7 +1833,7 @@ pub const prototype = struct {
     /// 27.1.3.3.7 Iterator.prototype.forEach ( procedure )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const procedure = arguments.get(0);
+        const procedure_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1523,39 +1851,37 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(procedure) is false, then
-        if (!procedure.isCallable()) {
+        if (!procedure_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{procedure},
+                .{procedure_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const procedure = procedure_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
-        // 6. Let counter be 0.
-        var counter: u53 = 0;
+        // 6. Let counter be +0𝔽.
+        var counter: f64 = 0;
 
         // 7. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return undefined.
         while (try iterated.stepValue(agent)) |value| {
-            // c. Let result be Completion(Call(procedure, undefined, « value, 𝔽(counter) »)).
-            _ = procedure.callAssumeCallable(
-                agent,
-                .undefined,
-                &.{ value, Value.from(counter) },
-            ) catch |err| {
+            // c. Let result be Completion(Call(procedure, undefined, « value, counter »)).
+            _ = procedure.call(agent, .undefined, &.{ value, Value.from(counter) }) catch |err| {
                 // d. IfAbruptCloseIterator(result, iterated).
                 return iterated.close(agent, @as(Agent.Error!Value, err));
             };
 
-            // e. Set counter to counter + 1.
+            // e. NOTE: The following step will not change counter once it reaches 2**53𝔽.
+            // f. Set counter to counter + 1𝔽.
             counter += 1;
         }
         return .undefined;
@@ -1565,7 +1891,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-iterator.prototype.map
     fn map(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
-        const mapper = arguments.get(0);
+        const mapper_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1583,17 +1909,18 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(mapper) is false, then
-        if (!mapper.isCallable()) {
+        if (!mapper_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{mapper},
+                .{mapper_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const mapper = mapper_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
@@ -1603,8 +1930,8 @@ pub const prototype = struct {
 
         const Captures = struct {
             iterated: *types.Iterator,
-            mapper: Value,
-            counter: u53,
+            mapper: *Object,
+            counter: f64,
         };
         const captures = try agent.gc_allocator.create(Captures);
         captures.* = .{
@@ -1621,7 +1948,7 @@ pub const prototype = struct {
                 const iterated_ = captures_.iterated;
                 const mapper_ = captures_.mapper;
 
-                // a. Let counter be 0.
+                // a. Let counter be +0𝔽.
                 const counter = &captures_.counter;
 
                 // b. Repeat,
@@ -1630,8 +1957,8 @@ pub const prototype = struct {
                 // ii. If value is done, return ReturnCompletion(undefined).
                 const value = (try iterated_.stepValue(agent_)) orelse return null;
 
-                // iii. Let mapped be Completion(Call(mapper, undefined, « value, 𝔽(counter) »)).
-                const mapped = mapper_.callAssumeCallable(
+                // iii. Let mapped be Completion(Call(mapper, undefined, « value, counter »)).
+                const mapped = mapper_.call(
                     agent_,
                     .undefined,
                     &.{ value, Value.from(counter.*) },
@@ -1640,7 +1967,8 @@ pub const prototype = struct {
                     return iterated_.close(agent_, @as(Agent.Error!?Value, err));
                 };
 
-                // vii. Set counter to counter + 1.
+                // vii. NOTE: The following step will not change counter once it reaches 2**53𝔽.
+                // viii. Set counter to counter + 1𝔽.
                 defer counter.* += 1;
 
                 // v. Let completion be Completion(Yield(mapped)).
@@ -1671,7 +1999,7 @@ pub const prototype = struct {
     /// 27.1.3.3.9 Iterator.prototype.reduce ( reducer [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.reduce
     fn reduce(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const reducer = arguments.get(0);
+        const reducer_value = arguments.get(0);
         const initial_value = arguments.getOrNull(1);
 
         // 1. Let obj be the this value.
@@ -1690,23 +2018,24 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(reducer) is false, then
-        if (!reducer.isCallable()) {
+        if (!reducer_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{reducer},
+                .{reducer_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const reducer = reducer_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
         var accumulator: Value = undefined;
-        var counter: u53 = undefined;
+        var counter: f64 = undefined;
 
         // 6. If initialValue is not present, then
         if (initial_value == null) {
@@ -1720,14 +2049,14 @@ pub const prototype = struct {
                 );
             };
 
-            // c. Let counter be 1.
+            // c. Let counter be 1𝔽.
             counter = 1;
         } else {
             // 7. Else,
             // a. Let accumulator be initialValue.
             accumulator = initial_value.?;
 
-            // b. Let counter be 0.
+            // b. Let counter be +0𝔽.
             counter = 0;
         }
 
@@ -1736,8 +2065,8 @@ pub const prototype = struct {
         //     b. If value is done, return accumulator.
         while (try iterated.stepValue(agent)) |value| {
             // c. Let result be Completion(Call(reducer, undefined, « accumulator, value,
-            //    𝔽(counter) »)).
-            const result = reducer.callAssumeCallable(
+            //    counter »)).
+            const result = reducer.call(
                 agent,
                 .undefined,
                 &.{ accumulator, value, Value.from(counter) },
@@ -1749,7 +2078,8 @@ pub const prototype = struct {
             // e. Set accumulator to result.
             accumulator = result;
 
-            // f. Set counter to counter + 1.
+            // f. NOTE: The following step will not change counter once it reaches 2**53𝔽.
+            // g. Set counter to counter + 1𝔽.
             counter += 1;
         }
         return accumulator;
@@ -1758,7 +2088,7 @@ pub const prototype = struct {
     /// 27.1.3.3.10 Iterator.prototype.some ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.some
     fn some(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const predicate = arguments.get(0);
+        const predicate_value = arguments.get(0);
 
         // 1. Let obj be the this value.
         // 2. If obj is not an Object, throw a TypeError exception.
@@ -1776,30 +2106,31 @@ pub const prototype = struct {
         };
 
         // 4. If IsCallable(predicate) is false, then
-        if (!predicate.isCallable()) {
+        if (!predicate_value.isCallable()) {
             // a. Let error be ThrowCompletion(a newly created TypeError object).
             const @"error" = agent.throwException(
                 .type_error,
                 "{f} is not callable",
-                .{predicate},
+                .{predicate_value},
             );
 
             // b. Return ? IteratorClose(iterated, error).
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
+        const predicate = predicate_value.asObject();
 
         // 5. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
-        // 6. Let counter be 0.
-        var counter: u53 = 0;
+        // 6. Let counter be +0𝔽.
+        var counter: f64 = 0;
 
         // 7. Repeat,
         //     a. Let value be ? IteratorStepValue(iterated).
         //     b. If value is done, return false.
         while (try iterated.stepValue(agent)) |value| {
-            // c. Let result be Completion(Call(predicate, undefined, « value, 𝔽(counter) »)).
-            const result = predicate.callAssumeCallable(
+            // c. Let result be Completion(Call(predicate, undefined, « value, counter »)).
+            const result = predicate.call(
                 agent,
                 .undefined,
                 &.{ value, Value.from(counter) },
@@ -1814,7 +2145,8 @@ pub const prototype = struct {
                 return try iterated.close(agent, @as(Agent.Error!Value, .true));
             }
 
-            // f. Set counter to counter + 1.
+            // f. NOTE: The following step will not change counter once it reaches 2**53𝔽.
+            // g. Set counter to counter + 1𝔽.
             counter += 1;
         }
         return .false;
@@ -1860,10 +2192,23 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 7. Let intLimit be ! ToIntegerOrInfinity(numberLimit).
+        // 7. If numberLimit is finite and numberLimit > 𝔽(2**53 - 1), then
+        if (number_limit.isFinite() and number_limit.asFloat() > std.math.maxInt(u53)) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Limit must not exceed 2^53-1",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 8. Let intLimit be ! ToIntegerOrInfinity(numberLimit).
         const int_limit = Value.from(number_limit).toIntegerOrInfinity(agent) catch unreachable;
 
-        // 8. If intLimit < 0, then
+        // 9. If intLimit < 0, then
         if (int_limit < 0) {
             // a. Let error be ThrowCompletion(a newly created RangeError object).
             const @"error" = agent.throwException(
@@ -1876,7 +2221,7 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         }
 
-        // 9. Set iterated to ? GetIteratorDirect(obj).
+        // 10. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
@@ -1892,30 +2237,27 @@ pub const prototype = struct {
             .int_limit = int_limit,
         };
 
-        // 10. Let closure be a new Abstract Closure with no parameters that captures iterated and
+        // 11. Let closure be a new Abstract Closure with no parameters that captures iterated and
         //     intLimit and performs the following steps when called:
         const closure = struct {
             fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
                 const captures_ = iterator_helper.fields.state.capturesAs(Captures);
                 const iterated_ = captures_.iterated;
 
-                // a. Let remaining be intLimit.
+                // a. Let remaining be 𝔽(intLimit).
                 const remaining = &captures_.int_limit;
 
                 // b. Repeat,
                 while (true) {
-                    // i. If remaining = 0, then
+                    // i. If remaining is +0𝔽, then
                     if (remaining.* == 0) {
                         // 1. Return ? IteratorClose(iterated, ReturnCompletion(undefined)).
                         iterator_helper.fields = .completed;
                         return iterated_.close(agent_, @as(Agent.Error!?Value, null));
                     }
 
-                    // ii. If remaining ≠ +∞, then
-                    if (!std.math.isInf(remaining.*)) {
-                        // 1. Set remaining to remaining - 1.
-                        remaining.* -= 1;
-                    }
+                    // ii. Set remaining to remaining - 1𝔽.
+                    remaining.* -= 1;
 
                     // iii. Let value be ? IteratorStepValue(iterated).
                     // iv. If value is done, return ReturnCompletion(undefined).
@@ -1928,13 +2270,13 @@ pub const prototype = struct {
             }
         }.func;
 
-        // 11. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
+        // 12. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
         //     %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
         const result = try builtins.IteratorHelper.create(agent, .{
             .prototype = try realm.intrinsic(.iterator_helper_prototype),
             .fields = .{
                 .state = .{
-                    // 12. Set result.[[UnderlyingIterators]] to « iterated ».
+                    // 13. Set result.[[UnderlyingIterators]] to « iterated ».
                     .underlying_iterators = iterated_list,
 
                     .closure = closure,
@@ -1943,7 +2285,7 @@ pub const prototype = struct {
             },
         });
 
-        // 13. Return result.
+        // 14. Return result.
         return Value.from(&result.object);
     }
 
@@ -1975,6 +2317,171 @@ pub const prototype = struct {
         return Value.from(&array.object);
     }
 
+    /// 2 Iterator.prototype.windows ( windowSize [ , undersized ] )
+    /// https://tc39.es/proposal-iterator-chunking/#sec-iterator.prototype.windows
+    fn windows(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const realm = agent.currentRealm();
+        const window_size_value = arguments.get(0);
+        const undersized_value = arguments.get(1);
+
+        // 1. Let O be the this value.
+        // 2. If O is not an Object, throw a TypeError exception.
+        if (!this_value.isObject()) {
+            return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
+        }
+        const obj = this_value.asObject();
+
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        //    [[Done]]: false }.
+        var iterated: types.Iterator = .{
+            .iterator = obj,
+            .next_method = .undefined,
+            .done = false,
+        };
+
+        // 4. If windowSize is not an integral Number, then
+        if (!window_size_value.isNumber() or !window_size_value.asNumber().isIntegral()) {
+            // a. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Window size must be an integral number",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+
+        // 5. If windowSize is not in the inclusive interval from 1𝔽 to 𝔽(2**32 - 1), then
+        const window_size_float = window_size_value.asNumber().asFloat();
+        if (window_size_float < 1 or window_size_float > std.math.maxInt(u32)) {
+            // a. Let error be ThrowCompletion(a newly created RangeError object).
+            const @"error" = agent.throwException(
+                .range_error,
+                "Window size must be in the inclusive interval from 1 to 2^32 - 1",
+                .{},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        }
+        const window_size: u32 = @intFromFloat(window_size_float);
+
+        const Undersized = enum { only_full, allow_partial };
+
+        // 6. If undersized is undefined, set undersized to "only-full".
+        // 7. If undersized is neither "only-full" nor "allow-partial", then
+        const undersized: Undersized = blk: {
+            if (undersized_value.isUndefined()) break :blk .only_full;
+            if (undersized_value.isString()) {
+                if (undersized_value.asString().eql(String.fromLiteral("only-full"))) break :blk .only_full;
+                if (undersized_value.asString().eql(String.fromLiteral("allow-partial"))) break :blk .allow_partial;
+            }
+
+            // a. Let error be ThrowCompletion(a newly created TypeError object).
+            const @"error" = agent.throwException(
+                .type_error,
+                "Invalid undersized {f}",
+                .{undersized_value},
+            );
+
+            // b. Return ? IteratorClose(iterated, error).
+            return iterated.close(agent, @as(Agent.Error!Value, @"error"));
+        };
+
+        // 8. Set iterated to ? GetIteratorDirect(O).
+        iterated = try getIteratorDirect(agent, obj);
+
+        const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
+        iterated_list[0] = iterated;
+
+        const Captures = struct {
+            iterated: *types.Iterator,
+            window_size: u32,
+            undersized: Undersized,
+            buffer: std.ArrayList(Value),
+        };
+        const captures = try agent.gc_allocator.create(Captures);
+        captures.* = .{
+            .iterated = &iterated_list[0],
+            .window_size = window_size,
+            .undersized = undersized,
+            .buffer = .empty,
+        };
+
+        // 9. Let closure be a new Abstract Closure with no parameters that captures iterated,
+        //    windowSize, and undersized and performs the following steps when called:
+        const closure = struct {
+            fn func(agent_: *Agent, iterator_helper: *builtins.IteratorHelper) Agent.Error!?Value {
+                const captures_ = iterator_helper.fields.state.capturesAs(Captures);
+                const iterated_ = captures_.iterated;
+                const window_size_ = captures_.window_size;
+                const undersized_ = captures_.undersized;
+                const buffer = &captures_.buffer;
+
+                // a. Let buffer be a new empty List.
+                // b. Repeat,
+                while (true) {
+                    // i. Let value be ? IteratorStepValue(iterated).
+                    // ii. If value is done, then
+                    const value = try iterated_.stepValue(agent_) orelse {
+                        defer buffer.clearAndFree(agent_.gc_allocator);
+
+                        // 1. If undersized is "allow-partial", buffer is not empty, and the number
+                        //    of elements in buffer < ℝ(windowSize), then
+                        if (undersized_ == .allow_partial and
+                            buffer.items.len != 0 and
+                            buffer.items.len < window_size_)
+                        {
+                            // a. Perform Completion(Yield(CreateArrayFromList(buffer))).
+                            const array = try createArrayFromList(agent_, buffer.items);
+                            return Value.from(&array.object);
+                        }
+
+                        // 2. Return ReturnCompletion(undefined).
+                        return null;
+                    };
+
+                    // iii. If the number of elements in buffer is ℝ(windowSize), then
+                    if (buffer.items.len == window_size_) {
+                        // 1. Remove the first element from buffer.
+                        _ = buffer.orderedRemove(0);
+                    }
+
+                    // iv. Append value to buffer.
+                    try buffer.append(agent_.gc_allocator, value);
+
+                    // v. If the number of elements in buffer is ℝ(windowSize), then
+                    if (buffer.items.len == window_size_) {
+                        // 1. Let completion be Completion(Yield(CreateArrayFromList(buffer))).
+                        const array = try createArrayFromList(agent_, buffer.items);
+
+                        // 2. IfAbruptCloseIterator(completion, iterated).
+                        return Value.from(&array.object);
+                    }
+                }
+            }
+        }.func;
+
+        // 10. Let result be CreateIteratorFromClosure(closure, "Iterator Helper",
+        //     %IteratorHelperPrototype%, « [[UnderlyingIterators]] »).
+        const result = try builtins.IteratorHelper.create(agent, .{
+            .prototype = try realm.intrinsic(.iterator_helper_prototype),
+            .fields = .{
+                .state = .{
+                    // 11. Set result.[[UnderlyingIterators]] to « iterated ».
+                    .underlying_iterators = iterated_list,
+
+                    .closure = closure,
+                    .captures = captures,
+                },
+            },
+        });
+
+        // 12. Return result.
+        return Value.from(&result.object);
+    }
+
     /// 27.1.3.3.13 Iterator.prototype [ %Symbol.dispose% ] ( )
     /// https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.dispose%
     fn @"Symbol.dispose"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
@@ -1985,7 +2492,7 @@ pub const prototype = struct {
         // 3. If return is not undefined, then
         if (maybe_return) |@"return"| {
             // a. Perform ? Call(return, obj).
-            _ = try Value.from(@"return").callAssumeCallable(agent, this_value, &.{});
+            _ = try @"return".call(agent, this_value, &.{});
         }
 
         // 4. Return undefined.

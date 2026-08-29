@@ -16,7 +16,7 @@ const Value = types.Value;
 
 const ModuleEnvironment = @This();
 
-indirect_bindings: String.HashMapUnmanaged(IndirectBinding),
+indirect_bindings: String.HashMap(IndirectBinding),
 
 // NOTE: This is how we implement the spec's inheritance of module environments.
 declarative_environment: DeclarativeEnvironment,

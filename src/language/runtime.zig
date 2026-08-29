@@ -68,9 +68,9 @@ pub fn getTemplateObject(
 
     const template = cooked;
 
-    // 4. Let rawStrings be the TemplateStrings of templateLiteral with argument true.
+    // 4. Let rawStrings be the TemplateStrings of templateLiteral with argument raw.
     // 5. Assert: rawStrings is a List of Strings.
-    // 6. Let cookedStrings be the TemplateStrings of templateLiteral with argument false.
+    // 6. Let cookedStrings be the TemplateStrings of templateLiteral with argument cooked.
     // 7. Let count be the number of elements in the List cookedStrings.
     // 8. Assert: count ≤ 2**32 - 1.
     // 9. Let template be ! ArrayCreate(count).
@@ -138,7 +138,7 @@ pub fn evaluateCall(
     agent: *Agent,
     func: Value,
     this_value: Value,
-    arguments: []const Value,
+    arg_list: []const Value,
 ) Agent.Error!Value {
     // 1-2.
     // NOTE: These are done in the function above, which is called by the prepare_call instruction.
@@ -158,7 +158,7 @@ pub fn evaluateCall(
 
     // 6. If tailPosition is true, perform PrepareForTailCall().
     // 7. Return ? Call(func, thisValue, argList).
-    return func.callAssumeCallable(agent, this_value, arguments);
+    return func.asObject().call(agent, this_value, arg_list);
 }
 
 /// 13.3.7.1 Runtime Semantics: Evaluation
@@ -284,7 +284,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
             // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&@"error".object)},
@@ -312,7 +312,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
                 // 1. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
                 //    TypeError object »).
-                _ = Value.from(promise_capability.reject).callAssumeCallable(
+                _ = promise_capability.reject.call(
                     agent,
                     .undefined,
                     &.{Value.from(&@"error".object)},
@@ -352,7 +352,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
                         // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly
                         //    created TypeError object »).
-                        _ = Value.from(promise_capability.reject).callAssumeCallable(
+                        _ = promise_capability.reject.call(
                             agent,
                             .undefined,
                             &.{Value.from(&@"error".object)},
@@ -382,7 +382,7 @@ pub fn evaluateImportCall(agent: *Agent, specifier: Value, options: Value) Agent
 
             // i. Perform ! Call(promiseCapability.[[Reject]], undefined, « a newly created
             //    TypeError object »).
-            _ = Value.from(promise_capability.reject).callAssumeCallable(
+            _ = promise_capability.reject.call(
                 agent,
                 .undefined,
                 &.{Value.from(&@"error".object)},
@@ -1531,15 +1531,12 @@ pub fn evaluateYieldStar(
         // b. Else if received is a throw completion, then
         .throw => |value| {
             // i. Let throw be ? GetMethod(iterator, "throw").
-            const maybe_throw = try Value.from(iterator.iterator).getMethod(
-                agent,
-                PropertyKey.from("throw"),
-            );
+            const maybe_throw = try iterator.iterator.getMethod(agent, PropertyKey.from("throw"));
 
             // ii. If throw is not undefined, then
             if (maybe_throw) |throw| {
                 // 1. Let innerResult be ? Call(throw, iterator, « received.[[Value]] »).
-                var inner_result = try Value.from(throw).call(
+                var inner_result = try throw.call(
                     agent,
                     Value.from(iterator.iterator),
                     &.{value},
@@ -1611,10 +1608,7 @@ pub fn evaluateYieldStar(
         .@"return" => |value| {
             // i. Assert: received is a return completion.
             // ii. Let return be ? GetMethod(iterator, "return").
-            const maybe_return = try Value.from(iterator.iterator).getMethod(
-                agent,
-                PropertyKey.from("return"),
-            );
+            const maybe_return = try iterator.iterator.getMethod(agent, PropertyKey.from("return"));
 
             // iii. If return is undefined, then
             const @"return" = maybe_return orelse {
@@ -1632,7 +1626,7 @@ pub fn evaluateYieldStar(
             };
 
             // iv. Let innerReturnResult be ? Call(return, iterator, « received.[[Value]] »).
-            var inner_return_result = try Value.from(@"return").call(
+            var inner_return_result = try @"return".call(
                 agent,
                 Value.from(iterator.iterator),
                 &.{value},
@@ -2289,27 +2283,27 @@ pub fn classDefinitionEvaluation(
                     //    not.
 
                     // 2. Let func be ! ctorFunc.[[GetPrototypeOf]]().
-                    const prototype_function = ctor_func.internalMethods().getPrototypeOf(
+                    const proto_func = ctor_func.internalMethods().getPrototypeOf(
                         agent_,
                         ctor_func,
                     ) catch |err| try noexcept(err);
 
                     // 3. If IsConstructor(func) is false, throw a TypeError exception.
-                    if (prototype_function == null or !Value.from(prototype_function.?).isConstructor()) {
+                    if (proto_func == null or !Value.from(proto_func.?).isConstructor()) {
                         return agent_.throwException(
                             .type_error,
                             "{f} is not a constructor",
                             .{
-                                if (prototype_function == null)
+                                if (proto_func == null)
                                     Value.undefined
                                 else
-                                    Value.from(prototype_function.?),
+                                    Value.from(proto_func.?),
                             },
                         );
                     }
 
                     // 4. Let result be ? Construct(func, args, NewTarget).
-                    break :blk try prototype_function.?.construct(agent_, args, new_target.?);
+                    break :blk try proto_func.?.construct(agent_, args, new_target.?);
                 } else blk: {
                     // v. Else,
                     // 1. NOTE: This branch behaves similarly to `constructor() {}`.
@@ -2591,7 +2585,7 @@ pub fn classDefinitionEvaluation(
                 // i. Assert: elementRecord is a ClassStaticBlockDefinition Record.
                 // ii. Let result be Completion(Call(elementRecord.[[BodyFunction]], ctorFunc)).
                 const body_function = &class_static_block_definition.body_function.object;
-                _ = Value.from(body_function).callAssumeCallable(
+                _ = body_function.call(
                     agent,
                     Value.from(ctor_func),
                     &.{},

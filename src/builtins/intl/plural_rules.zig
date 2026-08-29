@@ -1,5 +1,5 @@
 //! 17 PluralRules Objects
-//! hthttps://tc39.es/ecma402/#pluralrules-objects
+//! https://tc39.es/ecma402/#pluralrules-objects
 
 const std = @import("std");
 

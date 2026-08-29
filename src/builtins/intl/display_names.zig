@@ -326,6 +326,8 @@ pub const prototype = struct {
         defer gpa.free(code_utf8);
         // ICU4X LocaleDisplayNamesFormatter and RegionDisplayNames return an error for at least
         // the 'und' locale, other engines seem to fall back to 'en' in that case.
+        // LocaleNamesUnstable does not error but returns the code unchanged so we check for 'und'
+        // manually.
         const fallback_locale = icu4zig.Locale.fromString("en") catch unreachable;
         defer fallback_locale.deinit();
         const value = switch (display_names.fields.type) {
@@ -365,7 +367,22 @@ pub const prototype = struct {
                     ),
                 };
             },
-            else => return agent.throwException(
+            .script => blk: {
+                // Scripts only have one name in CLDR, so style doesn't matter - always use the full name.
+                const locale = if (display_names.fields.locale.normalizingEq("und"))
+                    fallback_locale
+                else
+                    display_names.fields.locale;
+                break :blk try icu4zig.locale_names_unstable.forScriptHeavy(
+                    agent.gc_allocator,
+                    locale,
+                    code_utf8,
+                );
+            },
+            .currency,
+            .calendar,
+            .date_time_field,
+            => return agent.throwException(
                 .internal_error,
                 "Unsupported Intl.DisplayNames type '{t}'",
                 .{display_names.fields.type},

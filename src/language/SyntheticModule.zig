@@ -276,7 +276,7 @@ pub fn evaluate(self: *SyntheticModule, agent: *Agent) std.mem.Allocator.Error!*
     };
 
     // 15. Perform ! Call(promiseCapability.[[Resolve]], undefined, « undefined »).
-    _ = Value.from(promise_capability.resolve).callAssumeCallable(
+    _ = promise_capability.resolve.call(
         agent,
         .undefined,
         &.{.undefined},

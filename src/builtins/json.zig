@@ -118,7 +118,7 @@ const JSONParseRecord = struct {
         array: []const JSONParseRecord,
 
         /// [[Entries]]
-        object: String.HashMapUnmanaged(JSONParseRecord),
+        object: String.HashMap(JSONParseRecord),
     };
 };
 
@@ -231,7 +231,7 @@ fn createJSONParseRecord(
                 std.debug.assert(token == .object_end);
             }
 
-            var entries: String.HashMapUnmanaged(JSONParseRecord) = .empty;
+            var entries: String.HashMap(JSONParseRecord) = .empty;
             try entries.ensureTotalCapacity(agent.gc_allocator, property_nodes.count());
 
             // iii. NOTE: Because value was produced from JSON text and has not been modified, all
@@ -304,6 +304,7 @@ fn internalizeJSONProperty(
     reviver: *Object,
     maybe_parse_record: ?JSONParseRecord,
 ) Agent.Error!Value {
+    std.debug.assert(reviver.internalMethods().call != null);
     const realm = agent.currentRealm();
 
     // 1. Let value be ? Get(holder, name).
@@ -317,7 +318,7 @@ fn internalizeJSONProperty(
 
     const records: union(enum) {
         array: []const JSONParseRecord,
-        object: *const String.HashMapUnmanaged(JSONParseRecord),
+        object: *const String.HashMap(JSONParseRecord),
         none,
     } = blk: {
         // 3. If parseRecord is a JSON Parse Record and SameValue(parseRecord.[[Value]], value) is
@@ -462,7 +463,7 @@ fn internalizeJSONProperty(
     }
 
     // 6. Return ? Call(reviver, holder, « name, value, context »).
-    return Value.from(reviver).callAssumeCallable(agent, Value.from(holder), &.{
+    return reviver.call(agent, Value.from(holder), &.{
         name.toValue(agent) catch unreachable,
         value,
         Value.from(context),
@@ -478,7 +479,7 @@ const JSONSerialization = struct {
     replacer_function: ?*Object,
 
     /// [[PropertyList]]
-    property_list: ?PropertyKey.ArrayHashMapUnmanaged(void),
+    property_list: ?PropertyKey.ArrayHashMap(void),
 
     /// [[Gap]]
     gap: *const String,
@@ -509,14 +510,14 @@ fn serializeJSONProperty(
         // b. If IsCallable(toJSON) is true, then
         if (to_json.isCallable()) {
             // i. Set value to ? Call(toJSON, value, « key »).
-            value = try to_json.callAssumeCallable(agent, value, &.{try key.toValue(agent)});
+            value = try to_json.asObject().call(agent, value, &.{try key.toValue(agent)});
         }
     }
 
     // 3. If state.[[ReplacerFunction]] is not undefined, then
     if (state.replacer_function) |replacer_function| {
         // a. Set value to ? Call(state.[[ReplacerFunction]], holder, « key, value »).
-        value = try Value.from(replacer_function).callAssumeCallable(
+        value = try replacer_function.call(
             agent,
             Value.from(holder),
             &.{ try key.toValue(agent), value },
@@ -708,7 +709,7 @@ fn serializeJSONObject(
     var keys = state.property_list orelse blk: {
         var keys = try value.enumerableOwnProperties(agent, .key);
         defer keys.deinit(agent.gc_allocator);
-        var converted: PropertyKey.ArrayHashMapUnmanaged(void) = .empty;
+        var converted: PropertyKey.ArrayHashMap(void) = .empty;
         try converted.ensureUnusedCapacity(agent.gc_allocator, keys.items.len);
         for (keys.items) |key| {
             converted.putAssumeCapacityNoClobber(key.toPropertyKey(agent) catch |err| try noexcept(err), {});
@@ -1065,7 +1066,7 @@ pub const namespace = struct {
         const indent: *const String = .empty;
 
         // 3. Let propertyList be undefined.
-        var property_list: ?PropertyKey.ArrayHashMapUnmanaged(void) = null;
+        var property_list: ?PropertyKey.ArrayHashMap(void) = null;
         defer if (property_list) |*p| p.deinit(agent.gc_allocator);
 
         // 4. Let replacerFunc be undefined.

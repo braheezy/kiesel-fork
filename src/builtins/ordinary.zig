@@ -535,7 +535,7 @@ pub fn ordinaryGet(
             .value => |value| return value,
             .accessor => |accessor| {
                 const getter = accessor.getter orelse return .undefined;
-                return Value.from(getter).callAssumeCallable(agent, receiver, &.{});
+                return getter.call(agent, receiver, &.{});
             },
         }
     }
@@ -567,7 +567,7 @@ pub fn ordinaryGet(
     const getter = property_desc.getter.? orelse return .undefined;
 
     // 7. Return ? Call(getter, receiver).
-    return Value.from(getter).callAssumeCallable(agent, receiver, &.{});
+    return getter.call(agent, receiver, &.{});
 }
 
 /// 10.1.9 [[Set]] ( propertyKey, value, receiver )
@@ -635,8 +635,8 @@ pub fn ordinarySet(
                     @branchHint(.unlikely);
                     return false;
                 }
-                std.debug.assert(setter_value.isObject());
-                _ = try setter_value.callAssumeCallable(agent, receiver, &.{value});
+                const setter = setter_value.asObject();
+                _ = try setter.call(agent, receiver, &.{value});
             },
         }
         return true;
@@ -748,7 +748,7 @@ pub fn ordinarySetWithOwnDescriptor(
     const setter = own_desc.setter.? orelse return false;
 
     // 6. Perform ? Call(setter, receiver, « value »).
-    _ = try Value.from(setter).callAssumeCallable(agent, receiver_value, &.{value});
+    _ = try setter.call(agent, receiver_value, &.{value});
 
     // 7. Return true.
     return true;

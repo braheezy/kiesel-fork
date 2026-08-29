@@ -212,7 +212,8 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not a string", .{value});
         }
 
-        // 4. Perform ? SetterThatIgnoresPrototypeProperties(this value, %Error.prototype%, "stack", v).
+        // 4. Perform ? SetterThatIgnoresPrototypeProperties(this value, %Error.prototype%, "stack",
+        //    v).
         try this_value.setterThatIgnoresPrototypeProperties(
             agent,
             try realm.intrinsic(.error_prototype),

@@ -170,11 +170,7 @@ pub const prototype = struct {
                 const on_dispose_async_ = captures_.on_dispose_async;
 
                 // a. Return ? Call(onDisposeAsync, undefined, « value »).
-                return Value.from(on_dispose_async_).callAssumeCallable(
-                    agent_,
-                    .undefined,
-                    &.{value_},
-                );
+                return on_dispose_async_.call(agent_, .undefined, &.{value_});
             }
         }.func;
 

@@ -7,6 +7,7 @@ const icu4zig = @import("icu4zig");
 const temporal_rs = @import("temporal_rs");
 
 const abstract_operations = @import("abstract_operations.zig");
+const build_options = @import("build-options");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -27,6 +28,46 @@ const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const resolveOptions = abstract_operations.resolveOptions;
 const systemTimeZoneIdentifier = builtins.systemTimeZoneIdentifier;
 
+/// 11.1.1.1 ChainDateTimeFormat ( dateTimeFormat, newTarget, this )
+/// https://tc39.es/ecma402/#sec-chaindatetimeformat
+fn chainDateTimeFormat(
+    agent: *Agent,
+    date_time_format: *DateTimeFormat,
+    new_target: ?*Object,
+    this: ?Value,
+) Agent.Error!Value {
+    const realm = agent.currentRealm();
+
+    // 1. If newTarget is undefined and ? OrdinaryHasInstance(%Intl.DateTimeFormat%, this) is true,
+    //    then
+    if (new_target == null and
+        try Value.from(try realm.intrinsic(.intl_date_time_format)).ordinaryHasInstance(
+            agent,
+            this.?,
+        ))
+    {
+        // a. Perform ? DefinePropertyOrThrow(this, %Intl%.[[FallbackSymbol]], PropertyDescriptor {
+        //    [[Value]]: dateTimeFormat, [[Writable]]: false, [[Enumerable]]: false,
+        //    [[Configurable]]: false }).
+        try this.?.asObject().definePropertyOrThrow(
+            agent,
+            PropertyKey.from(try realm.intrinsic(.intl_fallback_symbol)),
+            .{
+                .value = Value.from(&date_time_format.object),
+                .writable = false,
+                .enumerable = false,
+                .configurable = false,
+            },
+        );
+
+        // b. Return this.
+        return this.?;
+    }
+
+    // 2. Return dateTimeFormat.
+    return Value.from(&date_time_format.object);
+}
+
 /// 11.1.2 CreateDateTimeFormat ( newTarget, locales, options, required, defaults )
 /// https://tc39.es/ecma402/#sec-createdatetimeformat
 pub fn createDateTimeFormat(
@@ -37,8 +78,7 @@ pub fn createDateTimeFormat(
     required: enum { date, time, any },
     defaults: enum { date, time, all },
 ) Agent.Error!*DateTimeFormat {
-    const iana_parser = icu4zig.IanaParser.init();
-    defer iana_parser.deinit();
+    const gpa = agent.gpa;
 
     // 1. Let dateTimeFormat be ? OrdinaryCreateFromConstructor(newTarget,
     //    "%Intl.DateTimeFormat.prototype%", « [[InitializedDateTimeFormat]], [[Locale]],
@@ -54,13 +94,19 @@ pub fn createDateTimeFormat(
             .calendar = undefined,
             .numbering_system = undefined,
             .time_zone = undefined,
+            .time_zone_string = undefined,
+            .hour_cycle = undefined,
             .date_style = undefined,
             .time_style = undefined,
             .bound_format = null,
         },
     );
 
-    // TODO: 2-3.
+    // 2. Let specialOptions be the Record { [[Hour12]]: undefined }.
+    // 3. Let modifyResolutionOptions be a new Abstract Closure with parameters (options) that
+    //    captures specialOptions and performs the following steps when called:
+    //    [...]
+    // NOTE: We read hour12 directly below, so we don't implement the closure-based approach.
 
     // 4. Let optionsResolution be ? ResolveOptions(%Intl.DateTimeFormat%,
     //    %Intl.DateTimeFormat%.[[LocaleData]], locales, options, « coerce-options »,
@@ -83,7 +129,8 @@ pub fn createDateTimeFormat(
         .{ .coerce_options = true },
     );
 
-    // TODO: 5. Let hour12 be specialOptions.[[Hour12]].
+    // 5. Let hour12 be specialOptions.[[Hour12]].
+    const hour12 = options_resolution.resolved_locale.options.hour12;
 
     // 6. Set options to optionsResolution.[[Options]].
     const options = options_resolution.options;
@@ -107,10 +154,12 @@ pub fn createDateTimeFormat(
         .{ "dangi", .dangi },
         .{ "ethioaa", .ethiopian_amete_alem },
         .{ "ethiopic", .ethiopian },
+        .{ "ethiopic-amete-alem", .ethiopian_amete_alem },
         .{ "gregory", .gregorian },
         .{ "hebrew", .hebrew },
         .{ "indian", .indian },
         .{ "islamic-civil", .hijri_tabular_type_ii_friday },
+        .{ "islamicc", .hijri_tabular_type_ii_friday },
         .{ "islamic-tbla", .hijri_tabular_type_ii_thursday },
         .{ "islamic-umalqura", .hijri_umm_al_qura },
         .{ "islamic", .hijri_simulated_mecca },
@@ -130,25 +179,48 @@ pub fn createDateTimeFormat(
         resolved_locale.options.nu orelse String.fromLiteral("latn");
     date_time_format.fields.numbering_system = numbering_system;
 
-    // TODO: 12-15.
+    // 12. Let resolvedLocaleData be resolvedLocale.[[LocaleData]].
+    // NOTE: ICU4X doesn't have FFI for getting a locale's preferred hour cycle so we approximate.
+    const language = try locale.language(gpa);
+    defer gpa.free(language);
+    const hour_cycle_12_default: DateTimeFormat.Fields.HourCycle = if (std.mem.eql(u8, language, "ja"))
+        .h11
+    else
+        .h12;
+    const hour_cycle_24_default: DateTimeFormat.Fields.HourCycle = .h23;
+    const hour_cycle_default: DateTimeFormat.Fields.HourCycle = hour_cycle_12_default;
+
+    // 13. If hour12 is true, then
+    //     a. Let hc be resolvedLocaleData.[[hourCycle12]].
+    // 14. Else if hour12 is false, then
+    //     a. Let hc be resolvedLocaleData.[[hourCycle24]].
+    // 15. Else,
+    //     a. Assert: hour12 is undefined.
+    //     b. Let hc be resolvedLocale.[[hc]].
+    //     c. If hc is null, set hc to resolvedLocaleData.[[hourCycle]].
+    const hc: DateTimeFormat.Fields.HourCycle = if (hour12) |b|
+        if (b) hour_cycle_12_default else hour_cycle_24_default
+    else blk: {
+        const hc_from_locale = resolved_locale.options.hc orelse
+            if (try locale.getUnicodeExtension(agent.gc_allocator, "hc")) |hc_utf8|
+                try String.fromAscii(agent, hc_utf8)
+            else
+                break :blk hour_cycle_default;
+        break :blk std.StaticStringMap(DateTimeFormat.Fields.HourCycle).initComptime(&.{
+            .{ "h11", .h11 },
+            .{ "h12", .h12 },
+            .{ "h23", .h23 },
+            .{ "h24", .h24 },
+        }).get(hc_from_locale.asAscii()).?;
+    };
 
     // 16. Let timeZone be ? Get(options, "timeZone").
     const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
 
     // 17. If timeZone is undefined, then
-    const time_zone_string = if (time_zone_value.isUndefined()) blk: {
-        // a. Set timeZone to SystemTimeZoneIdentifier().
-        const time_zone = systemTimeZoneIdentifier(agent.platform);
-        if (@TypeOf(time_zone) == void) break :blk "UTC";
-        var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
-        temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner);
-        break :blk try write.toOwnedSlice();
-    } else blk: {
-        // 18. Else,
-        // a. Set timeZone to ? ToString(timeZone).
-        break :blk try (try time_zone_value.toString(agent)).toUtf8(agent.gc_allocator);
-    };
-
+    //     a. Set timeZone to SystemTimeZoneIdentifier().
+    // 18. Else,
+    //     a. Set timeZone to ? ToString(timeZone).
     // 19. If IsTimeZoneOffsetString(timeZone) is true, then
     //     a. Let parseResult be ParseText(StringToCodePoints(timeZone), UTCOffset).
     //     b. Assert: parseResult is a Parse Node.
@@ -162,16 +234,99 @@ pub fn createDateTimeFormat(
     //     a. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(timeZone).
     //     b. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
     //     c. Set timeZone to timeZoneIdentifierRecord.[[PrimaryIdentifier]].
-    // TODO: Detect invalid time zone
+    const time_zone, const time_zone_string = if (build_options.enable_temporal) blk: {
+        if (time_zone_value.isUndefined()) {
+            const time_zone = systemTimeZoneIdentifier(agent.platform);
+            const primary = temporal_rs.success(
+                temporal_rs.c.temporal_rs_TimeZone_primary_identifier(time_zone),
+            ).?;
+            var write: temporal_rs.DiplomatWrite = .init(agent.gc_allocator);
+            defer write.deinit();
+            temporal_rs.c.temporal_rs_TimeZone_identifier(primary, &write.inner);
+            const time_zone_string = try String.fromAscii(agent, try write.toOwnedSlice());
+            break :blk .{ time_zone, time_zone_string };
+        }
+
+        const time_zone_string = try time_zone_value.toString(agent);
+        const time_zone_utf8 = try time_zone_string.toUtf8(gpa);
+        defer gpa.free(time_zone_utf8);
+
+        // Reject cases accepted by temporal_rs (sub-minute precision)
+        if (std.mem.count(u8, time_zone_utf8, ":") <= 1) {
+            if (temporal_rs.success(
+                temporal_rs.c.temporal_rs_TimeZone_try_from_offset_str(
+                    temporal_rs.toDiplomatStringView(time_zone_utf8),
+                ),
+            )) |time_zone| {
+                const formatted_time_zone_string = try String.fromUtf8(
+                    agent,
+                    try formatOffsetTimeZoneIdentifier(
+                        agent.gc_allocator,
+                        time_zone.offset_minutes,
+                    ),
+                );
+                break :blk .{ time_zone, formatted_time_zone_string };
+            }
+            if (temporal_rs.success(
+                temporal_rs.c.temporal_rs_TimeZone_try_from_identifier_str(
+                    temporal_rs.toDiplomatStringView(time_zone_utf8),
+                ),
+            )) |time_zone| {
+                var write: temporal_rs.DiplomatWrite = .init(agent.gc_allocator);
+                defer write.deinit();
+                temporal_rs.c.temporal_rs_TimeZone_identifier(time_zone, &write.inner);
+                const canonical_time_zone_string = try String.fromAscii(
+                    agent,
+                    try write.toOwnedSlice(),
+                );
+                break :blk .{ time_zone, canonical_time_zone_string };
+            }
+        }
+        return agent.throwException(.range_error, "Invalid time zone", .{});
+    } else blk: {
+        if (time_zone_value.isUndefined()) {
+            const time_zone = icu4zig.UtcOffset.fromSeconds(0) catch unreachable;
+            const time_zone_string = String.fromLiteral("UTC");
+            break :blk .{ time_zone, time_zone_string };
+        }
+
+        const time_zone_string = try time_zone_value.toString(agent);
+        const time_zone_utf8 = try time_zone_string.toUtf8(gpa);
+        defer gpa.free(time_zone_utf8);
+
+        // Reject cases accepted by ICU4X (sub-minute precision, "Z")
+        if (std.mem.count(u8, time_zone_utf8, ":") <= 1 and
+            !std.mem.eql(u8, time_zone_utf8, "Z"))
+        {
+            if (icu4zig.UtcOffset.fromString(time_zone_utf8)) |time_zone| {
+                const formatted_time_zone_string = try String.fromUtf8(
+                    agent,
+                    try formatOffsetTimeZoneIdentifier(
+                        agent.gc_allocator,
+                        @intCast(@divTrunc(time_zone.seconds(), 60)),
+                    ),
+                );
+                break :blk .{ time_zone, formatted_time_zone_string };
+            } else |_| {}
+            if (std.mem.eql(u8, time_zone_utf8, "UTC")) {
+                const time_zone = icu4zig.UtcOffset.fromSeconds(0) catch unreachable;
+                break :blk .{ time_zone, time_zone_string };
+            }
+        }
+        return agent.throwException(.range_error, "Invalid time zone", .{});
+    };
 
     // 21. Set dateTimeFormat.[[TimeZone]] to timeZone.
-    date_time_format.fields.time_zone = try String.fromAscii(agent, time_zone_string);
+    date_time_format.fields.time_zone = time_zone;
+    date_time_format.fields.time_zone_string = time_zone_string;
 
     // TODO: 22. Let formatOptions be a new Record.
     // TODO: 23. Set formatOptions.[[hourCycle]] to hc.
 
     // 24. Let hasExplicitFormatComponents be false.
     var has_explicit_format_components = false;
+
+    var has_hour = false;
 
     // 25. For each row of Table 16, except the header row, in table order, do
     inline for (comptime .{
@@ -259,6 +414,10 @@ pub fn createDateTimeFormat(
         if (value != null) {
             // i. Set hasExplicitFormatComponents to true.
             has_explicit_format_components = true;
+
+            if (comptime std.mem.eql(u8, property_key, "hour")) {
+                has_hour = true;
+            }
         }
     }
 
@@ -323,6 +482,8 @@ pub fn createDateTimeFormat(
     else
         null;
 
+    if (time_style != null) has_hour = true;
+
     // 30. Set dateTimeFormat.[[TimeStyle]] to timeStyle.
     date_time_format.fields.time_style = time_style;
 
@@ -375,11 +536,37 @@ pub fn createDateTimeFormat(
     }
 
     // TODO: 33. Set dateTimeFormat.[[DateTimeFormat]] to bestFormat.
-    // TODO: 34. If bestFormat has a field [[hour]], then
-    //           a. Set dateTimeFormat.[[HourCycle]] to hc.
+
+    // 34. If bestFormat has a field [[hour]], then
+    //     a. Set dateTimeFormat.[[HourCycle]] to hc.
+    date_time_format.fields.hour_cycle = if (has_hour) hc else null;
 
     // 35. Return dateTimeFormat.
     return date_time_format;
+}
+
+/// 11.1.3 FormatOffsetTimeZoneIdentifier ( offsetMinutes )
+/// https://tc39.es/ecma402/#sec-formatoffsettimezoneidentifier
+fn formatOffsetTimeZoneIdentifier(
+    gpa: std.mem.Allocator,
+    offset_minutes: i16,
+) std.mem.Allocator.Error![]u8 {
+    // 1. If offsetMinutes ≥ 0, let sign be the code unit 0x002B (PLUS SIGN); otherwise, let sign be
+    //    the code unit 0x002D (HYPHEN-MINUS).
+    const sign: u8 = if (offset_minutes >= 0) '+' else '-';
+
+    // 2. Let absoluteMinutes be abs(offsetMinutes).
+    const absolute_minutes = @abs(offset_minutes);
+
+    // 3. Let hours be floor(absoluteMinutes / 60).
+    const hours = @divTrunc(absolute_minutes, 60);
+
+    // 4. Let minutes be absoluteMinutes modulo 60.
+    const minutes = @mod(absolute_minutes, 60);
+
+    // 5. Return the string-concatenation of sign, ToZeroPaddedDecimalString(hours, 2), the code
+    //    unit 0x003A (COLON), and ToZeroPaddedDecimalString(minutes, 2).
+    return std.fmt.allocPrint(gpa, "{c}{d:0>2}:{d:0>2}", .{ sign, hours, minutes });
 }
 
 /// 11.2 Properties of the Intl.DateTimeFormat Constructor
@@ -388,7 +575,7 @@ pub const constructor = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         const builtin_function = try createBuiltinFunction(
             agent,
-            .{ .constructor = impl },
+            .{ .constructor_with_this = impl },
             0,
             "DateTimeFormat",
             .{ .realm = realm, .proto = try realm.intrinsic(.function_prototype) },
@@ -409,7 +596,12 @@ pub const constructor = struct {
 
     /// 11.1.1 Intl.DateTimeFormat ( [ locales [ , options ] ] )
     /// https://tc39.es/ecma402/#sec-intl.datetimeformat
-    fn impl(agent: *Agent, arguments: Arguments, new_target: ?*Object) Agent.Error!Value {
+    fn impl(
+        agent: *Agent,
+        this_value: ?Value,
+        arguments: Arguments,
+        new_target: ?*Object,
+    ) Agent.Error!Value {
         const locales = arguments.get(0);
         const options = arguments.get(1);
 
@@ -429,8 +621,11 @@ pub const constructor = struct {
 
         // 3. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
-        //    a. Let this be the this value.
-        //    b. Return ? ChainDateTimeFormat(dateTimeFormat, NewTarget, this).
+        if (build_options.enable_annex_b) {
+            // a. Let this be the this value.
+            // b. Return ? ChainDateTimeFormat(dateTimeFormat, NewTarget, this).
+            return chainDateTimeFormat(agent, date_time_format, new_target, this_value);
+        }
 
         // 4. Return dateTimeFormat.
         return Value.from(&date_time_format.object);
@@ -480,8 +675,13 @@ pub const prototype = struct {
         // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
         //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
+        const date_time_format_value = if (build_options.enable_annex_b)
+            try unwrapDateTimeFormat(agent, this_value)
+        else
+            this_value;
+
         // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
-        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
+        const date_time_format = try date_time_format_value.requireInternalSlot(agent, DateTimeFormat);
 
         // 4. Let options be OrdinaryObjectCreate(%Object.prototype%).
         const options = try ordinaryObjectCreate(
@@ -537,6 +737,21 @@ pub const prototype = struct {
             PropertyKey.from("timeZone"),
             Value.from(resolved_options.time_zone),
         );
+        if (resolved_options.hour_cycle) |hour_cycle| {
+            const hour12 =
+                std.mem.eql(u8, hour_cycle.asAscii(), "h11") or
+                std.mem.eql(u8, hour_cycle.asAscii(), "h12");
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("hourCycle"),
+                Value.from(hour_cycle),
+            );
+            try options.createDataPropertyDirect(
+                agent,
+                PropertyKey.from("hour12"),
+                Value.from(hour12),
+            );
+        }
         if (resolved_options.date_style) |date_style| {
             try options.createDataPropertyDirect(
                 agent,
@@ -551,8 +766,8 @@ pub const prototype = struct {
                 Value.from(time_style),
             );
         }
-        // TODO: hourCycle, hour12, weekday, era, year, month, day, dayPeriod, hour, minute,
-        //       second, fractionalSecondDigits, timeZoneName
+        // TODO: weekday, era, year, month, day, dayPeriod, hour, minute, second,
+        //       fractionalSecondDigits, timeZoneName
 
         // 6. Return options.
         return Value.from(options);
@@ -565,8 +780,13 @@ pub const prototype = struct {
         // 2. If the implementation supports the normative optional constructor mode of 4.3 Note 1,
         //    then
         //     a. Set dtf to ? UnwrapDateTimeFormat(dtf).
+        const date_time_format_value = if (build_options.enable_annex_b)
+            try unwrapDateTimeFormat(agent, this_value)
+        else
+            this_value;
+
         // 3. Perform ? RequireInternalSlot(dtf, [[InitializedDateTimeFormat]]).
-        const date_time_format = try this_value.requireInternalSlot(agent, DateTimeFormat);
+        const date_time_format = try date_time_format_value.requireInternalSlot(agent, DateTimeFormat);
 
         // 4. If dtf.[[BoundFormat]] is undefined, then
         if (date_time_format.fields.bound_format == null) {
@@ -655,6 +875,16 @@ pub const prototype = struct {
 /// https://tc39.es/ecma402/#sec-properties-of-intl-datetimeformat-instances
 pub const DateTimeFormat = MakeObject(.{
     .Fields = struct {
+        pub const TimeZone = if (build_options.enable_temporal)
+            temporal_rs.c.TimeZone
+        else
+            icu4zig.UtcOffset;
+        pub const HourCycle = enum {
+            h11,
+            h12,
+            h23,
+            h24,
+        };
         pub const DateStyle = enum {
             full,
             long,
@@ -678,9 +908,13 @@ pub const DateTimeFormat = MakeObject(.{
         numbering_system: *const String,
 
         /// [[TimeZone]]
-        time_zone: *const String,
+        time_zone: TimeZone,
 
-        // TODO: [[HourCycle]]
+        /// [[TimeZone]] as a canonical string
+        time_zone_string: *const String,
+
+        /// [[HourCycle]]
+        hour_cycle: ?HourCycle,
 
         /// [[DateStyle]]
         date_style: ?DateStyle,
@@ -695,6 +929,7 @@ pub const DateTimeFormat = MakeObject(.{
             calendar: *const String,
             numbering_system: *const String,
             time_zone: *const String,
+            hour_cycle: ?*const String,
             date_style: ?*const String,
             time_style: ?*const String,
         };
@@ -703,7 +938,13 @@ pub const DateTimeFormat = MakeObject(.{
             return .{
                 .calendar = calendarToBcp47(self.calendar),
                 .numbering_system = self.numbering_system,
-                .time_zone = self.time_zone,
+                .time_zone = self.time_zone_string,
+                .hour_cycle = if (self.hour_cycle) |hour_cycle| switch (hour_cycle) {
+                    .h11 => String.fromLiteral("h11"),
+                    .h12 => String.fromLiteral("h12"),
+                    .h23 => String.fromLiteral("h23"),
+                    .h24 => String.fromLiteral("h24"),
+                } else null,
                 .date_style = if (self.date_style) |date_style| switch (date_style) {
                     .full => String.fromLiteral("full"),
                     .long => String.fromLiteral("long"),
@@ -725,19 +966,23 @@ pub const DateTimeFormat = MakeObject(.{
 
 /// 11.5.7 FormatDateTime ( dateTimeFormat, x )
 /// https://tc39.es/ecma402/#sec-formatdatetime
-pub fn formatDateTime(agent: *Agent, date_time_format: *const DateTimeFormat, x_: f64) Agent.Error!Value {
+pub fn formatDateTime(
+    agent: *Agent,
+    date_time_format: *const DateTimeFormat,
+    x_: f64,
+) Agent.Error!Value {
     // 1. Let parts be ? PartitionDateTimePattern(dateTimeFormat, x).
     // 2. Let result be the empty String.
     // 3. For each Record { [[Type]], [[Value]] } part of parts, do
     //     a. Set result to the string-concatenation of result and part.[[Value]].
     // 4. Return result.
-    const date = @import("../date.zig");
-    const x = date.timeClip(x_);
+    const x = builtins.date.timeClip(x_);
     if (std.math.isNan(x)) return agent.throwException(.range_error, "Invalid time value", .{});
+    const x_epoch_nanoseconds = @as(i128, @intFromFloat(x)) * std.time.ns_per_ms;
     const result = formatDateTimeImpl(
         agent.gc_allocator,
         date_time_format,
-        x,
+        x_epoch_nanoseconds,
     ) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
         else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
@@ -753,102 +998,293 @@ const FormatDateTimeError =
     icu4zig.Rfc9557ParseError;
 
 fn formatDateTimeImpl(
-    allocator: std.mem.Allocator,
+    gpa: std.mem.Allocator,
     date_time_format: *const DateTimeFormat,
-    x: f64,
+    x_epoch_nanoseconds: i128,
 ) FormatDateTimeError![]const u8 {
-    const date = try icu4zig.IsoDate.init(
-        builtins.date.yearFromTime(x),
-        builtins.date.monthFromTime(x) + 1,
-        builtins.date.dateFromTime(x),
+    const local_time = try toLocalTime(
+        x_epoch_nanoseconds,
+        date_time_format.fields.time_zone,
+        date_time_format.fields.time_zone_string,
     );
-    defer date.deinit();
+    defer local_time.deinit();
 
-    const time = try icu4zig.Time.init(
-        builtins.date.hourFromTime(x),
-        builtins.date.minFromTime(x),
-        builtins.date.secFromTime(x),
-        @as(u32, @intCast(builtins.date.msFromTime(x))) * 1_000_000,
-    );
-    defer time.deinit();
+    const iso_date = local_time.iso_date;
+    const time = local_time.time;
+    const zone = local_time.zone;
 
-    const iana_parser = icu4zig.IanaParser.init();
-    defer iana_parser.deinit();
-    const time_zone = iana_parser.parse(date_time_format.fields.time_zone.asAscii());
-    time_zone.deinit();
-    const offset = icu4zig.UtcOffset.fromString(date_time_format.fields.time_zone.asAscii()) catch
-        icu4zig.UtcOffset.fromSeconds(0) catch
-        unreachable;
-    defer offset.deinit();
-    const time_zone_info = time_zone.withOffset(offset);
-    defer time_zone_info.deinit();
+    const locale = date_time_format.fields.locale;
 
-    // TODO: Implement DateTimeFormatter in a way where the underlying format is selectable, currently hardcoded to ymdt
-    const date_time_formatter = try icu4zig.DateTimeFormatter.init(
-        date_time_format.fields.locale,
-        switch (date_time_format.fields.date_style orelse .short) {
+    if (date_time_format.fields.date_style) |date_style| {
+        const length: icu4zig.DateTimeFormatter.DateTimeLength = switch (date_style) {
             .full, .long => .long,
             .medium => .medium,
             .short => .short,
-        },
-        switch (date_time_format.fields.time_style orelse .short) {
-            .full => .subsecond9,
-            .long => .second,
-            .medium => .minute,
-            .short => .hour,
-        },
-        .auto,
-        .auto,
-    );
-    defer date_time_formatter.deinit();
-    const zoned_date_time_formatter = try icu4zig.ZonedDateTimeFormatter.init(
-        date_time_format.fields.locale,
-        date_time_formatter,
-    );
-    defer zoned_date_time_formatter.deinit();
-    const result = try zoned_date_time_formatter.formatIso(
-        allocator,
-        date,
-        time,
-        time_zone_info,
-    );
+        };
 
-    return result;
+        if (date_time_format.fields.time_style) |time_style| {
+            const precision: icu4zig.DateTimeFormatter.TimePrecision = switch (time_style) {
+                .full, .long, .medium => .second,
+                .short => .minute,
+            };
+
+            const date_time_formatter: icu4zig.DateTimeFormatter = switch (date_style) {
+                .full => try .createYmdet(locale, length, precision, .auto, .auto),
+                .long, .medium, .short => try .createYmdt(locale, length, precision, .auto, .auto),
+            };
+            defer date_time_formatter.deinit();
+            const zoned_date_time_formatter: icu4zig.ZonedDateTimeFormatter = switch (time_style) {
+                .full => try .createSpecificLong(locale, date_time_formatter),
+                .long => try .createSpecificShort(locale, date_time_formatter),
+                .medium, .short => {
+                    return date_time_formatter.formatIso(gpa, iso_date, time);
+                },
+            };
+            defer zoned_date_time_formatter.deinit();
+            return zoned_date_time_formatter.formatIso(gpa, iso_date, time, zone);
+        } else {
+            const date_formatter: icu4zig.DateFormatter = switch (date_style) {
+                .full => try .createYmde(locale, length, .auto, .auto),
+                .long, .medium, .short => try .createYmd(locale, length, .auto, .auto),
+            };
+            defer date_formatter.deinit();
+            return date_formatter.formatIso(gpa, iso_date);
+        }
+    } else if (date_time_format.fields.time_style) |time_style| {
+        const length: icu4zig.DateTimeFormatter.DateTimeLength = switch (time_style) {
+            .full, .long => .long,
+            .medium => .medium,
+            .short => .short,
+        };
+        const precision: icu4zig.DateTimeFormatter.TimePrecision = switch (time_style) {
+            .full, .long, .medium => .second,
+            .short => .minute,
+        };
+
+        const zoned_time_formatter: icu4zig.ZonedTimeFormatter = switch (time_style) {
+            .full => try .createSpecificLong(locale, length, precision, .auto),
+            .long => try .createSpecificShort(locale, length, precision, .auto),
+            .medium, .short => {
+                const time_formatter: icu4zig.TimeFormatter = try .create(
+                    locale,
+                    length,
+                    precision,
+                    .auto,
+                );
+                defer time_formatter.deinit();
+                return time_formatter.format(gpa, time);
+            },
+        };
+        defer zoned_time_formatter.deinit();
+        return zoned_time_formatter.format(gpa, time, zone);
+    } else {
+        const date_formatter = try icu4zig.DateFormatter.createYmd(locale, .short, .auto, .full);
+        defer date_formatter.deinit();
+        return date_formatter.formatIso(gpa, iso_date);
+    }
 }
 
 /// 11.5.10 FormatDateTimeRange ( dateTimeFormat, x, y )
 /// https://tc39.es/ecma402/#sec-formatdatetimerange
-pub fn formatDateTimeRange(agent: *Agent, date_time_format: *const DateTimeFormat, x_: f64, y_: f64) Agent.Error!Value {
+pub fn formatDateTimeRange(
+    agent: *Agent,
+    date_time_format: *const DateTimeFormat,
+    x_: f64,
+    y_: f64,
+) Agent.Error!Value {
     // 1. Let parts be ? PartitionDateTimeRangePattern(dateTimeFormat, x, y).
     // 2. Let result be the empty String.
     // 3. For each Record { [[Type]], [[Value]], [[Source]] } part of parts, do
     //     a. Set result to the string-concatenation of result and part.[[Value]].
     // 4. Return result.
-    const date = @import("../date.zig");
-    const x = date.timeClip(x_);
+    const x = builtins.date.timeClip(x_);
     if (std.math.isNan(x)) return agent.throwException(.range_error, "Invalid time value", .{});
-    const y = date.timeClip(y_);
+    const y = builtins.date.timeClip(y_);
     if (std.math.isNan(y)) return agent.throwException(.range_error, "Invalid time value", .{});
-    const result_x = formatDateTimeImpl(
+    const x_epoch_nanoseconds = @as(i128, @intFromFloat(x)) * std.time.ns_per_ms;
+    const y_epoch_nanoseconds = @as(i128, @intFromFloat(y)) * std.time.ns_per_ms;
+    const result = formatDateTimeRangeImpl(
         agent.gc_allocator,
         date_time_format,
-        x,
+        x_epoch_nanoseconds,
+        y_epoch_nanoseconds,
     ) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
         else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
     };
-    const result_y = formatDateTimeImpl(
-        agent.gc_allocator,
-        date_time_format,
-        y,
-    ) catch |err| switch (err) {
-        error.OutOfMemory => |e| return e,
-        else => return agent.throwException(.internal_error, "Unhandled ICU4X error: {t}", .{err}),
-    };
-    if (std.mem.eql(u8, result_x, result_y)) {
-        return Value.from(try String.fromUtf8(agent, result_x));
-    } else {
-        const result = try std.mem.concat(agent.gc_allocator, u8, &.{ result_x, " – ", result_y });
-        return Value.from(try String.fromUtf8(agent, result));
+    return Value.from(try String.fromUtf8(agent, result));
+}
+
+fn formatDateTimeRangeImpl(
+    gpa: std.mem.Allocator,
+    date_time_format: *const DateTimeFormat,
+    x_epoch_nanoseconds: i128,
+    y_epoch_nanoseconds: i128,
+) FormatDateTimeError![]const u8 {
+    const formatted_x = try formatDateTimeImpl(gpa, date_time_format, x_epoch_nanoseconds);
+    const formatted_y = try formatDateTimeImpl(gpa, date_time_format, y_epoch_nanoseconds);
+    if (std.mem.eql(u8, formatted_x, formatted_y)) {
+        return formatted_x;
     }
+
+    const local_time_x = try toLocalTime(
+        x_epoch_nanoseconds,
+        date_time_format.fields.time_zone,
+        date_time_format.fields.time_zone_string,
+    );
+    defer local_time_x.deinit();
+
+    const local_time_y = try toLocalTime(
+        y_epoch_nanoseconds,
+        date_time_format.fields.time_zone,
+        date_time_format.fields.time_zone_string,
+    );
+    defer local_time_y.deinit();
+
+    const iso_date_x = local_time_x.iso_date;
+    const time_x = local_time_x.time;
+
+    const iso_date_y = local_time_y.iso_date;
+    const time_y = local_time_y.time;
+
+    const locale = date_time_format.fields.locale;
+
+    const length: icu4zig.DateTimeFormatter.DateTimeLength = switch (date_time_format.fields.date_style orelse .short) {
+        .full, .long => .long,
+        .medium => .medium,
+        .short => .short,
+    };
+
+    if (date_time_format.fields.time_style) |time_style| {
+        const precision: icu4zig.DateTimeFormatter.TimePrecision = switch (time_style) {
+            .full, .long, .medium => .second,
+            .short => .minute,
+        };
+
+        const date_time_range_formatter = try icu4zig.DateTimeRangeFormatter.createYmdt(
+            locale,
+            length,
+            precision,
+            .auto,
+            .auto,
+        );
+        defer date_time_range_formatter.deinit();
+        return date_time_range_formatter.formatIso(gpa, iso_date_x, time_x, iso_date_y, time_y);
+    } else {
+        const date_range_formatter = try icu4zig.DateRangeFormatter.createYmd(
+            locale,
+            length,
+            .auto,
+            .auto,
+        );
+        defer date_range_formatter.deinit();
+        return date_range_formatter.formatIso(gpa, iso_date_x, iso_date_y);
+    }
+}
+
+/// 11.5.13 ToLocalTime Records
+/// https://tc39.es/ecma402/#sec-datetimeformat-tolocaltime-records
+const ToLocalTimeResult = struct {
+    iso_date: icu4zig.IsoDate,
+    time: icu4zig.Time,
+    zone: icu4zig.TimeZoneInfo,
+
+    fn deinit(result: *const ToLocalTimeResult) void {
+        result.iso_date.deinit();
+        result.time.deinit();
+        result.zone.deinit();
+    }
+};
+
+const ToLocalTimeError =
+    std.mem.Allocator.Error ||
+    icu4zig.CalendarError ||
+    icu4zig.Rfc9557ParseError;
+
+/// 11.5.12 ToLocalTime ( epochNs, calendar, timeZoneIdentifier )
+/// https://tc39.es/ecma402/#sec-tolocaltime
+fn toLocalTime(
+    epoch_nanoseconds: i128,
+    time_zone: DateTimeFormat.Fields.TimeZone,
+    time_zone_string: *const String,
+) ToLocalTimeError!ToLocalTimeResult {
+    // 1. If IsTimeZoneOffsetString(timeZoneIdentifier) is true, then
+    //     a. Let offsetNs be ParseTimeZoneOffsetString(timeZoneIdentifier).
+    // 2. Else,
+    //     a. Assert: GetAvailableNamedTimeZoneIdentifier(timeZoneIdentifier) is not empty.
+    //     b. Let offsetNs be GetNamedTimeZoneOffsetNanoseconds(timeZoneIdentifier, epochNs).
+    const offset_nanoseconds = if (build_options.enable_temporal) blk: {
+        break :blk if (builtins.date.isTimeZoneOffsetString(time_zone))
+            @as(i64, time_zone.offset_minutes) * std.time.ns_per_min
+        else
+            builtins.date.getNamedTimeZoneOffsetNanoseconds(time_zone, epoch_nanoseconds);
+    } else blk: {
+        break :blk @as(i64, time_zone.seconds()) * std.time.ns_per_s;
+    };
+
+    // 3. Let tz be ℝ(epochNs) + offsetNs.
+    const epoch_nanoseconds_local = epoch_nanoseconds + @as(i128, offset_nanoseconds);
+
+    const offset_seconds: i32 = @intCast(@divTrunc(offset_nanoseconds, std.time.ns_per_s));
+    const epoch_milliseconds: i64 = @intCast(@divTrunc(epoch_nanoseconds, std.time.ns_per_ms));
+    const epoch_milliseconds_local: i64 = @intCast(@divTrunc(epoch_nanoseconds_local, std.time.ns_per_ms));
+
+    // 4. If calendar is "gregory", then
+    //     a. Return a ToLocalTime Record with fields calculated from tz according to Table 17.
+    // 5. Else,
+    //     a. Return a ToLocalTime Record with the fields calculated from tz for the given calendar.
+    //        The calculations should use best available information about the specified calendar.
+    const offset = icu4zig.UtcOffset.fromSeconds(offset_seconds) catch unreachable;
+    defer offset.deinit();
+    const iana_parser: icu4zig.IanaParser = .init();
+    defer iana_parser.deinit();
+    const icu_time_zone = iana_parser.parse(time_zone_string.asAscii());
+    defer icu_time_zone.deinit();
+    const zone = icu_time_zone.withOffset(offset).atTimestamp(epoch_milliseconds);
+    const iso_date: icu4zig.IsoDate = try .init(
+        builtins.date.yearFromTime(@floatFromInt(epoch_milliseconds_local)),
+        builtins.date.monthFromTime(@floatFromInt(epoch_milliseconds_local)) + 1,
+        builtins.date.dateFromTime(@floatFromInt(epoch_milliseconds_local)),
+    );
+    const time: icu4zig.Time = try .init(
+        builtins.date.hourFromTime(@floatFromInt(epoch_milliseconds_local)),
+        builtins.date.minuteFromTime(@floatFromInt(epoch_milliseconds_local)),
+        builtins.date.secondFromTime(@floatFromInt(epoch_milliseconds_local)),
+        @as(u32, @intCast(builtins.date.millisecondFromTime(@floatFromInt(epoch_milliseconds_local)))) * std.time.ns_per_ms,
+    );
+    return .{
+        .iso_date = iso_date,
+        .time = time,
+        .zone = zone,
+    };
+}
+
+/// 11.5.14 UnwrapDateTimeFormat ( dtf )
+/// https://tc39.es/ecma402/#sec-unwrapdatetimeformat
+fn unwrapDateTimeFormat(agent: *Agent, date_time_format_value: Value) Agent.Error!Value {
+    const realm = agent.currentRealm();
+
+    // 1. If dtf is not an Object, throw a TypeError exception.
+    if (!date_time_format_value.isObject()) {
+        return agent.throwException(.type_error, "this value must be an object", .{});
+    }
+    const date_time_format = date_time_format_value.asObject();
+
+    // 2. If dtf does not have an [[InitializedDateTimeFormat]] internal slot and
+    //    ? OrdinaryHasInstance(%Intl.DateTimeFormat%, dtf) is true, then
+    if (!date_time_format.is(DateTimeFormat) and
+        try Value.from(try realm.intrinsic(.intl_date_time_format)).ordinaryHasInstance(
+            agent,
+            date_time_format_value,
+        ))
+    {
+        // a. Return ? Get(dtf, %Intl%.[[FallbackSymbol]]).
+        return date_time_format.get(
+            agent,
+            PropertyKey.from(try realm.intrinsic(.intl_fallback_symbol)),
+        );
+    }
+
+    // 3. Return dtf.
+    return date_time_format_value;
 }

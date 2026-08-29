@@ -1,8 +1,6 @@
 //! 9.1.1.2 Object Environment Records
 //! https://tc39.es/ecma262/#sec-object-environment-records
 
-const std = @import("std");
-
 const environments = @import("../environments.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
@@ -240,7 +238,7 @@ pub fn getBindingValueIfExists(
             .value => |value| return value,
             .accessor => |accessor| {
                 const getter = accessor.getter orelse return .undefined;
-                return try Value.from(getter).callAssumeCallable(agent, Value.from(object), &.{});
+                return try getter.call(agent, Value.from(object), &.{});
             },
         }
     }
@@ -295,8 +293,8 @@ pub fn setMutableBindingIfExists(
                     }
                     return true;
                 }
-                std.debug.assert(setter_value.isObject());
-                _ = try setter_value.callAssumeCallable(agent, Value.from(object), &.{value});
+                const setter = setter_value.asObject();
+                _ = try setter.call(agent, Value.from(object), &.{value});
             },
         }
         return true;

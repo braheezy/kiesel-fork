@@ -16,7 +16,7 @@ const sameValueZero = types.sameValueZero;
 const FindViaPredicateDirection = builtins.array.FindViaPredicateDirection;
 const FindViaPredicateResult = builtins.array.FindViaPredicateResult;
 
-fn lastIndexOfScalarPos(comptime T: type, slice: []const T, start_index: usize, value: T) ?usize {
+fn findLastScalarPos(comptime T: type, slice: []const T, start_index: usize, value: T) ?usize {
     var i: usize = start_index;
     while (true) : (i -= 1) {
         if (slice[i] == value) return i;
@@ -48,12 +48,13 @@ fn toF64(value: Value) ?f64 {
 fn cb(
     agent: *Agent,
     obj: *Object,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
     value: Value,
     index: usize,
 ) Agent.Error!void {
-    _ = try callback.callAssumeCallable(
+    std.debug.assert(callback.internalMethods().call != null);
+    _ = try callback.call(
         agent,
         this_arg,
         &.{ value, Value.from(@as(u53, @intCast(index))), Value.from(obj) },
@@ -63,12 +64,13 @@ fn cb(
 fn cbToBool(
     agent: *Agent,
     obj: *Object,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
     value: Value,
     index: usize,
 ) Agent.Error!bool {
-    const result = try callback.callAssumeCallable(
+    std.debug.assert(callback.internalMethods().call != null);
+    const result = try callback.call(
         agent,
         this_arg,
         &.{ value, Value.from(@as(u53, @intCast(index))), Value.from(obj) },
@@ -88,7 +90,7 @@ pub fn every(
     agent: *Agent,
     obj: *Object,
     length: u53,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done: bool,
@@ -218,7 +220,7 @@ pub fn findViaPredicate(
     obj: *Object,
     length: u53,
     comptime direction: FindViaPredicateDirection,
-    predicate: Value,
+    predicate: *Object,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done: FindViaPredicateResult,
@@ -317,7 +319,7 @@ pub fn forEach(
     agent: *Agent,
     obj: *Object,
     length: u53,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done,
@@ -501,7 +503,7 @@ pub fn lastIndexOf(obj: *Object, length: u53, from_index: u53, search_element: V
         .none => {},
         .dense_i32 => |dense_i32| {
             const search_element_i32 = toI32(search_element) orelse return Value.from(-1);
-            if (lastIndexOfScalarPos(
+            if (findLastScalarPos(
                 i32,
                 dense_i32.items,
                 start_index,
@@ -512,7 +514,7 @@ pub fn lastIndexOf(obj: *Object, length: u53, from_index: u53, search_element: V
         },
         .dense_f64 => |dense_f64| {
             const search_element_f64 = toF64(search_element) orelse return Value.from(-1);
-            if (lastIndexOfScalarPos(
+            if (findLastScalarPos(
                 f64,
                 dense_f64.items,
                 start_index,
@@ -708,7 +710,7 @@ pub fn some(
     agent: *Agent,
     obj: *Object,
     length: u53,
-    callback: Value,
+    callback: *Object,
     this_arg: Value,
 ) Agent.Error!?union(enum) {
     done: bool,

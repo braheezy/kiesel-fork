@@ -214,7 +214,7 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-weakmap.prototype.getorinsertcomputed
     fn getOrInsertComputed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
-        const callback = arguments.get(1);
+        const callback_value = arguments.get(1);
 
         // 1. Let weakMap be the this value.
         // 2. Perform ? RequireInternalSlot(weakMap, [[WeakMapData]]).
@@ -226,9 +226,10 @@ pub const prototype = struct {
         }
 
         // 4. If IsCallable(callback) is false, throw a TypeError exception.
-        if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{f} is not callable", .{callback});
+        if (!callback_value.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not callable", .{callback_value});
         }
+        const callback = callback_value.asObject();
 
         // 5. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
         //     a. If entry.[[Key]] is not empty and SameValue(entry.[[Key]], key) is true, return
@@ -238,7 +239,7 @@ pub const prototype = struct {
         if (weak_map_data.get(weak_key)) |value| return value;
 
         // 6. Let value be ? Call(callback, undefined, « key »).
-        const value = try callback.callAssumeCallable(agent, .undefined, &.{key});
+        const value = try callback.call(agent, .undefined, &.{key});
 
         // 7. NOTE: The WeakMap may have been modified during execution of callback.
         // 8. For each Record { [[Key]], [[Value]] } entry of weakMap.[[WeakMapData]], do
@@ -343,7 +344,7 @@ pub const prototype = struct {
     }
 };
 
-const WeakMapData = Value.Weak.HashMapUnmanaged(Value);
+const WeakMapData = Value.Weak.HashMap(Value);
 
 /// 24.3.4 Properties of WeakMap Instances
 /// https://tc39.es/ecma262/#sec-properties-of-weakmap-instances

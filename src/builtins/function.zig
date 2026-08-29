@@ -503,18 +503,17 @@ pub const prototype = struct {
         const arg_array = arguments.get(1);
 
         // 1. Let func be the this value.
-        const func = this_value;
-
         // 2. If IsCallable(func) is false, throw a TypeError exception.
-        if (!func.isCallable()) {
-            return agent.throwException(.type_error, "{f} is not a function", .{func});
+        if (!this_value.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not a function", .{this_value});
         }
+        const func = this_value.asObject();
 
         // 3. If argArray is either undefined or null, then
         if (arg_array.isUndefined() or arg_array.isNull()) {
             // a. Perform PrepareForTailCall().
             // b. Return ? Call(func, thisArg).
-            return func.callAssumeCallable(agent, this_arg, &.{});
+            return func.call(agent, this_arg, &.{});
         }
 
         // 4. Let argList be ? CreateListFromArrayLike(argArray).
@@ -522,7 +521,7 @@ pub const prototype = struct {
 
         // 5. Perform PrepareForTailCall().
         // 6. Return ? Call(func, thisArg, argList).
-        return func.callAssumeCallable(agent, this_arg, arg_list);
+        return func.call(agent, this_arg, arg_list);
     }
 
     /// 20.2.3.2 Function.prototype.bind ( thisArg, ...args )
@@ -601,16 +600,15 @@ pub const prototype = struct {
         const args = if (arguments.count() <= 1) &[_]Value{} else arguments.values[1..];
 
         // 1. Let func be the this value.
-        const func = this_value;
-
         // 2. If IsCallable(func) is false, throw a TypeError exception.
-        if (!func.isCallable()) {
-            return agent.throwException(.type_error, "{f} is not a function", .{func});
+        if (!this_value.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not a function", .{this_value});
         }
+        const func = this_value.asObject();
 
         // 3. Perform PrepareForTailCall().
         // 4. Return ? Call(func, thisArg, args).
-        return func.callAssumeCallable(agent, this_arg, args);
+        return func.call(agent, this_arg, args);
     }
 
     /// 20.2.3.5 Function.prototype.toString ( )

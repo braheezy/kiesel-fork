@@ -2,18 +2,6 @@ const std = @import("std");
 
 const build_crab = @import("build_crab");
 
-/// Helper to determine if a target query is considered "native" for the purpose of Rust
-/// cross-compilation. `std.Target.Query.isNative()` considers the CPU model as well, but since
-/// that's not included when translating to a rust target we should limit the check to arch, OS,
-/// and ABI. This allows building with `-Dcpu=baseline` and no explicit `-Dtarget` without
-/// forcing the use of Rust nightly for `-Zbuild-std`.
-fn targetQueryIsNativeish(query: std.Target.Query) bool {
-    return query.cpu_arch == null and
-        query.os_tag == null and
-        query.abi == null and
-        query.ofmt == null;
-}
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -39,11 +27,6 @@ pub fn build(b: *std.Build) void {
     if (optimize != .Debug) {
         cargo_args.append(b.allocator, "--release") catch @panic("OOM");
     }
-    if (!targetQueryIsNativeish(target.query)) {
-        // Required for cross-compilation, most targets won't be installed.
-        // -Z requires nightly so we don't enforce this for native builds.
-        cargo_args.appendSlice(b.allocator, &.{ "-Z", "build-std=std,panic_abort" }) catch @panic("OOM");
-    }
 
     const build_dir = build_crab.addCargoBuild(
         b,
@@ -57,11 +40,11 @@ pub fn build(b: *std.Build) void {
         },
     );
 
-    // Exporting a static library as a build system artifact here would be nicer but linking a
-    // static "system" library (libtemporal_capi.a) to another static library (the artifact) causes
-    // issues: https://github.com/ziglang/zig/issues/20476
-    // So for now we export the paths and do a bit of manual setup in the main build.zig.
-    b.addNamedLazyPath("lib", build_dir);
+    const zement = b.addModule("zement", .{
+        .root_source_file = b.path("src/root.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const unwind_stubs = b.addLibrary(.{
         .linkage = .static,
@@ -72,5 +55,21 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
         }),
     });
-    b.installArtifact(unwind_stubs);
+
+    // NOTE: Rust outputs 'libzement.a' instead of 'zement.lib' when targeting
+    // *-pc-windows-gnu, so we can hardcode the name here instead of using
+    // `std.zig.binNameAlloc()` to select a target-dependent prefix and extension.
+    // See: https://github.com/rust-lang/rust/pull/70937
+    zement.addObjectFile(build_dir.path(b, "libzement.a"));
+    // icu4zig provides its own copies of these symbols so we link them as a
+    // static library which will only include them if needed.
+    zement.linkLibrary(unwind_stubs);
+
+    // NOTE: Empirically these are not needed in release builds, presumably due to LTO.
+    if (target.result.os.tag == .windows and optimize == .Debug) {
+        // For GetUserProfileDirectoryW
+        zement.linkSystemLibrary("userenv", .{});
+        // For a bunch of networking APIs
+        zement.linkSystemLibrary("ws2_32", .{});
+    }
 }

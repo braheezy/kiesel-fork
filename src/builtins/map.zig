@@ -59,6 +59,8 @@ pub fn addEntriesFromIterable(
     iterable: Value,
     adder: *Object,
 ) Agent.Error!*Object {
+    std.debug.assert(adder.internalMethods().call != null);
+
     // 1. Let iteratorRecord be ? GetIterator(iterable, sync).
     var iterator = try getIterator(agent, iterable, .sync);
 
@@ -92,7 +94,7 @@ pub fn addEntriesFromIterable(
         };
 
         // h. Let status be Completion(Call(adder, target, « key, value »)).
-        _ = Value.from(adder).callAssumeCallable(agent, Value.from(target), &.{ key, value }) catch |err| {
+        _ = adder.call(agent, Value.from(target), &.{ key, value }) catch |err| {
             // i. IfAbruptCloseIterator(status, iteratorRecord).
             return iterator.close(agent, @as(Agent.Error!*Object, err));
         };
@@ -326,7 +328,7 @@ pub const prototype = struct {
     /// 24.1.3.5 Map.prototype.forEach ( callback [ , thisArg ] )
     /// https://tc39.es/ecma262/#sec-map.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
-        const callback = arguments.get(0);
+        const callback_value = arguments.get(0);
         const this_arg = arguments.get(1);
 
         // 1. Let map be the this value.
@@ -334,9 +336,10 @@ pub const prototype = struct {
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
-        if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{f} is not callable", .{callback});
+        if (!callback_value.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not callable", .{callback_value});
         }
+        const callback = callback_value.asObject();
 
         map.fields.active_iterators += 1;
         defer map.fields.active_iterators -= 1;
@@ -360,7 +363,7 @@ pub const prototype = struct {
             // c. If entry.[[Key]] is not empty, then
             if (!entry.key.isUninitialized()) {
                 // i. Perform ? Call(callback, thisArg, « entry.[[Value]], entry.[[Key]], map »).
-                _ = try callback.callAssumeCallable(
+                _ = try callback.call(
                     agent,
                     this_arg,
                     &.{ entry.value, entry.key, Value.from(&map.object) },
@@ -429,16 +432,17 @@ pub const prototype = struct {
     /// https://tc39.es/ecma262/#sec-map.prototype.getorinsertcomputed
     fn getOrInsertComputed(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         var key = arguments.get(0);
-        const callback = arguments.get(1);
+        const callback_value = arguments.get(1);
 
         // 1. Let map be the this value.
         // 2. Perform ? RequireInternalSlot(map, [[MapData]]).
         const map = try this_value.requireInternalSlot(agent, Map);
 
         // 3. If IsCallable(callback) is false, throw a TypeError exception.
-        if (!callback.isCallable()) {
-            return agent.throwException(.type_error, "{f} is not callable", .{callback});
+        if (!callback_value.isCallable()) {
+            return agent.throwException(.type_error, "{f} is not callable", .{callback_value});
         }
+        const callback = callback_value.asObject();
 
         // 4. Set key to CanonicalizeKeyedCollectionKey(key).
         key = key.canonicalizeKeyedCollectionKey();
@@ -449,7 +453,7 @@ pub const prototype = struct {
         if (map.fields.map_data.get(key)) |value| return value;
 
         // 6. Let value be ? Call(callback, undefined, « key »).
-        const value = try callback.callAssumeCallable(agent, .undefined, &.{key});
+        const value = try callback.call(agent, .undefined, &.{key});
 
         // 7. NOTE: The Map may have been modified during execution of callback.
         // 8. For each Record { [[Key]], [[Value]] } entry of map.[[MapData]], do

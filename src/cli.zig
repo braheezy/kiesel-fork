@@ -40,7 +40,7 @@ var tracked_promise_rejections: std.array_hash_map.Auto(
     HostHooks.PromiseRejectionTrackerOperation,
 ) = .empty;
 
-var module_cache: ModuleRequest.HashMapUnmanaged(Module) = .empty;
+var module_cache: ModuleRequest.HashMap(Module) = .empty;
 
 // Python REPL my beloved 🐍
 const repl_preamble = std.fmt.comptimePrint(
@@ -705,6 +705,9 @@ fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
     };
     try writer.print("Kiesel {f}\n\n", .{kiesel.version});
     try writer.print("Zig version        {s}\n", .{builtin.zig_version_string});
+    if (kiesel.build_options.enable_intl or kiesel.build_options.enable_temporal) {
+        try writer.print("Rust version       {s}\n", .{kiesel.zement.rustcVersion()});
+    }
     try writer.print("Target             {t}-{t}-{t}\n", .{ builtin.target.cpu.arch, builtin.target.os.tag, builtin.target.abi });
     try writer.print("Optimize mode      {t}\n", .{builtin.mode});
     if (enabled_features.len > 0) {
@@ -902,7 +905,7 @@ fn repl(
                 self.completion_buffer = try self.editor.allocator.alloc(Editor.CompletionSuggestion, 256);
 
             var suggestions: std.ArrayList(Editor.CompletionSuggestion) = .initBuffer(self.completion_buffer.?);
-            var seen: String.HashMapUnmanaged(void) = .empty;
+            var seen: String.HashMap(void) = .empty;
             defer seen.deinit(self.editor.allocator);
 
             // (k1)(.)(prop) OR (_)(k1)(.) -> complete property names of k1, starting with prop (if present)

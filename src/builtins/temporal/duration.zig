@@ -105,13 +105,16 @@ pub const constructor = struct {
         // 8. If seconds is undefined, let s be 0; else let s be ? ToIntegerIfIntegral(seconds).
         const seconds = if (seconds_value.isUndefined()) 0 else try seconds_value.toIntegerIfIntegral(agent);
 
-        // 9. If milliseconds is undefined, let ms be 0; else let ms be ? ToIntegerIfIntegral(milliseconds).
+        // 9. If milliseconds is undefined, let ms be 0; else let ms be ? ToIntegerIfIntegral(
+        //    milliseconds).
         const milliseconds = if (milliseconds_value.isUndefined()) 0 else try milliseconds_value.toIntegerIfIntegral(agent);
 
-        // 10. If microseconds is undefined, let mis be 0; else let mis be ? ToIntegerIfIntegral(microseconds).
+        // 10. If microseconds is undefined, let mis be 0; else let mis be ? ToIntegerIfIntegral(
+        //     microseconds).
         const microseconds = if (microseconds_value.isUndefined()) 0 else try microseconds_value.toIntegerIfIntegral(agent);
 
-        // 11. If nanoseconds is undefined, let ns be 0; else let ns be ? ToIntegerIfIntegral(nanoseconds).
+        // 11. If nanoseconds is undefined, let ns be 0; else let ns be ? ToIntegerIfIntegral(
+        //     nanoseconds).
         const nanoseconds = if (nanoseconds_value.isUndefined()) 0 else try nanoseconds_value.toIntegerIfIntegral(agent);
 
         // 12. Return ? CreateTemporalDuration(y, mo, w, d, h, m, s, ms, mis, ns, NewTarget).
@@ -156,11 +159,11 @@ pub const constructor = struct {
         defer relative_to.deinit();
 
         // 5. If one.[[Years]] = two.[[Years]], and one.[[Months]] = two.[[Months]], and
-        //    one.[[Weeks]] = two.[[Weeks]], and one.[[Days]] = two.[[Days]], and one.[[Hours]] =
-        //    two.[[Hours]], and one.[[Minutes]] = two.[[Minutes]], and one.[[Seconds]] =
-        //    two.[[Seconds]], and one.[[Milliseconds]] = two.[[Milliseconds]], and
-        //    one.[[Microseconds]] = two.[[Microseconds]], and one.[[Nanoseconds]] =
-        //    two.[[Nanoseconds]], then
+        //    one.[[Weeks]] = two.[[Weeks]], and one.[[Days]] = two.[[Days]], and
+        //    one.[[Hours]] = two.[[Hours]], and one.[[Minutes]] = two.[[Minutes]], and
+        //    one.[[Seconds]] = two.[[Seconds]], and one.[[Milliseconds]] = two.[[Milliseconds]],
+        //    and one.[[Microseconds]] = two.[[Microseconds]], and
+        //    one.[[Nanoseconds]] = two.[[Nanoseconds]], then
         //     a. Return +0𝔽.
         // 6. Let zonedRelativeTo be relativeToRecord.[[ZonedRelativeTo]].
         // 7. Let plainRelativeTo be relativeToRecord.[[PlainRelativeTo]].
@@ -168,7 +171,7 @@ pub const constructor = struct {
         // 9. Let largestUnit2 be DefaultTemporalLargestUnit(two).
         // 10. Let duration1 be ToInternalDurationRecord(one).
         // 11. Let duration2 be ToInternalDurationRecord(two).
-        // 12. If zonedRelativeTo is not undefined, and either TemporalUnitCategory(largestUnit1)
+        // 12. If zonedRelativeTo is not undefined, and TemporalUnitCategory(largestUnit1) is date
         //     or TemporalUnitCategory(largestUnit2) is date, then
         //     a. Let timeZone be zonedRelativeTo.[[TimeZone]].
         //     b. Let calendar be zonedRelativeTo.[[Calendar]].
@@ -273,9 +276,9 @@ pub const prototype = struct {
         const duration = try this_value.requireInternalSlot(agent, Duration);
 
         // 3. Return ! CreateTemporalDuration(abs(duration.[[Years]]), abs(duration.[[Months]]),
-        //    abs(duration.[[Weeks]]), abs(duration.[[Days]]), abs(duration.[[Hours]]),
-        //    abs(duration.[[Minutes]]), abs(duration.[[Seconds]]), abs(duration.[[Milliseconds]]),
-        //    abs(duration.[[Microseconds]]), abs(duration.[[Nanoseconds]])).
+        //    abs(duration.[[Weeks]]), abs(duration.[[Days]]), abs(duration.[[Hours]]), abs(
+        //    duration.[[Minutes]]), abs(duration.[[Seconds]]), abs(duration.[[Milliseconds]]), abs(
+        //    duration.[[Microseconds]]), abs(duration.[[Nanoseconds]])).
         const temporal_rs_duration = temporal_rs.c.temporal_rs_Duration_abs(duration.fields.inner);
         errdefer temporal_rs.c.temporal_rs_Duration_destroy(temporal_rs_duration);
         const new_duration = createTemporalDuration(
@@ -408,9 +411,8 @@ pub const prototype = struct {
         // 2. Perform ? RequireInternalSlot(duration, [[InitializedTemporalDuration]]).
         const duration = try this_value.requireInternalSlot(agent, Duration);
 
-        // 3. If roundTo is undefined, then
+        // 3. If roundTo is undefined, throw a TypeError exception.
         if (round_to.isUndefined()) {
-            // a. Throw a TypeError exception.
             return agent.throwException(.type_error, "Argument must not be undefined", .{});
         }
 
@@ -483,14 +485,15 @@ pub const prototype = struct {
         //     a. Set smallestUnitPresent to false.
         //     b. Set smallestUnit to nanosecond.
         // 18. Let existingLargestUnit be DefaultTemporalLargestUnit(duration).
-        // 19. Let defaultLargestUnit be LargerOfTwoTemporalUnits(existingLargestUnit, smallestUnit).
+        // 19. Let defaultLargestUnit be LargerOfTwoTemporalUnits(existingLargestUnit,
+        //     smallestUnit).
         // 20. If largestUnit is unset, then
         //     a. Set largestUnitPresent to false.
         //     b. Set largestUnit to defaultLargestUnit.
         // 21. Else if largestUnit is auto, then
         //     a. Set largestUnit to defaultLargestUnit.
-        // 22. If smallestUnitPresent is false and largestUnitPresent is false, then
-        //     a. Throw a RangeError exception.
+        // 22. If smallestUnitPresent is false and largestUnitPresent is false, throw a RangeError
+        //     exception.
         // 23. If LargerOfTwoTemporalUnits(largestUnit, smallestUnit) is not largestUnit, throw a
         //     RangeError exception.
         // 24. Let maximum be MaximumTemporalDurationRoundingIncrement(smallestUnit).
@@ -525,19 +528,21 @@ pub const prototype = struct {
         //        targetDateTime, calendar, largestUnit, roundingIncrement, smallestUnit,
         //        roundingMode).
         //     i. Return ? TemporalDurationFromInternal(internalDuration, largestUnit).
-        // 29. If IsCalendarUnit(existingLargestUnit) is true, or IsCalendarUnit(largestUnit) is
+        // 29. If IsCalendarUnit(existingLargestUnit) is true or IsCalendarUnit(largestUnit) is
         //     true, throw a RangeError exception.
         // 30. Assert: IsCalendarUnit(smallestUnit) is false.
         // 31. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
         // 32. If smallestUnit is day, then
         //     a. Let fractionalDays be TotalTimeDuration(internalDuration.[[Time]], day).
-        //     b. Let days be RoundNumberToIncrement(fractionalDays, roundingIncrement, roundingMode).
+        //     b. Let days be RoundNumberToIncrement(fractionalDays, roundingIncrement,
+        //        roundingMode).
         //     c. Let dateDuration be ? CreateDateDurationRecord(0, 0, 0, days).
         //     d. Set internalDuration to CombineDateAndTimeDuration(dateDuration, 0).
         // 33. Else,
         //     a. Let timeDuration be ? RoundTimeDuration(internalDuration.[[Time]],
         //        roundingIncrement, smallestUnit, roundingMode).
-        //     b. Set internalDuration to CombineDateAndTimeDuration(ZeroDateDuration(), timeDuration).
+        //     b. Set internalDuration to CombineDateAndTimeDuration(ZeroDateDuration(),
+        //        timeDuration).
         // 34. Return ? TemporalDurationFromInternal(internalDuration, largestUnit).
         const temporal_rs_duration = try builtins.temporal.extractResult(
             agent,
@@ -700,16 +705,19 @@ pub const prototype = struct {
         // 8. Perform ? ValidateTemporalUnitValue(smallestUnit, time).
         try validateTemporalUnitValue(agent, smallest_unit, "smallestUnit", .time, &.{});
 
-        // 9. If smallestUnit is hour or minute, throw a RangeError exception.
+        // 9. If smallestUnit is either hour or minute, throw a RangeError exception.
         // 10. Let precision be ToSecondsStringPrecisionRecord(smallestUnit, digits).
         // 11. If precision.[[Unit]] is nanosecond and precision.[[Increment]] = 1, then
         //     a. Return TemporalDurationToString(duration, precision.[[Precision]]).
         // 12. Let largestUnit be DefaultTemporalLargestUnit(duration).
         // 13. Let internalDuration be ToInternalDurationRecord(duration).
-        // 14. Let timeDuration be ? RoundTimeDuration(internalDuration.[[Time]], precision.[[Increment]], precision.[[Unit]], roundingMode).
-        // 15. Set internalDuration to CombineDateAndTimeDuration(internalDuration.[[Date]], timeDuration).
+        // 14. Let timeDuration be ? RoundTimeDuration(internalDuration.[[Time]],
+        //     precision.[[Increment]], precision.[[Unit]], roundingMode).
+        // 15. Set internalDuration to CombineDateAndTimeDuration(internalDuration.[[Date]],
+        //     timeDuration).
         // 16. Let roundedLargestUnit be LargerOfTwoTemporalUnits(largestUnit, second).
-        // 17. Let roundedDuration be ? TemporalDurationFromInternal(internalDuration, roundedLargestUnit).
+        // 17. Let roundedDuration be ? TemporalDurationFromInternal(internalDuration,
+        //     roundedLargestUnit).
         // 18. Return TemporalDurationToString(roundedDuration, precision.[[Precision]]).
         var write = temporal_rs.DiplomatWrite.init(agent.gc_allocator);
         try builtins.temporal.extractResult(
@@ -803,7 +811,7 @@ pub const prototype = struct {
         //        calendar, unit).
         // 14. Else,
         //     a. Let largestUnit be DefaultTemporalLargestUnit(duration).
-        //     b. If IsCalendarUnit(largestUnit) is true, or IsCalendarUnit(unit) is true, throw a
+        //     b. If IsCalendarUnit(largestUnit) is true or IsCalendarUnit(unit) is true, throw a
         //        RangeError exception.
         //     c. Let internalDuration be ToInternalDurationRecordWith24HourDays(duration).
         //     d. Let total be TotalTimeDuration(internalDuration.[[Time]], unit).
@@ -1031,9 +1039,12 @@ pub fn toTemporalDuration(agent: *Agent, item: Value) Agent.Error!*Duration {
     // 9. If partial.[[Hours]] is not undefined, set result.[[Hours]] to partial.[[Hours]].
     // 10. If partial.[[Minutes]] is not undefined, set result.[[Minutes]] to partial.[[Minutes]].
     // 11. If partial.[[Seconds]] is not undefined, set result.[[Seconds]] to partial.[[Seconds]].
-    // 12. If partial.[[Milliseconds]] is not undefined, set result.[[Milliseconds]] to partial.[[Milliseconds]].
-    // 13. If partial.[[Microseconds]] is not undefined, set result.[[Microseconds]] to partial.[[Microseconds]].
-    // 14. If partial.[[Nanoseconds]] is not undefined, set result.[[Nanoseconds]] to partial.[[Nanoseconds]].
+    // 12. If partial.[[Milliseconds]] is not undefined, set result.[[Milliseconds]] to
+    //     partial.[[Milliseconds]].
+    // 13. If partial.[[Microseconds]] is not undefined, set result.[[Microseconds]] to
+    //     partial.[[Microseconds]].
+    // 14. If partial.[[Nanoseconds]] is not undefined, set result.[[Nanoseconds]] to
+    //     partial.[[Nanoseconds]].
     // 15. Return ? CreateTemporalDuration(result.[[Years]], result.[[Months]], result.[[Weeks]],
     //     result.[[Days]], result.[[Hours]], result.[[Minutes]], result.[[Seconds]],
     //     result.[[Milliseconds]], result.[[Microseconds]], result.[[Nanoseconds]]).
@@ -1051,9 +1062,8 @@ pub fn toTemporalPartialDuration(
     agent: *Agent,
     temporal_duration_like_value: Value,
 ) Agent.Error!temporal_rs.c.PartialDuration {
-    // 1. If temporalDurationLike is not an Object, then
+    // 1. If temporalDurationLike is not an Object, throw a TypeError exception.
     if (!temporal_duration_like_value.isObject()) {
-        // a. Throw a TypeError exception.
         return agent.throwException(.type_error, "Duration-like must be an object", .{});
     }
     const temporal_duration_like = temporal_duration_like_value.asObject();
@@ -1100,7 +1110,8 @@ pub fn toTemporalPartialDuration(
     // 8. Let microseconds be ? Get(temporalDurationLike, "microseconds").
     const microseconds = try temporal_duration_like.get(agent, PropertyKey.from("microseconds"));
 
-    // 9. If microseconds is not undefined, set result.[[Microseconds]] to ? ToIntegerIfIntegral(microseconds).
+    // 9. If microseconds is not undefined, set result.[[Microseconds]] to ? ToIntegerIfIntegral(
+    //    microseconds).
     if (!microseconds.isUndefined()) {
         result.microseconds = temporal_rs.toOption(
             temporal_rs.c.OptionF64,
@@ -1111,7 +1122,8 @@ pub fn toTemporalPartialDuration(
     // 10. Let milliseconds be ? Get(temporalDurationLike, "milliseconds").
     const milliseconds = try temporal_duration_like.get(agent, PropertyKey.from("milliseconds"));
 
-    // 11. If milliseconds is not undefined, set result.[[Milliseconds]] to ? ToIntegerIfIntegral(milliseconds).
+    // 11. If milliseconds is not undefined, set result.[[Milliseconds]] to ? ToIntegerIfIntegral(
+    //     milliseconds).
     if (!milliseconds.isUndefined()) {
         result.milliseconds = temporal_rs.toOption(
             temporal_rs.c.OptionI64,
@@ -1144,7 +1156,8 @@ pub fn toTemporalPartialDuration(
     // 16. Let nanoseconds be ? Get(temporalDurationLike, "nanoseconds").
     const nanoseconds = try temporal_duration_like.get(agent, PropertyKey.from("nanoseconds"));
 
-    // 17. If nanoseconds is not undefined, set result.[[Nanoseconds]] to ? ToIntegerIfIntegral(nanoseconds).
+    // 17. If nanoseconds is not undefined, set result.[[Nanoseconds]] to ? ToIntegerIfIntegral(
+    //     nanoseconds).
     if (!nanoseconds.isUndefined()) {
         result.nanoseconds = temporal_rs.toOption(
             temporal_rs.c.OptionF64,
@@ -1243,7 +1256,7 @@ pub fn createTemporalDuration(
     );
 }
 
-/// 7.5.40 AddDurations ( operation, duration, other )
+/// 7.5.41 AddDurations ( operation, duration, other )
 /// https://tc39.es/proposal-temporal/#sec-temporal-adddurations
 fn addDurations(
     agent: *Agent,

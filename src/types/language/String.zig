@@ -564,7 +564,7 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
     if (from_index >= length or search_length > length) return null;
     if (self.isAscii() and search_value.isAscii()) {
         const end = std.math.clamp(from_index + search_length, 0, length);
-        return if (std.mem.lastIndexOf(
+        return if (std.mem.findLast(
             u8,
             self.asAscii()[0..end],
             search_value.asAscii(),
@@ -575,7 +575,7 @@ pub fn lastIndexOf(self: *const String, search_value: *const String, from_index:
     }
     if (self.isUtf16() and search_value.isUtf16()) {
         const end = std.math.clamp(from_index + search_length, 0, length);
-        return if (std.mem.lastIndexOf(
+        return if (std.mem.findLast(
             u16,
             self.asUtf16()[0..end],
             search_value.asUtf16(),
@@ -875,7 +875,7 @@ pub fn concat(
     return builder.build(agent);
 }
 
-pub fn HashMapUnmanaged(comptime V: type) type {
+pub fn HashMap(comptime V: type) type {
     return std.HashMapUnmanaged(*const String, V, struct {
         pub fn hash(_: @This(), key: *const String) u64 {
             return key.hash;
@@ -887,7 +887,7 @@ pub fn HashMapUnmanaged(comptime V: type) type {
     }, std.hash_map.default_max_load_percentage);
 }
 
-pub fn ArrayHashMapUnmanaged(comptime V: type) type {
+pub fn ArrayHashMap(comptime V: type) type {
     return std.array_hash_map.Custom(*const String, V, struct {
         pub fn hash(_: @This(), key: *const String) u32 {
             return @truncate(key.hash);

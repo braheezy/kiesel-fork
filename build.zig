@@ -209,20 +209,7 @@ pub fn build(b: *std.Build) !void {
             .@"enable-intl" = enable_intl,
             .@"enable-temporal" = enable_temporal,
         })) |zement| {
-            // NOTE: Rust outputs 'libzement.a' instead of 'zement.lib' when targeting
-            // *-pc-windows-gnu, so we can hardcode the name here instead of using
-            // `std.zig.binNameAlloc()` to select a target-dependent prefix and extension.
-            // See: https://github.com/rust-lang/rust/pull/70937
-            kiesel.addObjectFile(zement.namedLazyPath("lib").path(b, "libzement.a"));
-            kiesel.linkLibrary(zement.artifact("unwind_stubs"));
-
-            // NOTE: Empirically these are not needed in release builds, presumably due to LTO.
-            if (target.result.os.tag == .windows and optimize == .Debug) {
-                // For GetUserProfileDirectoryW
-                kiesel.linkSystemLibrary("userenv", .{});
-                // For a bunch of networking APIs
-                kiesel.linkSystemLibrary("ws2_32", .{});
-            }
+            kiesel.addImport("zement", zement.module("zement"));
         }
     }
 
