@@ -61,6 +61,7 @@ const ScriptOrModuleHostDefined = struct {
 
 const RealmHostDefined = struct {
     args: []const []const u8,
+    environ_map: *const std.process.Environ.Map,
 };
 
 fn resolveModulePath(
@@ -177,6 +178,31 @@ const Kiesel = struct {
         }
         try kiesel_object.defineBuiltinFunction(agent, "createRealm", createRealm, 0, realm);
         try kiesel_object.defineBuiltinFunction(agent, "detachArrayBuffer", detachArrayBuffer, 1, realm);
+        try kiesel_object.defineBuiltinPropertyLazy(
+            agent,
+            "env",
+            struct {
+                fn initializer(agent_: *Agent, realm_: *Realm) std.mem.Allocator.Error!Value {
+                    const host_defined: *RealmHostDefined = @ptrCast(@alignCast(realm_.host_defined.?));
+
+                    const env_object = try ordinaryObjectCreate(agent_, null);
+                    for (host_defined.environ_map.keys(), host_defined.environ_map.values()) |key, value| {
+                        // Environment variables are not guaranteed to be valid UTF-8
+                        const key_utf8 = try std.fmt.allocPrint(agent_.gc_allocator, "{f}", .{std.unicode.fmtUtf8(key)});
+                        const value_utf8 = try std.fmt.allocPrint(agent_.gc_allocator, "{f}", .{std.unicode.fmtUtf8(value)});
+                        try env_object.createDataPropertyDirect(
+                            agent_,
+                            PropertyKey.from(try String.fromUtf8(agent_, key_utf8)),
+                            Value.from(try String.fromUtf8(agent_, value_utf8)),
+                        );
+                    }
+                    _ = env_object.setIntegrityLevel(agent_, .frozen) catch |err| try noexcept(err);
+                    return Value.from(env_object);
+                }
+            }.initializer,
+            realm,
+            .builtin_default,
+        );
         try kiesel_object.defineBuiltinFunction(agent, "evalScript", evalScript, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "isMerlin", isMerlin, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "print", print, 1, realm);
@@ -1394,7 +1420,10 @@ pub fn main(init: std.process.Init) !u8 {
         }
     }.func;
 
-    var host_defined: RealmHostDefined = .{ .args = parsed_args.positionals };
+    var host_defined: RealmHostDefined = .{
+        .args = parsed_args.positionals,
+        .environ_map = environ_map,
+    };
 
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
