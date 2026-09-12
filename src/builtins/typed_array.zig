@@ -866,12 +866,9 @@ pub const constructor = struct {
             // d. Let k be 0.
             // e. Repeat, while k < length,
             for (values, 0..) |k_value, k| {
-                // i. Let propertyKey be ! ToString(𝔽(k)).
-                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+                // i. Let kValue be values[k].
 
-                // ii. Let kValue be values[k].
-
-                // iii. If mapping is true, then
+                // ii. If mapping is true, then
                 const mapped_value = if (maybe_mapper) |mapper| blk: {
                     // 1. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
                     break :blk try mapper.call(
@@ -880,15 +877,20 @@ pub const constructor = struct {
                         &.{ k_value, Value.from(@as(u53, @intCast(k))) },
                     );
                 } else blk: {
-                    // iv. Else,
+                    // iii. Else,
                     // 1. Let mappedValue be kValue.
                     break :blk k_value;
                 };
 
-                // v. Perform ? Set(targetObj, propertyKey, mappedValue, true).
-                try typed_array.object.set(agent, property_key, mapped_value, .throw);
+                // iv. Perform ? TypedArraySetElement(targetObj, 𝔽(k), mappedValue).
+                try typedArraySetElement(
+                    agent,
+                    typed_array,
+                    .{ .integer_index = @intCast(k) },
+                    mapped_value,
+                );
 
-                // vi. Set k to k + 1.
+                // v. Set k to k + 1.
             }
 
             // f. Return targetObj.
@@ -931,8 +933,8 @@ pub const constructor = struct {
                 break :blk k_value;
             };
 
-            // e. Perform ? Set(targetObj, propertyKey, mappedValue, true).
-            try typed_array.object.set(agent, property_key, mapped_value, .throw);
+            // e. Perform ? TypedArraySetElement(targetObj, 𝔽(k), mappedValue).
+            try typedArraySetElement(agent, typed_array, .{ .integer_index = k }, mapped_value);
 
             // f. Set k to k + 1.
         }
@@ -967,13 +969,15 @@ pub const constructor = struct {
         for (arguments.values, 0..) |k_value, k| {
             // a. Let kValue be items[k].
 
-            // b. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+            // b. Perform ? TypedArraySetElement(newObj, 𝔽(k), kValue).
+            try typedArraySetElement(
+                agent,
+                typed_array,
+                .{ .integer_index = @intCast(k) },
+                k_value,
+            );
 
-            // c. Perform ? Set(newObj, propertyKey, kValue, true).
-            try typed_array.object.set(agent, property_key, k_value, .throw);
-
-            // d. Set k to k + 1.
+            // c. Set k to k + 1.
         }
 
         // 7. Return newObj.
@@ -1070,8 +1074,8 @@ pub const prototype = struct {
         if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(@intFromEnum(length_)))) return .undefined;
         const k: u53 = @intFromFloat(k_f64);
 
-        // 6. Return ! Get(obj, ! ToString(𝔽(k))).
-        return typed_array.object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
+        // 6. Return TypedArrayGetElement(obj, 𝔽(k)).
+        return typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
     }
 
     /// 23.2.3.2 get %TypedArray%.prototype.buffer
@@ -1296,23 +1300,20 @@ pub const prototype = struct {
 
         // 6. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(agent, property_key) catch |err| try noexcept(err);
-
-            // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
+            // b. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
             const test_result = (try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             )).toBoolean();
 
-            // d. If testResult is false, return false.
+            // c. If testResult is false, return false.
             if (!test_result) return .false;
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 7. Return true.
@@ -1365,13 +1366,15 @@ pub const prototype = struct {
 
         // 12. Repeat, while k < endIndex,
         while (k < end_index) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Perform ! TypedArraySetElement(obj, 𝔽(k), value).
+            typedArraySetElement(
+                agent,
+                typed_array,
+                .{ .integer_index = k },
+                value,
+            ) catch |err| try noexcept(err);
 
-            // b. Perform ! Set(obj, propertyKey, value, true).
-            typed_array.object.set(agent, property_key, value, .throw) catch |err| try noexcept(err);
-
-            // c. Set k to k + 1.
+            // b. Set k to k + 1.
         }
 
         // 13. Return obj.
@@ -1410,20 +1413,17 @@ pub const prototype = struct {
 
         // 8. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(agent, property_key) catch |err| try noexcept(err);
-
-            // c. Let selected be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
+            // b. Let selected be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
             const selected = (try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             )).toBoolean();
 
-            // d. If selected is true, then
+            // c. If selected is true, then
             if (selected) {
                 // i. Append kValue to kept.
                 try kept.append(agent.gc_allocator, k_value);
@@ -1432,7 +1432,7 @@ pub const prototype = struct {
                 captured += 1;
             }
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 9. Let result be ? TypedArraySpeciesCreate(obj, « 𝔽(captured) »).
@@ -1445,12 +1445,12 @@ pub const prototype = struct {
         // 10. Let n be 0.
         // 11. For each element element of kept, do
         for (kept.items, 0..) |element, n| {
-            // a. Perform ! Set(result, ! ToString(𝔽(n)), element, true).
-            result_array.object.set(
+            // a. Perform ! TypedArraySetElement(result, 𝔽(n), element).
+            typedArraySetElement(
                 agent,
-                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n))),
+                result_array,
+                .{ .integer_index = @intCast(n) },
                 element,
-                .throw,
             ) catch |err| try noexcept(err);
 
             // b. Set n to n + 1.
@@ -1597,23 +1597,17 @@ pub const prototype = struct {
 
         // 6. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Perform ? Call(callback, thisArg, « kValue, 𝔽(k), obj »).
+            // b. Perform ? Call(callback, thisArg, « kValue, 𝔽(k), obj »).
             _ = try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             );
 
-            // d. Set k to k + 1.
+            // c. Set k to k + 1.
         }
 
         // 7. Return undefined.
@@ -1642,8 +1636,12 @@ pub const prototype = struct {
 
         // 6. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let elementK be ! Get(obj, ! ToString(𝔽(k))).
-            const element_k = typed_array.object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
+            // a. Let elementK be TypedArrayGetElement(obj, 𝔽(k)).
+            const element_k = try typedArrayGetElement(
+                agent,
+                typed_array,
+                .{ .integer_index = k },
+            );
 
             // b. If SameValueZero(searchElement, elementK) is true, return true.
             if (sameValueZero(search_element, element_k)) return .true;
@@ -1688,11 +1686,12 @@ pub const prototype = struct {
 
             // c. If kPresent is true, then
             if (k_present) {
-                // i. Let elementK be ! Get(obj, propertyKey).
-                const element_k = typed_array.object.get(
+                // i. Let elementK be TypedArrayGetElement(obj, 𝔽(k)).
+                const element_k = try typedArrayGetElement(
                     agent,
-                    property_key,
-                ) catch |err| try noexcept(err);
+                    typed_array,
+                    .{ .integer_index = k },
+                );
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
@@ -1742,11 +1741,8 @@ pub const prototype = struct {
             // a. If k > 0, set result to the string-concatenation of result and sep.
             if (k > 0) result.appendSegmentAssumeCapacity(sep);
 
-            // b. Let element be ! Get(obj, ! ToString(𝔽(k))).
-            const element = typed_array.object.get(
-                agent,
-                PropertyKey.from(k),
-            ) catch |err| try noexcept(err);
+            // b. Let element be TypedArrayGetElement(obj, 𝔽(k)).
+            const element = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
             // c. If element is not undefined, then
             if (!element.isUndefined()) {
@@ -1817,11 +1813,12 @@ pub const prototype = struct {
 
             // c. If kPresent is true, then
             if (k_present) {
-                // i. Let elementK be ! Get(obj, propertyKey).
-                const element_k = typed_array.object.get(
+                // i. Let elementK be TypedArrayGetElement(obj, 𝔽(k)).
+                const element_k = try typedArrayGetElement(
                     agent,
-                    property_key,
-                ) catch |err| try noexcept(err);
+                    typed_array,
+                    .{ .integer_index = k },
+                );
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
@@ -1888,26 +1885,20 @@ pub const prototype = struct {
 
         // 7. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Let mappedValue be ? Call(callback, thisArg, « kValue, 𝔽(k), obj »).
+            // b. Let mappedValue be ? Call(callback, thisArg, « kValue, 𝔽(k), obj »).
             const mapped_value = try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             );
 
-            // d. Perform ? Set(result, propertyKey, mappedValue, true).
-            try result_array.object.set(agent, property_key, mapped_value, .throw);
+            // c. Perform ? TypedArraySetElement(result, 𝔽(k), mappedValue).
+            try typedArraySetElement(agent, result_array, .{ .integer_index = k }, mapped_value);
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 8. Return result.
@@ -1955,31 +1946,19 @@ pub const prototype = struct {
             accumulator = initial_value.?;
         } else {
             // 9. Else,
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Set accumulator to TypedArrayGetElement(obj, 𝔽(k)).
+            accumulator = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Set accumulator to ! Get(obj, propertyKey).
-            accumulator = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Set k to k + 1.
+            // b. Set k to k + 1.
             k += 1;
         }
 
         // 10. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
+            // b. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
             //    obj »).
             accumulator = try callback.call(
                 agent,
@@ -1987,7 +1966,7 @@ pub const prototype = struct {
                 &.{ accumulator, k_value, Value.from(k), Value.from(&typed_array.object) },
             );
 
-            // d. Set k to k + 1.
+            // c. Set k to k + 1.
         }
 
         // 11. Return accumulator.
@@ -2035,31 +2014,19 @@ pub const prototype = struct {
             accumulator = initial_value.?;
         } else {
             // 9. Else,
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k.?);
+            // a. Set accumulator to TypedArrayGetElement(obj, 𝔽(k)).
+            accumulator = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k.? });
 
-            // b. Set accumulator to ! Get(obj, propertyKey).
-            accumulator = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Set k to k - 1.
+            // b. Set k to k - 1.
             if (k != null) k = std.math.sub(u53, k.?, 1) catch null;
         }
 
         // 10. Repeat, while k ≥ 0,
         while (k != null) : (k = (std.math.sub(u53, k.?, 1) catch null)) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k.?);
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k.? });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
+            // b. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
             //    obj »).
             accumulator = try callback.call(
                 agent,
@@ -2067,7 +2034,7 @@ pub const prototype = struct {
                 &.{ accumulator, k_value, Value.from(k.?), Value.from(&typed_array.object) },
             );
 
-            // d. Set k to k - 1.
+            // c. Set k to k - 1.
         }
 
         // 11. Return accumulator.
@@ -2096,41 +2063,37 @@ pub const prototype = struct {
             // a. Let upper be length - lower - 1.
             const upper = @intFromEnum(length_) - lower - 1;
 
-            // b. Let upperP be ! ToString(𝔽(upper)).
-            const upper_property_key = PropertyKey.from(upper);
-
-            // c. Let lowerP be ! ToString(𝔽(lower)).
-            const lower_property_key = PropertyKey.from(lower);
-
-            // d. Let lowerValue be ! Get(obj, lowerP).
-            const lower_value = typed_array.object.get(
+            // b. Let lowerValue be TypedArrayGetElement(obj, 𝔽(lower)).
+            const lower_value = try typedArrayGetElement(
                 agent,
-                lower_property_key,
-            ) catch |err| try noexcept(err);
+                typed_array,
+                .{ .integer_index = lower },
+            );
 
-            // e. Let upperValue be ! Get(obj, upperP).
-            const upper_value = typed_array.object.get(
+            // c. Let upperValue be TypedArrayGetElement(obj, 𝔽(upper)).
+            const upper_value = try typedArrayGetElement(
                 agent,
-                upper_property_key,
-            ) catch |err| try noexcept(err);
+                typed_array,
+                .{ .integer_index = upper },
+            );
 
-            // f. Perform ! Set(obj, lowerP, upperValue, true).
-            typed_array.object.set(
+            // d. Perform ! TypedArraySetElement(obj, 𝔽(lower), upperValue).
+            typedArraySetElement(
                 agent,
-                lower_property_key,
+                typed_array,
+                .{ .integer_index = lower },
                 upper_value,
-                .throw,
             ) catch |err| try noexcept(err);
 
-            // g. Perform ! Set(obj, upperP, lowerValue, true).
-            typed_array.object.set(
+            // e. Perform ! TypedArraySetElement(obj, 𝔽(upper), lowerValue).
+            typedArraySetElement(
                 agent,
-                upper_property_key,
+                typed_array,
+                .{ .integer_index = upper },
                 lower_value,
-                .throw,
             ) catch |err| try noexcept(err);
 
-            // h. Set lower to lower + 1.
+            // f. Set lower to lower + 1.
             lower += 1;
         }
 
@@ -2558,22 +2521,23 @@ pub const prototype = struct {
                     k += 1;
                     n += 1;
                 }) {
-                    // 1. Let propertyKey be ! ToString(𝔽(k)).
-                    const property_key = PropertyKey.from(k);
-
-                    // 2. Let kValue be ! Get(obj, propertyKey).
-                    const k_value = typed_array.object.get(agent, property_key) catch |err| try noexcept(err);
-
-                    // 3. Perform ! Set(resultArray, ! ToString(𝔽(n)), kValue, true).
-                    result_array.object.set(
+                    // 1. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+                    const k_value = try typedArrayGetElement(
                         agent,
-                        PropertyKey.from(n),
+                        typed_array,
+                        .{ .integer_index = k },
+                    );
+
+                    // 2. Perform ! TypedArraySetElement(resultArray, 𝔽(n), kValue).
+                    typedArraySetElement(
+                        agent,
+                        result_array,
+                        .{ .integer_index = n },
                         k_value,
-                        .throw,
                     ) catch |err| try noexcept(err);
 
-                    // 4. Set k to k + 1.
-                    // 5. Set n to n + 1.
+                    // 3. Set k to k + 1.
+                    // 4. Set n to n + 1.
                 }
             }
         }
@@ -2607,26 +2571,20 @@ pub const prototype = struct {
 
         // 6. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
+            // b. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
             const test_result = (try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             )).toBoolean();
 
-            // d. If testResult is true, return true.
+            // c. If testResult is true, return true.
             if (test_result) return .true;
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 7. Return false.
@@ -2680,12 +2638,12 @@ pub const prototype = struct {
         // 8. Let j be 0.
         // 9. Repeat, while j < length,
         for (sorted_list, 0..) |value, j| {
-            // a. Perform ! Set(obj, ! ToString(𝔽(j)), sortedList[j], true).
-            typed_array.object.set(
+            // a. Perform ! TypedArraySetElement(obj, 𝔽(j), sortedList[j]).
+            typedArraySetElement(
                 agent,
-                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(j))),
+                typed_array,
+                .{ .integer_index = @intCast(j) },
                 value,
-                .throw,
             ) catch |err| try noexcept(err);
 
             // b. Set j to j + 1.
@@ -2836,22 +2794,25 @@ pub const prototype = struct {
 
         // 6. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let from be ! ToString(𝔽(length - k - 1)).
-            const from = PropertyKey.from(@intFromEnum(length_) - k - 1);
+            // a. Let from be length - k - 1.
+            const from = @intFromEnum(length_) - k - 1;
 
-            // b. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
-
-            // c. Let fromValue be ! Get(obj, from).
-            const from_value = typed_array.object.get(
+            // b. Let fromValue be TypedArrayGetElement(obj, 𝔽(from)).
+            const from_value = try typedArrayGetElement(
                 agent,
-                from,
+                typed_array,
+                .{ .integer_index = from },
+            );
+
+            // c. Perform ! TypedArraySetElement(resultArray, 𝔽(k), fromValue).
+            typedArraySetElement(
+                agent,
+                result_array,
+                .{ .integer_index = k },
+                from_value,
             ) catch |err| try noexcept(err);
 
-            // d. Perform ! Set(resultArray, propertyKey, fromValue, true).
-            result_array.object.set(agent, property_key, from_value, .throw) catch |err| try noexcept(err);
-
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 7. Return resultArray.
@@ -2908,12 +2869,12 @@ pub const prototype = struct {
         // 9. Let j be 0.
         // 10. Repeat, while j < length,
         for (sorted_list, 0..) |value, j| {
-            // a. Perform ! Set(resultArray, ! ToString(𝔽(j)), sortedList[j], true).
-            result_array.object.set(
+            // a. Perform ! TypedArraySetElement(resultArray, 𝔽(j), sortedList[j]).
+            typedArraySetElement(
                 agent,
-                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(j))),
+                result_array,
+                .{ .integer_index = @intCast(j) },
                 value,
-                .throw,
             ) catch |err| try noexcept(err);
 
             // b. Set j to j + 1.
@@ -2981,25 +2942,22 @@ pub const prototype = struct {
 
         // 10. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
-
-            // b. If k = actualIndex, let fromValue be numericValue.
-            // c. Else, let fromValue be ! Get(obj, propertyKey).
+            // a. If k = actualIndex, let fromValue be numericValue.
+            // b. Else, let fromValue be TypedArrayGetElement(obj, 𝔽(k)).
             const from_value = if (k == actual_index)
                 numeric_value
             else
-                typed_array.object.get(agent, property_key) catch |err| try noexcept(err);
+                try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // d. Perform ! Set(resultArray, propertyKey, fromValue, true).
-            result_array.object.set(
+            // c. Perform ! TypedArraySetElement(resultArray, 𝔽(k), fromValue).
+            typedArraySetElement(
                 agent,
-                property_key,
+                result_array,
+                .{ .integer_index = k },
                 from_value,
-                .throw,
             ) catch |err| try noexcept(err);
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 11. Return resultArray.
@@ -3606,15 +3564,17 @@ fn initializeTypedArrayFromList(
     // 3. Let k be 0.
     // 4. Repeat, while k < length,
     for (values, 0..) |k_value, k| {
-        // a. Let propertyKey be ! ToString(𝔽(k)).
-        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+        // a. Let kValue be values[k].
 
-        // b. Let kValue be values[k].
+        // b. Perform ? TypedArraySetElement(obj, 𝔽(k), kValue).
+        try typedArraySetElement(
+            agent,
+            typed_array,
+            .{ .integer_index = @intCast(k) },
+            k_value,
+        );
 
-        // c. Perform ? Set(obj, propertyKey, kValue, true).
-        try typed_array.object.set(agent, property_key, k_value, .throw);
-
-        // d. Set k to k + 1.
+        // c. Set k to k + 1.
     }
 
     // 5. Return unused.
@@ -3644,8 +3604,8 @@ fn initializeTypedArrayFromArrayLike(
         // b. Let kValue be ? Get(arrayLike, propertyKey).
         const k_value = try array_like.get(agent, property_key);
 
-        // c. Perform ? Set(obj, propertyKey, kValue, true).
-        try typed_array.object.set(agent, property_key, k_value, .throw);
+        // c. Perform ? TypedArraySetElement(obj, 𝔽(k), kValue).
+        try typedArraySetElement(agent, typed_array, .{ .integer_index = k }, k_value);
 
         // d. Set k to k + 1.
     }
