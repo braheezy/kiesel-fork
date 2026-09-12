@@ -18,6 +18,7 @@ const ImportedModuleReferrer = kiesel.language.ImportedModuleReferrer;
 const Module = kiesel.language.Module;
 const ModuleRequest = kiesel.language.ModuleRequest;
 const Object = kiesel.types.Object;
+const PropertyKey = kiesel.types.PropertyKey;
 const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const ScriptOrModule = kiesel.execution.ScriptOrModule;
@@ -56,6 +57,10 @@ const repl_preamble = std.fmt.comptimePrint(
 
 const ScriptOrModuleHostDefined = struct {
     base_dir: []const u8,
+};
+
+const RealmHostDefined = struct {
+    args: []const []const u8,
 };
 
 fn resolveModulePath(
@@ -123,6 +128,50 @@ fn initializeRealm(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!void {
 const Kiesel = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         const kiesel_object = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
+        try kiesel_object.defineBuiltinPropertyLazy(
+            agent,
+            "args",
+            struct {
+                fn initializer(agent_: *Agent, realm_: *Realm) std.mem.Allocator.Error!Value {
+                    const gpa = agent_.gpa;
+                    const io = agent_.io;
+                    const host_defined: *RealmHostDefined = @ptrCast(@alignCast(realm_.host_defined.?));
+
+                    const exe_path = std.process.executablePathAlloc(io, gpa) catch |err| switch (err) {
+                        error.OutOfMemory => |e| return e,
+                        else => null,
+                    };
+                    defer if (exe_path) |path| gpa.free(path);
+
+                    const args_array = try kiesel.builtins.arrayCreateFast(agent_, @intCast(host_defined.args.len + 1));
+                    try args_array.object.createDataPropertyDirect(
+                        agent_,
+                        PropertyKey.from(0),
+                        if (exe_path) |path| blk: {
+                            // paths are not guaranteed to be valid UTF-8
+                            const path_utf8 = try std.fmt.allocPrint(agent_.gc_allocator, "{f}", .{std.unicode.fmtUtf8(path)});
+                            break :blk Value.from(try String.fromUtf8(agent_, path_utf8));
+                        } else Value.from(""),
+                    );
+                    for (host_defined.args, 0..) |arg, i| {
+                        // argv entries are not guaranteed to be valid UTF-8
+                        const arg_utf8 = try std.fmt.allocPrint(agent_.gc_allocator, "{f}", .{std.unicode.fmtUtf8(arg)});
+                        try args_array.object.createDataPropertyDirect(
+                            agent_,
+                            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i + 1))),
+                            Value.from(try String.fromUtf8(agent_, arg_utf8)),
+                        );
+                    }
+                    _ = args_array.object.setIntegrityLevel(
+                        agent_,
+                        .frozen,
+                    ) catch |err| try noexcept(err);
+                    return Value.from(&args_array.object);
+                }
+            }.initializer,
+            realm,
+            .builtin_default,
+        );
         if (kiesel.build_options.enable_annex_b) {
             try kiesel_object.defineBuiltinFunction(agent, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
         }
@@ -221,8 +270,10 @@ const Kiesel = struct {
     }
 
     fn createRealm(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+        const caller_realm = agent.currentRealm();
         try Realm.initializeHostDefinedRealm(agent, .{});
         const realm = agent.currentRealm();
+        realm.host_defined = caller_realm.host_defined;
         try initializeRealm(agent, realm);
         _ = agent.execution_context_stack.pop().?;
         return Value.from(realm.global_object);
@@ -1104,7 +1155,10 @@ pub fn main(init: std.process.Init) !u8 {
     const parsed_args = args.parseForCurrentProcess(Options, init, .print) catch return 1;
     defer parsed_args.deinit();
 
-    const maybe_path = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
+    const maybe_path = if (parsed_args.options.command == null and parsed_args.positionals.len > 0)
+        parsed_args.positionals[0]
+    else
+        null;
 
     if (parsed_args.options.version) {
         try printVersionInfo(stdout);
@@ -1340,8 +1394,11 @@ pub fn main(init: std.process.Init) !u8 {
         }
     }.func;
 
+    var host_defined: RealmHostDefined = .{ .args = parsed_args.positionals };
+
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
+    realm.host_defined = &host_defined;
     try initializeRealm(&agent, realm);
 
     const cwd = try std.process.currentPathAlloc(io, gpa);
