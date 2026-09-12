@@ -1609,7 +1609,7 @@ pub const prototype = struct {
         };
 
         // 4. If separator is undefined, then
-        const sep: String.Builder.Segment = if (separator.isUndefined())
+        const separator_string: String.Builder.Segment = if (separator.isUndefined())
             // a. Let sep be ",".
             .{ .char = ',' }
         else blk: {
@@ -1643,7 +1643,7 @@ pub const prototype = struct {
             } else {
                 // d. Else,
                 // i. Set result to the string-concatenation of result and sep.
-                try result.appendSegment(agent.gc_allocator, sep);
+                try result.appendSegment(agent.gc_allocator, separator_string);
             }
 
             // e. If value is neither undefined nor null, then

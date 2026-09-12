@@ -1012,11 +1012,11 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "ArrayBuffer is detached", .{});
         }
 
-        // 18. Let fromBuf be obj.[[ArrayBufferData]].
-        const from_buf = array_buffer.fields.data_block.?;
+        // 18. Let fromBlock be obj.[[ArrayBufferData]].
+        const from_block = array_buffer.fields.data_block.?;
 
-        // 19. Let toBuf be new.[[ArrayBufferData]].
-        const to_buf = new.fields.data_block.?;
+        // 19. Let toBlock be new.[[ArrayBufferData]].
+        const to_block = new.fields.data_block.?;
 
         // 20. Let currentLength be obj.[[ArrayBufferByteLength]].
         const current_length = array_buffer.fields.byte_length;
@@ -1029,8 +1029,8 @@ pub const prototype = struct {
             // a. Let count be min(newLength, maxCount).
             const count = @min(@intFromEnum(new_length), max_count);
 
-            // b. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, count).
-            copyDataBlockBytes(to_buf, 0, from_buf, first, count);
+            // b. Perform CopyDataBlockBytes(toBlock, 0, fromBlock, first, count).
+            copyDataBlockBytes(to_block, 0, from_block, first, count);
         }
 
         // 23. Return new.

@@ -281,19 +281,20 @@ pub fn await(agent: *Agent, arg: Value) Agent.Error!Value {
     const captures = try agent.gc_allocator.create(Captures);
     captures.* = .{ .async_context = async_context };
 
-    // 3. Let fulfilledClosure be a new Abstract Closure with parameters (v) that captures
+    // 3. Let fulfilledClosure be a new Abstract Closure with parameters (value) that captures
     //    asyncContext and performs the following steps when called:
     const fulfilled_closure = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function_ = agent_.activeFunctionObject();
             const captures_ = function_.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
             const async_context_ = captures_.async_context;
-            const v = arguments_.get(0);
+            const value_ = arguments_.get(0);
 
-            // TODO: a. Perform Completion(RunSuspendedContext(asyncContext, NormalCompletion(v))).
+            // TODO: a. Perform Completion(RunSuspendedContext(asyncContext, NormalCompletion(
+            //          value))).
             // b. NOTE: The Completion Record returned by RunSuspendedContext is intentionally
             //    ignored.
-            _ = v;
+            _ = value_;
             _ = async_context_;
 
             // c. Return NormalCompletion(undefined).

@@ -1717,9 +1717,9 @@ pub const prototype = struct {
         // 3. Let length be TypedArrayLength(taRecord).
         const length_ = typedArrayLength(ta_record);
 
-        // 4. If separator is undefined, let sep be ",".
-        // 5. Else, let sep be ? ToString(separator).
-        const sep: String.Builder.Segment = if (separator.isUndefined())
+        // 4. If separator is undefined, let separatorString be ",".
+        // 5. Else, let separatorString be ? ToString(separator).
+        const separator_string: String.Builder.Segment = if (separator.isUndefined())
             .{ .char = ',' }
         else
             .{ .string = try separator.toString(agent) };
@@ -1738,8 +1738,8 @@ pub const prototype = struct {
 
         // 8. Repeat, while k < length,
         while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. If k > 0, set result to the string-concatenation of result and sep.
-            if (k > 0) result.appendSegmentAssumeCapacity(sep);
+            // a. If k > 0, set result to the string-concatenation of result and separatorString.
+            if (k > 0) result.appendSegmentAssumeCapacity(separator_string);
 
             // b. Let element be TypedArrayGetElement(obj, 𝔽(k)).
             const element = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
@@ -4112,10 +4112,10 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
             const string = string_value.asString();
 
-            // 2. Let opts be ? GetOptionsObject(options).
+            // 2. Let optionsObj be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 3. Let alphabet be ? Get(opts, "alphabet").
+            // 3. Let alphabet be ? Get(optionsObj, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 4. If alphabet is undefined, set alphabet to "base64".
@@ -4129,7 +4129,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            // 6. Let lastChunkHandling be ? Get(optionsObj, "lastChunkHandling").
             var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 7. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
@@ -4297,10 +4297,10 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             }
             const string = string_value.asString();
 
-            // 4. Let opts be ? GetOptionsObject(options).
+            // 4. Let optionsObj be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 5. Let alphabet be ? Get(opts, "alphabet").
+            // 5. Let alphabet be ? Get(optionsObj, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 6. If alphabet is undefined, set alphabet to "base64".
@@ -4314,7 +4314,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 8. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            // 8. Let lastChunkHandling be ? Get(optionsObj, "lastChunkHandling").
             var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 9. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
@@ -4481,10 +4481,10 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 2. Perform ? ValidateUint8Array(obj).
             const typed_array = try validateUint8Array(agent, this_value);
 
-            // 3. Let opts be ? GetOptionsObject(options).
+            // 3. Let optionsObj be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 4. Let alphabet be ? Get(opts, "alphabet").
+            // 4. Let alphabet be ? Get(optionsObj, "alphabet").
             const alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 5. If alphabet is undefined, set alphabet to "base64".
@@ -4498,7 +4498,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 7. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
+            // 7. Let omitPadding be ToBoolean(? Get(optionsObj, "omitPadding")).
             const omit_padding = (try options.get(agent, PropertyKey.from("omitPadding"))).toBoolean();
 
             // 8. Let toEncode be ? GetUint8ArrayBytes(obj).

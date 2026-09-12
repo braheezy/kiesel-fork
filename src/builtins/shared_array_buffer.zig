@@ -71,12 +71,12 @@ pub fn allocateSharedArrayBuffer(
         },
     );
 
-    // 6. If allocatingGrowableBuffer is true, let allocLength be maxByteLength; else let
-    //    allocLength be byteLength.
-    const alloc_length = max_byte_length.unwrap() orelse byte_length;
+    // 6. If allocatingGrowableBuffer is true, let allocationLength be maxByteLength; else let
+    //    allocationLength be byteLength.
+    const allocation_length = max_byte_length.unwrap() orelse byte_length;
 
-    // 7. Let block be ? CreateSharedByteDataBlock(allocLength).
-    const block = try createSharedByteDataBlock(agent, alloc_length);
+    // 7. Let block be ? CreateSharedByteDataBlock(allocationLength).
+    const block = try createSharedByteDataBlock(agent, allocation_length);
 
     // 8. Set obj.[[ArrayBufferData]] to block.
     array_buffer.fields.data_block = block;
@@ -447,14 +447,14 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "SharedArrayBuffer is too small", .{});
         }
 
-        // 14. Let fromBuf be obj.[[ArrayBufferData]].
-        const from_buf = array_buffer.fields.data_block.?;
+        // 14. Let fromBlock be obj.[[ArrayBufferData]].
+        const from_block = array_buffer.fields.data_block.?;
 
-        // 15. Let toBuf be new.[[ArrayBufferData]].
-        const to_buf = new.fields.data_block.?;
+        // 15. Let toBlock be new.[[ArrayBufferData]].
+        const to_block = new.fields.data_block.?;
 
-        // 16. Perform CopyDataBlockBytes(toBuf, 0, fromBuf, first, newLength).
-        copyDataBlockBytes(to_buf, 0, from_buf, first, new_length);
+        // 16. Perform CopyDataBlockBytes(toBlock, 0, fromBlock, first, newLength).
+        copyDataBlockBytes(to_block, 0, from_block, first, new_length);
 
         // 17. Return new.
         return Value.from(&new.object);
