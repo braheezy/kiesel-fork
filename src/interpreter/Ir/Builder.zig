@@ -11,6 +11,7 @@ const computeLiveness = @import("liveness.zig").computeLiveness;
 const computeLiveRanges = @import("live_ranges.zig").computeLiveRanges;
 const constantFold = @import("constant_folding.zig").constantFold;
 const containsSlice = utils.containsSlice;
+const foldInst = @import("inst_folding.zig").foldInst;
 
 pub const Builder = @This();
 
@@ -244,6 +245,7 @@ pub fn build(b: *Builder) Error!Ir {
 }
 
 fn addInst(b: *Builder, inst: Ir.Inst) std.mem.Allocator.Error!Ir.Inst.Ref {
+    if (foldInst(b, inst)) |ref| return ref;
     const index: Ir.Inst.Index = @enumFromInt(b.instructions.len);
     try b.instructions.append(b.gpa, inst);
     return index.toRef();

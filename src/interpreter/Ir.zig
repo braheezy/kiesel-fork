@@ -253,6 +253,77 @@ pub const Inst = struct {
         add_disposable_resource_sync,
         add_disposable_resource_async,
         dispose_resources,
+
+        pub fn hint(tag: Tag) ?TypeHint {
+            return switch (tag) {
+                .undefined,
+                => .undefined,
+
+                .null,
+                => .null,
+
+                .true,
+                .false,
+                .to_boolean,
+                .logical_not,
+                .lt,
+                .lt_eq,
+                .gt,
+                .gt_eq,
+                .instanceof,
+                .in,
+                .eq,
+                .not_eq,
+                .eq_strict,
+                .not_eq_strict,
+                .delete_binding,
+                .delete_property,
+                .delete_property_strict,
+                .delete_property_computed,
+                .delete_property_computed_strict,
+                .delete_property_indexed,
+                .delete_property_indexed_strict,
+                .iterator_is_done,
+                .has_private_element,
+                => .boolean,
+
+                .string,
+                .to_string,
+                .typeof,
+                .typeof_binding,
+                => .string,
+
+                .number,
+                .to_number,
+                => .number,
+
+                .big_int,
+                => .big_int,
+
+                .create_array,
+                .create_object,
+                .create_reg_exp,
+                .to_object,
+                .construct,
+                .get_template_object,
+                .create_function,
+                .create_class,
+                .create_unmapped_arguments_object,
+                .create_mapped_arguments_object,
+                .get_rest_arguments,
+                .as_getter,
+                .as_setter,
+                .super_call,
+                .get_iterator,
+                .get_async_iterator,
+                .get_for_in_iterator,
+                .import_call,
+                .get_import_meta,
+                => .object,
+
+                else => null,
+            };
+        }
     };
 
     pub const Data = union {
@@ -297,6 +368,16 @@ pub const Inst = struct {
                 else => {},
             }
         }
+    };
+
+    pub const TypeHint = enum {
+        undefined,
+        null,
+        boolean,
+        string,
+        number,
+        big_int,
+        object,
     };
 
     pub const data_tags = std.enums.directEnumArray(Tag, std.meta.FieldEnum(Data), 0, .{
