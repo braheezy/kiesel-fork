@@ -305,16 +305,19 @@ fn peekToken(self: *Parser) ParserCore.AcceptError!Tokenizer.Token {
     return try self.core.peek() orelse return error.EndOfStream;
 }
 
+/// Report a syntax error on the current token.
 fn emitError(self: *Parser, comptime fmt: []const u8, args: anytype) std.mem.Allocator.Error!void {
-    try self.diagnostics.emit(self.core.tokenizer.current_location, .@"error", fmt, args);
+    try self.emitErrorAt(self.core.tokenizer.current_location, fmt, args);
 }
 
+/// Report a syntax error at a specific source location.
 fn emitErrorAt(
     self: *Parser,
     location: ptk.Location,
     comptime fmt: []const u8,
     args: anytype,
 ) std.mem.Allocator.Error!void {
+    @branchHint(.cold);
     try self.diagnostics.emit(location, .@"error", fmt, args);
 }
 
@@ -3849,6 +3852,17 @@ pub fn acceptMethodDefinition(
     try self.ensureUniqueParameterNames(.method, formal_parameters, open_parenthesis_token.location);
     if (function_body.functionBodyContainsUseStrict()) {
         try self.ensureSimpleParameterList(formal_parameters, open_parenthesis_token.location);
+    }
+    if (parsed) |p| {
+        switch (p.method_type) {
+            .get => if (formal_parameters.items.len > 0) {
+                try self.emitErrorAt(open_parenthesis_token.location, "A 'get' accessor must not have any formal parameters.", .{});
+            },
+            .set => if (formal_parameters.items.len != 1) {
+                try self.emitErrorAt(open_parenthesis_token.location, "A 'set' accessor must have exactly one parameters.", .{});
+            },
+            else => {},
+        }
     }
     const end_offset = self.core.tokenizer.offset;
     const source_range: ast.SourceRange = .{ .start = @intCast(start_offset), .end = @intCast(end_offset) };
