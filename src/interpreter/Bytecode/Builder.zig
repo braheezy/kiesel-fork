@@ -213,7 +213,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .array_create => try b.lowerArrayCreate(data.array, dest),
             .array_push => try b.lowerArrayPush(data.binary),
             .array_spread => try b.lowerArraySpread(data.binary),
-            .object_create => try b.lowerObjectCreate(dest),
+            .object_create => try b.lowerObjectCreate(data.object, dest),
             .object_set => try b.lowerObjectSet(data.set_property),
             .object_set_computed => try b.lowerObjectSetComputed(data.set_property_computed),
             .object_set_prototype => try b.lowerObjectSetPrototype(data.binary),
@@ -944,11 +944,11 @@ fn lowerArraySpread(b: *Builder, data: Ir.Inst.Binary) Error!void {
     });
 }
 
-fn lowerObjectCreate(b: *Builder, dest: Ir.Inst.Ref) Error!void {
+fn lowerObjectCreate(b: *Builder, data: Ir.Inst.Object, dest: Ir.Inst.Ref) Error!void {
     const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .object_create,
-        .data = .{ .reg = dest_reg },
+        .data = .{ .reg_u32 = .{ dest_reg, data.properties } },
     });
 }
 

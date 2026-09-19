@@ -3342,7 +3342,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
 
     const object_ref = try b.addInst(.{
         .tag = .object_create,
-        .data = .{ .none = {} },
+        .data = .{ .object = .{ .properties = @intCast(object_lit.property_definition_list.items.len) } },
     });
 
     for (object_lit.property_definition_list.items) |prop_def| {

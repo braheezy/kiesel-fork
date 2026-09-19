@@ -213,7 +213,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .array_push_hole => vm.executeArrayPushHole(data.reg),
                 .array_set => vm.executeArraySet(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
                 .array_spread => vm.executeArraySpread(data.reg_reg[0], data.reg_reg[1]),
-                .object_create => vm.executeObjectCreate(data.reg),
+                .object_create => vm.executeObjectCreate(data.reg_u32[0], data.reg_u32[1]),
                 .object_set => vm.executeObjectSet(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
                 .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .object_set_getter => vm.executeObjectSetGetter(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
@@ -751,8 +751,9 @@ fn executeArraySpread(vm: *Vm, array_reg: Bytecode.Reg, value_reg: Bytecode.Reg)
     }
 }
 
-fn executeObjectCreate(vm: *Vm, dst: Bytecode.Reg) std.mem.Allocator.Error!void {
+fn executeObjectCreate(vm: *Vm, dst: Bytecode.Reg, property_count: u32) std.mem.Allocator.Error!void {
     const object = try ordinaryObjectCreateFast(vm.agent);
+    try object.ensureProperties(vm.agent.gc_allocator, property_count);
     vm.load(dst, Value.from(object));
 }
 

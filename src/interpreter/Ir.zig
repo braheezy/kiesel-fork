@@ -263,6 +263,7 @@ pub const Inst = struct {
         string: StringIndex,
         big_int: BigIntIndex,
         array: Array,
+        object: Object,
         reg_exp: RegExp,
         br: Br,
         br_cond: ExtraIndex,
@@ -309,7 +310,7 @@ pub const Inst = struct {
         .array_create = .array,
         .array_push = .binary,
         .array_spread = .binary,
-        .object_create = .none,
+        .object_create = .object,
         .object_set = .set_property,
         .object_set_computed = .set_property_computed,
         .object_set_prototype = .binary,
@@ -435,6 +436,7 @@ pub const Inst = struct {
 
     // Inline data types (8 bytes)
     pub const Array = packed struct(u32) { len: u31, has_spread: bool };
+    pub const Object = struct { properties: u32 };
     pub const RegExp = struct { pattern: StringIndex, flags: StringIndex };
     pub const Br = struct { target: Ref, value: Ref };
     pub const Binary = struct { lhs: Ref, rhs: Ref };
