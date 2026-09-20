@@ -3340,9 +3340,11 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
         computed: Ir.Inst.Ref,
     };
 
+    const property_count = try object_lit.property_definition_list.propertyCount(b.gpa);
+
     const object_ref = try b.addInst(.{
         .tag = .object_create,
-        .data = .{ .object = .{ .properties = @intCast(object_lit.property_definition_list.items.len) } },
+        .data = .{ .object = .{ .property_count = @intCast(property_count) } },
     });
 
     for (object_lit.property_definition_list.items) |prop_def| {

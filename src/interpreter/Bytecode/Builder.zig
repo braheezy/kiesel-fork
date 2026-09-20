@@ -948,7 +948,10 @@ fn lowerObjectCreate(b: *Builder, data: Ir.Inst.Object, dest: Ir.Inst.Ref) Error
     const dest_reg = b.resolve(dest);
     try b.emit(.{
         .tag = .object_create,
-        .data = .{ .reg_u32 = .{ dest_reg, data.properties } },
+        .data = .{ .reg_u32 = .{
+            dest_reg,
+            data.property_count,
+        } },
     });
 }
 

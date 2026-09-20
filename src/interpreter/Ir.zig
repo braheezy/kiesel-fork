@@ -436,7 +436,7 @@ pub const Inst = struct {
 
     // Inline data types (8 bytes)
     pub const Array = packed struct(u32) { len: u31, has_spread: bool };
-    pub const Object = struct { properties: u32 };
+    pub const Object = struct { property_count: u32 };
     pub const RegExp = struct { pattern: StringIndex, flags: StringIndex };
     pub const Br = struct { target: Ref, value: Ref };
     pub const Binary = struct { lhs: Ref, rhs: Ref };

@@ -185,7 +185,7 @@
         \\  %5: [  5..5  ]                       set_binding @2 ("o"), %2
         \\  %6: [  6..7  ]                       object_create 0
         \\  %7: [  7..7  ]                       set_binding @3 ("p"), %6
-        \\  %8: [  8..20 ]                       object_create 5
+        \\  %8: [  8..20 ]                       object_create 3
         \\  %9: [  9..10 ]                       get_binding @0 ("a")
         \\ %10: [ 10..10 ]                       object_set %8, @0 ("a"), %9
         \\ %11: [ 11..13 ]                       number 2
@@ -208,7 +208,7 @@
         \\  31: 4e 02 00 00 00 00 00             set_binding @2 ("o"), r0
         \\  38: 12 00 00 00 00 00 00             object_create r0, 0
         \\  45: 4e 03 00 00 00 00 00             set_binding @3 ("p"), r0
-        \\  52: 12 00 00 05 00 00 00             object_create r0, 5
+        \\  52: 12 00 00 03 00 00 00             object_create r0, 3
         \\  59: 49 01 00 00 00 00 00             get_binding r1, @0 ("a")
         \\  66: 13 00 00 00 00 00 00 01 00       object_set r0, @0 ("a"), r1
         \\  75: 07 01 00 02                      load_number_i8 r1, 2

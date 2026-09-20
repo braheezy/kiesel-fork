@@ -392,6 +392,25 @@ pub const ObjectLiteral = struct {
 /// https://tc39.es/ecma262/#prod-PropertyDefinitionList
 pub const PropertyDefinitionList = struct {
     items: []const PropertyDefinition,
+
+    /// Count the number of properties an object literal will actually define,
+    /// i.e. excluding spread and `__proto__` properties.
+    ///
+    /// Only allocates in the pathological case of an escaped `__proto__` property.
+    pub fn propertyCount(
+        self: PropertyDefinitionList,
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error!usize {
+        var count: usize = 0;
+        for (self.items) |property_definition| switch (property_definition) {
+            .spread => {},
+            .identifier_reference, .method_definition => count += 1,
+            .property_name_and_expression => |p| {
+                if (!try p.property_name.isProtoSetter(allocator)) count += 1;
+            },
+        };
+        return count;
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-PropertyDefinition
