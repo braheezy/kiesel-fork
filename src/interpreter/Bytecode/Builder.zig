@@ -210,15 +210,15 @@ pub fn build(b: *Builder) Error!Bytecode {
             .number => try b.lowerNumber(data.number, dest),
             .string => try b.lowerString(data.string, dest),
             .big_int => try b.lowerBigInt(data.big_int, dest),
-            .array_create => try b.lowerArrayCreate(data.array, dest),
+            .create_array => try b.lowerCreateArray(data.array, dest),
             .array_push => try b.lowerArrayPush(data.binary),
             .array_spread => try b.lowerArraySpread(data.binary),
-            .object_create => try b.lowerObjectCreate(data.object, dest),
+            .create_object => try b.lowerCreateObject(data.object, dest),
             .object_set => try b.lowerObjectSet(data.set_property),
             .object_set_computed => try b.lowerObjectSetComputed(data.set_property_computed),
             .object_set_prototype => try b.lowerObjectSetPrototype(data.binary),
             .object_spread => try b.lowerObjectSpread(data.binary),
-            .reg_exp => try b.lowerRegExp(data.reg_exp, dest),
+            .create_reg_exp => try b.lowerCreateRegExp(data.reg_exp, dest),
             .this => try b.lowerThis(dest),
             .label => try b.lowerLabel(dest),
             .br => try b.lowerBr(data.br),
@@ -314,8 +314,8 @@ pub fn build(b: *Builder) Error!Bytecode {
             .get_argument => try b.lowerGetArgument(data.argument, dest),
             .get_rest_arguments => try b.lowerGetRestArguments(data.argument, dest),
             .get_new_target => try b.lowerGetNewTarget(dest),
-            .getter => try b.lowerGetter(data.ref, dest),
-            .setter => try b.lowerSetter(data.ref, dest),
+            .as_getter => try b.lowerAsGetter(data.ref, dest),
+            .as_setter => try b.lowerAsSetter(data.ref, dest),
             .super_call => try b.lowerSuperCall(data.super_call, dest),
             .get_super_property => try b.lowerGetSuperProperty(data.string, dest),
             .get_super_property_computed => try b.lowerGetSuperPropertyComputed(data.ref, dest),
@@ -721,7 +721,7 @@ fn emitMoveIfNeeded(b: *Builder, src: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void
 
 fn emitArgumentsArray(b: *Builder, args: []const Ir.Inst.Ref, dest_reg: Bytecode.Reg) Error!void {
     try b.emit(.{
-        .tag = .array_create,
+        .tag = .create_array,
         .data = .{ .reg_u32 = .{ dest_reg, 0 } },
     });
     for (args) |arg| {
@@ -862,10 +862,10 @@ fn lowerBigInt(b: *Builder, big_int_index: Ir.BigIntIndex, dest: Ir.Inst.Ref) Er
     });
 }
 
-fn lowerArrayCreate(b: *Builder, data: Ir.Inst.Array, dest: Ir.Inst.Ref) Error!void {
+fn lowerCreateArray(b: *Builder, data: Ir.Inst.Array, dest: Ir.Inst.Ref) Error!void {
     const dest_reg = b.resolve(dest);
     try b.emit(.{
-        .tag = .array_create,
+        .tag = .create_array,
         .data = .{ .reg_u32 = .{
             dest_reg,
             if (data.has_spread) 0 else data.len,
@@ -944,10 +944,10 @@ fn lowerArraySpread(b: *Builder, data: Ir.Inst.Binary) Error!void {
     });
 }
 
-fn lowerObjectCreate(b: *Builder, data: Ir.Inst.Object, dest: Ir.Inst.Ref) Error!void {
+fn lowerCreateObject(b: *Builder, data: Ir.Inst.Object, dest: Ir.Inst.Ref) Error!void {
     const dest_reg = b.resolve(dest);
     try b.emit(.{
-        .tag = .object_create,
+        .tag = .create_object,
         .data = .{ .reg_u32 = .{
             dest_reg,
             data.property_count,
@@ -965,7 +965,7 @@ fn lowerObjectSet(b: *Builder, extra_index: Ir.ExtraIndex) Error!void {
     const value_inst = value_index.inst(b.ir);
 
     switch (value_inst.tag) {
-        .getter, .setter, .create_function => {
+        .as_getter, .as_setter, .create_function => {
             try b.emit(.{
                 .tag = .set_home_object,
                 .data = .{ .reg_reg = .{
@@ -979,8 +979,8 @@ fn lowerObjectSet(b: *Builder, extra_index: Ir.ExtraIndex) Error!void {
 
     try b.emit(.{
         .tag = switch (value_inst.tag) {
-            .getter => .object_set_getter,
-            .setter => .object_set_setter,
+            .as_getter => .object_set_getter,
+            .as_setter => .object_set_setter,
             else => .object_set,
         },
         .data = .{ .reg_string_reg = .{
@@ -1001,7 +1001,7 @@ fn lowerObjectSetComputed(b: *Builder, extra_index: Ir.ExtraIndex) Error!void {
     const value_inst = value_index.inst(b.ir);
 
     switch (value_inst.tag) {
-        .getter, .setter, .create_function => {
+        .as_getter, .as_setter, .create_function => {
             try b.emit(.{
                 .tag = .set_home_object,
                 .data = .{ .reg_reg = .{
@@ -1015,8 +1015,8 @@ fn lowerObjectSetComputed(b: *Builder, extra_index: Ir.ExtraIndex) Error!void {
 
     try b.emit(.{
         .tag = switch (value_inst.tag) {
-            .getter => .object_set_getter_computed,
-            .setter => .object_set_setter_computed,
+            .as_getter => .object_set_getter_computed,
+            .as_setter => .object_set_setter_computed,
             else => .object_set_computed,
         },
         .data = .{ .reg_reg_reg = .{
@@ -1051,12 +1051,12 @@ fn lowerObjectSpread(b: *Builder, data: Ir.Inst.Binary) Error!void {
     });
 }
 
-fn lowerRegExp(b: *Builder, data: Ir.Inst.RegExp, dest: Ir.Inst.Ref) Error!void {
+fn lowerCreateRegExp(b: *Builder, data: Ir.Inst.RegExp, dest: Ir.Inst.Ref) Error!void {
     const dest_reg = b.resolve(dest);
     const pattern_index: Bytecode.StringIndex = @enumFromInt(@intFromEnum(data.pattern));
     const flags_index: Bytecode.StringIndex = @enumFromInt(@intFromEnum(data.flags));
     try b.emit(.{
-        .tag = .reg_exp_create,
+        .tag = .create_reg_exp,
         .data = .{ .reg_string_string = .{
             dest_reg,
             pattern_index,
@@ -1607,7 +1607,7 @@ fn lowerCopyDataProperties(b: *Builder, extra_index: Ir.ExtraIndex, dest: Ir.Ins
     const excluded_reg = try b.lsra.allocateTemp(b.gpa);
     defer b.lsra.freeTemp(excluded_reg);
     try b.emit(.{
-        .tag = .array_create,
+        .tag = .create_array,
         .data = .{ .reg_u32 = .{
             excluded_reg,
             0,
@@ -2025,11 +2025,11 @@ fn lowerGetNewTarget(b: *Builder, dest: Ir.Inst.Ref) Error!void {
     });
 }
 
-fn lowerGetter(b: *Builder, ref: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+fn lowerAsGetter(b: *Builder, ref: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
     try b.emitMoveIfNeeded(ref, dest);
 }
 
-fn lowerSetter(b: *Builder, ref: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+fn lowerAsSetter(b: *Builder, ref: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
     try b.emitMoveIfNeeded(ref, dest);
 }
 

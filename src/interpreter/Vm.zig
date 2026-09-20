@@ -208,12 +208,12 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .load_string => vm.executeLoadString(data.reg_string[0], data.reg_string[1]),
                 .load_big_int => vm.executeLoadBigInt(data.reg_big_int[0], data.reg_big_int[1]),
                 .move => vm.executeMove(data.reg_reg[0], data.reg_reg[1]),
-                .array_create => vm.executeCreateArray(data.reg_u32[0], data.reg_u32[1]),
+                .create_array => vm.executeCreateArray(data.reg_u32[0], data.reg_u32[1]),
                 .array_push => vm.executeArrayPush(data.reg_reg[0], data.reg_reg[1]),
                 .array_push_hole => vm.executeArrayPushHole(data.reg),
                 .array_set => vm.executeArraySet(data.reg_reg_u32[0], data.reg_reg_u32[1], data.reg_reg_u32[2]),
                 .array_spread => vm.executeArraySpread(data.reg_reg[0], data.reg_reg[1]),
-                .object_create => vm.executeObjectCreate(data.reg_u32[0], data.reg_u32[1]),
+                .create_object => vm.executeCreateObject(data.reg_u32[0], data.reg_u32[1]),
                 .object_set => vm.executeObjectSet(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
                 .object_set_computed => vm.executeObjectSetComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .object_set_getter => vm.executeObjectSetGetter(data.reg_string_reg[0], data.reg_string_reg[1], data.reg_string_reg[2]),
@@ -222,7 +222,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .object_set_setter_computed => vm.executeObjectSetSetterComputed(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .object_set_prototype => vm.executeObjectSetPrototype(data.reg_reg[0], data.reg_reg[1]),
                 .object_spread => vm.executeObjectSpread(data.reg_reg[0], data.reg_reg[1]),
-                .reg_exp_create => vm.executeRegExpCreate(data.reg_string_string[0], data.reg_string_string[1], data.reg_string_string[2]),
+                .create_reg_exp => vm.executeCreateRegExp(data.reg_string_string[0], data.reg_string_string[1], data.reg_string_string[2]),
                 .resolve_this_binding => vm.executeResolveThisBinding(data.reg),
                 .to_boolean => vm.executeToBoolean(data.reg_reg[0], data.reg_reg[1]),
                 .to_number => vm.executeToNumber(data.reg_reg[0], data.reg_reg[1]),
@@ -751,7 +751,7 @@ fn executeArraySpread(vm: *Vm, array_reg: Bytecode.Reg, value_reg: Bytecode.Reg)
     }
 }
 
-fn executeObjectCreate(vm: *Vm, dst: Bytecode.Reg, property_count: u32) std.mem.Allocator.Error!void {
+fn executeCreateObject(vm: *Vm, dst: Bytecode.Reg, property_count: u32) std.mem.Allocator.Error!void {
     const object = try ordinaryObjectCreateFast(vm.agent);
     try object.ensureProperties(vm.agent.gc_allocator, property_count);
     vm.load(dst, Value.from(object));
@@ -819,7 +819,7 @@ fn executeObjectSpread(vm: *Vm, object_reg: Bytecode.Reg, value_reg: Bytecode.Re
     try object.copyDataProperties(vm.agent, spread_value, excluded_items);
 }
 
-fn executeRegExpCreate(vm: *Vm, dst: Bytecode.Reg, pattern_index: Bytecode.StringIndex, flags_index: Bytecode.StringIndex) Agent.Error!void {
+fn executeCreateRegExp(vm: *Vm, dst: Bytecode.Reg, pattern_index: Bytecode.StringIndex, flags_index: Bytecode.StringIndex) Agent.Error!void {
     const pattern = try vm.getString(pattern_index);
     const flags = try vm.getString(flags_index);
     const reg_exp = try builtins.regExpCreateFast(vm.agent, pattern, flags);

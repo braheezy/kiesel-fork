@@ -3290,7 +3290,7 @@ fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.I
     } else false;
 
     const array_ref = try b.addInst(.{
-        .tag = .array_create,
+        .tag = .create_array,
         .data = .{ .array = .{
             .len = @intCast(array_lit.element_list.len),
             .has_spread = has_spread,
@@ -3343,7 +3343,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
     const property_count = try object_lit.property_definition_list.propertyCount(b.gpa);
 
     const object_ref = try b.addInst(.{
-        .tag = .object_create,
+        .tag = .create_object,
         .data = .{ .object = .{ .property_count = @intCast(property_count) } },
     });
 
@@ -3415,7 +3415,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                             .data = .{ .create_function = function_index },
                         });
                         break :blk try b.addInst(.{
-                            .tag = if (method_def.method == .get) .getter else .setter,
+                            .tag = if (method_def.method == .get) .as_getter else .as_setter,
                             .data = .{ .ref = func_ref },
                         });
                     },
@@ -3638,7 +3638,7 @@ fn lowerRegularExpressionLiteral(b: *Builder, regexp_lit: *const ast.RegularExpr
     const pattern_index = try b.internString(regexp_lit.pattern, .literal);
     const flags_index = try b.internString(regexp_lit.flags, .literal);
     return b.addInst(.{
-        .tag = .reg_exp,
+        .tag = .create_reg_exp,
         .data = .{ .reg_exp = .{
             .pattern = pattern_index,
             .flags = flags_index,
@@ -5350,7 +5350,7 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
 
     const cooked_array = blk: {
         const array_ref = try b.addInst(.{
-            .tag = .array_create,
+            .tag = .create_array,
             .data = .{ .array = .{
                 .len = @intCast(cooked_indices.items.len),
                 .has_spread = false,
@@ -5373,7 +5373,7 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
 
     const raw_array = blk: {
         const array_ref = try b.addInst(.{
-            .tag = .array_create,
+            .tag = .create_array,
             .data = .{ .array = .{
                 .len = @intCast(raw_indices.items.len),
                 .has_spread = false,

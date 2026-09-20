@@ -140,13 +140,13 @@ pub const Inst = struct {
         load_big_int,
         move,
 
-        array_create,
+        create_array,
         array_push,
         array_push_hole,
         array_set,
         array_spread,
 
-        object_create,
+        create_object,
         object_set,
         object_set_computed,
         object_set_getter,
@@ -156,7 +156,7 @@ pub const Inst = struct {
         object_set_prototype,
         object_spread,
 
-        reg_exp_create,
+        create_reg_exp,
 
         resolve_this_binding,
 
@@ -346,12 +346,12 @@ pub const Inst = struct {
             .load_string = .reg_string,
             .load_big_int = .reg_big_int,
             .move = .reg_reg,
-            .array_create = .reg_u32,
+            .create_array = .reg_u32,
             .array_push = .reg_reg,
             .array_push_hole = .reg,
             .array_set = .reg_reg_u32,
             .array_spread = .reg_reg,
-            .object_create = .reg_u32,
+            .create_object = .reg_u32,
             .object_set = .reg_string_reg,
             .object_set_computed = .reg_reg_reg,
             .object_set_getter = .reg_string_reg,
@@ -360,7 +360,7 @@ pub const Inst = struct {
             .object_set_setter_computed = .reg_reg_reg,
             .object_set_prototype = .reg_reg,
             .object_spread = .reg_reg,
-            .reg_exp_create = .reg_string_string,
+            .create_reg_exp = .reg_string_string,
             .resolve_this_binding = .reg,
             .to_boolean = .reg_reg,
             .to_number = .reg_reg,
