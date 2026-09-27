@@ -43,6 +43,7 @@ pub const State = struct {
     new_target_allowed: bool = false,
     in_strict_mode: bool = false,
     arguments_object_needed: bool = false,
+    arguments_disallowed: bool = false,
 };
 
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
@@ -801,6 +802,17 @@ pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierRefere
                 try self.emitErrorAt(
                     token.location,
                     "Identifier reference named 'await' not allowed in async functions or class static blocks",
+                    .{},
+                );
+            }
+            // - It is a Syntax Error if Initializer is present and ContainsArguments of
+            //   Initializer is true.
+            // - It is a Syntax Error if ContainsArguments of ClassStaticBlockStatementList is
+            //   true.
+            if (self.state.arguments_disallowed and std.mem.eql(u8, string_value, "arguments")) {
+                try self.emitErrorAt(
+                    token.location,
+                    "Identifier reference named 'arguments' not allowed in class field initializers or class static blocks",
                     .{},
                 );
             }
@@ -3513,6 +3525,9 @@ pub fn acceptFunctionDeclaration(self: *Parser) AcceptError!ast.FunctionDeclarat
     const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp5.restore();
 
+    const tmp6 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp6.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3565,6 +3580,9 @@ pub fn acceptFunctionExpression(self: *Parser) AcceptError!ast.FunctionExpressio
 
     const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp5.restore();
+
+    const tmp6 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp6.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -3843,6 +3861,9 @@ pub fn acceptMethodDefinition(
     const tmp7 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp7.restore();
 
+    const tmp8 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp8.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3907,6 +3928,9 @@ fn acceptGeneratorDeclaration(self: *Parser) AcceptError!ast.GeneratorDeclaratio
     const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp5.restore();
 
+    const tmp6 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp6.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -3960,6 +3984,9 @@ pub fn acceptGeneratorExpression(self: *Parser) AcceptError!ast.GeneratorExpress
 
     const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp5.restore();
+
+    const tmp6 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp6.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -4054,6 +4081,9 @@ fn acceptAsyncGeneratorDeclaration(self: *Parser) AcceptError!ast.AsyncGenerator
     const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp5.restore();
 
+    const tmp6 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp6.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -4111,6 +4141,9 @@ pub fn acceptAsyncGeneratorExpression(self: *Parser) AcceptError!ast.AsyncGenera
 
     const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp5.restore();
+
+    const tmp6 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp6.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
@@ -4315,10 +4348,11 @@ fn acceptFieldDefinition(self: *Parser) AcceptError!ast.FieldDefinition {
     errdefer self.core.restoreState(state);
 
     const class_element_name = try self.acceptClassElementName();
-    const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_|
-        try self.acceptExpression(.{})
-    else |_|
-        null;
+    const initializer = if (self.core.accept(RuleSet.is(.@"="))) |_| blk: {
+        const tmp = temporaryChange(&self.state.arguments_disallowed, true);
+        defer tmp.restore();
+        break :blk try self.acceptExpression(.{});
+    } else |_| null;
     return .{ .class_element_name = class_element_name, .initializer = initializer };
 }
 
@@ -4358,6 +4392,7 @@ fn acceptClassStaticBlock(self: *Parser) AcceptError!ast.ClassStaticBlock {
     self.state.in_labelled_statement = false;
     self.state.in_class_constructor = false;
     self.state.new_target_allowed = true;
+    self.state.arguments_disallowed = true;
 
     const token = try self.core.accept(RuleSet.is(.@"{"));
     const statement_list = try self.acceptStatementList(.{});
@@ -4479,6 +4514,9 @@ fn acceptAsyncFunctionDeclaration(self: *Parser) AcceptError!ast.AsyncFunctionDe
     const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp5.restore();
 
+    const tmp6 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp6.restore();
+
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();
     _ = try self.core.accept(RuleSet.is(.@")"));
@@ -4535,6 +4573,9 @@ pub fn acceptAsyncFunctionExpression(self: *Parser) AcceptError!ast.AsyncFunctio
 
     const tmp5 = temporaryChange(&self.state.new_target_allowed, true);
     defer tmp5.restore();
+
+    const tmp6 = temporaryChange(&self.state.arguments_disallowed, false);
+    defer tmp6.restore();
 
     const open_parenthesis_token = try self.core.accept(RuleSet.is(.@"("));
     const formal_parameters = try self.acceptFormalParameters();

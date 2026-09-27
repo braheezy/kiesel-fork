@@ -103,14 +103,15 @@ pub fn performEval(
         .diagnostics = &diagnostics,
         .file_name = "eval",
         .state = .{
-            // e-h.
+            // e-g.
             .in_strict_mode = strict_caller,
             .new_target_allowed = in_func,
             .in_method_definition = in_method,
             // TODO: The state should track whether we're in a *derived* constructor
             .in_class_constructor = in_derived_ctor,
-            // TODO: The state should track whether we're in a class field initializer
-            // .in_class_field_initializer = in_class_field_initializer,
+            // h. If inClassFieldInitializer is true and ContainsArguments of body is true, throw
+            //    a SyntaxError exception.
+            .arguments_disallowed = in_class_field_initializer,
         },
     }) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
