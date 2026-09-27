@@ -221,15 +221,26 @@ const Kiesel = struct {
             try kiesel_object.defineBuiltinFunction(agent, "asm", @"asm", 1, realm);
             try kiesel_object.defineBuiltinFunction(agent, "syscall", syscall, 1, realm);
             const sysno_object = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
-            inline for (std.meta.fields(std.os.linux.SYS)) |field| {
+            const sysno_names = comptime blk: {
                 @setEvalBranchQuota(100_000);
-                const name: []const u8 = comptime blk: {
-                    var name: [field.name.len]u8 = undefined;
-                    _ = std.ascii.upperString(&name, field.name);
-                    const final = name;
-                    break :blk &final;
-                };
-                try sysno_object.defineBuiltinProperty(agent, name, Value.from(@as(u53, @intCast(field.value))));
+                var names: [std.enums.values(std.os.linux.SYS).len]*const String = undefined;
+                for (std.enums.values(std.os.linux.SYS), 0..) |value, i| {
+                    var buf: [@tagName(value).len]u8 = undefined;
+                    _ = std.ascii.upperString(&buf, @tagName(value));
+                    const final = buf;
+                    names[i] = String.fromLiteral(&final);
+                }
+                break :blk names;
+            };
+            for (sysno_names, std.enums.values(std.os.linux.SYS)) |name, value| {
+                try sysno_object.definePropertyDirect(
+                    agent,
+                    PropertyKey.from(name),
+                    .{
+                        .value_or_accessor = .{ .value = Value.from(@as(u53, @intCast(@intFromEnum(value)))) },
+                        .attributes = .builtin_default,
+                    },
+                );
             }
             try kiesel_object.defineBuiltinProperty(agent, "Sysno", Value.from(sysno_object));
         }
