@@ -1678,7 +1678,7 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     } });
     continue_br.set(.{ .br = .{
         .target = test_label,
-        .value = body_result,
+        .value = continue_label,
     } });
     exit_br.set(.{ .br = .{
         .target = end_label,
