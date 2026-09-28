@@ -213,90 +213,60 @@ pub fn build(b: *std.Build) !void {
         }
     }
 
-    const exe = switch (target.result.os.tag) {
-        .uefi => b.addExecutable(.{
-            .name = "bootx64",
-            .root_module = b.createModule(.{
-                .root_source_file = b.path("src/uefi.zig"),
+    const exe = b.addExecutable(.{
+        .name = "kiesel",
+        .root_module = blk: {
+            const module = b.createModule(.{
+                .root_source_file = b.path("src/cli.zig"),
                 .imports = &.{
+                    .{ .name = "args", .module = args.module("args") },
                     .{ .name = "kiesel", .module = kiesel },
+                    .{ .name = "known-folders", .module = known_folders.module("known-folders") },
                     .{ .name = "zigline", .module = zigline.module("zigline") },
                 },
                 .target = target,
                 .optimize = optimize,
                 .strip = strip,
-            }),
-            .use_llvm = use_llvm,
-        }),
-        else => b.addExecutable(.{
-            .name = "kiesel",
-            .root_module = blk: {
-                const module = b.createModule(.{
-                    .root_source_file = b.path("src/cli.zig"),
-                    .imports = &.{
-                        .{ .name = "args", .module = args.module("args") },
-                        .{ .name = "kiesel", .module = kiesel },
-                        .{ .name = "known-folders", .module = known_folders.module("known-folders") },
-                        .{ .name = "zigline", .module = zigline.module("zigline") },
-                    },
+            });
+            // Use musl's optimized memset until Zig's compiler_rt implementations have
+            // comparable performance. See: https://codeberg.org/ziglang/zig/issues/32091
+            if (target.result.os.tag == .linux) {
+                if (b.lazyDependency("musl", .{})) |musl| {
+                    switch (target.result.cpu.arch) {
+                        .aarch64 => module.addAssemblyFile(musl.path("src/string/aarch64/memset.S")),
+                        .arm => module.addAssemblyFile(musl.path("src/string/arm/__aeabi_memset.s")),
+                        .x86 => module.addAssemblyFile(musl.path("src/string/i386/memset.s")),
+                        .x86_64 => module.addAssemblyFile(musl.path("src/string/x86_64/memset.s")),
+                        else => {},
+                    }
+                }
+            }
+            if (enable_intl) {
+                if (b.lazyDependency("icu4zig", .{
                     .target = target,
                     .optimize = optimize,
-                    .strip = strip,
-                });
-                // Use musl's optimized memset until Zig's compiler_rt implementations have
-                // comparable performance. See: https://codeberg.org/ziglang/zig/issues/32091
-                if (target.result.os.tag == .linux) {
-                    if (b.lazyDependency("musl", .{})) |musl| {
-                        switch (target.result.cpu.arch) {
-                            .aarch64 => module.addAssemblyFile(musl.path("src/string/aarch64/memset.S")),
-                            .arm => module.addAssemblyFile(musl.path("src/string/arm/__aeabi_memset.s")),
-                            .x86 => module.addAssemblyFile(musl.path("src/string/i386/memset.s")),
-                            .x86_64 => module.addAssemblyFile(musl.path("src/string/x86_64/memset.s")),
-                            else => {},
-                        }
-                    }
+                    .@"link-icu4x" = false,
+                })) |icu4zig| {
+                    module.addImport("icu4zig", icu4zig.module("icu4zig"));
                 }
-                if (enable_intl) {
-                    if (b.lazyDependency("icu4zig", .{
-                        .target = target,
-                        .optimize = optimize,
-                        .@"link-icu4x" = false,
-                    })) |icu4zig| {
-                        module.addImport("icu4zig", icu4zig.module("icu4zig"));
-                    }
+            }
+            if (enable_temporal) {
+                if (b.lazyDependency("temporal_rs", .{
+                    .target = target,
+                    .optimize = optimize,
+                })) |temporal_rs| {
+                    module.addImport("temporal_rs", temporal_rs.module("temporal_rs"));
                 }
-                if (enable_temporal) {
-                    if (b.lazyDependency("temporal_rs", .{
-                        .target = target,
-                        .optimize = optimize,
-                    })) |temporal_rs| {
-                        module.addImport("temporal_rs", temporal_rs.module("temporal_rs"));
-                    }
-                }
-                break :blk module;
-            },
-            .use_llvm = use_llvm,
-        }),
-    };
-
-    const install_exe = b.addInstallArtifact(exe, .{
-        .dest_dir = switch (target.result.os.tag) {
-            .uefi => .{ .override = .{ .custom = "EFI/BOOT" } },
-            else => .default,
+            }
+            break :blk module;
         },
+        .use_llvm = use_llvm,
     });
+
+    const install_exe = b.addInstallArtifact(exe, .{});
     b.getInstallStep().dependOn(&install_exe.step);
 
-    const run_cmd = switch (target.result.os.tag) {
-        .uefi => b.addSystemCommand(&.{
-            "qemu-system-x86_64",
-            "-bios",
-            "OVMF.fd",
-            "-drive",
-            "format=raw,file=fat:rw:zig-out",
-        }),
-        else => b.addRunArtifact(exe),
-    };
+    const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
 
     if (b.args) |args_| {

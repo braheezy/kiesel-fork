@@ -227,10 +227,6 @@ jobs:
       #   run: |
       #     zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
       #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
-      - name: Build kiesel-uefi-x86_64.efi
-        run: |
-          zig build -Dtarget=x86_64-uefi-gnu -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false -Denable-libgc=false -Denable-libregexp=false
-          mv zig-out/EFI/BOOT/bootx64.efi zig-out/bin/kiesel-uefi-x86_64.efi
       - name: Upload artifact
         uses: https://code.forgejo.org/forgejo/upload-artifact@v4
         with:
