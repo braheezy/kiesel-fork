@@ -110,7 +110,7 @@ jobs:
         uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.16.0
-          cache-size-limit: 5120 # 5 GiB
+          cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
@@ -146,7 +146,7 @@ jobs:
         uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.16.0
-          cache-size-limit: 5120 # 5 GiB
+          cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
@@ -177,7 +177,7 @@ jobs:
           name: build-windows
           path: zig-out/bin/*
 
-  build-misc:
+  build-freebsd:
     runs-on: meow
     container:
       image: ghcr.io/catthehacker/ubuntu:act-24.04
@@ -190,19 +190,11 @@ jobs:
         uses: https://github.com/mlugg/setup-zig@v2
         with:
           version: 0.16.0
-          cache-size-limit: 10240 # 10 GiB
+          cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-wasip1,x86_64-unknown-freebsd,x86_64-unknown-netbsd
-      - name: Build kiesel.wasm
-        run: |
-          # Building with Intl and Temporal adds nearly 10MB to the binary, so we build it twice:
-          # - ReleaseSafe with everything enabled to ensure it keeps building
-          # - ReleaseSmall with Intl and Temporal disabled for the published binary
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall -Denable-intl=false -Denable-temporal=false
-          # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
+          targets: x86_64-unknown-freebsd
       - name: Build kiesel-freebsd-aarch64
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
@@ -212,25 +204,116 @@ jobs:
         run: |
           zig build -Dtarget=x86_64-freebsd-none -Doptimize=ReleaseSafe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86_64
-      # TODO: Re-enable once https://codeberg.org/ziglang/translate-c/issues/323 is fixed
-      # - name: Build kiesel-netbsd-aarch64
-      #   run: |
-      #     # No prebuilt rust-std, build without Intl/Temporal
-      #     zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
-      #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
-      # - name: Build kiesel-netbsd-x86
-      #   run: |
-      #     # No prebuilt rust-std, build without Intl/Temporal
-      #     zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
-      #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
-      # - name: Build kiesel-netbsd-x86_64
-      #   run: |
-      #     zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
-      #     mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
       - name: Upload artifact
         uses: https://code.forgejo.org/forgejo/upload-artifact@v4
         with:
-          name: build-misc
+          name: build-freebsd
+          path: zig-out/bin/*
+
+  # TODO: Re-enable once https://codeberg.org/ziglang/translate-c/issues/323 is fixed
+  # build-netbsd:
+  #   runs-on: meow
+  #   container:
+  #     image: ghcr.io/catthehacker/ubuntu:act-24.04
+  #   steps:
+  #     - name: Check out Kiesel
+  #       uses: https://github.com/actions/checkout@v6
+  #       with:
+  #         fetch-depth: 0
+  #     - name: Install Zig
+  #       uses: https://github.com/mlugg/setup-zig@v2
+  #       with:
+  #         version: 0.16.0
+  #         cache-size-limit: 4096 # 4 GiB
+  #     - name: Install Rust
+  #       uses: https://github.com/dtolnay/rust-toolchain@stable
+  #       with:
+  #         targets: x86_64-unknown-netbsd
+  #     - name: Build kiesel-netbsd-aarch64
+  #       run: |
+  #         # No prebuilt rust-std, build without Intl/Temporal
+  #         zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+  #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
+  #     - name: Build kiesel-netbsd-x86
+  #       run: |
+  #         # No prebuilt rust-std, build without Intl/Temporal
+  #         zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+  #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
+  #     - name: Build kiesel-netbsd-x86_64
+  #       run: |
+  #         zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
+  #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
+  #     - name: Upload artifact
+  #       uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+  #       with:
+  #         name: build-netbsd
+  #         path: zig-out/bin/*
+
+  build-openbsd:
+    runs-on: meow
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
+    steps:
+      - name: Check out Kiesel
+        uses: https://github.com/actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install Zig
+        uses: https://github.com/mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+          cache-size-limit: 4096 # 4 GiB
+      - name: Build kiesel-openbsd-aarch64
+        run: |
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=aarch64-openbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-openbsd-aarch64
+      - name: Build kiesel-openbsd-x86
+        run: |
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=x86-openbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-openbsd-x86
+      - name: Build kiesel-openbsd-x86_64
+        run: |
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=x86_64-openbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-openbsd-x86_64
+      - name: Upload artifact
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: build-openbsd
+          path: zig-out/bin/*
+
+  build-wasm:
+    runs-on: meow
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
+    steps:
+      - name: Check out Kiesel
+        uses: https://github.com/actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install Zig
+        uses: https://github.com/mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+          cache-size-limit: 4096 # 4 GiB
+      - name: Install Rust
+        uses: https://github.com/dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-wasip1
+      - name: Build kiesel.wasm
+        run: |
+          # Building with Intl and Temporal adds nearly 10MB to the binary, so we build it twice:
+          # - ReleaseSafe with everything enabled to ensure it keeps building
+          # - ReleaseSmall with Intl and Temporal disabled for the published binary
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
+          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall -Denable-intl=false -Denable-temporal=false
+          # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
+      - name: Upload artifact
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: build-wasm
           path: zig-out/bin/*
 
   upload-files:
@@ -239,7 +322,9 @@ jobs:
       - build-linux
       - build-macos
       - build-windows
-      - build-misc
+      - build-freebsd
+      - build-openbsd
+      - build-wasm
     runs-on: meow
     container:
       image: ghcr.io/catthehacker/ubuntu:act-24.04
