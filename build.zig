@@ -167,6 +167,11 @@ pub fn build(b: *std.Build) !void {
             if (optimize != .Debug) {
                 try cflags.append(b.allocator, "-DNO_GETENV");
             }
+            // bdwgc references `__data_start` when targeting OpenBSD, but only their patched
+            // ld/lld ports provide it. See: https://codeberg.org/ziglang/zig/issues/32004
+            if (target.result.os.tag == .openbsd) {
+                try cflags.append(b.allocator, "-DSEARCH_FOR_DATA_START");
+            }
             break :blk try std.mem.join(b.allocator, " ", cflags.items);
         };
         if (b.lazyDependency("bdwgc_zig", .{
