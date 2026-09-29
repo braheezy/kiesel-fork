@@ -2122,7 +2122,23 @@ pub fn sameType(x: Value, y: Value) bool {
     // 7. If x is a String and y is a String, return true.
     // 8. If x is an Object and y is an Object, return true.
     // 9. Return false.
-    return x.type() == y.type();
+    switch (Impl) {
+        NanBoxingImpl => {
+            const x_tag = x.impl.getTag();
+            const y_tag = y.impl.getTag();
+            return x_tag == y_tag or
+                (x_tag == .number_i32 and y_tag == .number_f64) or
+                (x_tag == .number_f64 and y_tag == .number_i32);
+        },
+        TaggedUnionImpl => {
+            const x_tag = std.meta.activeTag(x.impl);
+            const y_tag = std.meta.activeTag(y.impl);
+            return x_tag == y_tag or
+                (x_tag == .number_i32 and y_tag == .number_f64) or
+                (x_tag == .number_f64 and y_tag == .number_i32);
+        },
+        else => comptime unreachable,
+    }
 }
 
 /// 7.2.9 SameValue ( x, y )
