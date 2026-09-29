@@ -1758,15 +1758,15 @@ fn lowerConstruct(b: *Builder, extra_index: Ir.ExtraIndex, dest: Ir.Inst.Ref) Er
 fn lowerGetTemplateObject(b: *Builder, extra_index: Ir.ExtraIndex, dest: Ir.Inst.Ref) Error!void {
     const extra = b.ir.extraData(Ir.Inst.GetTemplateObject, extra_index);
     const dest_reg = b.resolve(dest);
-    const cooked_reg = b.resolve(extra.data.cooked);
     const raw_reg = b.resolve(extra.data.raw);
+    const cooked_reg = b.resolve(extra.data.cooked);
 
     try b.emit(.{
         .tag = .get_template_object,
         .data = .{ .reg_reg_reg_u16 = .{
             dest_reg,
-            cooked_reg,
             raw_reg,
+            cooked_reg,
             @intCast(extra.data.id),
         } },
     });

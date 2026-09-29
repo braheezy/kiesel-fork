@@ -2016,11 +2016,11 @@ fn executeConstructN(
     vm.load(dest, Value.from(result));
 }
 
-fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Reg, cooked_reg: Bytecode.Reg, raw_reg: Bytecode.Reg, template_id: u16) Agent.Error!void {
+fn executeGetTemplateObject(vm: *Vm, dest: Bytecode.Reg, raw_reg: Bytecode.Reg, cooked_reg: Bytecode.Reg, template_id: u16) Agent.Error!void {
     const cache_key = std.hash.Wyhash.hash(template_id, std.mem.asBytes(&vm.frame.bytecode));
-    const cooked = vm.store(cooked_reg).asObject().as(builtins.Array);
     const raw = vm.store(raw_reg).asObject().as(builtins.Array);
-    const template = try getTemplateObject(vm.agent, cache_key, cooked, raw);
+    const cooked = vm.store(cooked_reg).asObject().as(builtins.Array);
+    const template = try getTemplateObject(vm.agent, cache_key, raw, cooked);
     vm.load(dest, Value.from(&template.object));
 }
 

@@ -5330,10 +5330,10 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
 
     const template_literal = &tagged_template.template_literal;
 
-    var cooked_indices: std.ArrayList(Ir.StringIndex) = .empty;
-    defer cooked_indices.deinit(b.gpa);
     var raw_indices: std.ArrayList(Ir.StringIndex) = .empty;
     defer raw_indices.deinit(b.gpa);
+    var cooked_indices: std.ArrayList(Ir.StringIndex) = .empty;
+    defer cooked_indices.deinit(b.gpa);
 
     for (template_literal.spans, 0..) |span, i| {
         if (i % 2 != 0) {
@@ -5346,19 +5346,19 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
         defer b.gpa.free(normalized);
         _ = std.mem.replaceScalar(u8, normalized, '\r', '\n');
 
-        try cooked_indices.append(b.gpa, try b.internString(normalized, .escaped));
         try raw_indices.append(b.gpa, try b.internString(normalized, .literal));
+        try cooked_indices.append(b.gpa, try b.internString(normalized, .escaped));
     }
 
-    const cooked_array = blk: {
+    const raw_array = blk: {
         const array_ref = try b.addInst(.{
             .tag = .create_array,
             .data = .{ .array = .{
-                .len = @intCast(cooked_indices.items.len),
+                .len = @intCast(raw_indices.items.len),
                 .has_spread = false,
             } },
         });
-        for (cooked_indices.items) |string_index| {
+        for (raw_indices.items) |string_index| {
             const ref = try b.addInst(.{ .tag = .string, .data = .{
                 .string = string_index,
             } });
@@ -5373,15 +5373,15 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
         break :blk array_ref;
     };
 
-    const raw_array = blk: {
+    const cooked_array = blk: {
         const array_ref = try b.addInst(.{
             .tag = .create_array,
             .data = .{ .array = .{
-                .len = @intCast(raw_indices.items.len),
+                .len = @intCast(cooked_indices.items.len),
                 .has_spread = false,
             } },
         });
-        for (raw_indices.items) |string_index| {
+        for (cooked_indices.items) |string_index| {
             const ref = try b.addInst(.{
                 .tag = .string,
                 .data = .{ .string = string_index },
@@ -5400,8 +5400,8 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
     const template_id = b.template_object_count;
     b.template_object_count += 1;
     const get_template_object_extra_index = try b.addExtra(Ir.Inst.GetTemplateObject, .{
-        .cooked = cooked_array,
         .raw = raw_array,
+        .cooked = cooked_array,
         .id = template_id,
     });
 

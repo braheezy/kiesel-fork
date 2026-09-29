@@ -538,7 +538,7 @@ pub const Inst = struct {
     pub const CopyDataProperties = struct { source: Ref, excluded_len: u32 };
     pub const Call = struct { callee: Ref, this_value: Ref, args_len: u32 };
     pub const Construct = struct { constructor: Ref, args_len: u32 };
-    pub const GetTemplateObject = struct { cooked: Ref, raw: Ref, id: u32 };
+    pub const GetTemplateObject = struct { raw: Ref, cooked: Ref, id: u32 };
     pub const SuperCall = struct { args_len: u32 };
 
     pub const Ref = enum(u32) {
@@ -621,8 +621,8 @@ pub const Inst = struct {
             },
             .get_template_object => {
                 const extra = ir.extraData(GetTemplateObject, inst.data.get_template_object);
-                try uses.append(gpa, extra.data.cooked);
                 try uses.append(gpa, extra.data.raw);
+                try uses.append(gpa, extra.data.cooked);
             },
             .create_class => {
                 const class = ir.classes[@intFromEnum(inst.data.create_class)];
@@ -801,9 +801,9 @@ fn printData(
         },
         .get_template_object => {
             const extra = ir.extraData(Inst.GetTemplateObject, data.get_template_object);
-            try printField(ir, extra.data.cooked, terminal);
-            try terminal.writer.writeAll(", ");
             try printField(ir, extra.data.raw, terminal);
+            try terminal.writer.writeAll(", ");
+            try printField(ir, extra.data.cooked, terminal);
             try terminal.writer.writeAll(", ");
             try printField(ir, extra.data.id, terminal);
         },
