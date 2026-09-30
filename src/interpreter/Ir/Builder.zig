@@ -1690,6 +1690,111 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     return end_label;
 }
 
+const IterationKind = enum {
+    enumerate,
+    iterate,
+    async_iterate,
+};
+
+const ForInOfHeadEvaluation = struct {
+    iterator: Ir.Inst.Ref,
+    skip_br_cond: ?Deferred,
+};
+
+/// 14.7.5.6 ForIn/OfHeadEvaluation ( uninitializedBoundNames, expr, iterationKind )
+/// https://tc39.es/ecma262/#sec-runtime-semantics-forinofheadevaluation
+fn lowerForInOfHeadEvaluation(
+    b: *Builder,
+    uninitialized_bound_names: []const ast.Identifier,
+    expr: *const ast.Expression,
+    iteration_kind: IterationKind,
+) Error!ForInOfHeadEvaluation {
+    // 1. Let oldEnv be the running execution context's LexicalEnvironment.
+
+    // 2. If uninitializedBoundNames is not empty, then
+    if (uninitialized_bound_names.len > 0) {
+        // a. Assert: uninitializedBoundNames has no duplicate entries.
+        // b. Let newEnv be NewDeclarativeEnvironment(oldEnv).
+        _ = try b.addInst(.{
+            .tag = .push_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth += 1;
+
+        // c. For each String name of uninitializedBoundNames, do
+        for (uninitialized_bound_names) |name| {
+            // i. Perform ! newEnv.CreateMutableBinding(name, false).
+            const string_index = try b.internString(name, .literal);
+            _ = try b.addInst(.{
+                .tag = .create_mutable_binding,
+                .data = .{ .string = string_index },
+            });
+        }
+
+        // d. Set the running execution context's LexicalEnvironment to newEnv.
+    }
+
+    // 3. Let exprRef be Completion(Evaluation of expr).
+    const expr_value = try b.lowerExpression(expr);
+
+    // 4. Set the running execution context's LexicalEnvironment to oldEnv.
+    if (uninitialized_bound_names.len > 0) {
+        _ = try b.addInst(.{
+            .tag = .pop_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth -= 1;
+    }
+
+    // 5. Let exprValue be ? GetValue(? exprRef).
+    // 6. If iterationKind is enumerate, then
+    //    a. If exprValue is either undefined or null, then
+    //       i. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
+    //    b. Let obj be ! ToObject(exprValue).
+    //    c. Let iterator be EnumerateObjectProperties(obj).
+    //    d. Let nextMethod be ! GetV(iterator, "next").
+    //    e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod,
+    //       [[Done]]: false }.
+    // 7. Assert: iterationKind is either iterate or async-iterate.
+    // 8. If iterationKind is async-iterate, let iteratorKind be async.
+    // 9. Else, let iteratorKind be sync.
+    // 10. Return ? GetIterator(exprValue, iteratorKind).
+    var skip_br_cond: ?Deferred = null;
+    if (iteration_kind == .enumerate) {
+        const null_ref = try b.addInst(.{
+            .tag = .null,
+            .data = .{ .none = {} },
+        });
+        const is_nullish = try b.addInst(.{
+            .tag = .eq,
+            .data = .{ .binary = .{
+                .lhs = expr_value,
+                .rhs = null_ref,
+            } },
+        });
+        skip_br_cond = try b.addInstDeferred(.br_cond);
+        const setup_label = try b.addLabel();
+        skip_br_cond.?.set(.{ .br_cond = .{
+            .condition = is_nullish,
+            .then_target = .none,
+            .else_target = setup_label,
+        } });
+    }
+    const iterator = try b.addInst(.{
+        .tag = switch (iteration_kind) {
+            .enumerate => .get_for_in_iterator,
+            .iterate => .get_iterator,
+            .async_iterate => .get_async_iterator,
+        },
+        .data = .{ .ref = expr_value },
+    });
+
+    return .{
+        .iterator = iterator,
+        .skip_br_cond = skip_br_cond,
+    };
+}
+
 fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
     const has_scope, const has_using = blk: {
         switch (for_in_of_stmt.initializer) {
@@ -1705,51 +1810,42 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         break :blk .{ false, false };
     };
 
-    const expr_value = try b.lowerExpression(&for_in_of_stmt.expression);
+    const iteration_kind: IterationKind = switch (for_in_of_stmt.type) {
+        .in => .enumerate,
+        .of => .iterate,
+        .async_of => .async_iterate,
+    };
+
+    var uninitialized_bound_names: std.ArrayList(ast.Identifier) = .empty;
+    defer uninitialized_bound_names.deinit(b.gpa);
+    switch (for_in_of_stmt.initializer) {
+        .for_declaration => |for_decl| {
+            try for_decl.for_binding.collectBoundNames(b.gpa, &uninitialized_bound_names);
+        },
+        else => {},
+    }
 
     const undefined_ref = try b.addInst(.{
         .tag = .undefined,
         .data = .{ .none = {} },
     });
 
-    var skip_br_cond: Deferred = undefined;
-    var skip_condition: Ir.Inst.Ref = .none;
-    var setup_label: Ir.Inst.Ref = undefined;
+    const head_eval = try b.lowerForInOfHeadEvaluation(
+        uninitialized_bound_names.items,
+        &for_in_of_stmt.expression,
+        iteration_kind,
+    );
+    const iterator = head_eval.iterator;
+
     var skip_label: Ir.Inst.Ref = .none;
     var skip_br: Deferred = undefined;
-
-    if (for_in_of_stmt.type == .in) {
-        std.debug.assert(!has_using);
-        const null_ref = try b.addInst(.{
-            .tag = .null,
-            .data = .{ .none = {} },
-        });
-        skip_condition = try b.addInst(.{
-            .tag = .eq,
-            .data = .{ .binary = .{
-                .lhs = expr_value,
-                .rhs = null_ref,
-            } },
-        });
-        skip_br_cond = try b.addInstDeferred(.br_cond);
-        setup_label = try b.addLabel();
-    }
-
-    const iterator = try b.addInst(.{
-        .tag = switch (for_in_of_stmt.type) {
-            .in => .get_for_in_iterator,
-            .of => .get_iterator,
-            .async_of => .get_async_iterator,
-        },
-        .data = .{ .ref = expr_value },
-    });
 
     const entry_br = try b.addInstDeferred(.br);
 
     const test_label = try b.addLabel();
 
     const next_value = try b.addInst(.{
-        .tag = if (for_in_of_stmt.type == .async_of) .iterator_step_value_async else .iterator_step_value,
+        .tag = if (iteration_kind == .async_iterate) .iterator_step_value_async else .iterator_step_value,
         .data = .{ .ref = iterator },
     });
     const is_done = try b.addInst(.{
@@ -1772,7 +1868,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         .continue_target = .{ .deferred = .empty },
         .break_target = .{ .deferred = .empty },
         .result_ref = undefined_ref,
-        .iterator_ref = if (for_in_of_stmt.type != .in) iterator else .none,
+        .iterator_ref = if (iteration_kind != .enumerate) iterator else .none,
     });
     defer b.popBreakableContext();
 
@@ -2011,7 +2107,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     const exit_label = try b.addLabel();
     const exit_br = try b.addInstDeferred(.br);
 
-    if (for_in_of_stmt.type == .in) {
+    if (iteration_kind == .enumerate) {
         skip_label = try b.addLabel();
         skip_br = try b.addInstDeferred(.br);
     }
@@ -2021,12 +2117,11 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     breakable_ctx.setDeferredContinues(test_label);
     breakable_ctx.setDeferredBreaks(end_label);
 
-    if (for_in_of_stmt.type == .in) {
-        skip_br_cond.set(.{ .br_cond = .{
-            .condition = skip_condition,
-            .then_target = skip_label,
-            .else_target = setup_label,
-        } });
+    if (head_eval.skip_br_cond) |skip_br_cond| {
+        const inst = b.instructions.get(@intFromEnum(skip_br_cond.index));
+        const extra_index = @intFromEnum(inst.data.br_cond);
+        // Set then_target which was initialized as .none
+        b.extra.items[extra_index + 1] = @intFromEnum(skip_label);
         skip_br.set(.{ .br = .{
             .target = end_label,
             .value = undefined_ref,
