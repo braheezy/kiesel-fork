@@ -406,7 +406,7 @@ pub const PropertyDefinitionList = struct {
             .spread => {},
             .identifier_reference, .method_definition => count += 1,
             .property_name_and_expression => |p| {
-                if (!try p.property_name.isProtoSetter(allocator)) count += 1;
+                if (!try p.property_name.eql(allocator, "__proto__")) count += 1;
             },
         };
         return count;
@@ -435,13 +435,14 @@ pub const PropertyName = union(enum) {
     },
     computed_property_name: Expression,
 
-    pub fn isProtoSetter(
+    pub fn eql(
         self: PropertyName,
         allocator: std.mem.Allocator,
+        comptime name: []const u8,
     ) std.mem.Allocator.Error!bool {
         switch (self) {
             .literal_property_name => |literal_property_name| switch (literal_property_name) {
-                .identifier => |identifier| return std.mem.eql(u8, identifier, "__proto__"),
+                .identifier => |identifier| return std.mem.eql(u8, identifier, name),
                 .string_literal => |string_literal| {
                     const string = try string_literal.stringValue(allocator);
                     defer if (string != String.empty) {
@@ -451,7 +452,7 @@ pub const PropertyName = union(enum) {
                         }
                         allocator.destroy(@constCast(string));
                     };
-                    return string.eql(String.fromLiteral("__proto__"));
+                    return string.eql(String.fromLiteral(name));
                 },
                 .numeric_literal => return false,
             },
@@ -3162,6 +3163,24 @@ pub const MethodDefinition = struct {
 
     class_element_name: ClassElementName,
     method: Method,
+
+    /// 15.4.3 Static Semantics: SpecialMethod
+    /// https://tc39.es/ecma262/#sec-static-semantics-specialmethod
+    pub fn specialMethod(self: MethodDefinition) bool {
+        // MethodDefinition : ClassElementName ( UniqueFormalParameters ) { FunctionBody }
+        // 1. Return false.
+        // MethodDefinition :
+        //     GeneratorMethod
+        //     AsyncMethod
+        //     AsyncGeneratorMethod
+        //     get ClassElementName ( ) { FunctionBody }
+        //     set ClassElementName ( PropertySetParameterList ) { FunctionBody }
+        // 1. Return true.
+        return switch (self.method) {
+            .method => false,
+            .get, .set, .generator, .async, .async_generator => true,
+        };
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-GeneratorDeclaration
@@ -3300,7 +3319,10 @@ pub const ClassBody = struct {
 
     /// 15.7.3 Static Semantics: ConstructorMethod
     /// https://tc39.es/ecma262/#sec-static-semantics-constructormethod
-    pub fn constructorMethod(self: ClassBody) ?MethodDefinition {
+    pub fn constructorMethod(
+        self: ClassBody,
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error!?MethodDefinition {
         // ClassElementList : ClassElement
         // 1. If the ClassElementKind of ClassElement is constructor-method, return ClassElement.
         // 2. Return empty.
@@ -3310,7 +3332,7 @@ pub const ClassBody = struct {
         // 3. If the ClassElementKind of ClassElement is constructor-method, return ClassElement.
         // 4. Return empty.
         for (self.class_element_list.items) |class_element| {
-            if (class_element.classElementKind() == .constructor_method) {
+            if (try class_element.classElementKind(allocator) == .constructor_method) {
                 return class_element.method_definition;
             }
         }
@@ -3337,7 +3359,7 @@ pub const ClassBody = struct {
             self.class_element_list.items.len,
         );
         for (self.class_element_list.items) |class_element| {
-            if (class_element.classElementKind() == .non_constructor_method) {
+            if (try class_element.classElementKind(allocator) == .non_constructor_method) {
                 class_elements.appendAssumeCapacity(class_element);
             }
         }
@@ -3434,17 +3456,16 @@ pub const ClassElement = union(enum) {
 
     /// 15.7.2 Static Semantics: ClassElementKind
     /// https://tc39.es/ecma262/#sec-static-semantics-classelementkind
-    pub fn classElementKind(self: ClassElement) Kind {
+    pub fn classElementKind(
+        self: ClassElement,
+        allocator: std.mem.Allocator,
+    ) std.mem.Allocator.Error!Kind {
         switch (self) {
             // ClassElement : MethodDefinition
             .method_definition => |method_definition| {
                 // 1. If the PropName of MethodDefinition is "constructor", return
                 //    constructor-method.
-                if (method_definition.class_element_name == .property_name and
-                    method_definition.class_element_name.property_name == .literal_property_name and
-                    method_definition.class_element_name.property_name.literal_property_name == .identifier and
-                    std.mem.eql(u8, method_definition.class_element_name.property_name.literal_property_name.identifier, "constructor"))
-                {
+                if (try method_definition.class_element_name.eql(allocator, "constructor")) {
                     return .constructor_method;
                 }
 
@@ -3513,6 +3534,17 @@ pub const FieldDefinition = struct {
 pub const ClassElementName = union(enum) {
     property_name: PropertyName,
     private_identifier: PrivateIdentifier,
+
+    pub fn eql(
+        self: ClassElementName,
+        allocator: std.mem.Allocator,
+        comptime name: []const u8,
+    ) std.mem.Allocator.Error!bool {
+        return switch (self) {
+            .property_name => |property_name| property_name.eql(allocator, name),
+            .private_identifier => false,
+        };
+    }
 };
 
 /// https://tc39.es/ecma262/#prod-ClassStaticBlock

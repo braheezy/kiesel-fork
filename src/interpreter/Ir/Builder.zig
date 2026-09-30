@@ -3569,7 +3569,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     },
                 }
             },
-            .property_name_and_expression => |*prop| if (try prop.property_name.isProtoSetter(b.gpa)) {
+            .property_name_and_expression => |*prop| if (try prop.property_name.eql(b.gpa, "__proto__")) {
                 const value_ref = try b.lowerExpression(&prop.expression);
                 _ = try b.addInst(.{
                     .tag = .object_set_prototype,
@@ -3673,7 +3673,7 @@ fn lowerClassElementNames(b: *Builder, class_body: *const ast.ClassBody) Error![
     var private_names: std.StringHashMapUnmanaged(Ir.Inst.Ref) = .empty;
     defer private_names.deinit(b.gpa);
     for (class_body.class_element_list.items) |class_element| {
-        switch (class_element.classElementKind()) {
+        switch (try class_element.classElementKind(b.gpa)) {
             .constructor_method, .empty => continue,
             .non_constructor_method => {},
         }

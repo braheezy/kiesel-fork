@@ -12,6 +12,7 @@ const String = types.String;
 const TemporaryChange = utils.TemporaryChange;
 const Tokenizer = tokenizer_.Tokenizer;
 const containsLineTerminator = tokenizer_.containsLineTerminator;
+const containsSlice = utils.containsSlice;
 const parseNumericLiteral = literals.parseNumericLiteral;
 const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
 const parseStringLiteral = literals.parseStringLiteral;
@@ -512,26 +513,70 @@ fn ensureUniqueLexicallyDeclaredNames(
     var_declared_names: []const ast.Identifier,
     location: ptk.Location,
 ) std.mem.Allocator.Error!void {
+    try self.ensureUniqueBoundNames(.lexical_declaration, lexically_declared_names, location);
+
+    try self.ensureBoundNamesNotVarDeclared(
+        .lexical_declaration,
+        lexically_declared_names,
+        var_declared_names,
+        location,
+    );
+}
+
+fn ensureUniqueBoundNames(
+    self: *Parser,
+    kind: enum { lexical_declaration, for_declaration },
+    bound_names: []const ast.Identifier,
+    location: ptk.Location,
+) std.mem.Allocator.Error!void {
     var seen: std.StringHashMapUnmanaged(void) = .empty;
     defer seen.deinit(self.allocator);
 
+    for (bound_names) |name| {
+        if (seen.contains(name)) {
+            switch (kind) {
+                .lexical_declaration => try self.emitErrorAt(
+                    location,
+                    "Lexical declaration has duplicate binding '{s}'",
+                    .{name},
+                ),
+                .for_declaration => try self.emitErrorAt(
+                    location,
+                    "For declaration has duplicate binding '{s}'",
+                    .{name},
+                ),
+            }
+        }
+        try seen.put(self.allocator, name, {});
+    }
+}
+
+fn ensureBoundNamesNotVarDeclared(
+    self: *Parser,
+    kind: enum { lexical_declaration, for_declaration },
+    bound_names: []const ast.Identifier,
+    var_declared_names: []const ast.Identifier,
+    location: ptk.Location,
+) std.mem.Allocator.Error!void {
     var var_names_set: std.StringHashMapUnmanaged(void) = .empty;
     try var_names_set.ensureUnusedCapacity(self.allocator, @intCast(var_declared_names.len));
     defer var_names_set.deinit(self.allocator);
     for (var_declared_names) |name| var_names_set.putAssumeCapacity(name, {});
 
-    for (lexically_declared_names) |name| {
-        if (seen.contains(name)) {
-            try self.emitErrorAt(location, "Duplicate lexical declaration '{s}'", .{name});
-        }
-        try seen.put(self.allocator, name, {});
-
+    for (bound_names) |name| {
         if (var_names_set.contains(name)) {
-            try self.emitErrorAt(
-                location,
-                "Lexical declaration '{s}' is also var-declared",
-                .{name},
-            );
+            switch (kind) {
+                .lexical_declaration => try self.emitErrorAt(
+                    location,
+                    "Lexical declaration '{s}' is also var-declared",
+                    .{name},
+                ),
+                .for_declaration => try self.emitErrorAt(
+                    location,
+                    "For declaration '{s}' is also var-declared",
+                    .{name},
+                ),
+            }
         }
     }
 }
@@ -558,7 +603,7 @@ fn ensureUniqueCatchParameterNames(
 
     for (bound_names) |name| {
         if (seen.contains(name)) {
-            try self.emitErrorAt(location, "Duplicate catch parameter '{s}'", .{name});
+            try self.emitErrorAt(location, "Catch parameter has duplicate binding '{s}'", .{name});
         }
         try seen.put(self.allocator, name, {});
 
@@ -641,7 +686,7 @@ fn ensureUniquePrivateClassElementNames(
         if (duplicate) {
             try self.emitErrorAt(
                 location,
-                "Duplicate private class element '#{s}'",
+                "Class has duplicate private element '#{s}'",
                 .{private_identifier},
             );
         }
@@ -655,7 +700,7 @@ fn ensureUniqueConstructorMethod(
 ) std.mem.Allocator.Error!void {
     var seen = false;
     const duplicate = for (class_body.class_element_list.items) |class_element| {
-        if (class_element.classElementKind() == .constructor_method) {
+        if (try class_element.classElementKind(self.allocator) == .constructor_method) {
             if (seen) break true;
             seen = true;
         }
@@ -1625,13 +1670,13 @@ pub fn acceptPropertyNameAndExpression(
     const property_name = try self.acceptPropertyName();
     _ = try self.core.accept(RuleSet.is(.@":"));
     const expression = try self.acceptExpression(ctx);
-    const is_proto_setter = try property_name.isProtoSetter(self.allocator);
+    const is_proto_setter = try property_name.eql(self.allocator, "__proto__");
     // It is a Syntax Error if the PropertyNameList of PropertyDefinitionList contains any
     // duplicate entries for "__proto__" and at least two of those entries were obtained
     // from productions of the form PropertyDefinition : PropertyName : AssignmentExpression.
     if (is_proto_setter) {
         if (has_proto_setter.*) {
-            try self.emitErrorAt(location, "Duplicate '__proto__' property not allowed", .{});
+            try self.emitErrorAt(location, "Object literal has duplicate '__proto__' property", .{});
             return error.UnexpectedToken;
         }
         has_proto_setter.* = true;
@@ -2342,6 +2387,23 @@ pub fn acceptLexicalDeclaration(
     const binding_list = try self.acceptBindingList();
     if (!for_initializer) try self.acceptOrInsertSemicolon();
 
+    var bound_names = IdentifierStackRange.open(self);
+    defer bound_names.deinit();
+    try binding_list.collectBoundNames(self.allocator, &self.identifier_stack);
+    bound_names.close();
+
+    // It is a Syntax Error if the BoundNames of BindingList contains "let".
+    if (containsSlice(bound_names.slice(), "let")) {
+        try self.emitErrorAt(
+            state.location,
+            "Lexical declaration must not have binding named 'let'",
+            .{},
+        );
+    }
+
+    // It is a Syntax Error if the BoundNames of BindingList contains any duplicate entries.
+    try self.ensureUniqueBoundNames(.lexical_declaration, bound_names.slice(), state.location);
+
     switch (@"type") {
         .@"const" => for (binding_list.items) |binding| switch (binding) {
             .binding_identifier => |binding_identifier| if (!for_initializer and binding_identifier.initializer == null) {
@@ -2920,16 +2982,23 @@ pub fn acceptIterationStatement(self: *Parser) AcceptError!ast.IterationStatemen
     const tmp = temporaryChange(&self.state.in_iteration_statement, true);
     defer tmp.restore();
 
-    if (self.acceptDoWhileStatement()) |do_while_statement|
-        return .{ .do_while_statement = do_while_statement }
+    const error_count = self.diagnostics.errors.items.len;
+
+    return if (self.acceptDoWhileStatement()) |do_while_statement|
+        .{ .do_while_statement = do_while_statement }
     else |_| if (self.acceptWhileStatement()) |while_statement|
-        return .{ .while_statement = while_statement }
+        .{ .while_statement = while_statement }
     else |_| if (self.acceptForStatement()) |for_statement|
-        return .{ .for_statement = for_statement }
-    else |_| if (self.acceptForInOfStatement()) |for_in_of_statement|
-        return .{ .for_in_of_statement = for_in_of_statement }
-    else |_|
-        return error.UnexpectedToken;
+        .{ .for_statement = for_statement }
+    else |_| blk: {
+        // If parsing the 'for' statement failed we may have emitted a 'let' binding error, e.g.
+        // for `for (let let of [])` - get rid of those
+        while (self.diagnostics.errors.items.len > error_count) _ = self.diagnostics.errors.pop();
+        break :blk if (self.acceptForInOfStatement()) |for_in_of_statement|
+            .{ .for_in_of_statement = for_in_of_statement }
+        else |_|
+            error.UnexpectedToken;
+    };
 }
 
 pub fn acceptDoWhileStatement(self: *Parser) AcceptError!ast.DoWhileStatement {
@@ -2990,6 +3059,32 @@ pub fn acceptForStatement(self: *Parser) AcceptError!ast.ForStatement {
     const increment_expression = self.acceptExpression(.{}) catch null;
     _ = try self.core.accept(RuleSet.is(.@")"));
     const consequent_statement = try self.acceptStatement();
+
+    // ForStatement : for ( LexicalDeclaration Expression[opt] ; Expression[opt] ) Statement
+    // - It is a Syntax Error if any element of the BoundNames of LexicalDeclaration also occurs
+    //   in the VarDeclaredNames of Statement.
+    if (initializer) |init| switch (init) {
+        .lexical_declaration => |lexical_declaration| {
+            var bound_names = IdentifierStackRange.open(self);
+            defer bound_names.deinit();
+            try lexical_declaration.collectBoundNames(self.allocator, &self.identifier_stack);
+            bound_names.close();
+
+            var var_declared_names = IdentifierStackRange.open(self);
+            defer var_declared_names.deinit();
+            try consequent_statement.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
+            var_declared_names.close();
+
+            try self.ensureBoundNamesNotVarDeclared(
+                .lexical_declaration,
+                bound_names.slice(),
+                var_declared_names.slice(),
+                state.location,
+            );
+        },
+        else => {},
+    };
+
     return .{
         .initializer = initializer,
         .test_expression = test_expression,
@@ -3075,6 +3170,32 @@ pub fn acceptForInOfStatement(self: *Parser) AcceptError!ast.ForInOfStatement {
     const expression = try self.acceptExpression(.{});
     _ = try self.core.accept(RuleSet.is(.@")"));
     const consequent_statement = try self.acceptStatement();
+
+    // ForInOfStatement :
+    //     for ( ForDeclaration in Expression ) Statement
+    //     for ( ForDeclaration of AssignmentExpression ) Statement
+    //     for await ( ForDeclaration of AssignmentExpression ) Statement
+    // - It is a Syntax Error if any element of the BoundNames of ForDeclaration also occurs in the
+    //   VarDeclaredNames of Statement.
+    if (initializer == .for_declaration) {
+        var bound_names = IdentifierStackRange.open(self);
+        defer bound_names.deinit();
+        try initializer.for_declaration.for_binding.collectBoundNames(self.allocator, &self.identifier_stack);
+        bound_names.close();
+
+        var var_declared_names = IdentifierStackRange.open(self);
+        defer var_declared_names.deinit();
+        try consequent_statement.collectVarDeclaredNames(self.allocator, &self.identifier_stack);
+        var_declared_names.close();
+
+        try self.ensureBoundNamesNotVarDeclared(
+            .for_declaration,
+            bound_names.slice(),
+            var_declared_names.slice(),
+            initializer_location,
+        );
+    }
+
     return .{
         .type = @"type",
         .initializer = initializer,
@@ -3106,6 +3227,19 @@ pub fn acceptForDeclaration(self: *Parser) AcceptError!ast.ForDeclaration {
     } else |_| return error.UnexpectedToken;
 
     const for_binding = try self.acceptForBinding();
+
+    var bound_names = IdentifierStackRange.open(self);
+    defer bound_names.deinit();
+    try for_binding.collectBoundNames(self.allocator, &self.identifier_stack);
+    bound_names.close();
+
+    // It is a Syntax Error if the BoundNames of ForDeclaration contains "let".
+    if (containsSlice(bound_names.slice(), "let")) {
+        try self.emitErrorAt(state.location, "For declaration must not have binding named 'let'", .{});
+    }
+
+    // It is a Syntax Error if the BoundNames of ForDeclaration contains any duplicate entries.
+    try self.ensureUniqueBoundNames(.for_declaration, bound_names.slice(), state.location);
 
     switch (@"type") {
         .using, .await_using => if (for_binding == .binding_pattern) {
@@ -4285,34 +4419,29 @@ fn acceptClassElement(self: *Parser) AcceptError!ast.ClassElement {
     if (self.acceptKeyword("static")) |_| {
         if (self.acceptMethodDefinition(null)) |*method_definition| {
             // It is a Syntax Error if the PropName of MethodDefinition is "prototype".
-            if (method_definition.class_element_name == .property_name and
-                method_definition.class_element_name.property_name == .literal_property_name and
-                method_definition.class_element_name.property_name.literal_property_name == .identifier)
-            {
-                const identifier = method_definition.class_element_name.property_name.literal_property_name.identifier;
-                if (std.mem.eql(u8, identifier, "prototype")) {
-                    try self.emitErrorAt(
-                        state.location,
-                        "Class must not have static method named 'prototype'",
-                        .{},
-                    );
-                }
+            if (try method_definition.class_element_name.eql(self.allocator, "prototype")) {
+                try self.emitErrorAt(
+                    state.location,
+                    "Class must not have static method named 'prototype'",
+                    .{},
+                );
             }
             return .{ .static_method_definition = method_definition.* };
         } else |_| if (self.acceptFieldDefinition()) |field_definition| {
-            // It is a Syntax Error if the PropName of FieldDefinition is either "prototype" or "constructor".
-            if (field_definition.class_element_name == .property_name and
-                field_definition.class_element_name.property_name == .literal_property_name and
-                field_definition.class_element_name.property_name.literal_property_name == .identifier)
-            {
-                const identifier = field_definition.class_element_name.property_name.literal_property_name.identifier;
-                if (std.mem.eql(u8, identifier, "prototype") or std.mem.eql(u8, identifier, "constructor")) {
-                    try self.emitErrorAt(
-                        state.location,
-                        "Class must not have static field named '{s}'",
-                        .{identifier},
-                    );
-                }
+            // It is a Syntax Error if the PropName of FieldDefinition is either "prototype" or
+            // "constructor".
+            if (try field_definition.class_element_name.eql(self.allocator, "prototype")) {
+                try self.emitErrorAt(
+                    state.location,
+                    "Class must not have static field named 'prototype'",
+                    .{},
+                );
+            } else if (try field_definition.class_element_name.eql(self.allocator, "constructor")) {
+                try self.emitErrorAt(
+                    state.location,
+                    "Class must not have static field named 'constructor'",
+                    .{},
+                );
             }
             _ = try self.acceptOrInsertSemicolon();
             return .{ .static_field_definition = field_definition };
@@ -4320,21 +4449,26 @@ fn acceptClassElement(self: *Parser) AcceptError!ast.ClassElement {
             return .{ .class_static_block = class_static_block };
         } else |_| return error.UnexpectedToken;
     } else |_| if (self.acceptMethodDefinition(null)) |*method_definition| {
+        // It is a Syntax Error if the PropName of MethodDefinition is "constructor" and
+        // SpecialMethod of MethodDefinition is true.
+        if (try method_definition.class_element_name.eql(self.allocator, "constructor") and
+            method_definition.specialMethod())
+        {
+            try self.emitErrorAt(
+                state.location,
+                "Class constructor must not be an accessor, generator, or async method",
+                .{},
+            );
+        }
         return .{ .method_definition = method_definition.* };
     } else |_| if (self.acceptFieldDefinition()) |field_definition| {
         // It is a Syntax Error if the PropName of FieldDefinition is "constructor".
-        if (field_definition.class_element_name == .property_name and
-            field_definition.class_element_name.property_name == .literal_property_name and
-            field_definition.class_element_name.property_name.literal_property_name == .identifier)
-        {
-            const identifier = field_definition.class_element_name.property_name.literal_property_name.identifier;
-            if (std.mem.eql(u8, identifier, "constructor")) {
-                try self.emitErrorAt(
-                    state.location,
-                    "Class must not have field named 'constructor'",
-                    .{},
-                );
-            }
+        if (try field_definition.class_element_name.eql(self.allocator, "constructor")) {
+            try self.emitErrorAt(
+                state.location,
+                "Class must not have field named 'constructor'",
+                .{},
+            );
         }
         _ = try self.acceptOrInsertSemicolon();
         return .{ .field_definition = field_definition };
@@ -4991,7 +5125,7 @@ pub fn acceptWithClauseItem(
     if (gop.found_existing) {
         try self.emitErrorAt(
             location,
-            "Duplicate import attribute '{f}'",
+            "Import attribute has duplicate key '{f}'",
             .{key_string.fmtEscaped()},
         );
         return error.UnexpectedToken;
