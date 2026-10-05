@@ -33,11 +33,6 @@ const validateNonRevokedProxy = builtins.validateNonRevokedProxy;
 
 pub const Weak = @import("Value/weak.zig").Weak;
 
-const safety = switch (builtin.mode) {
-    .Debug, .ReleaseSafe => true,
-    .ReleaseFast, .ReleaseSmall => false,
-};
-
 const Value = @This();
 
 pub const PreferredType = enum { string, number };
@@ -86,6 +81,7 @@ pub const Type = enum {
 };
 
 const TaggedUnionImpl = union(enum) {
+    uninitialized,
     undefined,
     null,
     boolean: bool,
@@ -127,6 +123,7 @@ const TaggedUnionImpl = union(enum) {
 
     pub fn @"type"(self: TaggedUnionImpl) Type {
         return switch (self) {
+            .uninitialized => unreachable,
             .undefined => .undefined,
             .null => .null,
             .boolean => .boolean,
@@ -208,6 +205,7 @@ const NanBoxingImpl = enum(u64) {
     const nan_mask: u64 = 0x7ff8000000000000;
     const payload_len = 48;
 
+    uninitialized = initBits(.uninitialized, {}),
     undefined = initBits(.undefined, {}),
     null = initBits(.null, {}),
     boolean_false = initBits(.boolean, false),
@@ -223,9 +221,10 @@ const NanBoxingImpl = enum(u64) {
     const Tag = enum(u16) {
         number_f64 = 0x0000,
         number_i32 = 0x0001,
-        undefined = 0x0002,
-        null = 0x0003,
-        boolean = 0x0004,
+        uninitialized = 0x0002,
+        undefined = 0x0003,
+        null = 0x0004,
+        boolean = 0x0005,
         object = 0x8001,
         string = 0x8002,
         symbol = 0x8003,
@@ -235,6 +234,7 @@ const NanBoxingImpl = enum(u64) {
             return switch (tag) {
                 .number_f64 => f64,
                 .number_i32 => i32,
+                .uninitialized,
                 .undefined,
                 .null,
                 => void,
@@ -330,6 +330,7 @@ const NanBoxingImpl = enum(u64) {
 
     pub fn @"type"(self: NanBoxingImpl) Type {
         return switch (self.getTag()) {
+            .uninitialized => unreachable,
             .undefined => .undefined,
             .null => .null,
             .boolean => .boolean,
@@ -419,10 +420,7 @@ const Impl = if (build_options.enable_nan_boxing) NanBoxingImpl else TaggedUnion
 impl: Impl,
 
 /// Sentinel value to avoid the memory overhead of `?Value`.
-///
-/// Uses an object value with a made-up pointer rather than its own tag to avoid leaking into the
-/// public API. Use with care.
-pub const uninitialized = from(@as(*Object, @ptrFromInt(@alignOf(Object))));
+pub const uninitialized: Value = .{ .impl = Impl.uninitialized };
 
 pub const @"undefined": Value = .{ .impl = Impl.undefined };
 pub const @"null": Value = .{ .impl = Impl.null };
@@ -483,7 +481,7 @@ pub fn @"type"(self: Value) Type {
 }
 
 pub fn isUninitialized(value: Value) bool {
-    return value.impl.isObject() and value.impl.asObject() == uninitialized.impl.asObject();
+    return value.impl == .uninitialized;
 }
 
 pub fn isUndefined(self: Value) bool {
@@ -535,21 +533,10 @@ pub fn asBigInt(self: Value) *const BigInt {
 }
 
 pub fn isObject(self: Value) bool {
-    if (!self.impl.isObject()) return false;
-    if (safety) {
-        // The `uninitialized` sentinel value is an object value with a made-up pointer, make sure
-        // we don't branch on it by accident in safe builds.
-        std.debug.assert(!self.isUninitialized());
-    }
-    return true;
+    return self.impl.isObject();
 }
 
 pub fn asObject(self: Value) *Object {
-    if (safety) {
-        // The `uninitialized` sentinel value is an object value with a made-up pointer, make sure
-        // we don't return it by accident in safe builds.
-        std.debug.assert(!self.isUninitialized());
-    }
     return self.impl.asObject();
 }
 
