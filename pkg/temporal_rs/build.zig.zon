@@ -8,6 +8,10 @@
             .url = "git+https://github.com/boa-dev/temporal#v0.2.6",
             .hash = "N-V-__8AAMbwOQCO0EZvYBsVhaoQKm4xPCMGTpt16ekd9WXT",
         },
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=2.0.0#0da7a16c3235b935b82421646076e0657cda21f6",
+            .hash = "translate_c-2.0.0-Q_BUWltOBwA0229IE8wwSxxGzOxyRso3hvcb1nN8oJX_",
+        },
     },
     .paths = .{
         "build.zig",

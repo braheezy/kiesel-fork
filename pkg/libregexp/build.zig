@@ -1,22 +1,25 @@
 const std = @import("std");
 
+const Translator = @import("translate_c").Translator;
+
 pub fn build(b: *std.Build) !void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     const quickjs = b.dependency("quickjs", .{});
+    const translate_c = b.dependency("translate_c", .{});
 
-    const translate_c = b.addTranslateC(.{
-        .root_source_file = b.path("src/c.h"),
+    const c: Translator = .init(translate_c, .{
+        .c_source_file = b.path("src/c.h"),
         .target = target,
         .optimize = optimize,
     });
-    translate_c.addIncludePath(quickjs.path("."));
+    c.addIncludePath(quickjs.path("."));
 
     const module = b.addModule("libregexp", .{
         .root_source_file = b.path("src/root.zig"),
         .imports = &.{
-            .{ .name = "c", .module = translate_c.createModule() },
+            .{ .name = "c", .module = c.mod },
         },
         .target = target,
         .optimize = optimize,
