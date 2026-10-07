@@ -2,11 +2,11 @@
     .name = .zement,
     .version = "0.1.0",
     .fingerprint = 0x61efa220c3b353b6,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .build_crab = .{
-            .url = "git+https://github.com/linusg/build.crab#8592bb943546f1b08cdcb3a23701750737f40af5",
-            .hash = "build_crab-0.3.0-U0id_xWbAAD_ILwDslPuOn6XptkUzaGgJqRtO8aV_naN",
+            .url = "git+https://github.com/linusg/build.crab#25739fd8bf62979713d0220f8d616d059a445a59",
+            .hash = "build_crab-0.4.0-U0id_1COAADs4wbFcxbc7FU8Eaw4HYAdhHuXvsRlNl74",
         },
     },
     .paths = .{

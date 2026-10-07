@@ -163,7 +163,7 @@ pub const Number = union(enum) {
         switch (self) {
             .f64 => |x| {
                 // OPTIMIZATION: ARMv8.3-A has an instruction for this :^)
-                if (comptime builtin.target.cpu.arch.isAARCH64() and
+                if (comptime builtin.target.cpu.arch.isAarch64() and
                     std.Target.aarch64.featureSetHas(builtin.target.cpu.features, .jsconv))
                 {
                     return asm volatile (
@@ -661,7 +661,7 @@ pub const Number = union(enum) {
                 try writer.print("{e}", .{x})
             else {
                 var buffer: [32]u8 = undefined;
-                const scientific = std.fmt.bufPrint(&buffer, "{e}", .{x}) catch |err| switch (err) {
+                const scientific = std.mem.print(&buffer, "{e}", .{x}) catch |err| switch (err) {
                     error.NoSpaceLeft => unreachable,
                 };
                 const exponent_index = std.mem.findScalar(u8, scientific, 'e').?;

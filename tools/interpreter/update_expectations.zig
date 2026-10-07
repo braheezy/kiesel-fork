@@ -13,12 +13,13 @@ const Edit = struct {
 };
 
 const TestCase = struct {
-    source: std.zig.Zoir.Node.Index,
+    source: []const u8,
     expected_result: std.zig.Zoir.Node.Index,
     expected_output: std.zig.Zoir.Node.Index,
 };
 
 pub fn main(init: std.process.Init) !u8 {
+    const arena = init.arena;
     const gpa = init.gpa;
     const io = init.io;
 
@@ -41,17 +42,18 @@ pub fn main(init: std.process.Init) !u8 {
     );
     defer gpa.free(zon_source);
 
-    var diag: std.zon.parse.Diagnostics = .{};
-    defer diag.deinit(gpa);
+    var ast = try std.zig.Ast.parse(gpa, zon_source, .{ .mode = .zon });
+    defer ast.deinit(gpa);
+    var zoir = try std.zig.ZonGen.generate(gpa, ast, .{ .parse_str_lits = false });
+    defer zoir.deinit(gpa);
 
-    const test_cases = try std.zon.parse.fromSliceAlloc(
-        []const TestCase,
-        gpa,
-        zon_source,
-        &diag,
-        .{},
-    );
-    defer std.zon.parse.free(gpa, test_cases);
+    var diagnostics: std.zon.parse.Diagnostics = undefined;
+    const test_cases = try std.zon.parse.fromZoir([]const TestCase, .{
+        .arena = arena.allocator(),
+        .ast = &ast,
+        .zoir = &zoir,
+        .diagnostics = &diagnostics,
+    });
 
     var edits: std.ArrayList(Edit) = .empty;
     defer {
@@ -60,26 +62,15 @@ pub fn main(init: std.process.Init) !u8 {
     }
 
     for (test_cases, 0..) |test_case, i| {
-        const expected_output_ast_node = test_case.expected_output.getAstNode(diag.zoir);
+        const expected_output_ast_node = test_case.expected_output.getAstNode(&zoir);
 
-        const script_source = try std.zon.parse.fromZoirNodeAlloc(
-            []const u8,
-            gpa,
-            diag.ast,
-            diag.zoir,
-            test_case.source,
-            null,
-            .{},
-        );
-        defer gpa.free(script_source);
-
-        const output = generateExpectedOutput(gpa, io, script_source) catch |err| {
+        const output = generateExpectedOutput(gpa, io, test_case.source) catch |err| {
             std.debug.print("Failed to generate expected output for case {d}: {t}\n", .{ i, err });
             return 1;
         };
         defer gpa.free(output);
 
-        const span = nodeSpan(diag.ast, zon_source, expected_output_ast_node);
+        const span = nodeSpan(ast, zon_source, expected_output_ast_node);
         const replacement = try formatMultilineLiteral(gpa, output);
         try edits.append(gpa, .{
             .span = span,

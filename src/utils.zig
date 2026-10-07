@@ -48,7 +48,7 @@ pub inline fn isZigString(comptime T: type) bool {
 
         const ptr = &info.pointer;
         // Check for CV qualifiers that would prevent coerction to []const u8
-        if (ptr.is_volatile or ptr.is_allowzero) break :blk false;
+        if (ptr.attrs.@"volatile" or ptr.attrs.@"allowzero") break :blk false;
 
         // If it's already a slice, simple check.
         if (ptr.size == .slice) {

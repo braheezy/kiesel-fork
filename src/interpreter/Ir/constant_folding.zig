@@ -51,7 +51,7 @@ pub const Constant = union(enum) {
     }
 
     pub fn isStrictlyEqual(lhs: Constant, rhs: Constant) ?bool {
-        if (@intFromEnum(lhs) != @intFromEnum(rhs)) return false;
+        if (@backingInt(lhs) != @backingInt(rhs)) return false;
         return switch (lhs) {
             .undefined, .null => true,
             .number => |number| {
@@ -70,7 +70,7 @@ pub const Constant = union(enum) {
     }
 
     pub fn isLooselyEqual(lhs: Constant, rhs: Constant) ?bool {
-        if (@intFromEnum(lhs) == @intFromEnum(rhs)) return lhs.isStrictlyEqual(rhs);
+        if (@backingInt(lhs) == @backingInt(rhs)) return lhs.isStrictlyEqual(rhs);
         if (lhs == .null and rhs == .undefined) return true;
         if (lhs == .undefined and rhs == .null) return true;
         // The rest requires type coercion, bail out

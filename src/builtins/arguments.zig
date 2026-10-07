@@ -1,6 +1,7 @@
 //! 10.4.4 Arguments Exotic Objects
 //! https://tc39.es/ecma262/#sec-arguments-exotic-objects
 
+const builtin = @import("builtin");
 const std = @import("std");
 
 const ast = @import("../language/ast.zig");
@@ -281,9 +282,11 @@ pub fn createMappedArgumentsObject(
 
     // 1. Assert: formals does not contain a rest parameter, any binding patterns, or any
     //    initializers. It may contain duplicate identifiers.
-    if (std.debug.runtime_safety) for (formals.items) |item| {
-        std.debug.assert(item == .formal_parameter);
-    };
+    if (builtin.optimize.runtimeSafety()) {
+        for (formals.items) |item| {
+            std.debug.assert(item == .formal_parameter);
+        }
+    }
 
     // 2. Let length be the number of elements in argList.
     const length = arg_list.len;

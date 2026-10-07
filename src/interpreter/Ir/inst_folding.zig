@@ -25,7 +25,7 @@ pub fn foldInst(b: *Ir.Builder, inst: Ir.Inst) ?Ir.Inst.Ref {
         .logical_not => {
             const index, const last = lastOperand(b, inst.data.ref) orelse return null;
             if (last.tag != .logical_not) return null;
-            b.instructions.set(@intFromEnum(index), .{
+            b.instructions.set(@backingInt(index), .{
                 .tag = .to_boolean,
                 .data = last.data,
             });
@@ -39,7 +39,7 @@ pub fn foldInst(b: *Ir.Builder, inst: Ir.Inst) ?Ir.Inst.Ref {
             if (hint != .number) return null;
             const index, const rhs = lastOperand(b, inst.data.binary.rhs) orelse return null;
             if (rhs.tag != .number or rhs.data.number != 1) return null;
-            b.instructions.set(@intFromEnum(index), .{
+            b.instructions.set(@backingInt(index), .{
                 .tag = if (inst.tag == .add) .increment else .decrement,
                 .data = .{ .ref = inst.data.binary.lhs },
             });
@@ -52,15 +52,15 @@ pub fn foldInst(b: *Ir.Builder, inst: Ir.Inst) ?Ir.Inst.Ref {
 
 fn deref(b: *const Ir.Builder, ref: Ir.Inst.Ref) ?Ir.Inst {
     const index = ref.toIndex() orelse return null;
-    return b.instructions.get(@intFromEnum(index));
+    return b.instructions.get(@backingInt(index));
 }
 
 /// The most recently emitted instruction, if `ref` refers to it. Asserts at
 /// least one instruction has been emitted so far.
 fn lastOperand(b: *const Ir.Builder, ref: Ir.Inst.Ref) ?struct { Ir.Inst.Index, Ir.Inst } {
-    const index: Ir.Inst.Index = @enumFromInt(b.instructions.len - 1);
+    const index: Ir.Inst.Index = @fromBackingInt(@intCast(b.instructions.len - 1));
     if (ref != index.toRef()) return null;
-    return .{ index, b.instructions.get(@intFromEnum(index)) };
+    return .{ index, b.instructions.get(@backingInt(index)) };
 }
 
 fn foldRedundantCast(b: *const Ir.Builder, comptime ty: Ir.Inst.TypeHint, inst: Ir.Inst) ?Ir.Inst.Ref {

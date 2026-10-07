@@ -50,5 +50,5 @@ Important notes:
 - This should be done atomically for each individual commit
 - Make sure your copy of test262 is in sync with `TEST262_COMMIT` in
   [`ci.yml`](../.forgejo/workflows/ci.yml)
-- Use a `ReleaseSafe` build for good performance while ensuring that triggering
+- Use a `safe` build for good performance while ensuring that triggering
   undefined behavior consistently causes tests to fail via safety checks

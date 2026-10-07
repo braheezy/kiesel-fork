@@ -194,11 +194,11 @@ fn getOrCreateShape(
     allocator: std.mem.Allocator,
     transition: Transition,
 ) std.mem.Allocator.Error!*Shape {
-    std.debug.assert(@intFromEnum(self.transition_count) < @intFromEnum(TransitionCount.max));
+    std.debug.assert(@backingInt(self.transition_count) < @backingInt(TransitionCount.max));
     const shape_gop = try self.transitions.getOrPut(allocator, transition);
     if (shape_gop.found_existing) return shape_gop.value_ptr.*;
     const shape = try self.clone(allocator);
-    shape.transition_count = @enumFromInt(@intFromEnum(self.transition_count) + 1);
+    shape.transition_count = @fromBackingInt(@backingInt(self.transition_count) + 1);
     shape_gop.value_ptr.* = shape;
     return shape;
 }
@@ -306,8 +306,8 @@ pub fn setProperty(
         .attributes = attributes,
     };
     shape.next_offset = switch (property_type) {
-        .value => @enumFromInt(@intFromEnum(shape.next_offset) + 1),
-        .accessor => @enumFromInt(@intFromEnum(shape.next_offset) + 2),
+        .value => @fromBackingInt(@backingInt(shape.next_offset) + 1),
+        .accessor => @fromBackingInt(@backingInt(shape.next_offset) + 2),
     };
     return shape;
 }
@@ -332,8 +332,8 @@ pub fn setPropertyWithoutTransition(
         .attributes = attributes,
     };
     self.next_offset = switch (property_type) {
-        .value => @enumFromInt(@intFromEnum(self.next_offset) + 1),
-        .accessor => @enumFromInt(@intFromEnum(self.next_offset) + 2),
+        .value => @fromBackingInt(@backingInt(self.next_offset) + 1),
+        .accessor => @fromBackingInt(@backingInt(self.next_offset) + 2),
     };
 }
 

@@ -398,11 +398,7 @@ pub fn asAsciiOrUtf16(self: *const String) AsciiOrUtf16 {
 pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u8 {
     return switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| allocator.dupe(u8, ascii),
-        .utf16 => |utf16| std.fmt.allocPrint(
-            allocator,
-            "{f}",
-            .{std.unicode.fmtUtf16Le(utf16)},
-        ),
+        .utf16 => |utf16| allocator.print("{f}", .{std.unicode.fmtUtf16Le(utf16)}),
     };
 }
 

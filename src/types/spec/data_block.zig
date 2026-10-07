@@ -14,7 +14,7 @@ pub const DataBlock = struct {
     shared: bool,
 
     /// Arbitrary size limit (32 GiB)
-    pub const max_byte_length: ByteLength = @enumFromInt(1024 * 1024 * 1024 * 32);
+    pub const max_byte_length: ByteLength = @fromBackingInt(1024 * 1024 * 1024 * 32);
 
     pub fn resize(
         self: *DataBlock,
@@ -22,7 +22,7 @@ pub const DataBlock = struct {
         size: ByteLength,
     ) std.mem.Allocator.Error!void {
         const old_size = self.bytes.len;
-        const new_size = std.math.cast(usize, @intFromEnum(size)) orelse return error.OutOfMemory;
+        const new_size = std.math.cast(usize, @backingInt(size)) orelse return error.OutOfMemory;
         self.bytes = try allocator.realloc(self.bytes, new_size);
         if (new_size > old_size) {
             @memset(self.bytes[old_size..], 0);
@@ -37,11 +37,11 @@ pub fn createByteDataBlock(agent: *Agent, size: ByteLength) Agent.Error!DataBloc
 
     // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
     //       done in other engines (and tested by test262)
-    if (@intFromEnum(size) > @intFromEnum(DataBlock.max_byte_length)) {
+    if (@backingInt(size) > @backingInt(DataBlock.max_byte_length)) {
         return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     }
 
-    const size_casted = std.math.cast(usize, @intFromEnum(size)) orelse {
+    const size_casted = std.math.cast(usize, @backingInt(size)) orelse {
         return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
 
@@ -64,11 +64,11 @@ pub fn createByteDataBlock(agent: *Agent, size: ByteLength) Agent.Error!DataBloc
 pub fn createSharedByteDataBlock(agent: *Agent, size: ByteLength) Agent.Error!DataBlock {
     // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
     //       done in other engines (and tested by test262)
-    if (@intFromEnum(size) > @intFromEnum(DataBlock.max_byte_length)) {
+    if (@backingInt(size) > @backingInt(DataBlock.max_byte_length)) {
         return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     }
 
-    const size_casted = std.math.cast(usize, @intFromEnum(size)) orelse {
+    const size_casted = std.math.cast(usize, @backingInt(size)) orelse {
         return agent.throwException(.range_error, "Cannot allocate buffer of size {d}", .{size});
     };
 

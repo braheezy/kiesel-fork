@@ -42,13 +42,13 @@ pub fn allocateSharedArrayBuffer(
     // 3. If allocatingGrowableBuffer is true, then
     if (allocating_growable_buffer) {
         // a. If byteLength > maxByteLength, throw a RangeError exception.
-        if (@intFromEnum(byte_length) > @intFromEnum(max_byte_length)) {
+        if (@backingInt(byte_length) > @backingInt(max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
         // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
         //       done in other engines (and tested by test262)
-        if (@intFromEnum(max_byte_length) > @intFromEnum(DataBlock.max_byte_length)) {
+        if (@backingInt(max_byte_length) > @backingInt(DataBlock.max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
@@ -84,7 +84,7 @@ pub fn allocateSharedArrayBuffer(
     // 9. If allocatingGrowableBuffer is true, then
     if (allocating_growable_buffer) {
         // a. Assert: byteLength ≤ maxByteLength.
-        std.debug.assert(@intFromEnum(byte_length) <= @intFromEnum(max_byte_length));
+        std.debug.assert(@backingInt(byte_length) <= @backingInt(max_byte_length));
 
         // b. Let byteLengthBlock be ? CreateSharedByteDataBlock(8).
         // c. Perform SetValueInBuffer(byteLengthBlock, 0, biguint64, ℤ(byteLength), true, seq-cst).
@@ -165,7 +165,7 @@ pub const constructor = struct {
         }
 
         // 2. Let byteLength be ? ToIndex(length).
-        const byte_length: ByteLength = @enumFromInt(try length.toIndex(agent));
+        const byte_length: ByteLength = @fromBackingInt(try length.toIndex(agent));
 
         // 3. Let requestedMaxByteLength be ? GetArrayBufferMaxByteLengthOption(options).
         const requested_max_byte_length = try getArrayBufferMaxByteLengthOption(agent, options);
@@ -244,7 +244,7 @@ pub const prototype = struct {
         const length = arrayBufferByteLength(array_buffer, .seq_cst);
 
         // 5. Return 𝔽(length).
-        return Value.from(@intFromEnum(length));
+        return Value.from(@backingInt(length));
     }
 
     /// 25.2.5.3 SharedArrayBuffer.prototype.grow ( newLength )
@@ -270,7 +270,7 @@ pub const prototype = struct {
         }
 
         // 4. Let newByteLength be ? ToIndex(newLength).
-        const new_byte_length: ByteLength = @enumFromInt(try new_length.toIndex(agent));
+        const new_byte_length: ByteLength = @fromBackingInt(try new_length.toIndex(agent));
 
         // 5. Let hostHandled be ? HostGrowSharedArrayBuffer(obj, newByteLength).
         const host_handled = try agent.host_hooks.hostGrowSharedArrayBuffer(
@@ -295,17 +295,17 @@ pub const prototype = struct {
         // b. Let currentByteLength be ℝ(RawBytesToNumeric(biguint64, currentByteLengthRawBytes,
         //    isLittleEndian)).
         const ptr: *usize = @ptrCast(&array_buffer.fields.byte_length);
-        const current_byte_length: ByteLength = @enumFromInt(@atomicLoad(usize, ptr, .seq_cst));
+        const current_byte_length: ByteLength = @fromBackingInt(@intCast(@atomicLoad(usize, ptr, .seq_cst)));
 
         // c. If newByteLength = currentByteLength, return undefined.
         if (new_byte_length == current_byte_length) return .undefined;
 
         // d. If newByteLength < currentByteLength or
         //    newByteLength > obj.[[ArrayBufferMaxByteLength]], throw a RangeError exception.
-        if (@intFromEnum(new_byte_length) < @intFromEnum(current_byte_length)) {
+        if (@backingInt(new_byte_length) < @backingInt(current_byte_length)) {
             return agent.throwException(.range_error, "Cannot shrink buffer", .{});
         }
-        if (@intFromEnum(new_byte_length) > @intFromEnum(array_buffer.fields.max_byte_length)) {
+        if (@backingInt(new_byte_length) > @backingInt(array_buffer.fields.max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
@@ -321,7 +321,7 @@ pub const prototype = struct {
         // i. If ByteListEqual(readByteLengthRawBytes, currentByteLengthRawBytes) is true, return
         //    undefined.
         // j. Set currentByteLengthRawBytes to readByteLengthRawBytes.
-        @atomicStore(usize, ptr, @intCast(@intFromEnum(new_byte_length)), .seq_cst);
+        @atomicStore(usize, ptr, @intCast(@backingInt(new_byte_length)), .seq_cst);
         return .undefined;
     }
 
@@ -373,7 +373,7 @@ pub const prototype = struct {
         };
 
         // 6. Return 𝔽(length).
-        return Value.from(@intFromEnum(length));
+        return Value.from(@backingInt(length));
     }
 
     /// 25.2.5.6 SharedArrayBuffer.prototype.slice ( start, end )
@@ -400,14 +400,14 @@ pub const prototype = struct {
         const length = arrayBufferByteLength(array_buffer, .seq_cst);
 
         // 5. Let first be ? ToClampedIndex(start, length).
-        const first = try start.toClampedIndex(agent, @intFromEnum(length));
+        const first = try start.toClampedIndex(agent, @backingInt(length));
 
         // 6. If end is undefined, let final be length; else let final be ? ToClampedIndex(end,
         //    length).
         const final = if (end.isUndefined())
-            @intFromEnum(length)
+            @backingInt(length)
         else
-            try end.toClampedIndex(agent, @intFromEnum(length));
+            try end.toClampedIndex(agent, @backingInt(length));
 
         // 7. Let newLength be max(final - first, 0).
         const new_length = final -| first;
@@ -443,7 +443,7 @@ pub const prototype = struct {
         }
 
         // 13. If ArrayBufferByteLength(new, seq-cst) < newLength, throw a TypeError exception.
-        if (@intFromEnum(arrayBufferByteLength(new, .seq_cst)) < new_length) {
+        if (@backingInt(arrayBufferByteLength(new, .seq_cst)) < new_length) {
             return agent.throwException(.type_error, "SharedArrayBuffer is too small", .{});
         }
 

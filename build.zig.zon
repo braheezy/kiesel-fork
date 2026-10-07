@@ -2,25 +2,25 @@
     .name = .kiesel,
     .version = "0.4.0",
     .fingerprint = 0x411228af4a775b43,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .args = .{
-            .url = "git+https://github.com/ikskuh/zig-args#d47ae21768f9ec47c2a4154ab48b87166965b820",
-            .hash = "args-0.0.0-CiLiqmvgAADyJmrzcQTP9IOYNvTzR_KGrg3ZNNsH2Qv0",
+            .url = "git+https://github.com/ikskuh/zig-args#6655972f2635cc0ddd9032ad2a84d70f48d8115d",
+            .hash = "args-0.0.0-CiLiqkbiAABvxczIO21oxxd5qPgriMAB1pYLWzsR_oWb",
         },
         .bdwgc_zig = .{
-            .url = "git+https://github.com/bdwgc/bdwgc-zig#81e92063debddd226f3a660cee43665a04c926f3",
-            .hash = "bdwgc_zig-0.1.0-ffcEgYd6AAA_rlVpPv9GN2Olt2DCBle_4Ageca2NDNUy",
+            .url = "git+https://github.com/bdwgc/bdwgc-zig#3269055d02d590a33dcbed2a201c81119828f028",
+            .hash = "bdwgc_zig-0.1.0-ffcEgXp6AAACpwqbryxOLQDBLxWHoFCnni44bkeqC9Pa",
             .lazy = true,
         },
         .icu4zig = .{
-            .url = "git+https://codeberg.org/linus/icu4zig#bdc052d69c8e8aadf96387d624739de7ad09806f",
-            .hash = "icu4zig-0.1.0-IT7GrIheBQAVyxX-rzcAvCN8jYVQf8Y9-bubhciaA9Ud",
+            .url = "git+https://codeberg.org/linus/icu4zig#579cb9c098f5e92b87d52b4cdb976a7dd041108d",
+            .hash = "icu4zig-0.1.0-IT7GrKdfBQB6GCeUGAfbjYMQAcyPHgUvBKwv39NhXe0m",
             .lazy = true,
         },
         .known_folders = .{
-            .url = "git+https://github.com/ziglibs/known-folders#207c34a16e4365edc20d92c7892f962b3bed46e8",
-            .hash = "known_folders-0.0.0-Fy-PJsbKAACbDh9bBxR0MMThxZSS6A9RH4apWphNHY70",
+            .url = "git+https://github.com/ziglibs/known-folders#6da0d0c41b78b9ed2d34fa364fcb81b5ebece6c4",
+            .hash = "known_folders-0.0.0-Fy-PJiDLAAB98m3uYUzatrTb2mO2fpvwx2zpSroEtfbO",
         },
         .libregexp = .{
             .path = "./pkg/libregexp",
@@ -36,24 +36,24 @@
             .hash = "parser_toolkit-0.1.0-baYGPdpDEwBQQ2__YEalqGB09TAjP7vpoe2DFkwg6mRa",
         },
         .stackinfo = .{
-            .url = "git+https://codeberg.org/linus/zig-stackinfo#8fcab6807f44e95e95047a734ce0a05abf310d1c",
-            .hash = "stackinfo-0.1.0-NZ2qTqEkAAAO6eY7NS0yscBsG9vOSAapNfr72g7VTVsi",
+            .url = "git+https://codeberg.org/linus/zig-stackinfo#93419a2213d1a343d21494f7a7706a981a305803",
+            .hash = "stackinfo-0.1.0-NZ2qTs8mAADNzp7We0wm81otvHWk09GNVImZ2dRT3DGF",
         },
         .temporal_rs = .{
             .path = "./pkg/temporal_rs",
             .lazy = true,
         },
         .unicode_id = .{
-            .url = "git+https://codeberg.org/linus/unicode-id#107488ed2dea04ef30a79538ded406d84a164901",
-            .hash = "unicode_id-0.0.1-u-LDL5CDAQArdOvYpoHk9jOi8A9QbZwUD0JB3CjZ7i6O",
+            .url = "git+https://codeberg.org/linus/unicode-id#37f8ba149359fd050095486db21c93b0c3e6cae4",
+            .hash = "unicode_id-0.0.1-u-LDL56EAQD6rXqpk0fzT6Tr25MaKyoApDR1YUqPfgbt",
         },
         .zement = .{
             .path = "./pkg/zement",
             .lazy = true,
         },
         .zigline = .{
-            .url = "git+https://github.com/alimpfard/zigline#c0e5fc200b35ec177167f6dac1bb923b8a1478c5",
-            .hash = "zigline-0.1.0-6llsB4uJAgAP1Yhp3ewmtwUXbg9RjHoc9Arl-i27NGWT",
+            .url = "git+https://github.com/alimpfard/zigline#7382d2a040a5b2c4cc423d9499ae2f8c637b5126",
+            .hash = "zigline-0.1.0-6llsB26JAgAdZPpvqY63Gsavr75dgWk06JxMd9JBOH0u",
         },
     },
     .paths = .{

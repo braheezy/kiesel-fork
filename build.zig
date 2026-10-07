@@ -10,9 +10,9 @@ pub fn build(b: *std.Build) !void {
     const optimize = b.standardOptimizeOption(.{});
 
     // Stop people from trying to build with an outdated Zig compiler
-    if (builtin.zig_version.order(.{ .major = 0, .minor = 16, .patch = 0 }) == .lt) {
+    if (builtin.zig_version.order(.{ .major = 0, .minor = 17, .patch = 0, .pre = "dev" }) == .lt) {
         std.debug.print("\n    {s}\n    {s}\n\n", .{
-            "Zig version 0.16.0 is required, found " ++ builtin.zig_version_string ++ ".",
+            "Zig version 0.17.0 is required, found " ++ builtin.zig_version_string ++ ".",
             "Please \u{1B}]8;;https://ziglang.org/download/\u{1B}\\download\u{1B}]8;;\u{1B}\\ or otherwise install a newer build and try again.",
         });
         std.process.exit(1);
@@ -57,8 +57,8 @@ pub fn build(b: *std.Build) !void {
         "Enable the Temporal built-in object (requires cargo)",
     ) orelse true;
 
-    const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .Debug);
-    // Defaults to true for now as the self-hosted backend in 0.16 fails with a linker error.
+    const strip = b.option(bool, "strip", "Strip debug symbols") orelse (optimize != .debug);
+    // Defaults to true for now as the self-hosted backend in 0.17 fails with a linker error.
     const use_llvm = b.option(bool, "use-llvm", "Use the LLVM backend") orelse true;
     const maybe_version_string = b.option([]const u8, "version-string", "Version string, read from git by default");
 
@@ -69,7 +69,7 @@ pub fn build(b: *std.Build) !void {
         var code: u8 = undefined;
         const git_describe_untrimmed = b.runAllowFail(&.{
             "git",
-            "-C", b.build_root.path orelse ".", // affects the --git-dir argument
+            "-C", b.fmt("{f}", .{b.root}), // affects the --git-dir argument
             "--git-dir", ".git", // affected by the -C argument
             "describe", "--match",    "*.*.*", //
             "--tags",   "--abbrev=9",
@@ -164,7 +164,7 @@ pub fn build(b: *std.Build) !void {
             var cflags: std.ArrayList([]const u8) = .empty;
             defer cflags.deinit(b.allocator);
             try cflags.append(b.allocator, "-DNO_MSGBOX_ON_ERROR");
-            if (optimize != .Debug) {
+            if (optimize != .debug) {
                 try cflags.append(b.allocator, "-DNO_GETENV");
             }
             // bdwgc references `__data_start` when targeting OpenBSD, but only their patched
@@ -273,10 +273,7 @@ pub fn build(b: *std.Build) !void {
 
     const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
-
-    if (b.args) |args_| {
-        run_cmd.addArgs(args_);
-    }
+    run_cmd.addPassthruArgs();
 
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);

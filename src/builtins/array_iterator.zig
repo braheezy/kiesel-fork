@@ -109,7 +109,7 @@ pub const prototype = struct {
             );
 
             // b. Let length be TypedArrayLength(taRecord).
-            break :blk @intFromEnum(typedArrayLength(ta));
+            break :blk @backingInt(typedArrayLength(ta));
         } else blk: {
             // 9. Else,
             // a. Let length be ? LengthOfArrayLike(array).

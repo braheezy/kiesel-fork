@@ -139,7 +139,8 @@ pub fn init(
 ) std.mem.Allocator.Error!*const InternalMethods {
     var internal_methods = try allocator.create(InternalMethods);
     internal_methods.* = initial.*;
-    inline for (comptime std.meta.fieldNames(Overwrites)) |field_name| {
+    const info = @typeInfo(Overwrites).@"struct";
+    inline for (info.field_names) |field_name| {
         if (@field(overwrites, field_name)) |internal_method| {
             @field(internal_methods, field_name) = internal_method;
             if (field_names_to_ordinary_flags.get(field_name)) |flag| {
@@ -154,7 +155,8 @@ pub fn init(
 pub inline fn initComptime(comptime overwrites: Overwrites) *const InternalMethods {
     comptime {
         var internal_methods = default.*;
-        for (std.meta.fieldNames(Overwrites)) |field_name| {
+        const info = @typeInfo(Overwrites).@"struct";
+        for (info.field_names) |field_name| {
             if (@field(overwrites, field_name)) |internal_method| {
                 @field(internal_methods, field_name) = internal_method;
                 if (field_names_to_ordinary_flags.get(field_name)) |flag| {

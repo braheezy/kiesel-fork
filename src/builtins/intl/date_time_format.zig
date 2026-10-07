@@ -566,7 +566,7 @@ fn formatOffsetTimeZoneIdentifier(
 
     // 5. Return the string-concatenation of sign, ToZeroPaddedDecimalString(hours, 2), the code
     //    unit 0x003A (COLON), and ToZeroPaddedDecimalString(minutes, 2).
-    return std.fmt.allocPrint(gpa, "{c}{d:0>2}:{d:0>2}", .{ sign, hours, minutes });
+    return gpa.print("{c}{d:0>2}:{d:0>2}", .{ sign, hours, minutes });
 }
 
 /// 11.2 Properties of the Intl.DateTimeFormat Constructor

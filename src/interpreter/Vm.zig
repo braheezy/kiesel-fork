@@ -80,9 +80,9 @@ pub const Pc = enum(u32) {
 
     pub fn offsetBy(pc: Pc, offset: i32) Pc {
         if (offset >= 0) {
-            return @enumFromInt(@intFromEnum(pc) + @as(u32, @intCast(offset)));
+            return @fromBackingInt(@backingInt(pc) + @as(u32, @intCast(offset)));
         } else {
-            return @enumFromInt(@intFromEnum(pc) - @as(u32, @intCast(-offset)));
+            return @fromBackingInt(@backingInt(pc) - @as(u32, @intCast(-offset)));
         }
     }
 };
@@ -187,10 +187,10 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
     var code = vm.frame.bytecode.code;
     var pc = options.start_pc;
 
-    loop: switch (Bytecode.Inst.decodeTag(code[@intFromEnum(pc)..])) {
+    loop: switch (Bytecode.Inst.decodeTag(code[@backingInt(pc)..])) {
         inline else => |tag| {
             @setEvalBranchQuota(3_000);
-            const data = Bytecode.Inst.decodeData(code[@intFromEnum(pc) + 1 ..], tag);
+            const data = Bytecode.Inst.decodeData(code[@backingInt(pc) + 1 ..], tag);
             const inst_size = comptime Bytecode.Inst.encodedSize(tag);
             const inst_pc = pc;
             pc = pc.offsetBy(inst_size);
@@ -358,7 +358,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 },
                 else => comptime unreachable,
             }
-            continue :loop Bytecode.Inst.decodeTag(code[@intFromEnum(pc)..]);
+            continue :loop Bytecode.Inst.decodeTag(code[@backingInt(pc)..]);
         },
     }
 }
@@ -368,7 +368,7 @@ fn handleError(vm: *Vm, err: Agent.Error, inst_pc: Pc, pc: *Pc) Agent.Error!void
         error.OutOfMemory => return err,
         error.ExceptionThrown => {
             const execution_context = vm.agent.runningExecutionContext();
-            const maybe_handler = vm.frame.bytecode.findExceptionHandler(@intFromEnum(inst_pc));
+            const maybe_handler = vm.frame.bytecode.findExceptionHandler(@backingInt(inst_pc));
             const target_scope_depth = if (maybe_handler) |handler| handler.scope_depth else 0;
             while (true) {
                 const env = execution_context.ecmascript_code.lexical_environment;
@@ -390,7 +390,7 @@ fn handleError(vm: *Vm, err: Agent.Error, inst_pc: Pc, pc: *Pc) Agent.Error!void
             const handler = maybe_handler orelse return err;
             const exception = vm.agent.clearException();
             vm.load(handler.exception_reg, exception.value);
-            pc.* = @enumFromInt(handler.target);
+            pc.* = @fromBackingInt(handler.target);
         },
     }
 }
@@ -453,7 +453,7 @@ fn ensurePerBytecodeCache(vm: *Vm, bytecode: *const Bytecode) std.mem.Allocator.
 }
 
 fn updateCachedFields(vm: *Vm, cache: PerBytecodeCache) void {
-    const frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
+    const frame = vm.call_stack.lastPtr().?;
     const locals_start = frame.stack_base + 1 + frame.argument_count;
     const regs_start = locals_start + frame.bytecode.local_count;
     vm.frame = frame;
@@ -503,7 +503,7 @@ pub fn popCallFrame(vm: *Vm) void {
     vm.stack.shrinkRetainingCapacity(vm.stack.items.len - stack_len);
     _ = vm.call_stack.pop().?;
 
-    const frame = &vm.call_stack.items[vm.call_stack.items.len - 1];
+    const frame = vm.call_stack.lastPtr().?;
     const cache = vm.per_bytecode_cache.get(frame.bytecode).?;
     vm.updateCachedFields(cache);
 }
@@ -515,16 +515,16 @@ fn arguments(vm: *Vm) []const Value {
 
 fn store(vm: *Vm, reg: Bytecode.Reg) Value {
     std.debug.assert(reg != .none);
-    return vm.regs[@intFromEnum(reg)];
+    return vm.regs[@backingInt(reg)];
 }
 
 fn load(vm: *Vm, reg: Bytecode.Reg, value: Value) void {
     std.debug.assert(reg != .none);
-    vm.regs[@intFromEnum(reg)] = value;
+    vm.regs[@backingInt(reg)] = value;
 }
 
 fn getString(vm: *Vm, index: Bytecode.StringIndex) std.mem.Allocator.Error!*const String {
-    const cache_index = @intFromEnum(index);
+    const cache_index = @backingInt(index);
     if (vm.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
@@ -543,7 +543,7 @@ fn getString(vm: *Vm, index: Bytecode.StringIndex) std.mem.Allocator.Error!*cons
 }
 
 fn getBigInt(vm: *Vm, index: Bytecode.BigIntIndex) std.mem.Allocator.Error!*const BigInt {
-    const cache_index = vm.frame.bytecode.strings.len + @intFromEnum(index);
+    const cache_index = vm.frame.bytecode.strings.len + @backingInt(index);
     if (vm.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
@@ -575,10 +575,10 @@ fn Ic(comptime IcIndex: type) type {
 
 fn getIc(vm: *Vm, index: anytype) *Ic(@TypeOf(index)) {
     return switch (@TypeOf(index)) {
-        Bytecode.GetPropertyIcIndex => &vm.get_property_ics[@intFromEnum(index)],
-        Bytecode.GetPropertyComputedIcIndex => &vm.get_property_computed_ics[@intFromEnum(index)],
-        Bytecode.SetPropertyIcIndex => &vm.set_property_ics[@intFromEnum(index)],
-        Bytecode.SetPropertyComputedIcIndex => &vm.set_property_computed_ics[@intFromEnum(index)],
+        Bytecode.GetPropertyIcIndex => &vm.get_property_ics[@backingInt(index)],
+        Bytecode.GetPropertyComputedIcIndex => &vm.get_property_computed_ics[@backingInt(index)],
+        Bytecode.SetPropertyIcIndex => &vm.set_property_ics[@backingInt(index)],
+        Bytecode.SetPropertyComputedIcIndex => &vm.set_property_computed_ics[@backingInt(index)],
         else => comptime unreachable,
     };
 }
@@ -604,17 +604,17 @@ fn iteratorToObject(agent: *Agent, iterator: Iterator) std.mem.Allocator.Error!*
     const iterator_obj = &(try builtins.Object.createWithShape(agent, .{
         .shape = try agent.ensureIteratorRecordShape(),
     })).object;
-    iterator_obj.setValueAtPropertyOffset(@enumFromInt(0), Value.from(iterator.iterator));
-    iterator_obj.setValueAtPropertyOffset(@enumFromInt(1), iterator.next_method);
-    iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), Value.from(iterator.done));
+    iterator_obj.setValueAtPropertyOffset(@fromBackingInt(0), Value.from(iterator.iterator));
+    iterator_obj.setValueAtPropertyOffset(@fromBackingInt(1), iterator.next_method);
+    iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), Value.from(iterator.done));
     return iterator_obj;
 }
 
 fn objectToIterator(iterator_obj: *const Object) Iterator {
     return .{
-        .iterator = iterator_obj.getValueAtPropertyOffset(@enumFromInt(0)).asObject(),
-        .next_method = iterator_obj.getValueAtPropertyOffset(@enumFromInt(1)),
-        .done = iterator_obj.getValueAtPropertyOffset(@enumFromInt(2)).toBoolean(),
+        .iterator = iterator_obj.getValueAtPropertyOffset(@fromBackingInt(0)).asObject(),
+        .next_method = iterator_obj.getValueAtPropertyOffset(@fromBackingInt(1)),
+        .done = iterator_obj.getValueAtPropertyOffset(@fromBackingInt(2)).toBoolean(),
     };
 }
 
@@ -939,7 +939,7 @@ fn executeTypeof(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
 }
 
 fn executeTypeofLocal(vm: *Vm, dst: Bytecode.Reg, local: Bytecode.Local) void {
-    const value = vm.locals[@intFromEnum(local)];
+    const value = vm.locals[@backingInt(local)];
     vm.load(dst, Value.from(value.typeof()));
 }
 
@@ -1433,7 +1433,7 @@ fn executeInitializeBinding(
 }
 
 fn executeGetLocal(vm: *Vm, dst: Bytecode.Reg, local: Bytecode.Local) void {
-    const value = vm.locals[@intFromEnum(local)];
+    const value = vm.locals[@backingInt(local)];
     vm.load(dst, value);
 }
 
@@ -1600,7 +1600,7 @@ fn executeGetPropertyIndexed(
 }
 
 fn executeSetLocal(vm: *Vm, local: Bytecode.Local, value_reg: Bytecode.Reg) void {
-    vm.locals[@intFromEnum(local)] = vm.store(value_reg);
+    vm.locals[@backingInt(local)] = vm.store(value_reg);
 }
 
 fn executeSetBinding(
@@ -1884,11 +1884,12 @@ fn executeCall(
     const args_value = vm.store(args_reg);
     const args_array = args_value.asObject().as(builtins.Array);
 
-    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
-    const sfa = stack_fallback.get();
+    var buffer: [@sizeOf(Value) * 8]u8 = undefined;
+    var bfa_state: std.heap.BufferFirstAllocator = .init(&buffer, gpa);
+    const bfa = bfa_state.allocator();
 
-    var args_list = try argsArrayToList(sfa, args_array);
-    defer args_list.deinit(sfa);
+    var args_list = try argsArrayToList(bfa, args_array);
+    defer args_list.deinit(bfa);
 
     const result = try evaluateCall(vm.agent, callee_value, .undefined, args_list.items);
     vm.load(dest, result);
@@ -1923,11 +1924,12 @@ fn executeCallProperty(
     const args_value = vm.store(args_reg);
     const args_array = args_value.asObject().as(builtins.Array);
 
-    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
-    const sfa = stack_fallback.get();
+    var buffer: [@sizeOf(Value) * 8]u8 = undefined;
+    var bfa_state: std.heap.BufferFirstAllocator = .init(&buffer, gpa);
+    const bfa = bfa_state.allocator();
 
-    var args_list = try argsArrayToList(sfa, args_array);
-    defer args_list.deinit(sfa);
+    var args_list = try argsArrayToList(bfa, args_array);
+    defer args_list.deinit(bfa);
 
     const result = try evaluateCall(vm.agent, callee_value, this_value, args_list.items);
     vm.load(dest, result);
@@ -1963,11 +1965,12 @@ fn executeCallDirectEval(
     const args_value = vm.store(args_reg);
     const args_array = args_value.asObject().as(builtins.Array);
 
-    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
-    const sfa = stack_fallback.get();
+    var buffer: [@sizeOf(Value) * 8]u8 = undefined;
+    var bfa_state: std.heap.BufferFirstAllocator = .init(&buffer, gpa);
+    const bfa = bfa_state.allocator();
 
-    var args_list = try argsArrayToList(sfa, args_array);
-    defer args_list.deinit(sfa);
+    var args_list = try argsArrayToList(bfa, args_array);
+    defer args_list.deinit(bfa);
 
     const realm = vm.agent.currentRealm();
     const eval = try realm.intrinsic(.eval);
@@ -1990,11 +1993,12 @@ fn executeConstruct(
     const args_value = vm.store(args_reg);
     const args_array = args_value.asObject().as(builtins.Array);
 
-    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
-    const sfa = stack_fallback.get();
+    var buffer: [@sizeOf(Value) * 8]u8 = undefined;
+    var bfa_state: std.heap.BufferFirstAllocator = .init(&buffer, gpa);
+    const bfa = bfa_state.allocator();
 
-    var args_list = try argsArrayToList(sfa, args_array);
-    defer args_list.deinit(sfa);
+    var args_list = try argsArrayToList(bfa, args_array);
+    defer args_list.deinit(bfa);
 
     const result = try evaluateNew(vm.agent, constructor, args_list.items);
     vm.load(dest, Value.from(result));
@@ -2055,7 +2059,7 @@ fn executeIteratorStep(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Reg) 
         vm.load(dest, Value.from(next));
     } else {
         vm.load(dest, .undefined);
-        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), .true);
     }
 }
 
@@ -2067,34 +2071,34 @@ fn executeIteratorStepValue(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.
         vm.load(dest, next);
     } else {
         vm.load(dest, .undefined);
-        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), .true);
     }
 }
 
 fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Reg) Agent.Error!void {
     const iterator_obj = vm.store(iterator_reg).asObject();
 
-    const iterator_inner = iterator_obj.getValueAtPropertyOffset(@enumFromInt(0)).asObject();
-    const next_method = iterator_obj.getValueAtPropertyOffset(@enumFromInt(1));
+    const iterator_inner = iterator_obj.getValueAtPropertyOffset(@fromBackingInt(0)).asObject();
+    const next_method = iterator_obj.getValueAtPropertyOffset(@fromBackingInt(1));
 
     // Implements steps 8.a-f. of ForIn/OfBodyEvaluation for async iterators.
     // https://tc39.es/ecma262/#sec-runtime-semantics-forin-div-ofbodyevaluation-lhs-stmt-iterator-lhskind-labelset
 
     // a. Let nextResult be ? Call(iteratorRecord.[[NextMethod]], iteratorRecord.[[Iterator]]).
     const next_result = next_method.call(vm.agent, Value.from(iterator_inner), &.{}) catch |err| {
-        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), .true);
         return err;
     };
 
     // b. If iteratorKind is async, set nextResult to ? Await(nextResult).
     const awaited_result = await(vm.agent, next_result) catch |err| {
-        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), .true);
         return err;
     };
 
     // c. If nextResult is not an Object, throw a TypeError exception.
     if (!awaited_result.isObject()) {
-        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), .true);
         return vm.agent.throwException(.type_error, "{f} is not an Object", .{awaited_result});
     }
 
@@ -2103,14 +2107,14 @@ fn executeIteratorStepValueAsync(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Byte
 
     // e. If done is true, return V.
     if (done) {
-        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), .true);
         vm.load(dest, .undefined);
         return;
     }
 
     // f. Let nextValue be ? IteratorValue(nextResult).
     const value = Iterator.value(vm.agent, awaited_result.asObject()) catch |err| {
-        iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
+        iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), .true);
         return err;
     };
 
@@ -2126,7 +2130,7 @@ fn executeIteratorClose(vm: *Vm, iterator_reg: Bytecode.Reg) Agent.Error!void {
 
 fn executeIteratorIsDone(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Reg) void {
     const iterator_obj = vm.store(iterator_reg).asObject();
-    const done = iterator_obj.getValueAtPropertyOffset(@enumFromInt(2));
+    const done = iterator_obj.getValueAtPropertyOffset(@fromBackingInt(2));
     vm.load(dest, done);
 }
 
@@ -2139,7 +2143,7 @@ fn executeIteratorCollect(vm: *Vm, dest: Bytecode.Reg, iterator_reg: Bytecode.Re
     while (try iterator.stepValue(vm.agent)) |next| {
         try values.append(vm.agent.gc_allocator, next);
     }
-    iterator_obj.setValueAtPropertyOffset(@enumFromInt(2), .true);
+    iterator_obj.setValueAtPropertyOffset(@fromBackingInt(2), .true);
 
     const array = try createArrayFromList(vm.agent, values.items);
     vm.load(dest, Value.from(&array.object));
@@ -2249,7 +2253,7 @@ fn executeCreateFunction(vm: *Vm, dest: Bytecode.Reg, function_index: Bytecode.F
     const cache_index =
         vm.frame.bytecode.strings.len +
         vm.frame.bytecode.big_ints.len +
-        @intFromEnum(function_index);
+        @backingInt(function_index);
     const cached_bytecode: *const Bytecode = if (vm.cache_slots[cache_index]) |ptr| blk: {
         @branchHint(.likely);
         break :blk @ptrCast(ptr);
@@ -2442,11 +2446,12 @@ fn executeSuperCall(
     const args_value = vm.store(args_reg);
     const args_array = args_value.asObject().as(builtins.Array);
 
-    var stack_fallback = std.heap.stackFallback(@sizeOf(Value) * 8, gpa);
-    const sfa = stack_fallback.get();
+    var buffer: [@sizeOf(Value) * 8]u8 = undefined;
+    var bfa_state: std.heap.BufferFirstAllocator = .init(&buffer, gpa);
+    const bfa = bfa_state.allocator();
 
-    var args_list = try argsArrayToList(sfa, args_array);
-    defer args_list.deinit(sfa);
+    var args_list = try argsArrayToList(bfa, args_array);
+    defer args_list.deinit(bfa);
 
     const result = try evaluateSuperCall(vm.agent, args_list.items);
     vm.load(dest, result);

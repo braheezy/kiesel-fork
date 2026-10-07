@@ -249,7 +249,7 @@ const NanBoxingImpl = enum(u64) {
 
     fn initBits(comptime tag: Tag, payload: tag.Payload()) u64 {
         const T = @TypeOf(payload);
-        const tag_bits: u64 = @as(u64, @intFromEnum(tag)) << payload_len;
+        const tag_bits: u64 = @as(u64, @backingInt(tag)) << payload_len;
         comptime std.debug.assert(tag_bits & nan_mask == 0);
         if (T == f64) {
             return @bitCast(payload);
@@ -267,18 +267,18 @@ const NanBoxingImpl = enum(u64) {
     }
 
     fn init(comptime tag: Tag, payload: tag.Payload()) NanBoxingImpl {
-        return @enumFromInt(initBits(tag, payload));
+        return @fromBackingInt(initBits(tag, payload));
     }
 
     /// If the NaN bits are set, then parses the tag from the fraction section.
     /// Otherwise, returns number_f64.
     fn getTag(self: NanBoxingImpl) Tag {
-        const bits: u64 = @intFromEnum(self);
+        const bits: u64 = @backingInt(self);
         // Decode only the top 16-bit header, which generates better assembly than a 64-bit mask.
         const header_bits: u16 = @truncate(bits >> payload_len);
         const header_nan_mask: u16 = @truncate(nan_mask >> payload_len);
         return if (header_bits & header_nan_mask == header_nan_mask)
-            @enumFromInt(header_bits & ~header_nan_mask)
+            @fromBackingInt(header_bits & ~header_nan_mask)
         else
             .number_f64;
     }
@@ -286,7 +286,7 @@ const NanBoxingImpl = enum(u64) {
     fn getPayload(self: NanBoxingImpl, comptime tag: Tag) tag.Payload() {
         std.debug.assert(self.getTag() == tag);
         const T = tag.Payload();
-        const bits: u64 = @intFromEnum(self);
+        const bits: u64 = @backingInt(self);
         if (@typeInfo(T) == .pointer) {
             const ptr_bits: if (@sizeOf(T) >= 8) u48 else usize = @truncate(bits);
             return @ptrFromInt(ptr_bits);
@@ -2604,7 +2604,7 @@ pub fn hash(value: Value) u32 {
         .big_int => std.array_hash_map.getAutoHashStratFn(*const BigInt, void, .Shallow)({}, value.asBigInt()),
         .object => std.array_hash_map.getAutoHashStratFn(*Object, void, .Shallow)({}, value.asObject()),
     };
-    const tag: u32 = @intFromEnum(value.type());
+    const tag: u32 = @backingInt(value.type());
     return tag ^ value_hash;
 }
 

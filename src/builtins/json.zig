@@ -529,7 +529,7 @@ fn serializeJSONProperty(
         // a. If value has an [[IsRawJSON]] internal slot, then
         if (value.asObject().is(RawJSON)) {
             // i. Let rawJSON be ! Get(value, "rawJSON").
-            const raw_json = value.asObject().getValueAtPropertyOffset(@enumFromInt(0));
+            const raw_json = value.asObject().getValueAtPropertyOffset(@fromBackingInt(0));
 
             // ii. Assert: rawJSON is a String.
             std.debug.assert(raw_json.isString());
@@ -677,7 +677,7 @@ fn unicodeEscape(agent: *Agent, code_unit: u16) std.mem.Allocator.Error![]const 
     // 3. Let hex be the String representation of n, formatted as a lowercase hexadecimal number.
     // 4. Return the string-concatenation of the code unit 0x005C (REVERSE SOLIDUS), "u", and
     //    StringPad(hex, 4, "0", start).
-    return std.fmt.allocPrint(agent.gc_allocator, "\\u{x:0>4}", .{code_unit});
+    return agent.gc_allocator.print("\\u{x:0>4}", .{code_unit});
 }
 
 /// 25.5.4.5 SerializeJSONObject ( state, value )
@@ -740,18 +740,14 @@ fn serializeJSONObject(
             //     1. Set member to the string-concatenation of member and the code unit 0x0020
             //        (SPACE).
             // iv. Set member to the string-concatenation of member and stringP.
-            const member = try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "{f}:{s}{f}",
-                .{
-                    (try quoteJSONString(
-                        agent,
-                        (try property_key.toStringOrSymbol(agent)).string,
-                    )).fmtRaw(),
-                    if (!state.gap.isEmpty()) " " else "",
-                    string_property.?.fmtRaw(),
-                },
-            );
+            const member = try agent.gc_allocator.print("{f}:{s}{f}", .{
+                (try quoteJSONString(
+                    agent,
+                    (try property_key.toStringOrSymbol(agent)).string,
+                )).fmtRaw(),
+                if (!state.gap.isEmpty()) " " else "",
+                string_property.?.fmtRaw(),
+            });
 
             // v. Append member to partial.
             try partial.append(agent.gc_allocator, member);
@@ -773,16 +769,15 @@ fn serializeJSONObject(
             const properties = try std.mem.join(agent.gc_allocator, ",", partial.items);
 
             // ii. Let final be the string-concatenation of "{", properties, and "}".
-            break :blk String.fromUtf8(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "{{{s}}}",
-                .{properties},
-            ));
+            break :blk String.fromUtf8(
+                agent,
+                try agent.gc_allocator.print("{{{s}}}", .{properties}),
+            );
         } else {
             // b. Else,
             // i. Let separator be the string-concatenation of the code unit 0x002C (COMMA), the
             //    code unit 0x000A (LINE FEED), and state.[[Indent]].
-            const separator = try std.fmt.allocPrint(agent.gc_allocator, ",\n{f}", .{state.indent.fmtRaw()});
+            const separator = try agent.gc_allocator.print(",\n{f}", .{state.indent.fmtRaw()});
 
             // ii. Let properties be the String value formed by concatenating all the element
             //     Strings of partial with each adjacent pair of Strings separated with separator.
@@ -793,8 +788,7 @@ fn serializeJSONObject(
             // iii. Let final be the string-concatenation of "{", the code unit 0x000A (LINE FEED),
             //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepBack, and
             //      "}".
-            break :blk String.fromUtf8(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
+            break :blk String.fromUtf8(agent, try agent.gc_allocator.print(
                 "{{\n{f}{s}\n{f}}}",
                 .{ state.indent.fmtRaw(), properties, step_back.fmtRaw() },
             ));
@@ -881,20 +875,15 @@ fn serializeJSONArray(
             const properties = try std.mem.join(agent.gc_allocator, ",", partial.items);
 
             // ii. Let final be the string-concatenation of "[", properties, and "]".
-            break :blk try String.fromUtf8(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "[{s}]",
-                .{properties},
-            ));
+            break :blk try String.fromUtf8(
+                agent,
+                try agent.gc_allocator.print("[{s}]", .{properties}),
+            );
         } else {
             // b. Else,
             // i. Let separator be the string-concatenation of the code unit 0x002C (COMMA), the
             //    code unit 0x000A (LINE FEED), and state.[[Indent]].
-            const separator = try std.fmt.allocPrint(
-                agent.gc_allocator,
-                ",\n{f}",
-                .{state.indent.fmtRaw()},
-            );
+            const separator = try agent.gc_allocator.print(",\n{f}", .{state.indent.fmtRaw()});
 
             // ii. Let properties be the String value formed by concatenating all the element
             //     Strings of partial with each adjacent pair of Strings separated with separator.
@@ -905,8 +894,7 @@ fn serializeJSONArray(
             // iii. Let final be the string-concatenation of "[", the code unit 0x000A (LINE FEED),
             //      state.[[Indent]], properties, the code unit 0x000A (LINE FEED), stepBack, and
             //      "]".
-            break :blk try String.fromUtf8(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
+            break :blk try String.fromUtf8(agent, try agent.gc_allocator.print(
                 "[\n{f}{s}\n{f}]",
                 .{ state.indent.fmtRaw(), properties, step_back.fmtRaw() },
             ));

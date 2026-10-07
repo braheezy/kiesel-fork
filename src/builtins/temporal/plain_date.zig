@@ -1067,7 +1067,7 @@ pub fn isValidISODate(year: f64, month: f64, day: f64) bool {
     // 2. Let daysInMonth be ISODaysInMonth(year, month).
     const days_in_month = std.time.epoch.getDaysInMonth(
         year_int,
-        @enumFromInt(month_int),
+        @fromBackingInt(month_int),
     );
 
     // 3. If day < 1 or day > daysInMonth, return false; else return true.

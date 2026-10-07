@@ -13,7 +13,7 @@ string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
 classes: []const Class,
-liveness: std.DynamicBitSetUnmanaged,
+liveness: std.bit_set.Dynamic,
 live_ranges: []const LiveRange,
 
 pub const Builder = @import("Ir/Builder.zig");
@@ -25,11 +25,11 @@ pub const StringIndex = enum(u32) {
     _,
 
     pub fn slice(index: StringIndex, ir: *const Ir) []const u8 {
-        return ir.strings[@intFromEnum(index)];
+        return ir.strings[@backingInt(index)];
     }
 
     pub fn kind(index: StringIndex, ir: *const Ir) StringKind {
-        return ir.string_kinds[@intFromEnum(index)];
+        return ir.string_kinds[@backingInt(index)];
     }
 };
 
@@ -42,7 +42,7 @@ pub const BigIntIndex = enum(u16) {
     _,
 
     pub fn value(index: BigIntIndex, ir: *const Ir) std.math.big.int.Const {
-        return ir.big_ints[@intFromEnum(index)];
+        return ir.big_ints[@backingInt(index)];
     }
 };
 
@@ -57,7 +57,7 @@ pub const Function = struct {
         _,
 
         pub fn ptr(index: Index, ir: *const Ir) *const Function {
-            return &ir.functions[@intFromEnum(index)];
+            return &ir.functions[@backingInt(index)];
         }
     };
 
@@ -88,7 +88,7 @@ pub const Class = struct {
         _,
 
         pub fn ptr(index: Index, ir: *const Ir) *const Class {
-            return &ir.classes[@intFromEnum(index)];
+            return &ir.classes[@backingInt(index)];
         }
     };
 
@@ -363,9 +363,8 @@ pub const Inst = struct {
         // bigger than expected. Note that in safety builds, Zig is allowed
         // to insert a secret field for safety checks.
         comptime {
-            switch (builtin.mode) {
-                .ReleaseFast, .ReleaseSmall => std.debug.assert(@sizeOf(Data) == 8),
-                else => {},
+            if (!builtin.optimize.runtimeSafety()) {
+                std.debug.assert(@sizeOf(Data) == 8);
             }
         }
     };
@@ -548,8 +547,8 @@ pub const Inst = struct {
         const static_len = 1;
 
         pub fn toIndex(ref: Ref) ?Inst.Index {
-            if (@intFromEnum(ref) < static_len) return null;
-            return @enumFromInt(@intFromEnum(ref) - static_len);
+            if (@backingInt(ref) < static_len) return null;
+            return @fromBackingInt(@backingInt(ref) - static_len);
         }
     };
 
@@ -558,19 +557,19 @@ pub const Inst = struct {
         _,
 
         pub fn inst(index: Index, ir: *const Ir) Inst {
-            return ir.instructions.get(@intFromEnum(index));
+            return ir.instructions.get(@backingInt(index));
         }
 
         pub fn liveness(index: Index, ir: *const Ir) bool {
-            return ir.liveness.isSet(@intFromEnum(index));
+            return ir.liveness.isSet(@backingInt(index));
         }
 
         pub fn liveRange(index: Index, ir: *const Ir) LiveRange {
-            return ir.live_ranges[@intFromEnum(index)];
+            return ir.live_ranges[@backingInt(index)];
         }
 
         pub fn toRef(index: Index) Inst.Ref {
-            return @enumFromInt(Ref.static_len + @intFromEnum(index));
+            return @fromBackingInt(Ref.static_len + @backingInt(index));
         }
     };
 
@@ -585,7 +584,7 @@ pub const Inst = struct {
         gpa: std.mem.Allocator,
         uses: *std.ArrayList(Ref),
     ) std.mem.Allocator.Error!void {
-        const data_tag = data_tags[@intFromEnum(inst.tag)];
+        const data_tag = data_tags[@backingInt(inst.tag)];
         switch (data_tag) {
             .none,
             .boolean,
@@ -625,7 +624,7 @@ pub const Inst = struct {
                 try uses.append(gpa, extra.data.cooked);
             },
             .create_class => {
-                const class = ir.classes[@intFromEnum(inst.data.create_class)];
+                const class = ir.classes[@backingInt(inst.data.create_class)];
                 if (class.heritage != .none) try uses.append(gpa, class.heritage);
                 for (class.element_names) |name_ref| {
                     if (name_ref != .none) try uses.append(gpa, name_ref);
@@ -649,15 +648,17 @@ pub const Inst = struct {
                         else => comptime unreachable,
                     };
                     const extra = ir.extraData(ExtraType, field_data);
-                    inline for (@typeInfo(ExtraType).@"struct".fields) |extra_field| {
-                        if (extra_field.type == Ref) {
-                            try uses.append(gpa, @field(extra.data, extra_field.name));
+                    const info = @typeInfo(ExtraType).@"struct";
+                    inline for (info.field_names, info.field_types) |field_name, field_type| {
+                        if (field_type == Ref) {
+                            try uses.append(gpa, @field(extra.data, field_name));
                         }
                     }
                 } else {
-                    inline for (@typeInfo(FieldType).@"struct".fields) |struct_field| {
-                        if (struct_field.type == Ref) {
-                            try uses.append(gpa, @field(field_data, struct_field.name));
+                    const info = @typeInfo(FieldType).@"struct";
+                    inline for (info.field_names, info.field_types) |field_name, field_type| {
+                        if (field_type == Ref) {
+                            try uses.append(gpa, @field(field_data, field_name));
                         }
                     }
                 }
@@ -687,28 +688,28 @@ pub fn ExtraData(comptime T: type) type {
 }
 
 pub fn extraData(ir: *const Ir, comptime T: type, extra_index: ExtraIndex) ExtraData(T) {
-    const fields = @typeInfo(T).@"struct".fields;
-    var i: usize = @intFromEnum(extra_index);
+    const info = @typeInfo(T).@"struct";
+    var i: usize = @backingInt(extra_index);
     var result: T = undefined;
-    inline for (fields) |field| {
-        @field(result, field.name) = switch (field.type) {
+    inline for (info.field_names, info.field_types) |field_name, field_type| {
+        @field(result, field_name) = switch (field_type) {
             u16 => @intCast(ir.extra[i]),
             u32 => ir.extra[i],
             Inst.Ref,
             StringIndex,
-            => @enumFromInt(ir.extra[i]),
+            => @fromBackingInt(ir.extra[i]),
             else => comptime unreachable,
         };
         i += 1;
     }
     return .{
         .data = result,
-        .end = @enumFromInt(i),
+        .end = @fromBackingInt(@intCast(i)),
     };
 }
 
 pub fn refSlice(ir: *const Ir, start: ExtraIndex, len: u32) []const Inst.Ref {
-    return @ptrCast(ir.extra[@intFromEnum(start)..][0..len]);
+    return @ptrCast(ir.extra[@backingInt(start)..][0..len]);
 }
 
 pub const PrintError = std.Io.Terminal.SetColorError;
@@ -723,7 +724,7 @@ pub fn print(ir: *const Ir, terminal: std.Io.Terminal) PrintError!void {
         const is_live = ir.liveness.isSet(i);
 
         var buf: [16]u8 = undefined;
-        const label = std.fmt.bufPrint(&buf, "%{d}", .{i}) catch unreachable;
+        const label = std.mem.print(&buf, "%{d}", .{i}) catch unreachable;
         try terminal.writer.print("{s: >4}: ", .{label});
 
         try terminal.setColor(.dim);
@@ -746,7 +747,7 @@ fn printData(
     data: Inst.Data,
     terminal: std.Io.Terminal,
 ) PrintError!void {
-    const data_tag = Inst.data_tags[@intFromEnum(tag)];
+    const data_tag = Inst.data_tags[@backingInt(tag)];
     if (data_tag == .none) return;
 
     try terminal.writer.writeByte(' ');
@@ -844,16 +845,16 @@ fn printData(
                     else => comptime unreachable,
                 };
                 const extra = ir.extraData(ExtraType, field_data);
-                const extra_fields = @typeInfo(ExtraType).@"struct".fields;
-                inline for (extra_fields, 0..) |extra_field, j| {
+                const info = @typeInfo(ExtraType).@"struct";
+                inline for (info.field_names, 0..) |field_name, j| {
                     if (j > 0) try terminal.writer.writeAll(", ");
-                    try printField(ir, @field(extra.data, extra_field.name), terminal);
+                    try printField(ir, @field(extra.data, field_name), terminal);
                 }
             } else {
-                const struct_fields = @typeInfo(FieldType).@"struct".fields;
-                inline for (struct_fields, 0..) |struct_field, j| {
+                const info = @typeInfo(FieldType).@"struct";
+                inline for (info.field_names, 0..) |field_name, j| {
                     if (j > 0) try terminal.writer.writeAll(", ");
-                    try printField(ir, @field(field_data, struct_field.name), terminal);
+                    try printField(ir, @field(field_data, field_name), terminal);
                 }
             }
         },
@@ -879,7 +880,7 @@ fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintErr
         },
         Inst.Ref => if (value.toIndex()) |index| {
             try terminal.setColor(.blue);
-            try terminal.writer.print("%{d}", .{@intFromEnum(index)});
+            try terminal.writer.print("%{d}", .{@backingInt(index)});
             try terminal.setColor(.reset);
         } else {
             try terminal.setColor(.dim);
@@ -900,7 +901,7 @@ fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintErr
         StringIndex => {
             const str = value.slice(ir);
             try terminal.setColor(.yellow);
-            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.writer.print("@{d}", .{@backingInt(value)});
             try terminal.setColor(.reset);
             try terminal.writer.writeAll(" (");
             try terminal.setColor(.green);
@@ -911,7 +912,7 @@ fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintErr
         BigIntIndex => {
             const big_int = value.value(ir);
             try terminal.setColor(.yellow);
-            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.writer.print("@{d}", .{@backingInt(value)});
             try terminal.setColor(.reset);
             try terminal.writer.writeAll(" (");
             try terminal.setColor(.magenta);
@@ -924,7 +925,7 @@ fn printField(ir: *const Ir, value: anytype, terminal: std.Io.Terminal) PrintErr
         Class.Index,
         => {
             try terminal.setColor(.yellow);
-            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.writer.print("@{d}", .{@backingInt(value)});
             try terminal.setColor(.reset);
         },
         else => comptime unreachable,

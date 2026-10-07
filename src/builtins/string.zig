@@ -2532,8 +2532,7 @@ pub const prototype = struct {
             //    - the code unit 0x0022 (QUOTATION MARK)
             //    - escapedAttrValue
             //    - the code unit 0x0022 (QUOTATION MARK)
-            return types.String.fromUtf8(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
+            return types.String.fromUtf8(agent, try agent.gc_allocator.print(
                 "<{[tag]s} {[attribute]s}=\"{[value]f}\">{[string]f}</{[tag]s}>",
                 .{
                     .string = contents_string.fmtRaw(),
@@ -2544,8 +2543,7 @@ pub const prototype = struct {
             ));
         }
 
-        return types.String.fromUtf8(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return types.String.fromUtf8(agent, try agent.gc_allocator.print(
             "<{[tag]s}>{[string]f}</{[tag]s}>",
             .{ .string = contents_string.fmtRaw(), .tag = tag },
         ));

@@ -52,13 +52,13 @@ pub fn allocateArrayBuffer(
     // 3. If allocatingResizableBuffer is true, then
     if (allocating_resizable_buffer) {
         // a. If byteLength > maxByteLength, throw a RangeError exception.
-        if (@intFromEnum(byte_length) > @intFromEnum(max_byte_length)) {
+        if (@backingInt(byte_length) > @backingInt(max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
         // NOTE: Checking for a reasonable size below the theoretical limit is non-standard but also
         //       done in other engines (and tested by test262)
-        if (@intFromEnum(max_byte_length) > @intFromEnum(DataBlock.max_byte_length)) {
+        if (@backingInt(max_byte_length) > @backingInt(DataBlock.max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
@@ -119,7 +119,7 @@ pub fn arrayBufferByteLength(array_buffer: *const ArrayBuffer, order: Order) Byt
             .seq_cst => @atomicLoad(usize, ptr, .seq_cst),
             .unordered => @atomicLoad(usize, ptr, .unordered),
         };
-        return @enumFromInt(value);
+        return @fromBackingInt(@intCast(value));
     }
 
     // 2. Assert: IsDetachedBuffer(arrayBuffer) is false.
@@ -157,7 +157,7 @@ pub fn arrayBufferCopyAndDetach(
     } else blk: {
         // 4. Else,
         // a. Let newByteLength be ? ToIndex(newLength).
-        break :blk @enumFromInt(try new_length.toIndex(agent));
+        break :blk @fromBackingInt(try new_length.toIndex(agent));
     };
 
     // 5. If IsDetachedBuffer(arrayBuffer) is true, throw a TypeError exception.
@@ -193,8 +193,8 @@ pub fn arrayBufferCopyAndDetach(
 
     // 10. Let copyLength be min(newByteLength, arrayBuffer.[[ArrayBufferByteLength]]).
     const copy_length = @min(
-        @intFromEnum(new_byte_length),
-        @intFromEnum(array_buffer.fields.byte_length),
+        @backingInt(new_byte_length),
+        @backingInt(array_buffer.fields.byte_length),
     );
 
     // 11. Let fromBlock be arrayBuffer.[[ArrayBufferData]].
@@ -287,8 +287,8 @@ pub fn cloneArrayBuffer(
         target_block,
         0,
         source_block,
-        @intFromEnum(source_byte_offset),
-        @intFromEnum(source_length),
+        @backingInt(source_byte_offset),
+        @backingInt(source_length),
     );
 
     // 6. Return targetBuffer.
@@ -311,7 +311,7 @@ pub fn getArrayBufferMaxByteLengthOption(
     if (max_byte_length.isUndefined()) return .none;
 
     // 4. Return ? ToIndex(maxByteLength).
-    return @enumFromInt(try max_byte_length.toIndex(agent));
+    return @fromBackingInt(try max_byte_length.toIndex(agent));
 }
 
 /// 25.1.3.9 IsFixedLengthArrayBuffer ( arrayBuffer )
@@ -559,7 +559,7 @@ pub fn getModifySetValueInBuffer(
     byte_index: u53,
     comptime @"type": ElementType,
     value: Value,
-    comptime op: std.builtin.AtomicRmwOp,
+    comptime op: std.lang.AtomicRmwOp,
 ) std.mem.Allocator.Error!@"type".type() {
     // 1. Assert: IsDetachedBuffer(arrayBuffer) is false.
     std.debug.assert(!isDetachedBuffer(array_buffer));
@@ -682,7 +682,7 @@ pub const constructor = struct {
         }
 
         // 2. Let byteLength be ? ToIndex(length).
-        const byte_length: ByteLength = @enumFromInt(try length.toIndex(agent));
+        const byte_length: ByteLength = @fromBackingInt(try length.toIndex(agent));
 
         // 3. Let requestedMaxByteLength be ? GetArrayBufferMaxByteLengthOption(options).
         const requested_max_byte_length = try getArrayBufferMaxByteLengthOption(agent, options);
@@ -777,7 +777,7 @@ pub const prototype = struct {
         if (isDetachedBuffer(array_buffer)) return Value.from(0);
 
         // 5. Let length be obj.[[ArrayBufferByteLength]].
-        const length = @intFromEnum(array_buffer.fields.byte_length);
+        const length = @backingInt(array_buffer.fields.byte_length);
 
         // 6. Return 𝔽(length).
         return Value.from(length);
@@ -833,7 +833,7 @@ pub const prototype = struct {
         };
 
         // 7. Return 𝔽(length).
-        return Value.from(@intFromEnum(length));
+        return Value.from(@backingInt(length));
     }
 
     /// 25.1.6.5 get ArrayBuffer.prototype.resizable
@@ -880,7 +880,7 @@ pub const prototype = struct {
         }
 
         // 4. Let newByteLength be ? ToIndex(newLength).
-        const new_byte_length: ByteLength = @enumFromInt(try new_length.toIndex(agent));
+        const new_byte_length: ByteLength = @fromBackingInt(try new_length.toIndex(agent));
 
         // 5. If IsDetachedBuffer(obj) is true, throw a TypeError exception.
         if (isDetachedBuffer(array_buffer)) {
@@ -888,7 +888,7 @@ pub const prototype = struct {
         }
 
         // 6. If newByteLength > obj.[[ArrayBufferMaxByteLength]], throw a RangeError exception.
-        if (@intFromEnum(new_byte_length) > @intFromEnum(array_buffer.fields.max_byte_length)) {
+        if (@backingInt(new_byte_length) > @backingInt(array_buffer.fields.max_byte_length)) {
             return agent.throwException(.range_error, "Maximum buffer size exceeded", .{});
         }
 
@@ -947,7 +947,7 @@ pub const prototype = struct {
         }
 
         // 5. Let length be obj.[[ArrayBufferByteLength]].
-        const length = @intFromEnum(array_buffer.fields.byte_length);
+        const length = @backingInt(array_buffer.fields.byte_length);
 
         // 6. Let first be ? ToClampedIndex(start, length).
         const first = try start.toClampedIndex(agent, length);
@@ -960,7 +960,7 @@ pub const prototype = struct {
             try end.toClampedIndex(agent, length);
 
         // 8. Let newLength be max(final - first, 0).
-        const new_length: ByteLength = @enumFromInt(final -| first);
+        const new_length: ByteLength = @fromBackingInt(final -| first);
 
         // 9. Let ctor be ? SpeciesConstructor(obj, %ArrayBuffer%).
         const ctor = try array_buffer.object.speciesConstructor(
@@ -971,7 +971,7 @@ pub const prototype = struct {
         // 10. Let new be ? Construct(ctor, « 𝔽(newLength) »).
         const new_object = try ctor.construct(
             agent,
-            &.{Value.from(@intFromEnum(new_length))},
+            &.{Value.from(@backingInt(new_length))},
             null,
         );
 
@@ -1002,7 +1002,7 @@ pub const prototype = struct {
         }
 
         // 15. If new.[[ArrayBufferByteLength]] < newLength, throw a TypeError exception.
-        if (@intFromEnum(new.fields.byte_length) < @intFromEnum(new_length)) {
+        if (@backingInt(new.fields.byte_length) < @backingInt(new_length)) {
             return agent.throwException(.type_error, "ArrayBuffer is too small", .{});
         }
 
@@ -1022,12 +1022,12 @@ pub const prototype = struct {
         const current_length = array_buffer.fields.byte_length;
 
         // 21. Let maxCount be currentLength - first.
-        const max_count = @intFromEnum(current_length) -| first;
+        const max_count = @backingInt(current_length) -| first;
 
         // 22. If maxCount > 0, then
         if (max_count > 0) {
             // a. Let count be min(newLength, maxCount).
-            const count = @min(@intFromEnum(new_length), max_count);
+            const count = @min(@backingInt(new_length), max_count);
 
             // b. Perform CopyDataBlockBytes(toBlock, 0, fromBlock, first, count).
             copyDataBlockBytes(to_block, 0, from_block, first, count);

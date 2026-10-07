@@ -1348,7 +1348,7 @@ pub const NumberFormat = MakeObject(.{
                     .except_zero => String.fromLiteral("exceptZero"),
                     .negative => String.fromLiteral("negative"),
                 },
-                .rounding_increment = @intFromEnum(self.rounding_increment),
+                .rounding_increment = @backingInt(self.rounding_increment),
                 .rounding_mode = switch (self.rounding_mode) {
                     .ceil => String.fromLiteral("ceil"),
                     .floor => String.fromLiteral("floor"),

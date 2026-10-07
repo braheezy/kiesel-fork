@@ -106,7 +106,7 @@ pub fn MakeObject(
             };
             try self.object.ensureProperties(
                 agent.gc_allocator,
-                @intFromEnum(args.shape.next_offset),
+                @backingInt(args.shape.next_offset),
             );
             if (build_options.enable_libgc) {
                 if (options.finalizer) |finalizer| {

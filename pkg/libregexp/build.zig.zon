@@ -2,7 +2,7 @@
     .name = .libregexp,
     .version = "0.1.0",
     .fingerprint = 0xc7e5900671eca91d,
-    .minimum_zig_version = "0.16.0",
+    .minimum_zig_version = "0.17.0",
     .dependencies = .{
         .quickjs = .{
             .url = "git+https://github.com/bellard/quickjs#535a7c250ff4a577ec36c3e103daab6dadeea650",

@@ -293,18 +293,13 @@ pub fn createDynamicFunction(
 
     // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
     //     0x000A (LINE FEED).
-    const body_parse_string = try std.fmt.allocPrint(
-        gpa,
-        "\n{f}\n",
-        .{body_string.fmtRaw()},
-    );
+    const body_parse_string = try gpa.print("\n{f}\n", .{body_string.fmtRaw()});
     defer gpa.free(body_parse_string);
 
     // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", paramString,
     //     0x000A (LINE FEED), ") {", bodyParseString, and "}".
     // 16. Let sourceText be StringToCodePoints(sourceString).
-    const source_text = try std.fmt.allocPrint(
-        agent.gc_allocator,
+    const source_text = try agent.gc_allocator.print(
         "{[prefix]s} anonymous({[parameters_string]s}\n) {{{[body_parse_string]s}}}",
         .{ .prefix = prefix, .parameters_string = parameters_string, .body_parse_string = body_parse_string },
     );
@@ -636,8 +631,7 @@ pub const prototype = struct {
         //    matched by NativeFunctionAccessor[opt] PropertyName must be func.[[InitialName]].
         if (this_value.castObject(BuiltinFunction)) |builtin_function| {
             const name: *const String = builtin_function.fields.initial_name orelse .empty;
-            const source_text = try std.fmt.allocPrint(
-                agent.gc_allocator,
+            const source_text = try agent.gc_allocator.print(
                 "function {f}() {{ [native code] }}",
                 .{name.fmtRaw()},
             );

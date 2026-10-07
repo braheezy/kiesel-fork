@@ -246,7 +246,7 @@ pub fn build(b: *Builder) Error!Ir {
 
 fn addInst(b: *Builder, inst: Ir.Inst) std.mem.Allocator.Error!Ir.Inst.Ref {
     if (foldInst(b, inst)) |ref| return ref;
-    const index: Ir.Inst.Index = @enumFromInt(b.instructions.len);
+    const index: Ir.Inst.Index = @fromBackingInt(@intCast(b.instructions.len));
     try b.instructions.append(b.gpa, inst);
     return index.toRef();
 }
@@ -263,20 +263,20 @@ const Deferred = struct {
 
     fn set(d: Deferred, data: Data) void {
         const slice = d.b.instructions.slice();
-        const i = @intFromEnum(d.index);
+        const i = @backingInt(d.index);
         switch (slice.items(.tag)[i]) {
             .br => slice.items(.data)[i] = .{ .br = data.br },
             .br_cond => {
-                const ei = @intFromEnum(slice.items(.data)[i].br_cond);
-                d.b.extra.items[ei] = @intFromEnum(data.br_cond.condition);
-                d.b.extra.items[ei + 1] = @intFromEnum(data.br_cond.then_target);
-                d.b.extra.items[ei + 2] = @intFromEnum(data.br_cond.else_target);
+                const ei = @backingInt(slice.items(.data)[i].br_cond);
+                d.b.extra.items[ei] = @backingInt(data.br_cond.condition);
+                d.b.extra.items[ei + 1] = @backingInt(data.br_cond.then_target);
+                d.b.extra.items[ei + 2] = @backingInt(data.br_cond.else_target);
             },
             .exception_handler => {
-                const ei = @intFromEnum(slice.items(.data)[i].exception_handler);
-                d.b.extra.items[ei] = @intFromEnum(data.exception_handler.start);
-                d.b.extra.items[ei + 1] = @intFromEnum(data.exception_handler.end);
-                d.b.extra.items[ei + 2] = @intFromEnum(data.exception_handler.target);
+                const ei = @backingInt(slice.items(.data)[i].exception_handler);
+                d.b.extra.items[ei] = @backingInt(data.exception_handler.start);
+                d.b.extra.items[ei + 1] = @backingInt(data.exception_handler.end);
+                d.b.extra.items[ei + 2] = @backingInt(data.exception_handler.target);
                 d.b.extra.items[ei + 3] = data.exception_handler.scope_depth;
             },
             else => unreachable,
@@ -288,12 +288,12 @@ fn addInstDeferred(b: *Builder, tag: Ir.Inst.Tag) std.mem.Allocator.Error!Deferr
     const data: Ir.Inst.Data = switch (tag) {
         .br => .{ .br = undefined },
         .br_cond => blk: {
-            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
             try b.extra.appendNTimes(b.gpa, undefined, 3);
             break :blk .{ .br_cond = extra_index };
         },
         .exception_handler => blk: {
-            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
             try b.extra.appendNTimes(b.gpa, undefined, 4);
             break :blk .{ .exception_handler = extra_index };
         },
@@ -314,16 +314,16 @@ fn addLabel(b: *Builder) std.mem.Allocator.Error!Ir.Inst.Ref {
 }
 
 fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.ExtraIndex {
-    const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
-    const fields = @typeInfo(T).@"struct".fields;
-    try b.extra.ensureUnusedCapacity(b.gpa, fields.len);
-    inline for (fields) |field| {
-        const value = @field(extra, field.name);
-        b.extra.appendAssumeCapacity(switch (field.type) {
+    const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
+    const info = @typeInfo(T).@"struct";
+    try b.extra.ensureUnusedCapacity(b.gpa, info.field_names.len);
+    inline for (info.field_names, info.field_types) |field_name, field_type| {
+        const value = @field(extra, field_name);
+        b.extra.appendAssumeCapacity(switch (field_type) {
             u32 => value,
             Ir.Inst.Ref,
             Ir.StringIndex,
-            => @intFromEnum(value),
+            => @backingInt(value),
             else => comptime unreachable,
         });
     }
@@ -331,31 +331,31 @@ fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.
 }
 
 fn addFunction(b: *Builder, function: Ir.Function) std.mem.Allocator.Error!Ir.Function.Index {
-    const index: Ir.Function.Index = @enumFromInt(b.functions.items.len);
+    const index: Ir.Function.Index = @fromBackingInt(@intCast(b.functions.items.len));
     try b.functions.append(b.gpa, function);
     return index;
 }
 
 fn addClass(b: *Builder, class: Ir.Class) std.mem.Allocator.Error!Ir.Class.Index {
-    const index: Ir.Class.Index = @enumFromInt(b.classes.items.len);
+    const index: Ir.Class.Index = @fromBackingInt(@intCast(b.classes.items.len));
     try b.classes.append(b.gpa, class);
     return index;
 }
 
 fn setAnonymousFunctionName(b: *Builder, ref: Ir.Inst.Ref, string_index: Ir.StringIndex) void {
     const index = ref.toIndex().?;
-    const inst = b.instructions.get(@intFromEnum(index));
+    const inst = b.instructions.get(@backingInt(index));
     switch (inst.tag) {
         .create_function => {
             const function_index = inst.data.create_function;
-            const function = &b.functions.items[@intFromEnum(function_index)];
+            const function = &b.functions.items[@backingInt(function_index)];
             if (function.name == .none) {
                 function.name = .{ .default = string_index };
             }
         },
         .create_class => {
             const class_index = inst.data.create_class;
-            const class = &b.classes.items[@intFromEnum(class_index)];
+            const class = &b.classes.items[@backingInt(class_index)];
             if (class.name == .none) {
                 class.name = .{ .default = string_index };
             }
@@ -390,7 +390,7 @@ fn findBreakableContext(b: *Builder, label: ?[]const u8) *BreakableContext {
         }
         unreachable;
     }
-    return b.breakable_stack.items[b.breakable_stack.items.len - 1];
+    return b.breakable_stack.last().?;
 }
 
 fn internString(b: *Builder, string: []const u8, kind: StringKind) std.mem.Allocator.Error!Ir.StringIndex {
@@ -405,7 +405,7 @@ fn internString(b: *Builder, string: []const u8, kind: StringKind) std.mem.Alloc
     if (!gop.found_existing) {
         gop.key_ptr.string = try b.gpa.dupe(u8, string);
     }
-    return @enumFromInt(gop.index);
+    return @fromBackingInt(@intCast(gop.index));
 }
 
 fn internBigInt(b: *Builder, big_int: std.math.big.int.Const) std.mem.Allocator.Error!Ir.BigIntIndex {
@@ -413,7 +413,7 @@ fn internBigInt(b: *Builder, big_int: std.math.big.int.Const) std.mem.Allocator.
     if (!gop.found_existing) {
         gop.key_ptr.limbs = try b.gpa.dupe(std.math.big.Limb, big_int.limbs);
     }
-    return @enumFromInt(gop.index);
+    return @fromBackingInt(@intCast(gop.index));
 }
 
 fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
@@ -2118,10 +2118,10 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     breakable_ctx.setDeferredBreaks(end_label);
 
     if (head_eval.skip_br_cond) |skip_br_cond| {
-        const inst = b.instructions.get(@intFromEnum(skip_br_cond.index));
-        const extra_index = @intFromEnum(inst.data.br_cond);
+        const inst = b.instructions.get(@backingInt(skip_br_cond.index));
+        const extra_index = @backingInt(inst.data.br_cond);
         // Set then_target which was initialized as .none
-        b.extra.items[extra_index + 1] = @intFromEnum(skip_label);
+        b.extra.items[extra_index + 1] = @backingInt(skip_label);
         skip_br.set(.{ .br = .{
             .target = end_label,
             .value = undefined_ref,
@@ -2260,10 +2260,10 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
         .value = undefined_ref,
     } });
     for (case_branches.items) |item| {
-        const inst = b.instructions.get(@intFromEnum(item.br_cond.index));
-        const extra_index = @intFromEnum(inst.data.br_cond);
+        const inst = b.instructions.get(@backingInt(item.br_cond.index));
+        const extra_index = @backingInt(inst.data.br_cond);
         // Set then_target which was initialized as .none
-        b.extra.items[extra_index + 1] = @intFromEnum(body_labels[item.index]);
+        b.extra.items[extra_index + 1] = @backingInt(body_labels[item.index]);
     }
     default_br.set(.{ .br = .{
         .target = if (default_index) |index| body_labels[index] else end_label,
@@ -2278,7 +2278,7 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
 }
 
 fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) Error!Ir.Inst.Ref {
-    const current_ctx = b.breakable_stack.items[b.breakable_stack.items.len - 1];
+    const current_ctx = b.breakable_stack.last().?;
     const target_ctx = b.findBreakableContext(cont_stmt.label);
     const value = current_ctx.result_ref;
 
@@ -2323,7 +2323,7 @@ fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) 
 }
 
 fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!Ir.Inst.Ref {
-    const current_ctx = b.breakable_stack.items[b.breakable_stack.items.len - 1];
+    const current_ctx = b.breakable_stack.last().?;
     const target_ctx = b.findBreakableContext(brk_stmt.label);
     const value = current_ctx.result_ref;
 
@@ -2949,9 +2949,9 @@ fn lowerObjectAssignmentPattern(b: *Builder, pattern: *const ast.ObjectAssignmen
                 .assignment_rest_property => {},
             };
 
-            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
             const excluded_len: u32 = @intCast(excluded_names.items.len);
-            try b.extra.append(b.gpa, @intFromEnum(object));
+            try b.extra.append(b.gpa, @backingInt(object));
             try b.extra.append(b.gpa, excluded_len);
             try b.extra.appendSlice(b.gpa, @ptrCast(excluded_names.items));
 
@@ -3288,9 +3288,9 @@ fn lowerObjectBindingPattern(b: *Builder, pattern: *const ast.ObjectBindingPatte
                 .binding_rest_property => {},
             };
 
-            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
             const excluded_len: u32 = @intCast(excluded_names.items.len);
-            try b.extra.append(b.gpa, @intFromEnum(object));
+            try b.extra.append(b.gpa, @backingInt(object));
             try b.extra.append(b.gpa, excluded_len);
             try b.extra.appendSlice(b.gpa, @ptrCast(excluded_names.items));
 
@@ -3483,7 +3483,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                 else blk: {
                     const key_ref = try b.lowerPropertyName(property_name);
                     const key_index = key_ref.toIndex().?;
-                    const key_inst = b.instructions.get(@intFromEnum(key_index));
+                    const key_inst = b.instructions.get(@backingInt(key_index));
                     break :blk if (key_inst.tag == .string)
                         .{ .string = key_inst.data.string }
                     else
@@ -3496,7 +3496,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                         name: {
                             const prefix: []const u8 = if (method_def.method == .get) "get " else "set ";
                             const identifier = property_name.literal_property_name.identifier;
-                            const prefixed = try std.fmt.allocPrint(b.gpa, "{s}{s}", .{ prefix, identifier });
+                            const prefixed = try b.gpa.print("{s}{s}", .{ prefix, identifier });
                             defer b.gpa.free(prefixed);
                             break :name .{ .default = try b.internString(prefixed, .literal) };
                         } else .none;
@@ -3588,7 +3588,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                 else blk: {
                     const key_ref = try b.lowerPropertyName(&prop.property_name);
                     const key_index = key_ref.toIndex().?;
-                    const key_inst = b.instructions.get(@intFromEnum(key_index));
+                    const key_inst = b.instructions.get(@backingInt(key_index));
                     break :blk if (key_inst.tag == .string)
                         .{ .string = key_inst.data.string }
                     else

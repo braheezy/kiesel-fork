@@ -7,7 +7,7 @@ on:
 
 jobs:
   # NOTE:
-  # - The ReleaseFast builds are being used for benchmarking, ReleaseSafe is noticeably slower
+  # - The `fast` builds are being used for benchmarking, `safe` is noticeably slower
   #   - https://boajs.dev/benchmarks/
   #   - https://ahaoboy.github.io/js-engine-benchmark/
   # - This is split into multiple build jobs to have some level of parallelization. Ideally that
@@ -25,7 +25,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
           cache-size-limit: 10240 # 10 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
@@ -34,62 +34,62 @@ jobs:
       - name: Build kiesel-linux-aarch64
         run: |
           # Verify building without NaN-boxing on aarch64.
-          zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseSafe -Denable-nan-boxing=false
-          zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseSafe
+          zig build -Dtarget=aarch64-linux-musl -Doptimize=safe -Denable-nan-boxing=false
+          zig build -Dtarget=aarch64-linux-musl -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-aarch64
-      - name: Build kiesel-linux-aarch64 (ReleaseFast)
+      - name: Build kiesel-linux-aarch64 (fast)
         run: |
-          zig build -Dtarget=aarch64-linux-musl -Doptimize=ReleaseFast
+          zig build -Dtarget=aarch64-linux-musl -Doptimize=fast
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-aarch64-releasefast
       - name: Build kiesel-linux-arm
         run: |
-          zig build -Dtarget=arm-linux-musleabihf -Doptimize=ReleaseSafe
+          zig build -Dtarget=arm-linux-musleabihf -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-arm
       - name: Build kiesel-linux-loongarch64
         run: |
-          zig build -Dtarget=loongarch64-linux-musl -Doptimize=ReleaseSafe
+          zig build -Dtarget=loongarch64-linux-musl -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-loongarch64
       - name: Build kiesel-linux-mips
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
-          zig build -Dtarget=mips-linux-musleabi -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          zig build -Dtarget=mips-linux-musleabi -Doptimize=safe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips
       - name: Build kiesel-linux-mips64
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
-          zig build -Dtarget=mips64-linux-muslabi64 -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          zig build -Dtarget=mips64-linux-muslabi64 -Doptimize=safe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-mips64
       - name: Build kiesel-linux-powerpc
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
-          zig build -Dtarget=powerpc-linux-musleabihf -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          zig build -Dtarget=powerpc-linux-musleabihf -Doptimize=safe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-powerpc
       - name: Build kiesel-linux-powerpc64
         run: |
-          zig build -Dtarget=powerpc64-linux-musl -Doptimize=ReleaseSafe
+          zig build -Dtarget=powerpc64-linux-musl -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-powerpc64
       - name: Build kiesel-linux-riscv64
         run: |
-          zig build -Dtarget=riscv64-linux-musl -Doptimize=ReleaseSafe
+          zig build -Dtarget=riscv64-linux-musl -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-riscv64
       - name: Build kiesel-linux-s390x
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
-          zig build -Dtarget=s390x-linux-musl -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          zig build -Dtarget=s390x-linux-musl -Doptimize=safe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-s390x
       - name: Build kiesel-linux-x86
         run: |
-          zig build -Dtarget=x86-linux-musl -Doptimize=ReleaseSafe
+          zig build -Dtarget=x86-linux-musl -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86
       - name: Build kiesel-linux-x86_64
         run: |
           # Verify building without NaN-boxing on x86_64.
-          zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe -Denable-nan-boxing=false
-          zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseSafe
+          zig build -Dtarget=x86_64-linux-musl -Doptimize=safe -Denable-nan-boxing=false
+          zig build -Dtarget=x86_64-linux-musl -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64
-      - name: Build kiesel-linux-x86_64 (ReleaseFast)
+      - name: Build kiesel-linux-x86_64 (fast)
         run: |
-          zig build -Dtarget=x86_64-linux-musl -Doptimize=ReleaseFast
+          zig build -Dtarget=x86_64-linux-musl -Doptimize=fast
           mv zig-out/bin/kiesel zig-out/bin/kiesel-linux-x86_64-releasefast
       - name: Upload artifact
         uses: https://code.forgejo.org/forgejo/upload-artifact@v4
@@ -109,7 +109,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
@@ -117,15 +117,15 @@ jobs:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Build kiesel-macos-aarch64
         run: |
-          zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseSafe
+          zig build -Dtarget=aarch64-macos-none -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-aarch64
-      - name: Build kiesel-macos-aarch64 (ReleaseFast)
+      - name: Build kiesel-macos-aarch64 (fast)
         run: |
-          zig build -Dtarget=aarch64-macos-none -Doptimize=ReleaseFast
+          zig build -Dtarget=aarch64-macos-none -Doptimize=fast
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-aarch64-releasefast
       - name: Build kiesel-macos-x86_64
         run: |
-          zig build -Dtarget=x86_64-macos-none -Doptimize=ReleaseSafe
+          zig build -Dtarget=x86_64-macos-none -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-macos-x86_64
       - name: Upload artifact
         uses: https://code.forgejo.org/forgejo/upload-artifact@v4
@@ -145,7 +145,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
@@ -157,19 +157,19 @@ jobs:
           sudo apt-get install -y binutils-mingw-w64
       - name: Build kiesel-windows-aarch64.exe
         run: |
-          zig build -Dtarget=aarch64-windows-gnu -Doptimize=ReleaseSafe
+          zig build -Dtarget=aarch64-windows-gnu -Doptimize=safe
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-aarch64.exe
       - name: Build kiesel-windows-x86.exe
         run: |
-          zig build -Dtarget=x86-windows-gnu -Doptimize=ReleaseSafe
+          zig build -Dtarget=x86-windows-gnu -Doptimize=safe
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86.exe
       - name: Build kiesel-windows-x86_64.exe
         run: |
-          zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseSafe
+          zig build -Dtarget=x86_64-windows-gnu -Doptimize=safe
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86_64.exe
-      - name: Build kiesel-windows-x86_64.exe (ReleaseFast)
+      - name: Build kiesel-windows-x86_64.exe (fast)
         run: |
-          zig build -Dtarget=x86_64-windows-gnu -Doptimize=ReleaseFast
+          zig build -Dtarget=x86_64-windows-gnu -Doptimize=fast
           mv zig-out/bin/kiesel.exe zig-out/bin/kiesel-windows-x86_64-releasefast.exe
       - name: Upload artifact
         uses: https://code.forgejo.org/forgejo/upload-artifact@v4
@@ -189,7 +189,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
@@ -198,11 +198,11 @@ jobs:
       - name: Build kiesel-freebsd-aarch64
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
-          zig build -Dtarget=aarch64-freebsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          zig build -Dtarget=aarch64-freebsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-aarch64
       - name: Build kiesel-freebsd-x86_64
         run: |
-          zig build -Dtarget=x86_64-freebsd-none -Doptimize=ReleaseSafe
+          zig build -Dtarget=x86_64-freebsd-none -Doptimize=safe
           mv zig-out/bin/kiesel zig-out/bin/kiesel-freebsd-x86_64
       - name: Upload artifact
         uses: https://code.forgejo.org/forgejo/upload-artifact@v4
@@ -210,7 +210,6 @@ jobs:
           name: build-freebsd
           path: zig-out/bin/*
 
-  # TODO: Re-enable once https://codeberg.org/ziglang/translate-c/issues/323 is fixed
   # build-netbsd:
   #   runs-on: meow
   #   container:
@@ -223,7 +222,7 @@ jobs:
   #     - name: Install Zig
   #       uses: https://github.com/mlugg/setup-zig@v2
   #       with:
-  #         version: 0.16.0
+  #         version: 0.17.0
   #         cache-size-limit: 4096 # 4 GiB
   #     - name: Install Rust
   #       uses: https://github.com/dtolnay/rust-toolchain@stable
@@ -232,16 +231,16 @@ jobs:
   #     - name: Build kiesel-netbsd-aarch64
   #       run: |
   #         # No prebuilt rust-std, build without Intl/Temporal
-  #         zig build -Dtarget=aarch64-netbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+  #         zig build -Dtarget=aarch64-netbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
   #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
   #     - name: Build kiesel-netbsd-x86
   #       run: |
   #         # No prebuilt rust-std, build without Intl/Temporal
-  #         zig build -Dtarget=x86-netbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+  #         zig build -Dtarget=x86-netbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
   #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
   #     - name: Build kiesel-netbsd-x86_64
   #       run: |
-  #         zig build -Dtarget=x86_64-netbsd-none -Doptimize=ReleaseSafe
+  #         zig build -Dtarget=x86_64-netbsd-none -Doptimize=safe
   #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
   #     - name: Upload artifact
   #       uses: https://code.forgejo.org/forgejo/upload-artifact@v4
@@ -261,22 +260,22 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Build kiesel-openbsd-aarch64
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
-          zig build -Dtarget=aarch64-openbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          zig build -Dtarget=aarch64-openbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-openbsd-aarch64
       - name: Build kiesel-openbsd-x86
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
-          zig build -Dtarget=x86-openbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          zig build -Dtarget=x86-openbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-openbsd-x86
       - name: Build kiesel-openbsd-x86_64
         run: |
           # No prebuilt rust-std, build without Intl/Temporal
-          zig build -Dtarget=x86_64-openbsd-none -Doptimize=ReleaseSafe -Denable-intl=false -Denable-temporal=false
+          zig build -Dtarget=x86_64-openbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
           mv zig-out/bin/kiesel zig-out/bin/kiesel-openbsd-x86_64
       - name: Upload artifact
         uses: https://code.forgejo.org/forgejo/upload-artifact@v4
@@ -296,7 +295,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
@@ -305,10 +304,10 @@ jobs:
       - name: Build kiesel.wasm
         run: |
           # Building with Intl and Temporal adds nearly 10MB to the binary, so we build it twice:
-          # - ReleaseSafe with everything enabled to ensure it keeps building
-          # - ReleaseSmall with Intl and Temporal disabled for the published binary
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSafe
-          zig build -Dtarget=wasm32-wasi -Doptimize=ReleaseSmall -Denable-intl=false -Denable-temporal=false
+          # - `safe` with everything enabled to ensure it keeps building
+          # - `small` with Intl and Temporal disabled for the published binary
+          zig build -Dtarget=wasm32-wasi -Doptimize=safe
+          zig build -Dtarget=wasm32-wasi -Doptimize=small -Denable-intl=false -Denable-temporal=false
           # Outputs zig-out/bin/kiesel.wasm, no `mv` needed
       - name: Upload artifact
         uses: https://code.forgejo.org/forgejo/upload-artifact@v4
@@ -357,7 +356,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
@@ -400,7 +399,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
       - name: Check formatting
         run: |
           zig fmt --check .
@@ -408,7 +407,7 @@ jobs:
         run: |
           git clone https://github.com/tusharsadhwani/zigimports
           cd zigimports
-          git checkout 0c56cb27d932f69e572fb1247213075624011f7f
+          git checkout cd67cc8bc2595d963e89ead6a20f86168c84739a
           zig build --release=safe
           "./zig-out/bin/zigimports-$(uname -m)-linux" ..
 
@@ -424,7 +423,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
       - name: Run tests
         run: |
           zig build -Denable-intl=false -Denable-temporal=false test
@@ -458,7 +457,7 @@ jobs:
       - name: Install Zig
         uses: https://github.com/mlugg/setup-zig@v2
         with:
-          version: 0.16.0
+          version: 0.17.0
       - name: Install Rust
         uses: https://github.com/dtolnay/rust-toolchain@stable
       - name: Install Node.js
@@ -469,7 +468,7 @@ jobs:
           npm install -g git+https://codeberg.org/kiesel-js/test262-harness-fork.git
       - name: Build Kiesel
         run: |
-          zig build -Doptimize=ReleaseSafe
+          zig build -Doptimize=safe
       - name: Run test262
         run: |
           ./tools/test262/generate-results.sh ./zig-out/bin/kiesel ./test262 'test/**/*.js' > ./tools/test262/results-new.json

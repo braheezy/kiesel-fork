@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) void {
     var cargo_args: std.ArrayList([]const u8) = .empty;
     defer cargo_args.deinit(b.allocator);
     cargo_args.appendSlice(b.allocator, &.{ "--features", features }) catch @panic("OOM");
-    if (optimize != .Debug) {
+    if (optimize != .debug) {
         cargo_args.append(b.allocator, "--release") catch @panic("OOM");
     }
 
@@ -36,7 +36,7 @@ pub fn build(b: *std.Build) void {
         },
         .{
             .target = target,
-            .optimize = .ReleaseSafe,
+            .optimize = .safe,
         },
     );
 
@@ -66,7 +66,7 @@ pub fn build(b: *std.Build) void {
     zement.linkLibrary(unwind_stubs);
 
     // NOTE: Empirically these are not needed in release builds, presumably due to LTO.
-    if (target.result.os.tag == .windows and optimize == .Debug) {
+    if (target.result.os.tag == .windows and optimize == .debug) {
         // For GetUserProfileDirectoryW
         zement.linkSystemLibrary("userenv", .{});
         // For a bunch of networking APIs

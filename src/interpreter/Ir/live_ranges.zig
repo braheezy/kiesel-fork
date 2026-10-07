@@ -29,7 +29,7 @@ pub fn computeLiveRanges(
 
         for (uses.items) |use| {
             if (use.toIndex()) |index| {
-                const live_range = &live_ranges[@intFromEnum(index)];
+                const live_range = &live_ranges[@backingInt(index)];
                 live_range.end = @max(live_range.end, @as(u32, @intCast(inst_index)));
             }
         }
@@ -41,7 +41,7 @@ pub fn computeLiveRanges(
         const index = switch (inst.tag) {
             .br => blk: {
                 if (inst.data.br.target.toIndex()) |target_index| {
-                    if (@intFromEnum(target_index) < inst_index) {
+                    if (@backingInt(target_index) < inst_index) {
                         break :blk target_index;
                     }
                 }
@@ -51,17 +51,17 @@ pub fn computeLiveRanges(
                 // br_cond currently only creates forward jumps
                 const extra = ir.extraData(Ir.Inst.BrCond, inst.data.br_cond);
                 if (extra.data.then_target.toIndex()) |target_index| {
-                    std.debug.assert(@intFromEnum(target_index) >= inst_index);
+                    std.debug.assert(@backingInt(target_index) >= inst_index);
                 }
                 if (extra.data.else_target.toIndex()) |target_index| {
-                    std.debug.assert(@intFromEnum(target_index) >= inst_index);
+                    std.debug.assert(@backingInt(target_index) >= inst_index);
                 }
                 continue;
             },
             else => continue,
         };
         for (live_ranges) |*live_range| {
-            if (live_range.start <= @intFromEnum(index) and live_range.end >= @intFromEnum(index)) {
+            if (live_range.start <= @backingInt(index) and live_range.end >= @backingInt(index)) {
                 live_range.end = @max(live_range.end, @as(u32, @intCast(inst_index)));
             }
         }

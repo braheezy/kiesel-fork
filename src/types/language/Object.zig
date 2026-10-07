@@ -173,8 +173,8 @@ pub fn cast(self: *const Object, comptime T: type) ?*T {
 
 fn propertyPtr(self: *Object, offset: Shape.Property.Offset) *Value {
     return switch (self.properties) {
-        .fixed => &self.properties.fixed[@intFromEnum(offset)],
-        .dynamic => &self.properties.dynamic.items[@intFromEnum(offset)],
+        .fixed => &self.properties.fixed[@backingInt(offset)],
+        .dynamic => &self.properties.dynamic.items[@backingInt(offset)],
     };
 }
 
@@ -298,7 +298,7 @@ pub fn getPropertyCreateLazyIfNeeded(
         },
         .accessor => {
             var getter_value = self.propertyPtr(property.offset);
-            var setter_value = self.propertyPtr(@enumFromInt(@intFromEnum(property.offset) + 1));
+            var setter_value = self.propertyPtr(@fromBackingInt(@backingInt(property.offset) + 1));
             if (getter_value.isUninitialized()) {
                 @branchHint(.unlikely);
                 std.debug.assert(setter_value.isUninitialized());
@@ -358,16 +358,16 @@ pub fn setProperty(
                 .accessor => {
                     // We can't use `setAccessorAtPropertyOffset()` here because it branches on the args
                     self.propertyPtr(property.offset).* = undefined;
-                    self.propertyPtr(@enumFromInt(@intFromEnum(property.offset) + 1)).* = undefined;
+                    self.propertyPtr(@fromBackingInt(@backingInt(property.offset) + 1)).* = undefined;
                 },
             }
             switch (value_or_accessor) {
                 .value => |value| {
-                    try self.ensureProperties(allocator, @intFromEnum(new_property.offset) + 1);
+                    try self.ensureProperties(allocator, @backingInt(new_property.offset) + 1);
                     self.setValueAtPropertyOffset(new_property.offset, value);
                 },
                 .accessor => |accessor| {
-                    try self.ensureProperties(allocator, @intFromEnum(new_property.offset) + 2);
+                    try self.ensureProperties(allocator, @backingInt(new_property.offset) + 2);
                     self.setAccessorAtPropertyOffset(new_property.offset, accessor);
                 },
             }
@@ -391,11 +391,11 @@ pub fn setProperty(
         );
         switch (value_or_accessor) {
             .value => |value| {
-                try self.ensureProperties(allocator, @intFromEnum(offset) + 1);
+                try self.ensureProperties(allocator, @backingInt(offset) + 1);
                 self.setValueAtPropertyOffset(offset, value);
             },
             .accessor => |accessor| {
-                try self.ensureProperties(allocator, @intFromEnum(offset) + 2);
+                try self.ensureProperties(allocator, @backingInt(offset) + 2);
                 self.setAccessorAtPropertyOffset(offset, accessor);
             },
         }
@@ -424,7 +424,7 @@ pub fn removeProperty(
         .accessor => {
             // We can't use `setAccessorAtPropertyOffset()` here because it branches on the args
             self.propertyPtr(property.offset).* = undefined;
-            self.propertyPtr(@enumFromInt(@intFromEnum(property.offset) + 1)).* = undefined;
+            self.propertyPtr(@fromBackingInt(@backingInt(property.offset) + 1)).* = undefined;
         },
     }
 }
@@ -447,7 +447,7 @@ pub fn setAccessorAtPropertyOffset(
     const getter_value: Value = if (accessor.getter) |getter| Value.from(getter) else .null;
     const setter_value: Value = if (accessor.setter) |setter| Value.from(setter) else .null;
     self.propertyPtr(offset).* = getter_value;
-    self.propertyPtr(@enumFromInt(@intFromEnum(offset) + 1)).* = setter_value;
+    self.propertyPtr(@fromBackingInt(@backingInt(offset) + 1)).* = setter_value;
 }
 
 pub fn getIndexedFast(self: *const Object, index: u32) ?Value {
@@ -701,7 +701,7 @@ pub fn defineBuiltinAccessorWithAttributes(
         attributes_,
         .accessor,
     );
-    try self.ensureProperties(agent.gc_allocator, @intFromEnum(offset) + 2);
+    try self.ensureProperties(agent.gc_allocator, @backingInt(offset) + 2);
     self.setAccessorAtPropertyOffset(offset, .{
         .getter = if (@TypeOf(getter_function) != void) &getter_function.object else null,
         .setter = if (@TypeOf(setter_function) != void) &setter_function.object else null,
@@ -854,7 +854,7 @@ pub fn defineBuiltinPropertyWithAttributes(
         attributes,
         .value,
     );
-    try self.ensureProperties(agent.gc_allocator, @intFromEnum(offset) + 1);
+    try self.ensureProperties(agent.gc_allocator, @backingInt(offset) + 1);
     self.setValueAtPropertyOffset(offset, value);
 }
 
@@ -878,7 +878,7 @@ pub fn defineBuiltinPropertyLazy(
         attributes,
         .value,
     );
-    try self.ensureProperties(agent.gc_allocator, @intFromEnum(offset) + 1);
+    try self.ensureProperties(agent.gc_allocator, @backingInt(offset) + 1);
     self.setValueAtPropertyOffset(offset, .uninitialized);
     try extra_data.lazy_properties.putNoClobber(
         agent.gc_allocator,

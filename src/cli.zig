@@ -51,8 +51,8 @@ const repl_preamble = std.fmt.comptimePrint(
 , .{
     .kiesel = kiesel.version,
     .zig = builtin.zig_version,
-    .os = builtin.os.tag,
-    .eof = if (builtin.os.tag == .windows) "Ctrl+Z followed by Enter" else "Ctrl+D",
+    .os = builtin.target.os.tag,
+    .eof = if (builtin.target.os.tag == .windows) "Ctrl+Z followed by Enter" else "Ctrl+D",
 });
 
 const ScriptOrModuleHostDefined = struct {
@@ -150,13 +150,13 @@ const Kiesel = struct {
                         PropertyKey.from(0),
                         if (exe_path) |path| blk: {
                             // paths are not guaranteed to be valid UTF-8
-                            const path_utf8 = try std.fmt.allocPrint(agent_.gc_allocator, "{f}", .{std.unicode.fmtUtf8(path)});
+                            const path_utf8 = try agent_.gc_allocator.print("{f}", .{std.unicode.fmtUtf8(path)});
                             break :blk Value.from(try String.fromUtf8(agent_, path_utf8));
                         } else Value.from(""),
                     );
                     for (host_defined.args, 0..) |arg, i| {
                         // argv entries are not guaranteed to be valid UTF-8
-                        const arg_utf8 = try std.fmt.allocPrint(agent_.gc_allocator, "{f}", .{std.unicode.fmtUtf8(arg)});
+                        const arg_utf8 = try agent_.gc_allocator.print("{f}", .{std.unicode.fmtUtf8(arg)});
                         try args_array.object.createDataPropertyDirect(
                             agent_,
                             PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i + 1))),
@@ -188,8 +188,8 @@ const Kiesel = struct {
                     const env_object = try ordinaryObjectCreate(agent_, null);
                     for (host_defined.environ_map.keys(), host_defined.environ_map.values()) |key, value| {
                         // Environment variables are not guaranteed to be valid UTF-8
-                        const key_utf8 = try std.fmt.allocPrint(agent_.gc_allocator, "{f}", .{std.unicode.fmtUtf8(key)});
-                        const value_utf8 = try std.fmt.allocPrint(agent_.gc_allocator, "{f}", .{std.unicode.fmtUtf8(value)});
+                        const key_utf8 = try agent_.gc_allocator.print("{f}", .{std.unicode.fmtUtf8(key)});
+                        const value_utf8 = try agent_.gc_allocator.print("{f}", .{std.unicode.fmtUtf8(value)});
                         try env_object.createDataPropertyDirect(
                             agent_,
                             PropertyKey.from(try String.fromUtf8(agent_, key_utf8)),
@@ -217,7 +217,7 @@ const Kiesel = struct {
             try gc_object.defineBuiltinFunction(agent, "collect", collect, 0, realm);
             try kiesel_object.defineBuiltinProperty(agent, "gc", Value.from(gc_object));
         }
-        if (builtin.os.tag == .linux) {
+        if (builtin.target.os.tag == .linux) {
             try kiesel_object.defineBuiltinFunction(agent, "asm", @"asm", 1, realm);
             try kiesel_object.defineBuiltinFunction(agent, "syscall", syscall, 1, realm);
             const sysno_object = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
@@ -237,7 +237,7 @@ const Kiesel = struct {
                     agent,
                     PropertyKey.from(name),
                     .{
-                        .value_or_accessor = .{ .value = Value.from(@as(u53, @intCast(@intFromEnum(value)))) },
+                        .value_or_accessor = .{ .value = Value.from(@as(u53, @intCast(@backingInt(value)))) },
                         .attributes = .builtin_default,
                     },
                 );
@@ -779,10 +779,11 @@ fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
     const enabled_features, const disabled_features = comptime blk: {
         var enabled_features: []const []const u8 = &.{};
         var disabled_features: []const []const u8 = &.{};
-        for (@typeInfo(kiesel.build_options).@"struct".decls) |decl| {
-            if (std.mem.startsWith(u8, decl.name, "enable_")) {
-                const feature = decl.name["enable_".len..];
-                if (@field(kiesel.build_options, decl.name)) {
+        const info = @typeInfo(kiesel.build_options).@"struct";
+        for (info.decl_names) |decl_name| {
+            if (std.mem.startsWith(u8, decl_name, "enable_")) {
+                const feature = decl_name["enable_".len..];
+                if (@field(kiesel.build_options, decl_name)) {
                     enabled_features = enabled_features ++ .{feature};
                 } else {
                     disabled_features = disabled_features ++ .{feature};
@@ -797,7 +798,7 @@ fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.print("Rust version       {s}\n", .{kiesel.zement.rustcVersion()});
     }
     try writer.print("Target             {t}-{t}-{t}\n", .{ builtin.target.cpu.arch, builtin.target.os.tag, builtin.target.abi });
-    try writer.print("Optimize mode      {t}\n", .{builtin.mode});
+    try writer.print("Optimize           {t}\n", .{builtin.optimize});
     if (enabled_features.len > 0) {
         try writer.writeAll("Enabled features   ");
         for (enabled_features, 0..) |feature, i| {
@@ -1073,14 +1074,14 @@ fn repl(
         handler.string_arena.deinit();
     }
 
-    const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(gpa, io, environ_map);
-    defer if (builtin.os.tag != .wasi) gpa.free(history_path);
+    const history_path = if (builtin.target.os.tag != .wasi) try getHistoryPath(gpa, io, environ_map);
+    defer if (builtin.target.os.tag != .wasi) gpa.free(history_path);
 
-    if (builtin.os.tag != .wasi) editor.loadHistory(history_path) catch {
+    if (builtin.target.os.tag != .wasi) editor.loadHistory(history_path) catch {
         try stdout.writeAll("Failed to load history\n");
         try stdout.flush();
     };
-    defer if (builtin.os.tag != .wasi) editor.saveHistory(history_path) catch {
+    defer if (builtin.target.os.tag != .wasi) editor.saveHistory(history_path) catch {
         stdout.writeAll("Failed to save history\n") catch {};
         stdout.flush() catch {};
     };
@@ -1350,7 +1351,7 @@ pub fn main(init: std.process.Init) !u8 {
             };
             defer gpa_.free(raw_source_text);
 
-            const source_text = try std.fmt.allocPrint(gpa_, "{f}", .{
+            const source_text = try gpa_.print("{f}", .{
                 std.unicode.fmtUtf8(raw_source_text),
             });
             defer gpa_.free(source_text);
@@ -1454,7 +1455,7 @@ pub fn main(init: std.process.Init) !u8 {
         const raw_source_text = try readFile(gpa, io, path);
         defer gpa.free(raw_source_text);
         // The parser assumes valid UTF-8, replace invalid byte sequences with U+FFFD.
-        const source_text = try std.fmt.allocPrint(gpa, "{f}", .{
+        const source_text = try gpa.print("{f}", .{
             std.unicode.fmtUtf8(raw_source_text),
         });
         defer gpa.free(source_text);
@@ -1478,7 +1479,7 @@ pub fn main(init: std.process.Init) !u8 {
     } else if (parsed_args.options.command) |raw_source_text| {
         std.debug.assert(!run_as_module);
         // The parser assumes valid UTF-8, replace invalid byte sequences with U+FFFD.
-        const source_text = try std.fmt.allocPrint(gpa, "{f}", .{
+        const source_text = try gpa.print("{f}", .{
             std.unicode.fmtUtf8(raw_source_text),
         });
         defer gpa.free(source_text);

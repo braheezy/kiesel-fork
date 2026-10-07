@@ -74,7 +74,7 @@ fn getViewByteLength(view: DataViewWithBufferWitness) ByteLength {
 
     // 3. If view.[[ByteLength]] is not auto, return view.[[ByteLength]].
     if (data_view.fields.byte_length != .auto) {
-        return @enumFromInt(@intFromEnum(data_view.fields.byte_length));
+        return @fromBackingInt(@intCast(@backingInt(data_view.fields.byte_length)));
     }
 
     // 4. Assert: IsFixedLengthArrayBuffer(view.[[ViewedArrayBuffer]]) is false.
@@ -90,7 +90,7 @@ fn getViewByteLength(view: DataViewWithBufferWitness) ByteLength {
     std.debug.assert(byte_length != .detached);
 
     // 8. Return byteLength - byteOffset.
-    return @enumFromInt(@intFromEnum(byte_length) - @intFromEnum(byte_offset));
+    return @fromBackingInt(@intCast(@backingInt(byte_length) - @backingInt(byte_offset)));
 }
 
 /// 25.3.1.4 IsViewOutOfBounds ( viewRecord )
@@ -120,14 +120,14 @@ fn isViewOutOfBounds(view: DataViewWithBufferWitness) bool {
     // 6. If view.[[ByteLength]] is auto, then
     const byte_offset_end: ByteOffset = if (data_view.fields.byte_length == .auto) blk: {
         // a. Let byteOffsetEnd be bufferByteLength.
-        break :blk @enumFromInt(@intFromEnum(buffer_byte_length));
+        break :blk @fromBackingInt(@intCast(@backingInt(buffer_byte_length)));
     } else blk: {
         // 7. Else,
         // a. Let byteOffsetEnd be byteOffsetStart + view.[[ByteLength]].
-        break :blk @enumFromInt(std.math.add(
+        break :blk @fromBackingInt(std.math.add(
             u53,
-            @intFromEnum(byte_offset_start),
-            @intFromEnum(data_view.fields.byte_length.unwrap().?),
+            @backingInt(byte_offset_start),
+            @backingInt(data_view.fields.byte_length.unwrap().?),
         ) catch return true);
     };
 
@@ -135,8 +135,8 @@ fn isViewOutOfBounds(view: DataViewWithBufferWitness) bool {
     //    out-of-bounds.
 
     // 9. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
-    if (@intFromEnum(byte_offset_start) > @intFromEnum(buffer_byte_length) or
-        @intFromEnum(byte_offset_end) > @intFromEnum(buffer_byte_length)) return true;
+    if (@backingInt(byte_offset_start) > @backingInt(buffer_byte_length) or
+        @backingInt(byte_offset_end) > @backingInt(buffer_byte_length)) return true;
 
     // 10. Return false.
     return false;
@@ -181,7 +181,7 @@ fn getViewValue(
     const element_size = @"type".elementSize();
 
     // 11. If getIndex + elementSize > viewSize, throw a RangeError exception.
-    if (if (std.math.add(u53, get_index, element_size)) |x| x > @intFromEnum(view_size) else |_| true) {
+    if (if (std.math.add(u53, get_index, element_size)) |x| x > @backingInt(view_size) else |_| true) {
         return agent.throwException(
             .range_error,
             "Cannot get element of size {d} at index {d}",
@@ -190,7 +190,7 @@ fn getViewValue(
     }
 
     // 12. Let bufferIndex be getIndex + viewOffset.
-    const buffer_index = get_index + @intFromEnum(view_offset);
+    const buffer_index = get_index + @backingInt(view_offset);
 
     // 13. Return GetValueFromBuffer(view.[[ViewedArrayBuffer]], bufferIndex, type, false,
     //     unordered, isLittleEndian).
@@ -256,7 +256,7 @@ fn setViewValue(
     const element_size = @"type".elementSize();
 
     // 13. If getIndex + elementSize > viewSize, throw a RangeError exception.
-    if (if (std.math.add(u53, get_index, element_size)) |x| x > @intFromEnum(view_size) else |_| true) {
+    if (if (std.math.add(u53, get_index, element_size)) |x| x > @backingInt(view_size) else |_| true) {
         return agent.throwException(
             .range_error,
             "Cannot set element of size {d} at index {d}",
@@ -265,7 +265,7 @@ fn setViewValue(
     }
 
     // 14. Let bufferIndex be getIndex + viewOffset.
-    const buffer_index = get_index + @intFromEnum(view_offset);
+    const buffer_index = get_index + @backingInt(view_offset);
 
     // 15. Perform SetValueInBuffer(view.[[ViewedArrayBuffer]], bufferIndex, type, number, false,
     //     unordered, isLittleEndian).
@@ -329,7 +329,7 @@ pub const constructor = struct {
         const buffer = try buffer_value.requireInternalSlot(agent, builtins.ArrayBuffer);
 
         // 3. Let offset be ? ToIndex(byteOffset).
-        const offset: ByteOffset = @enumFromInt(try byte_offset.toIndex(agent));
+        const offset: ByteOffset = @fromBackingInt(try byte_offset.toIndex(agent));
 
         // 4. If IsDetachedBuffer(buffer) is true, throw a TypeError exception.
         if (isDetachedBuffer(buffer)) {
@@ -340,7 +340,7 @@ pub const constructor = struct {
         var buffer_byte_length = arrayBufferByteLength(buffer, .seq_cst);
 
         // 6. If offset > bufferByteLength, throw a RangeError exception.
-        if (@intFromEnum(offset) > @intFromEnum(buffer_byte_length)) {
+        if (@backingInt(offset) > @backingInt(buffer_byte_length)) {
             return agent.throwException(
                 .range_error,
                 "DataView start cannot exceed buffer byte length",
@@ -356,7 +356,7 @@ pub const constructor = struct {
             // a. If bufferIsFixedLength is true, then
             if (buffer_is_fixed_length) {
                 // i. Let viewByteLength be bufferByteLength - offset.
-                break :blk @enumFromInt(@intFromEnum(buffer_byte_length) - @intFromEnum(offset));
+                break :blk @fromBackingInt(@backingInt(buffer_byte_length) - @backingInt(offset));
             } else {
                 // b. Else,
                 // i. Let viewByteLength be auto.
@@ -365,11 +365,11 @@ pub const constructor = struct {
         } else blk: {
             // 9. Else,
             // a. Let viewByteLength be ? ToIndex(byteLength).
-            const view_byte_length: ByteLength = @enumFromInt(try byte_length.toIndex(agent));
+            const view_byte_length: ByteLength = @fromBackingInt(try byte_length.toIndex(agent));
 
             // b. If offset + viewByteLength > bufferByteLength, throw a RangeError exception.
-            if (if (std.math.add(u53, @intFromEnum(offset), @intFromEnum(view_byte_length))) |x|
-                x > @intFromEnum(buffer_byte_length)
+            if (if (std.math.add(u53, @backingInt(offset), @backingInt(view_byte_length))) |x|
+                x > @backingInt(buffer_byte_length)
             else |_|
                 true)
             {
@@ -406,7 +406,7 @@ pub const constructor = struct {
         buffer_byte_length = arrayBufferByteLength(buffer, .seq_cst);
 
         // 13. If offset > bufferByteLength, throw a RangeError exception.
-        if (@intFromEnum(offset) > @intFromEnum(buffer_byte_length)) {
+        if (@backingInt(offset) > @backingInt(buffer_byte_length)) {
             return agent.throwException(
                 .range_error,
                 "DataView start cannot exceed buffer byte length",
@@ -417,8 +417,8 @@ pub const constructor = struct {
         // 14. If byteLength is not undefined, then
         if (!byte_length.isUndefined()) {
             // a. If offset + viewByteLength > bufferByteLength, throw a RangeError exception.
-            if (if (std.math.add(u53, @intFromEnum(offset), @intFromEnum(view_byte_length.unwrap().?))) |x|
-                x > @intFromEnum(buffer_byte_length)
+            if (if (std.math.add(u53, @backingInt(offset), @backingInt(view_byte_length.unwrap().?))) |x|
+                x > @backingInt(buffer_byte_length)
             else |_|
                 true)
             {
@@ -535,7 +535,7 @@ pub const prototype = struct {
         const size = getViewByteLength(view);
 
         // 7. Return 𝔽(size).
-        return Value.from(@intFromEnum(size));
+        return Value.from(@backingInt(size));
     }
 
     /// 25.3.4.3 get DataView.prototype.byteOffset
@@ -558,7 +558,7 @@ pub const prototype = struct {
         const offset = data_view.fields.byte_offset;
 
         // 7. Return 𝔽(offset).
-        return Value.from(@intFromEnum(offset));
+        return Value.from(@backingInt(offset));
     }
 
     /// 25.3.4.5 DataView.prototype.getBigInt64 ( byteOffset [ , littleEndian ] )

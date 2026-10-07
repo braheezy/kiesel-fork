@@ -345,7 +345,7 @@ pub const constructor = struct {
             9,
             null,
         )) |fractional_digits|
-            @enumFromInt(fractional_digits)
+            @fromBackingInt(@intCast(fractional_digits))
         else
             null;
 
@@ -813,7 +813,7 @@ pub const DurationFormat = MakeObject(.{
                     .always => String.fromLiteral("always"),
                 },
                 .fractional_digits = if (self.fractional_digits) |fractional_digits|
-                    @intFromEnum(fractional_digits)
+                    @backingInt(fractional_digits)
                 else
                     null,
             };

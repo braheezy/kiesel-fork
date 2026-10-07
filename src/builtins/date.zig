@@ -62,7 +62,7 @@ fn toIntegerOrInfinity(x: f64) f64 {
 fn toZeroPaddedDecimalString(buf: []u8, n: anytype, min_length: usize) []const u8 {
     // NOTE: std.fmt does a weird thing where padded 1 becomes '00+1', so we do this ourselves.
     var tmp: [100]u8 = undefined;
-    const s = std.fmt.bufPrint(&tmp, "{d}", .{@abs(n)}) catch unreachable;
+    const s = std.mem.print(&tmp, "{d}", .{@abs(n)}) catch unreachable;
 
     @memset(buf[0 .. buf.len - s.len], '0');
     @memcpy(buf[buf.len - s.len ..], s);
@@ -901,8 +901,7 @@ pub const constructor = struct {
             const now_: f64 = @floatFromInt(timestamp.toMilliseconds());
 
             // b. Return ToDateString(now).
-            return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
+            return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
                 "{f}",
                 .{fmtToDateString(agent.platform, now_)},
             )));
@@ -2201,8 +2200,7 @@ pub const prototype = struct {
         const t = localTime(agent.platform, tv);
 
         // 6. Return DateString(t).
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{f}",
             .{fmtDateString(t)},
         )));
@@ -2238,8 +2236,7 @@ pub const prototype = struct {
             if (year >= 0 and year <= 9999) 4 else 6,
         );
 
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{s}{s}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}.{d:0>3}Z",
             .{
                 year_sign,
@@ -2430,8 +2427,7 @@ pub const prototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. Return ToDateString(tv).
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{f}",
             .{fmtToDateString(agent.platform, time_value)},
         )));
@@ -2489,8 +2485,7 @@ pub const prototype = struct {
         const local_time = localTime(agent.platform, tv);
 
         // 6. Return the string-concatenation of TimeString(localTime) and TimeZoneString(tv).
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{f}{f}",
             .{
                 fmtTimeString(local_time),
@@ -2534,8 +2529,7 @@ pub const prototype = struct {
         // 11. Return the string-concatenation of weekday, ",", the code unit 0x0020 (SPACE), day,
         //     the code unit 0x0020 (SPACE), month, the code unit 0x0020 (SPACE), yearSign,
         //     paddedYear, the code unit 0x0020 (SPACE), and TimeString(tv).
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{s}, {d:0>2} {s} {s}{s} {f}",
             .{
                 weekday,

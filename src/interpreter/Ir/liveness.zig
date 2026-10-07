@@ -7,10 +7,10 @@ const Ir = interpreter.Ir;
 pub fn computeLiveness(
     gpa: std.mem.Allocator,
     ir: *const Ir,
-) std.mem.Allocator.Error!std.DynamicBitSetUnmanaged {
-    var reachable: std.DynamicBitSetUnmanaged = try .initEmpty(gpa, ir.instructions.len);
+) std.mem.Allocator.Error!std.bit_set.Dynamic {
+    var reachable: std.bit_set.Dynamic = try .initEmpty(gpa, ir.instructions.len);
     defer reachable.deinit(gpa);
-    var live: std.DynamicBitSetUnmanaged = try .initEmpty(gpa, ir.instructions.len);
+    var live: std.bit_set.Dynamic = try .initEmpty(gpa, ir.instructions.len);
     errdefer live.deinit(gpa);
 
     // Pass 1: Reachability analysis (forward pass from start)
@@ -29,7 +29,7 @@ pub fn computeLiveness(
             .string,
             .big_int,
             => {},
-            else => try markLive(gpa, ir, &live, @enumFromInt(i)),
+            else => try markLive(gpa, ir, &live, @fromBackingInt(@intCast(i))),
         }
     }
 
@@ -39,7 +39,7 @@ pub fn computeLiveness(
 fn markReachable(
     gpa: std.mem.Allocator,
     ir: *const Ir,
-    reachable: *std.DynamicBitSetUnmanaged,
+    reachable: *std.bit_set.Dynamic,
     start: Ir.Inst.Index,
 ) std.mem.Allocator.Error!void {
     const ExceptionHandler = struct {
@@ -66,16 +66,16 @@ fn markReachable(
     try worklist.append(gpa, start);
 
     while (worklist.pop()) |index| {
-        const i = @intFromEnum(index);
+        const i = @backingInt(index);
         if (reachable.isSet(i)) continue;
         reachable.set(i);
 
         const inst = ir.instructions.get(i);
 
         for (exception_handlers.items) |handler| {
-            if (i >= @intFromEnum(handler.start) and
-                i < @intFromEnum(handler.end) and
-                !reachable.isSet(@intFromEnum(handler.target)))
+            if (i >= @backingInt(handler.start) and
+                i < @backingInt(handler.end) and
+                !reachable.isSet(@backingInt(handler.target)))
             {
                 try worklist.append(gpa, handler.target);
             }
@@ -84,7 +84,7 @@ fn markReachable(
         switch (inst.tag) {
             .br => {
                 const target_index = inst.data.br.target.toIndex().?;
-                if (!reachable.isSet(@intFromEnum(target_index))) {
+                if (!reachable.isSet(@backingInt(target_index))) {
                     try worklist.append(gpa, target_index);
                 }
                 continue; // Unconditional branch never reaches next instruction
@@ -93,10 +93,10 @@ fn markReachable(
                 const extra = ir.extraData(Ir.Inst.BrCond, inst.data.br_cond);
                 const then_index = extra.data.then_target.toIndex().?;
                 const else_index = extra.data.else_target.toIndex().?;
-                if (!reachable.isSet(@intFromEnum(then_index))) {
+                if (!reachable.isSet(@backingInt(then_index))) {
                     try worklist.append(gpa, then_index);
                 }
-                if (!reachable.isSet(@intFromEnum(else_index))) {
+                if (!reachable.isSet(@backingInt(else_index))) {
                     try worklist.append(gpa, else_index);
                 }
                 continue; // Conditional branch doesn't fall through
@@ -108,7 +108,7 @@ fn markReachable(
             else => {},
         }
         if (i + 1 < ir.instructions.len and !reachable.isSet(i + 1)) {
-            try worklist.append(gpa, @enumFromInt(i + 1));
+            try worklist.append(gpa, @fromBackingInt(i + 1));
         }
     }
 }
@@ -116,7 +116,7 @@ fn markReachable(
 fn markLive(
     gpa: std.mem.Allocator,
     ir: *const Ir,
-    live: *std.DynamicBitSetUnmanaged,
+    live: *std.bit_set.Dynamic,
     start: Ir.Inst.Index,
 ) std.mem.Allocator.Error!void {
     var worklist: std.ArrayList(Ir.Inst.Index) = .empty;
@@ -124,7 +124,7 @@ fn markLive(
     try worklist.append(gpa, start);
 
     while (worklist.pop()) |index| {
-        const i = @intFromEnum(index);
+        const i = @backingInt(index);
         if (live.isSet(i)) continue;
         live.set(i);
 

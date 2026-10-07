@@ -43,7 +43,7 @@ platform: *const Platform,
 active_vm: ?*interpreter.Vm,
 
 /// [[LittleEndian]]
-little_endian: bool = builtin.cpu.arch.endian() == .little,
+little_endian: bool = builtin.target.cpu.arch.endian() == .little,
 
 /// [[ModuleAsyncEvaluationCount]]
 module_async_evaluation_count: u32 = 0,
@@ -175,7 +175,7 @@ pub fn createErrorObject(
 ) std.mem.Allocator.Error!*error_type.T() {
     const realm = self.currentRealm();
     const constructor = try realm.intrinsic(error_type.intrinsic());
-    const message = try std.fmt.allocPrint(self.gc_allocator, fmt, args);
+    const message = try self.gc_allocator.print(fmt, args);
     const error_object = constructor.construct(
         self,
         &.{Value.from(try String.fromUtf8(self, message))},
@@ -247,7 +247,7 @@ pub fn runningExecutionContext(self: *const Agent) *ExecutionContext {
     // executing code. This is known as the agent's running execution context.
     // The running execution context is always the top element of this stack.
     std.debug.assert(self.execution_context_stack.items.len > 0);
-    return self.execution_context_stack.items[self.execution_context_stack.items.len - 1];
+    return self.execution_context_stack.last().?;
 }
 
 /// https://tc39.es/ecma262/#current-realm
