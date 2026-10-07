@@ -8,6 +8,54 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-07
+
+### Added
+
+- `Iterator.prototype.chunks()` and `Iterator.prototype.windows()`
+  ([#199](https://codeberg.org/kiesel-js/kiesel/issues/199))
+- `Iterator.prototype.includes()`
+  ([#200](https://codeberg.org/kiesel-js/kiesel/issues/200))
+- `Iterator.prototype.join()`
+  ([#201](https://codeberg.org/kiesel-js/kiesel/issues/201))
+- `Promise.allKeyed()` and `Promise.allSettledKeyed()`
+  ([#219](https://codeberg.org/kiesel-js/kiesel/issues/219))
+- Intl legacy constructor mode for `Intl.DateTimeFormat` and `Intl.NumberFormat`
+- `Intl.DisplayNames.prototype.of()` support for the `"script"` type
+- Named time zone offset calculation for `Date` and `Intl.DateTimeFormat`
+- `Kiesel.args` and `Kiesel.env` CLI globals
+- Rust version in `--version` output for Intl/Temporal builds
+- CI builds for OpenBSD (new) and NetBSD (re-enabled)
+  ([#164](https://codeberg.org/kiesel-js/kiesel/issues/164),
+  [#208](https://codeberg.org/kiesel-js/kiesel/issues/208))
+- SerenityOS port
+  ([SerenityOS/serenity#26931](https://github.com/SerenityOS/serenity/pull/26931))
+
+### Changed
+
+- Update to Zig 0.17
+- Stop requiring nightly Rust for cross-compilation
+- Improve `Intl.DateTimeFormat` implementation, including time zone handling,
+  `hourCycle`, `resolvedOptions`, and `formatRange`
+- Use Number semantics for counters in `Iterator` methods, and throw a
+  `RangeError` when `Iterator.prototype.{take,drop}()` limits exceed 2^53-1
+- Make `Promise.try()` use `PromiseResolve` in the non-error case
+- Minor performance improvements, including
+  polymorphic/megamorphic/computed/prototype inline caches and more constant/
+  instruction folding
+
+### Removed
+
+- UEFI port
+
+### Fixed
+
+- Tagged template raw/cooked mixup
+- Incorrect branch target for `for`-loop `continue` statements
+- Missing binding creation in `for`-`in`/`for`-`of` head evaluation
+- Implement more early errors, including accessor parameter mismatches and
+  disallowed `arguments` bindings
+
 ## [0.3.0] - 2026-07-17
 
 ### Added
@@ -65,7 +113,8 @@ this point.
 Placeholder version used during the first few years of development. No release
 exists.
 
-[unreleased]: https://codeberg.org/kiesel-js/kiesel/compare/0.3.0...HEAD
+[unreleased]: https://codeberg.org/kiesel-js/kiesel/compare/0.4.0...HEAD
+[0.4.0]: https://codeberg.org/kiesel-js/kiesel/compare/0.3.0...0.4.0
 [0.3.0]: https://codeberg.org/kiesel-js/kiesel/compare/0.2.0...0.3.0
 [0.2.0]:
   https://codeberg.org/kiesel-js/kiesel/compare/929bb044ffcd1776c850a5b924f9992915277e58...0.2.0
