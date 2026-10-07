@@ -210,43 +210,43 @@ jobs:
           name: build-freebsd
           path: zig-out/bin/*
 
-  # build-netbsd:
-  #   runs-on: meow
-  #   container:
-  #     image: ghcr.io/catthehacker/ubuntu:act-24.04
-  #   steps:
-  #     - name: Check out Kiesel
-  #       uses: https://github.com/actions/checkout@v6
-  #       with:
-  #         fetch-depth: 0
-  #     - name: Install Zig
-  #       uses: https://github.com/mlugg/setup-zig@v2
-  #       with:
-  #         version: 0.17.0
-  #         cache-size-limit: 4096 # 4 GiB
-  #     - name: Install Rust
-  #       uses: https://github.com/dtolnay/rust-toolchain@stable
-  #       with:
-  #         targets: x86_64-unknown-netbsd
-  #     - name: Build kiesel-netbsd-aarch64
-  #       run: |
-  #         # No prebuilt rust-std, build without Intl/Temporal
-  #         zig build -Dtarget=aarch64-netbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
-  #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
-  #     - name: Build kiesel-netbsd-x86
-  #       run: |
-  #         # No prebuilt rust-std, build without Intl/Temporal
-  #         zig build -Dtarget=x86-netbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
-  #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
-  #     - name: Build kiesel-netbsd-x86_64
-  #       run: |
-  #         zig build -Dtarget=x86_64-netbsd-none -Doptimize=safe
-  #         mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
-  #     - name: Upload artifact
-  #       uses: https://code.forgejo.org/forgejo/upload-artifact@v4
-  #       with:
-  #         name: build-netbsd
-  #         path: zig-out/bin/*
+  build-netbsd:
+    runs-on: meow
+    container:
+      image: ghcr.io/catthehacker/ubuntu:act-24.04
+    steps:
+      - name: Check out Kiesel
+        uses: https://github.com/actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Install Zig
+        uses: https://github.com/mlugg/setup-zig@v2
+        with:
+          version: 0.17.0
+          cache-size-limit: 4096 # 4 GiB
+      - name: Install Rust
+        uses: https://github.com/dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-netbsd
+      - name: Build kiesel-netbsd-aarch64
+        run: |
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=aarch64-netbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-aarch64
+      - name: Build kiesel-netbsd-x86
+        run: |
+          # No prebuilt rust-std, build without Intl/Temporal
+          zig build -Dtarget=x86-netbsd-none -Doptimize=safe -Denable-intl=false -Denable-temporal=false
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86
+      - name: Build kiesel-netbsd-x86_64
+        run: |
+          zig build -Dtarget=x86_64-netbsd-none -Doptimize=safe
+          mv zig-out/bin/kiesel zig-out/bin/kiesel-netbsd-x86_64
+      - name: Upload artifact
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        with:
+          name: build-netbsd
+          path: zig-out/bin/*
 
   build-openbsd:
     runs-on: meow
