@@ -8,6 +8,12 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-08
+
+### Fixed
+
+- Stale pinned dependency refs
+
 ## [0.4.0] - 2026-10-07
 
 ### Added
@@ -113,7 +119,8 @@ this point.
 Placeholder version used during the first few years of development. No release
 exists.
 
-[unreleased]: https://codeberg.org/kiesel-js/kiesel/compare/0.4.0...HEAD
+[unreleased]: https://codeberg.org/kiesel-js/kiesel/compare/0.4.1...HEAD
+[0.4.1]: https://codeberg.org/kiesel-js/kiesel/compare/0.4.0...0.4.1
 [0.4.0]: https://codeberg.org/kiesel-js/kiesel/compare/0.3.0...0.4.0
 [0.3.0]: https://codeberg.org/kiesel-js/kiesel/compare/0.2.0...0.3.0
 [0.2.0]:
