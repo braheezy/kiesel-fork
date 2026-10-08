@@ -1,6 +1,6 @@
 .{
     .name = .kiesel,
-    .version = "0.4.1",
+    .version = "0.5.0",
     .fingerprint = 0x411228af4a775b43,
     .minimum_zig_version = "0.17.0",
     .dependencies = .{
