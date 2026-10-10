@@ -62,6 +62,7 @@ Further reading:
 - [Kiesel Devlog #12: Write Once, Run Anywhere](https://linus.dev/posts/kiesel-devlog-12/)
 - [Kiesel Devlog #13: Human After All](https://linus.dev/posts/kiesel-devlog-13/)
 - [Kiesel Devlog #14: Release 0.3.0](https://linus.dev/posts/kiesel-devlog-14/)
+- [Kiesel Devlog #15: Release 0.4.0](https://linus.dev/posts/kiesel-devlog-15/)
 
 ## Build
 
