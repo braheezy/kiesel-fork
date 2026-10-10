@@ -13,7 +13,7 @@ const LinearScanRegisterAllocation = @This();
 
 allocations: []Bytecode.Reg,
 num_allocations: u16,
-free_temp_regs: std.DynamicBitSetUnmanaged,
+free_temp_regs: std.bit_set.Dynamic,
 
 const ActiveRange = struct {
     index: u32,
@@ -31,7 +31,7 @@ pub fn init(
     var active: std.ArrayList(ActiveRange) = .empty;
     defer active.deinit(gpa);
 
-    var free_regs: std.DynamicBitSetUnmanaged = .{};
+    var free_regs: std.bit_set.Dynamic = .{};
     defer free_regs.deinit(gpa);
 
     for (live_ranges, 0..) |live_range, i| {
@@ -41,7 +41,7 @@ pub fn init(
             if (active.items[j].end < live_range.start) {
                 const reg = allocations[active.items[j].index];
                 std.debug.assert(reg != .none);
-                free_regs.set(@intFromEnum(reg));
+                free_regs.set(@backingInt(reg));
                 _ = active.swapRemove(j);
             } else {
                 j += 1;
@@ -56,12 +56,12 @@ pub fn init(
 
         // Use register without marking active for dead values
         if (live_range.end == live_range.start) {
-            allocations[i] = @enumFromInt(reg);
+            allocations[i] = @fromBackingInt(@intCast(reg));
             continue;
         }
 
         // Allocate register and mark used
-        allocations[i] = @enumFromInt(reg);
+        allocations[i] = @fromBackingInt(@intCast(reg));
         free_regs.unset(reg);
         try active.append(gpa, .{ .index = @intCast(i), .end = live_range.end });
     }
@@ -85,11 +85,11 @@ pub fn allocateTemp(lsra: *LinearScanRegisterAllocation, gpa: std.mem.Allocator)
         break :blk new_reg;
     };
     lsra.free_temp_regs.unset(reg);
-    return @enumFromInt(lsra.num_allocations + @as(u16, @intCast(reg)));
+    return @fromBackingInt(lsra.num_allocations + @as(u16, @intCast(reg)));
 }
 
 pub fn freeTemp(lsra: *LinearScanRegisterAllocation, reg: Bytecode.Reg) void {
-    lsra.free_temp_regs.set(@intFromEnum(reg) - lsra.num_allocations);
+    lsra.free_temp_regs.set(@backingInt(reg) - lsra.num_allocations);
 }
 
 pub fn count(lsra: *LinearScanRegisterAllocation) u16 {

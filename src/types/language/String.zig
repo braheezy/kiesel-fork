@@ -7,6 +7,7 @@ const execution = @import("../../execution.zig");
 const language = @import("../../language.zig");
 
 const Agent = execution.Agent;
+const Tokenizer = language.Tokenizer;
 
 fn utf8IsAscii(utf8: []const u8) bool {
     var remaining = utf8;
@@ -49,10 +50,17 @@ pub const ascii_word_characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrs
 
 /// The definition of white space is the union of WhiteSpace and LineTerminator.
 pub const whitespace_code_points = blk: {
-    const whitespace = language.tokenizer.whitespace ++ language.tokenizer.line_terminators;
-    var code_points: [whitespace.len]u21 = undefined;
-    for (whitespace, 0..) |utf8, i| {
+    const single_byte = Tokenizer.single_byte_whitespace ++ Tokenizer.single_byte_line_terminators;
+    const multi_byte = Tokenizer.multi_byte_whitespace ++ Tokenizer.multi_byte_line_terminators;
+    var code_points: [single_byte.len + multi_byte.len]u21 = undefined;
+    var i: usize = 0;
+    for (single_byte) |c| {
+        code_points[i] = c;
+        i += 1;
+    }
+    for (multi_byte) |utf8| {
         code_points[i] = std.unicode.utf8Decode(utf8) catch unreachable;
+        i += 1;
     }
     break :blk code_points;
 };
@@ -241,6 +249,61 @@ pub fn fromUtf8Alloc(allocator: std.mem.Allocator, utf8: []const u8) std.mem.All
     }
 }
 
+pub fn fromWtf8(agent: *Agent, wtf8: []const u8) std.mem.Allocator.Error!*const String {
+    std.debug.assert(wtf8.len <= std.math.maxInt(u32));
+    if (wtf8.len == 0) return empty;
+    const result = try agent.string_cache.getOrPut(agent, .{ .utf8 = wtf8 });
+    if (!result.found_existing) {
+        if (utf8IsAscii(wtf8)) {
+            const ascii = wtf8;
+            result.string.* = .{
+                .data = .{ .owned_ascii = ascii.ptr },
+                .length = @intCast(ascii.len),
+                .hash = std.hash.Wyhash.hash(0, ascii),
+            };
+        } else {
+            const utf16 = try wtf8ToUtf16LeAlloc(agent.gc_allocator, wtf8);
+            result.string.* = .{
+                .data = .{ .owned_utf16 = utf16.ptr },
+                .length = @intCast(utf16.len),
+                .hash = std.hash.Wyhash.hash(0, std.mem.sliceAsBytes(utf16)),
+            };
+        }
+    }
+    return result.string;
+}
+
+pub fn fromWtf8Alloc(allocator: std.mem.Allocator, wtf8: []const u8) std.mem.Allocator.Error!*const String {
+    std.debug.assert(wtf8.len <= std.math.maxInt(u32));
+    if (wtf8.len == 0) return empty;
+    if (utf8IsAscii(wtf8)) {
+        return fromAsciiAlloc(allocator, wtf8);
+    } else {
+        // FIXME: Align ownership semantics with `fromUtf8Alloc()`
+        defer allocator.free(wtf8);
+        const utf16 = try wtf8ToUtf16LeAlloc(allocator, wtf8);
+        errdefer allocator.free(utf16);
+        return fromUtf16Alloc(allocator, utf16);
+    }
+}
+
+fn wtf8ToUtf16LeAlloc(allocator: std.mem.Allocator, wtf8: []const u8) std.mem.Allocator.Error![]u16 {
+    var result: std.ArrayList(u16) = try .initCapacity(allocator, @intCast(wtf8.len));
+    var i: usize = 0;
+    while (i < wtf8.len) {
+        const len = std.unicode.utf8ByteSequenceLength(wtf8[i]) catch unreachable;
+        const code_point = std.unicode.wtf8Decode(wtf8[i..][0..len]) catch unreachable;
+        if (code_point < 0x10000) {
+            result.appendAssumeCapacity(@intCast(code_point));
+        } else {
+            result.appendAssumeCapacity(@intCast(0xd800 | ((code_point - 0x10000) >> 10)));
+            result.appendAssumeCapacity(@intCast(0xdc00 | ((code_point - 0x10000) & 0x3ff)));
+        }
+        i += len;
+    }
+    return result.toOwnedSlice(allocator);
+}
+
 pub fn fromAscii(agent: *Agent, ascii: []const u8) std.mem.Allocator.Error!*const String {
     std.debug.assert(ascii.len <= std.math.maxInt(u32));
     if (ascii.len == 0) return empty;
@@ -398,11 +461,7 @@ pub fn asAsciiOrUtf16(self: *const String) AsciiOrUtf16 {
 pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u8 {
     return switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| allocator.dupe(u8, ascii),
-        .utf16 => |utf16| std.fmt.allocPrint(
-            allocator,
-            "{f}",
-            .{std.unicode.fmtUtf16Le(utf16)},
-        ),
+        .utf16 => |utf16| allocator.print("{f}", .{std.unicode.fmtUtf16Le(utf16)}),
     };
 }
 

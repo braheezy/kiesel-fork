@@ -2247,7 +2247,7 @@ pub fn classDefinitionEvaluation(
 
     // 10. If ClassBody is not present, let ctor be empty.
     // 11. Else, let ctor be the ConstructorMethod of ClassBody.
-    const ctor = class_tail.class_body.constructorMethod();
+    const ctor = try class_tail.class_body.constructorMethod(agent.gpa);
 
     // 12. Set the running execution context's LexicalEnvironment to classEnv.
     agent.runningExecutionContext().ecmascript_code.lexical_environment = .{ .declarative_environment = class_env };

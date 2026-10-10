@@ -150,7 +150,7 @@ pub fn generatorStart(
     //       with a heap-allocated one here since generators store it for later resumption.
     const gen_context = try agent.gc_allocator.create(ExecutionContext);
     gen_context.* = agent.runningExecutionContext().*;
-    agent.execution_context_stack.items[agent.execution_context_stack.items.len - 1] = gen_context;
+    agent.execution_context_stack.lastPtr().?.* = gen_context;
 
     // 3. Set the Generator component of genContext to gen.
     gen_context.generator = .{ .generator = gen };
@@ -179,7 +179,7 @@ pub fn generatorStart(
             switch (resume_completion) {
                 .normal => |value| {
                     if (suspension.yield_reg != .none) {
-                        suspension.regs()[@intFromEnum(suspension.yield_reg)] = value;
+                        suspension.regs()[@backingInt(suspension.yield_reg)] = value;
                     }
                 },
                 // TODO: Integrate throw/return completions with exception handlers in the Vm

@@ -438,7 +438,7 @@ fn ownPropertyKeys(agent: *Agent, obj: *Object) std.mem.Allocator.Error![]Proper
     var keys = try std.ArrayList(PropertyKey).initCapacity(
         agent.gc_allocator,
         obj.shape.properties.count() + if (!isTypedArrayOutOfBounds(ta_record))
-            @as(usize, @intCast(@intFromEnum(typedArrayLength(ta_record))))
+            @as(usize, @intCast(@backingInt(typedArrayLength(ta_record))))
         else
             0,
     );
@@ -450,7 +450,7 @@ fn ownPropertyKeys(agent: *Agent, obj: *Object) std.mem.Allocator.Error![]Proper
 
         // b. For each integer i such that 0 ≤ i < length, in ascending order, do
         var i: u53 = 0;
-        while (i < @intFromEnum(length)) : (i += 1) {
+        while (i < @backingInt(length)) : (i += 1) {
             // i. Append ! ToString(𝔽(i)) to keys.
             keys.appendAssumeCapacity(PropertyKey.from(i));
         }
@@ -524,7 +524,7 @@ pub fn typedArrayByteLength(ta_record: TypedArrayWithBufferWitness) ByteLength {
 
     // 3. If obj.[[ByteLength]] is not auto, return obj.[[ByteLength]].
     if (typed_array.fields.byte_length != .auto) {
-        return @enumFromInt(@intFromEnum(typed_array.fields.byte_length));
+        return @fromBackingInt(@intCast(@backingInt(typed_array.fields.byte_length)));
     }
 
     // 4. Let length be TypedArrayLength(taRecord).
@@ -536,7 +536,7 @@ pub fn typedArrayByteLength(ta_record: TypedArrayWithBufferWitness) ByteLength {
     // 6. NOTE: The returned byte length is always an integer multiple of elementSize, even when the
     //    underlying buffer has been resized to a non-integer multiple.
     // 7. Return length × elementSize.
-    return @enumFromInt(@intFromEnum(length) * element_size);
+    return @fromBackingInt(@backingInt(length) * element_size);
 }
 
 /// 10.4.5.13 TypedArrayLength ( taRecord )
@@ -550,7 +550,7 @@ pub fn typedArrayLength(ta_record: TypedArrayWithBufferWitness) ArrayLength {
 
     // 3. If obj.[[ArrayLength]] is not auto, return obj.[[ArrayLength]].
     if (typed_array.fields.array_length != .auto) {
-        return @enumFromInt(@intFromEnum(typed_array.fields.array_length));
+        return @fromBackingInt(@intCast(@backingInt(typed_array.fields.array_length)));
     }
 
     // 4. Assert: IsFixedLengthArrayBuffer(obj.[[ViewedArrayBuffer]]) is false.
@@ -569,7 +569,7 @@ pub fn typedArrayLength(ta_record: TypedArrayWithBufferWitness) ArrayLength {
     std.debug.assert(byte_length != .detached);
 
     // 9. Return floor((byteLength - byteOffset) / elementSize).
-    return @enumFromInt(@divFloor(@intFromEnum(byte_length) - @intFromEnum(byte_offset), element_size));
+    return @fromBackingInt(@intCast(@divFloor(@backingInt(byte_length) - @backingInt(byte_offset), element_size)));
 }
 
 /// 10.4.5.14 IsTypedArrayOutOfBounds ( taRecord )
@@ -599,7 +599,7 @@ pub fn isTypedArrayOutOfBounds(ta_record: TypedArrayWithBufferWitness) bool {
     // 6. If obj.[[ArrayLength]] is auto, then
     const byte_offset_end: ByteOffset = if (typed_array.fields.array_length == .auto) blk: {
         // a. Let byteOffsetEnd be bufferByteLength.
-        break :blk @enumFromInt(@intFromEnum(buffer_byte_length));
+        break :blk @fromBackingInt(@intCast(@backingInt(buffer_byte_length)));
     } else blk: {
         // 7. Else,
         // a. Let elementSize be TypedArrayElementSize(obj).
@@ -608,26 +608,26 @@ pub fn isTypedArrayOutOfBounds(ta_record: TypedArrayWithBufferWitness) bool {
         // b. Let arrayByteLength be obj.[[ArrayLength]] × elementSize.
         const array_byte_length = std.math.mul(
             u53,
-            @intFromEnum(typed_array.fields.array_length.unwrap().?),
+            @backingInt(typed_array.fields.array_length.unwrap().?),
             element_size,
         ) catch return true;
 
         // c. Let byteOffsetEnd be byteOffsetStart + arrayByteLength.
         const byte_offset_end = std.math.add(
             u53,
-            @intFromEnum(byte_offset_start),
+            @backingInt(byte_offset_start),
             array_byte_length,
         ) catch return true;
 
-        break :blk @enumFromInt(byte_offset_end);
+        break :blk @fromBackingInt(byte_offset_end);
     };
 
     // 8. NOTE: A 0-length TypedArray whose [[ByteOffset]] is bufferByteLength is not considered
     //    out-of-bounds.
 
     // 9. If byteOffsetStart > bufferByteLength or byteOffsetEnd > bufferByteLength, return true.
-    if (@intFromEnum(byte_offset_start) > @intFromEnum(buffer_byte_length) or
-        @intFromEnum(byte_offset_end) > @intFromEnum(buffer_byte_length)) return true;
+    if (@backingInt(byte_offset_start) > @backingInt(buffer_byte_length) or
+        @backingInt(byte_offset_end) > @backingInt(buffer_byte_length)) return true;
 
     // 10. Return false.
     return false;
@@ -675,7 +675,7 @@ fn isValidIntegerIndex(
     const length = typedArrayLength(ta_record);
 
     // 8. If ℝ(index) ≥ length, return false.
-    if (index.integer_index >= @intFromEnum(length)) return false;
+    if (index.integer_index >= @backingInt(length)) return false;
 
     // 9. Return true.
     return true;
@@ -698,7 +698,7 @@ fn typedArrayGetElement(
     const element_size = typedArrayElementSize(typed_array);
 
     // 4. Let byteIndexInBuffer be (ℝ(index) × elementSize) + offset.
-    const byte_index_in_buffer = (index.integer_index * element_size) + @intFromEnum(offset);
+    const byte_index_in_buffer = (index.integer_index * element_size) + @backingInt(offset);
 
     // 5. Let elementType be TypedArrayElementType(obj).
     switch (typed_array.fields.element_type) {
@@ -746,7 +746,7 @@ fn typedArraySetElement(
         const element_size = typedArrayElementSize(typed_array);
 
         // c. Let byteIndexInBuffer be (ℝ(index) × elementSize) + offset.
-        const byte_index_in_buffer = (index.integer_index * element_size) + @intFromEnum(offset);
+        const byte_index_in_buffer = (index.integer_index * element_size) + @backingInt(offset);
 
         // d. Let elementType be TypedArrayElementType(obj).
         switch (typed_array.fields.element_type) {
@@ -854,24 +854,21 @@ pub const constructor = struct {
             defer agent.gc_allocator.free(values);
 
             // b. Let length be the number of elements in values.
-            const length: ArrayLength = @enumFromInt(values.len);
+            const length: ArrayLength = @fromBackingInt(@intCast(values.len));
 
             // c. Let targetObj be ? TypedArrayCreateFromConstructor(ctor, « 𝔽(length) »).
             const typed_array = try typedArrayCreateFromConstructor(
                 agent,
                 ctor.asObject(),
-                &.{Value.from(@intFromEnum(length))},
+                &.{Value.from(@backingInt(length))},
             );
 
             // d. Let k be 0.
             // e. Repeat, while k < length,
             for (values, 0..) |k_value, k| {
-                // i. Let propertyKey be ! ToString(𝔽(k)).
-                const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+                // i. Let kValue be values[k].
 
-                // ii. Let kValue be values[k].
-
-                // iii. If mapping is true, then
+                // ii. If mapping is true, then
                 const mapped_value = if (maybe_mapper) |mapper| blk: {
                     // 1. Let mappedValue be ? Call(mapper, thisArg, « kValue, 𝔽(k) »).
                     break :blk try mapper.call(
@@ -880,15 +877,20 @@ pub const constructor = struct {
                         &.{ k_value, Value.from(@as(u53, @intCast(k))) },
                     );
                 } else blk: {
-                    // iv. Else,
+                    // iii. Else,
                     // 1. Let mappedValue be kValue.
                     break :blk k_value;
                 };
 
-                // v. Perform ? Set(targetObj, propertyKey, mappedValue, true).
-                try typed_array.object.set(agent, property_key, mapped_value, .throw);
+                // iv. Perform ? TypedArraySetElement(targetObj, 𝔽(k), mappedValue).
+                try typedArraySetElement(
+                    agent,
+                    typed_array,
+                    .{ .integer_index = @intCast(k) },
+                    mapped_value,
+                );
 
-                // vi. Set k to k + 1.
+                // v. Set k to k + 1.
             }
 
             // f. Return targetObj.
@@ -901,20 +903,20 @@ pub const constructor = struct {
         const array_like = source.toObject(agent) catch |err| try noexcept(err);
 
         // 9. Let length be ? LengthOfArrayLike(arrayLike).
-        const length: ArrayLength = @enumFromInt(try array_like.lengthOfArrayLike(agent));
+        const length: ArrayLength = @fromBackingInt(try array_like.lengthOfArrayLike(agent));
 
         // 10. Let targetObj be ? TypedArrayCreateFromConstructor(ctor, « 𝔽(length) »).
         const typed_array = try typedArrayCreateFromConstructor(
             agent,
             ctor.asObject(),
-            &.{Value.from(@intFromEnum(length))},
+            &.{Value.from(@backingInt(length))},
         );
 
         // 11. Let k be 0.
         var k: u53 = 0;
 
         // 12. Repeat, while k < length,
-        while (k < @intFromEnum(length)) : (k += 1) {
+        while (k < @backingInt(length)) : (k += 1) {
             // a. Let propertyKey be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -931,8 +933,8 @@ pub const constructor = struct {
                 break :blk k_value;
             };
 
-            // e. Perform ? Set(targetObj, propertyKey, mappedValue, true).
-            try typed_array.object.set(agent, property_key, mapped_value, .throw);
+            // e. Perform ? TypedArraySetElement(targetObj, 𝔽(k), mappedValue).
+            try typedArraySetElement(agent, typed_array, .{ .integer_index = k }, mapped_value);
 
             // f. Set k to k + 1.
         }
@@ -967,13 +969,15 @@ pub const constructor = struct {
         for (arguments.values, 0..) |k_value, k| {
             // a. Let kValue be items[k].
 
-            // b. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+            // b. Perform ? TypedArraySetElement(newObj, 𝔽(k), kValue).
+            try typedArraySetElement(
+                agent,
+                typed_array,
+                .{ .integer_index = @intCast(k) },
+                k_value,
+            );
 
-            // c. Perform ? Set(newObj, propertyKey, kValue, true).
-            try typed_array.object.set(agent, property_key, k_value, .throw);
-
-            // d. Set k to k + 1.
+            // c. Set k to k + 1.
         }
 
         // 7. Return newObj.
@@ -1064,14 +1068,14 @@ pub const prototype = struct {
         const length_ = typedArrayLength(ta_record);
 
         // 4. Let k be ? ToAbsoluteIndex(index, length).
-        const k_f64 = try index.toAbsoluteIndex(agent, @intFromEnum(length_));
+        const k_f64 = try index.toAbsoluteIndex(agent, @backingInt(length_));
 
         // 5. If k < 0 or k ≥ length, return undefined.
-        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(@intFromEnum(length_)))) return .undefined;
+        if (k_f64 < 0 or k_f64 >= @as(f64, @floatFromInt(@backingInt(length_)))) return .undefined;
         const k: u53 = @intFromFloat(k_f64);
 
-        // 6. Return ! Get(obj, ! ToString(𝔽(k))).
-        return typed_array.object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
+        // 6. Return TypedArrayGetElement(obj, 𝔽(k)).
+        return typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
     }
 
     /// 23.2.3.2 get %TypedArray%.prototype.buffer
@@ -1107,7 +1111,7 @@ pub const prototype = struct {
         const size = typedArrayByteLength(ta_record);
 
         // 7. Return 𝔽(size).
-        return Value.from(@intFromEnum(size));
+        return Value.from(@backingInt(size));
     }
 
     /// 23.2.3.4 get %TypedArray%.prototype.byteOffset
@@ -1128,7 +1132,7 @@ pub const prototype = struct {
         const offset = typed_array.fields.byte_offset;
 
         // 7. Return 𝔽(offset).
-        return Value.from(@intFromEnum(offset));
+        return Value.from(@backingInt(offset));
     }
 
     /// 23.2.3.6 %TypedArray%.prototype.copyWithin ( target, start [ , end ] )
@@ -1147,20 +1151,20 @@ pub const prototype = struct {
         var length_ = typedArrayLength(ta_record);
 
         // 4. Let targetIndex be ? ToClampedIndex(target, length).
-        const target_index = try target.toClampedIndex(agent, @intFromEnum(length_));
+        const target_index = try target.toClampedIndex(agent, @backingInt(length_));
 
         // 5. Let startIndex be ? ToClampedIndex(start, length).
-        const start_index = try start.toClampedIndex(agent, @intFromEnum(length_));
+        const start_index = try start.toClampedIndex(agent, @backingInt(length_));
 
         // 6. If end is undefined, let endIndex be length; else let endIndex be ? ToClampedIndex(
         //    end, length).
         const end_index = if (end.isUndefined())
-            @intFromEnum(length_)
+            @backingInt(length_)
         else
-            try end.toClampedIndex(agent, @intFromEnum(length_));
+            try end.toClampedIndex(agent, @backingInt(length_));
 
         // 7. Let count be min(endIndex - startIndex, length - targetIndex).
-        var count = @min(end_index -| start_index, @intFromEnum(length_) -| target_index);
+        var count = @min(end_index -| start_index, @backingInt(length_) -| target_index);
 
         // 8. If count > 0, then
         if (count > 0) {
@@ -1179,7 +1183,7 @@ pub const prototype = struct {
             // e. NOTE: Side-effects of the above steps may have reduced the size of obj, in which
             //    case copying should proceed with the longest still-applicable prefix.
             // f. Set count to min(count, length - startIndex, length - targetIndex).
-            count = @min(count, @intFromEnum(length_) - start_index, @intFromEnum(length_) - target_index);
+            count = @min(count, @backingInt(length_) - start_index, @backingInt(length_) - target_index);
 
             // g. Let elementSize be TypedArrayElementSize(obj).
             const element_size = typedArrayElementSize(typed_array);
@@ -1188,10 +1192,10 @@ pub const prototype = struct {
             const byte_offset = typed_array.fields.byte_offset;
 
             // i. Let toByteIndex be (targetIndex × elementSize) + byteOffset.
-            var to_byte_index = (target_index * element_size) + @intFromEnum(byte_offset);
+            var to_byte_index = (target_index * element_size) + @backingInt(byte_offset);
 
             // j. Let fromByteIndex be (startIndex × elementSize) + byteOffset.
-            var from_byte_index = (start_index * element_size) + @intFromEnum(byte_offset);
+            var from_byte_index = (start_index * element_size) + @backingInt(byte_offset);
 
             // k. Let countBytes be count × elementSize.
             var count_bytes = count * element_size;
@@ -1295,24 +1299,21 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 6. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(agent, property_key) catch |err| try noexcept(err);
-
-            // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
+            // b. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
             const test_result = (try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             )).toBoolean();
 
-            // d. If testResult is false, return false.
+            // c. If testResult is false, return false.
             if (!test_result) return .false;
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 7. Return true.
@@ -1342,14 +1343,14 @@ pub const prototype = struct {
             Value.from(try value.toNumber(agent));
 
         // 6. Let startIndex be ? ToClampedIndex(start, length).
-        const start_index = try start.toClampedIndex(agent, @intFromEnum(length_));
+        const start_index = try start.toClampedIndex(agent, @backingInt(length_));
 
         // 7. If end is undefined, let endIndex be length; else let endIndex be ? ToClampedIndex(
         //    end, length).
         var end_index = if (end.isUndefined())
-            @intFromEnum(length_)
+            @backingInt(length_)
         else
-            try end.toClampedIndex(agent, @intFromEnum(length_));
+            try end.toClampedIndex(agent, @backingInt(length_));
 
         // 8. Set taRecord to ? ValidateTypedArrayBounds(obj, seq-cst).
         ta_record = try validateTypedArrayBounds(agent, typed_array, .seq_cst);
@@ -1358,20 +1359,22 @@ pub const prototype = struct {
         length_ = typedArrayLength(ta_record);
 
         // 10. Set endIndex to min(endIndex, length).
-        end_index = @min(end_index, @intFromEnum(length_));
+        end_index = @min(end_index, @backingInt(length_));
 
         // 11. Let k be startIndex.
         var k: u53 = start_index;
 
         // 12. Repeat, while k < endIndex,
         while (k < end_index) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Perform ! TypedArraySetElement(obj, 𝔽(k), value).
+            typedArraySetElement(
+                agent,
+                typed_array,
+                .{ .integer_index = k },
+                value,
+            ) catch |err| try noexcept(err);
 
-            // b. Perform ! Set(obj, propertyKey, value, true).
-            typed_array.object.set(agent, property_key, value, .throw) catch |err| try noexcept(err);
-
-            // c. Set k to k + 1.
+            // b. Set k to k + 1.
         }
 
         // 13. Return obj.
@@ -1409,21 +1412,18 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 8. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(agent, property_key) catch |err| try noexcept(err);
-
-            // c. Let selected be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
+            // b. Let selected be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
             const selected = (try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             )).toBoolean();
 
-            // d. If selected is true, then
+            // c. If selected is true, then
             if (selected) {
                 // i. Append kValue to kept.
                 try kept.append(agent.gc_allocator, k_value);
@@ -1432,7 +1432,7 @@ pub const prototype = struct {
                 captured += 1;
             }
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 9. Let result be ? TypedArraySpeciesCreate(obj, « 𝔽(captured) »).
@@ -1445,12 +1445,12 @@ pub const prototype = struct {
         // 10. Let n be 0.
         // 11. For each element element of kept, do
         for (kept.items, 0..) |element, n| {
-            // a. Perform ! Set(result, ! ToString(𝔽(n)), element, true).
-            result_array.object.set(
+            // a. Perform ! TypedArraySetElement(result, 𝔽(n), element).
+            typedArraySetElement(
                 agent,
-                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(n))),
+                result_array,
+                .{ .integer_index = @intCast(n) },
                 element,
-                .throw,
             ) catch |err| try noexcept(err);
 
             // b. Set n to n + 1.
@@ -1478,7 +1478,7 @@ pub const prototype = struct {
         const find_record = try findViaPredicate(
             agent,
             &typed_array.object,
-            @intFromEnum(length_),
+            @backingInt(length_),
             .ascending,
             predicate,
             this_arg,
@@ -1506,7 +1506,7 @@ pub const prototype = struct {
         const find_record = try findViaPredicate(
             agent,
             &typed_array.object,
-            @intFromEnum(length_),
+            @backingInt(length_),
             .ascending,
             predicate,
             this_arg,
@@ -1534,7 +1534,7 @@ pub const prototype = struct {
         const find_record = try findViaPredicate(
             agent,
             &typed_array.object,
-            @intFromEnum(length_),
+            @backingInt(length_),
             .descending,
             predicate,
             this_arg,
@@ -1562,7 +1562,7 @@ pub const prototype = struct {
         const find_record = try findViaPredicate(
             agent,
             &typed_array.object,
-            @intFromEnum(length_),
+            @backingInt(length_),
             .descending,
             predicate,
             this_arg,
@@ -1596,24 +1596,18 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 6. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Perform ? Call(callback, thisArg, « kValue, 𝔽(k), obj »).
+            // b. Perform ? Call(callback, thisArg, « kValue, 𝔽(k), obj »).
             _ = try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             );
 
-            // d. Set k to k + 1.
+            // c. Set k to k + 1.
         }
 
         // 7. Return undefined.
@@ -1638,12 +1632,16 @@ pub const prototype = struct {
         if (length_ == .zero) return .false;
 
         // 5. Let k be ? ToClampedIndex(fromIndex, length).
-        var k = try from_index.toClampedIndex(agent, @intFromEnum(length_));
+        var k = try from_index.toClampedIndex(agent, @backingInt(length_));
 
         // 6. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let elementK be ! Get(obj, ! ToString(𝔽(k))).
-            const element_k = typed_array.object.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. Let elementK be TypedArrayGetElement(obj, 𝔽(k)).
+            const element_k = try typedArrayGetElement(
+                agent,
+                typed_array,
+                .{ .integer_index = k },
+            );
 
             // b. If SameValueZero(searchElement, elementK) is true, return true.
             if (sameValueZero(search_element, element_k)) return .true;
@@ -1673,10 +1671,10 @@ pub const prototype = struct {
         if (length_ == .zero) return Value.from(-1);
 
         // 5. Let k be ? ToClampedIndex(fromIndex, length).
-        var k = try from_index.toClampedIndex(agent, @intFromEnum(length_));
+        var k = try from_index.toClampedIndex(agent, @backingInt(length_));
 
         // 6. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
+        while (k < @backingInt(length_)) : (k += 1) {
             // a. Let propertyKey be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -1688,11 +1686,12 @@ pub const prototype = struct {
 
             // c. If kPresent is true, then
             if (k_present) {
-                // i. Let elementK be ! Get(obj, propertyKey).
-                const element_k = typed_array.object.get(
+                // i. Let elementK be TypedArrayGetElement(obj, 𝔽(k)).
+                const element_k = try typedArrayGetElement(
                     agent,
-                    property_key,
-                ) catch |err| try noexcept(err);
+                    typed_array,
+                    .{ .integer_index = k },
+                );
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
@@ -1718,9 +1717,9 @@ pub const prototype = struct {
         // 3. Let length be TypedArrayLength(taRecord).
         const length_ = typedArrayLength(ta_record);
 
-        // 4. If separator is undefined, let sep be ",".
-        // 5. Else, let sep be ? ToString(separator).
-        const sep: String.Builder.Segment = if (separator.isUndefined())
+        // 4. If separator is undefined, let separatorString be ",".
+        // 5. Else, let separatorString be ? ToString(separator).
+        const separator_string: String.Builder.Segment = if (separator.isUndefined())
             .{ .char = ',' }
         else
             .{ .string = try separator.toString(agent) };
@@ -1730,23 +1729,20 @@ pub const prototype = struct {
 
         // 6. Let result be the empty String.
         // NOTE: This allocates the maximum needed capacity upfront
-        if (@intFromEnum(length_) > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@intFromEnum(length_) * 2) - 1));
+        if (@backingInt(length_) > std.math.maxInt(usize)) return error.OutOfMemory;
+        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@backingInt(length_) * 2) - 1));
         defer result.deinit(agent.gc_allocator);
 
         // 7. Let k be 0.
         var k: u53 = 0;
 
         // 8. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. If k > 0, set result to the string-concatenation of result and sep.
-            if (k > 0) result.appendSegmentAssumeCapacity(sep);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. If k > 0, set result to the string-concatenation of result and separatorString.
+            if (k > 0) result.appendSegmentAssumeCapacity(separator_string);
 
-            // b. Let element be ! Get(obj, ! ToString(𝔽(k))).
-            const element = typed_array.object.get(
-                agent,
-                PropertyKey.from(k),
-            ) catch |err| try noexcept(err);
+            // b. Let element be TypedArrayGetElement(obj, 𝔽(k)).
+            const element = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
             // c. If element is not undefined, then
             if (!element.isUndefined()) {
@@ -1797,11 +1793,11 @@ pub const prototype = struct {
         // 5. If fromIndex is not present, let k be length - 1; else let k be min(? ToAbsoluteIndex(
         //    fromIndex, length), length - 1).
         var k: u53 = if (arguments.count() <= 1)
-            @intFromEnum(length_) - 1
+            @backingInt(length_) - 1
         else blk: {
-            const absolute = try from_index.toAbsoluteIndex(agent, @intFromEnum(length_));
+            const absolute = try from_index.toAbsoluteIndex(agent, @backingInt(length_));
             if (absolute < 0) return Value.from(-1);
-            break :blk @as(u53, @intFromFloat(@min(absolute, @as(f64, @floatFromInt(@intFromEnum(length_) - 1)))));
+            break :blk @as(u53, @intFromFloat(@min(absolute, @as(f64, @floatFromInt(@backingInt(length_) - 1)))));
         };
 
         // 6. Repeat, while k ≥ 0,
@@ -1817,11 +1813,12 @@ pub const prototype = struct {
 
             // c. If kPresent is true, then
             if (k_present) {
-                // i. Let elementK be ! Get(obj, propertyKey).
-                const element_k = typed_array.object.get(
+                // i. Let elementK be TypedArrayGetElement(obj, 𝔽(k)).
+                const element_k = try typedArrayGetElement(
                     agent,
-                    property_key,
-                ) catch |err| try noexcept(err);
+                    typed_array,
+                    .{ .integer_index = k },
+                );
 
                 // ii. If IsStrictlyEqual(searchElement, elementK) is true, return 𝔽(k).
                 if (isStrictlyEqual(search_element, element_k)) return Value.from(k);
@@ -1853,7 +1850,7 @@ pub const prototype = struct {
         const length_ = typedArrayLength(ta_record);
 
         // 7. Return 𝔽(length).
-        return Value.from(@intFromEnum(length_));
+        return Value.from(@backingInt(length_));
     }
 
     /// 23.2.3.22 %TypedArray%.prototype.map ( callback [ , thisArg ] )
@@ -1880,34 +1877,28 @@ pub const prototype = struct {
         const result_array = try typedArraySpeciesCreate(
             agent,
             typed_array,
-            &.{Value.from(@intFromEnum(length_))},
+            &.{Value.from(@backingInt(length_))},
         );
 
         // 6. Let k be 0.
         var k: u53 = 0;
 
         // 7. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Let mappedValue be ? Call(callback, thisArg, « kValue, 𝔽(k), obj »).
+            // b. Let mappedValue be ? Call(callback, thisArg, « kValue, 𝔽(k), obj »).
             const mapped_value = try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             );
 
-            // d. Perform ? Set(result, propertyKey, mappedValue, true).
-            try result_array.object.set(agent, property_key, mapped_value, .throw);
+            // c. Perform ? TypedArraySetElement(result, 𝔽(k), mappedValue).
+            try typedArraySetElement(agent, result_array, .{ .integer_index = k }, mapped_value);
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 8. Return result.
@@ -1955,31 +1946,19 @@ pub const prototype = struct {
             accumulator = initial_value.?;
         } else {
             // 9. Else,
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+            // a. Set accumulator to TypedArrayGetElement(obj, 𝔽(k)).
+            accumulator = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Set accumulator to ! Get(obj, propertyKey).
-            accumulator = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Set k to k + 1.
+            // b. Set k to k + 1.
             k += 1;
         }
 
         // 10. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
+            // b. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
             //    obj »).
             accumulator = try callback.call(
                 agent,
@@ -1987,7 +1966,7 @@ pub const prototype = struct {
                 &.{ accumulator, k_value, Value.from(k), Value.from(&typed_array.object) },
             );
 
-            // d. Set k to k + 1.
+            // c. Set k to k + 1.
         }
 
         // 11. Return accumulator.
@@ -2024,7 +2003,7 @@ pub const prototype = struct {
         }
 
         // 6. Let k be length - 1.
-        var k: ?u53 = std.math.sub(u53, @intFromEnum(length_), 1) catch null;
+        var k: ?u53 = std.math.sub(u53, @backingInt(length_), 1) catch null;
 
         // 7. Let accumulator be undefined.
         var accumulator: Value = undefined;
@@ -2035,31 +2014,19 @@ pub const prototype = struct {
             accumulator = initial_value.?;
         } else {
             // 9. Else,
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k.?);
+            // a. Set accumulator to TypedArrayGetElement(obj, 𝔽(k)).
+            accumulator = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k.? });
 
-            // b. Set accumulator to ! Get(obj, propertyKey).
-            accumulator = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Set k to k - 1.
+            // b. Set k to k - 1.
             if (k != null) k = std.math.sub(u53, k.?, 1) catch null;
         }
 
         // 10. Repeat, while k ≥ 0,
         while (k != null) : (k = (std.math.sub(u53, k.?, 1) catch null)) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k.?);
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k.? });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
+            // b. Set accumulator to ? Call(callback, undefined, « accumulator, kValue, 𝔽(k),
             //    obj »).
             accumulator = try callback.call(
                 agent,
@@ -2067,7 +2034,7 @@ pub const prototype = struct {
                 &.{ accumulator, k_value, Value.from(k.?), Value.from(&typed_array.object) },
             );
 
-            // d. Set k to k - 1.
+            // c. Set k to k - 1.
         }
 
         // 11. Return accumulator.
@@ -2086,7 +2053,7 @@ pub const prototype = struct {
         const length_ = typedArrayLength(ta_record);
 
         // 4. Let middle be floor(length / 2).
-        const middle = @divFloor(@intFromEnum(length_), 2);
+        const middle = @divFloor(@backingInt(length_), 2);
 
         // 5. Let lower be 0.
         var lower: u53 = 0;
@@ -2094,43 +2061,39 @@ pub const prototype = struct {
         // 6. Repeat, while lower ≠ middle,
         while (lower != middle) {
             // a. Let upper be length - lower - 1.
-            const upper = @intFromEnum(length_) - lower - 1;
+            const upper = @backingInt(length_) - lower - 1;
 
-            // b. Let upperP be ! ToString(𝔽(upper)).
-            const upper_property_key = PropertyKey.from(upper);
-
-            // c. Let lowerP be ! ToString(𝔽(lower)).
-            const lower_property_key = PropertyKey.from(lower);
-
-            // d. Let lowerValue be ! Get(obj, lowerP).
-            const lower_value = typed_array.object.get(
+            // b. Let lowerValue be TypedArrayGetElement(obj, 𝔽(lower)).
+            const lower_value = try typedArrayGetElement(
                 agent,
-                lower_property_key,
-            ) catch |err| try noexcept(err);
+                typed_array,
+                .{ .integer_index = lower },
+            );
 
-            // e. Let upperValue be ! Get(obj, upperP).
-            const upper_value = typed_array.object.get(
+            // c. Let upperValue be TypedArrayGetElement(obj, 𝔽(upper)).
+            const upper_value = try typedArrayGetElement(
                 agent,
-                upper_property_key,
-            ) catch |err| try noexcept(err);
+                typed_array,
+                .{ .integer_index = upper },
+            );
 
-            // f. Perform ! Set(obj, lowerP, upperValue, true).
-            typed_array.object.set(
+            // d. Perform ! TypedArraySetElement(obj, 𝔽(lower), upperValue).
+            typedArraySetElement(
                 agent,
-                lower_property_key,
+                typed_array,
+                .{ .integer_index = lower },
                 upper_value,
-                .throw,
             ) catch |err| try noexcept(err);
 
-            // g. Perform ! Set(obj, upperP, lowerValue, true).
-            typed_array.object.set(
+            // e. Perform ! TypedArraySetElement(obj, 𝔽(upper), lowerValue).
+            typedArraySetElement(
                 agent,
-                upper_property_key,
+                typed_array,
+                .{ .integer_index = upper },
                 lower_value,
-                .throw,
             ) catch |err| try noexcept(err);
 
-            // h. Set lower to lower + 1.
+            // f. Set lower to lower + 1.
             lower += 1;
         }
 
@@ -2191,7 +2154,7 @@ pub const prototype = struct {
         const source = try source_value.toObject(agent);
 
         // 4. Let sourceLength be ? LengthOfArrayLike(source).
-        const source_length: ArrayLength = @enumFromInt(try source.lengthOfArrayLike(agent));
+        const source_length: ArrayLength = @fromBackingInt(try source.lengthOfArrayLike(agent));
 
         // 5. If targetOffset = +∞, throw a RangeError exception.
         if (target_offset_f64 == std.math.inf(f64)) {
@@ -2199,8 +2162,8 @@ pub const prototype = struct {
         }
 
         // 6. If sourceLength + targetOffset > targetLength, throw a RangeError exception.
-        if (if (std.math.add(u53, @intFromEnum(source_length), std.math.lossyCast(u53, target_offset_f64))) |x|
-            x > @intFromEnum(target_length)
+        if (if (std.math.add(u53, @backingInt(source_length), std.math.lossyCast(u53, target_offset_f64))) |x|
+            x > @backingInt(target_length)
         else |_|
             true)
         {
@@ -2217,7 +2180,7 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 8. Repeat, while k < sourceLength,
-        while (k < @intFromEnum(source_length)) : (k += 1) {
+        while (k < @backingInt(source_length)) : (k += 1) {
             // a. Let propertyKey be ! ToString(𝔽(k)).
             const property_key = PropertyKey.from(k);
 
@@ -2288,8 +2251,8 @@ pub const prototype = struct {
         }
 
         // 14. If sourceLength + targetOffset > targetLength, throw a RangeError exception.
-        if (if (std.math.add(u53, @intFromEnum(source_length), std.math.lossyCast(u53, target_offset))) |x|
-            x > @intFromEnum(target_length)
+        if (if (std.math.add(u53, @backingInt(source_length), std.math.lossyCast(u53, target_offset))) |x|
+            x > @backingInt(target_length)
         else |_|
             true)
         {
@@ -2337,14 +2300,14 @@ pub const prototype = struct {
         } else blk: {
             // 18. Else,
             // a. Let sourceByteIndex be sourceByteOffset.
-            break :blk @intFromEnum(source_byte_offset);
+            break :blk @backingInt(source_byte_offset);
         };
 
         // 19. Let targetByteIndex be (targetOffset × targetElementSize) + targetByteOffset.
-        var target_byte_index = (@as(u53, @intFromFloat(target_offset)) * target_element_size) + @intFromEnum(target_byte_offset);
+        var target_byte_index = (@as(u53, @intFromFloat(target_offset)) * target_element_size) + @backingInt(target_byte_offset);
 
         // 20. Let limit be targetByteIndex + (targetElementSize × sourceLength).
-        const limit = target_byte_index + (target_element_size * @intFromEnum(source_length));
+        const limit = target_byte_index + (target_element_size * @backingInt(source_length));
 
         // 21. If sourceType is targetType, then
         if (source_type == target_type) {
@@ -2447,7 +2410,7 @@ pub const prototype = struct {
         const typed_array = ta_record.object;
 
         // 3. Let sourceArrayLength be TypedArrayLength(taRecord).
-        const source_array_length = @intFromEnum(typedArrayLength(ta_record));
+        const source_array_length = @backingInt(typedArrayLength(ta_record));
 
         // 4. Let startIndex be ? ToClampedIndex(start, sourceArrayLength).
         const start_index = try start.toClampedIndex(agent, source_array_length);
@@ -2475,7 +2438,7 @@ pub const prototype = struct {
             ta_record = try validateTypedArrayBounds(agent, typed_array, .seq_cst);
 
             // b. Set endIndex to min(endIndex, TypedArrayLength(taRecord)).
-            end_index = @min(end_index, @intFromEnum(typedArrayLength(ta_record)));
+            end_index = @min(end_index, @backingInt(typedArrayLength(ta_record)));
 
             // c. Set countBytes to max(endIndex - startIndex, 0).
             count_bytes = end_index -| start_index;
@@ -2504,10 +2467,10 @@ pub const prototype = struct {
                 const source_byte_offset = typed_array.fields.byte_offset;
 
                 // vi. Let sourceByteIndex be (startIndex × elementSize) + sourceByteOffset.
-                var source_byte_index = (start_index * element_size) + @intFromEnum(source_byte_offset);
+                var source_byte_index = (start_index * element_size) + @backingInt(source_byte_offset);
 
                 // vii. Let targetByteIndex be resultArray.[[ByteOffset]].
-                var target_byte_index = @intFromEnum(result_array.fields.byte_offset);
+                var target_byte_index = @backingInt(result_array.fields.byte_offset);
 
                 // viii. Let endByteIndex be targetByteIndex + (countBytes × elementSize).
                 const end_byte_index = target_byte_index + (count_bytes * element_size);
@@ -2558,22 +2521,23 @@ pub const prototype = struct {
                     k += 1;
                     n += 1;
                 }) {
-                    // 1. Let propertyKey be ! ToString(𝔽(k)).
-                    const property_key = PropertyKey.from(k);
-
-                    // 2. Let kValue be ! Get(obj, propertyKey).
-                    const k_value = typed_array.object.get(agent, property_key) catch |err| try noexcept(err);
-
-                    // 3. Perform ! Set(resultArray, ! ToString(𝔽(n)), kValue, true).
-                    result_array.object.set(
+                    // 1. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+                    const k_value = try typedArrayGetElement(
                         agent,
-                        PropertyKey.from(n),
+                        typed_array,
+                        .{ .integer_index = k },
+                    );
+
+                    // 2. Perform ! TypedArraySetElement(resultArray, 𝔽(n), kValue).
+                    typedArraySetElement(
+                        agent,
+                        result_array,
+                        .{ .integer_index = n },
                         k_value,
-                        .throw,
                     ) catch |err| try noexcept(err);
 
-                    // 4. Set k to k + 1.
-                    // 5. Set n to n + 1.
+                    // 3. Set k to k + 1.
+                    // 4. Set n to n + 1.
                 }
             }
         }
@@ -2606,27 +2570,21 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 6. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. Let kValue be TypedArrayGetElement(obj, 𝔽(k)).
+            const k_value = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // b. Let kValue be ! Get(obj, propertyKey).
-            const k_value = typed_array.object.get(
-                agent,
-                property_key,
-            ) catch |err| try noexcept(err);
-
-            // c. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
+            // b. Let testResult be ToBoolean(? Call(callback, thisArg, « kValue, 𝔽(k), obj »)).
             const test_result = (try callback.call(
                 agent,
                 this_arg,
                 &.{ k_value, Value.from(k), Value.from(&typed_array.object) },
             )).toBoolean();
 
-            // d. If testResult is true, return true.
+            // c. If testResult is true, return true.
             if (test_result) return .true;
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 7. Return false.
@@ -2668,24 +2626,24 @@ pub const prototype = struct {
         const sorted_list = try sortIndexedProperties(
             agent,
             &typed_array.object,
-            @intFromEnum(length_),
+            @backingInt(length_),
             .{
                 .impl = sortCompare,
                 .comparator = if (!comparator.isUndefined()) comparator.asObject() else null,
             },
             .read_through_holes,
         );
-        std.debug.assert(sorted_list.len == @intFromEnum(length_));
+        std.debug.assert(sorted_list.len == @backingInt(length_));
 
         // 8. Let j be 0.
         // 9. Repeat, while j < length,
         for (sorted_list, 0..) |value, j| {
-            // a. Perform ! Set(obj, ! ToString(𝔽(j)), sortedList[j], true).
-            typed_array.object.set(
+            // a. Perform ! TypedArraySetElement(obj, 𝔽(j), sortedList[j]).
+            typedArraySetElement(
                 agent,
-                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(j))),
+                typed_array,
+                .{ .integer_index = @intCast(j) },
                 value,
-                .throw,
             ) catch |err| try noexcept(err);
 
             // b. Set j to j + 1.
@@ -2719,7 +2677,7 @@ pub const prototype = struct {
         } else blk: {
             // 7. Else,
             // a. Let sourceLength be TypedArrayLength(sourceRecord).
-            break :blk @intFromEnum(typedArrayLength(source_record));
+            break :blk @backingInt(typedArrayLength(source_record));
         };
 
         // 8. Let startIndex be ? ToClampedIndex(start, sourceLength).
@@ -2732,7 +2690,7 @@ pub const prototype = struct {
         const source_byte_offset = typed_array.fields.byte_offset;
 
         // 11. Let beginByteOffset be sourceByteOffset + (startIndex × elementSize).
-        const begin_byte_offset = @intFromEnum(source_byte_offset) + (start_index * element_size);
+        const begin_byte_offset = @backingInt(source_byte_offset) + (start_index * element_size);
 
         // 12. If obj.[[ArrayLength]] is auto and end is undefined, then
         if (typed_array.fields.array_length == .auto and end.isUndefined()) {
@@ -2782,15 +2740,15 @@ pub const prototype = struct {
 
         // 4. Let result be the empty String.
         // NOTE: This allocates the maximum needed capacity upfront
-        if (@intFromEnum(length_) > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@intFromEnum(length_) * 2) - 1));
+        if (@backingInt(length_) > std.math.maxInt(usize)) return error.OutOfMemory;
+        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@backingInt(length_) * 2) - 1));
         defer result.deinit(agent.gc_allocator);
 
         // 5. Let k be 0.
         var k: u53 = 0;
 
         // 6. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
+        while (k < @backingInt(length_)) : (k += 1) {
             // a. If k > 0, set R to the string-concatenation of R and separator.
             if (k > 0) result.appendStringAssumeCapacity(separator);
 
@@ -2835,23 +2793,26 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 6. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let from be ! ToString(𝔽(length - k - 1)).
-            const from = PropertyKey.from(@intFromEnum(length_) - k - 1);
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. Let from be length - k - 1.
+            const from = @backingInt(length_) - k - 1;
 
-            // b. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
-
-            // c. Let fromValue be ! Get(obj, from).
-            const from_value = typed_array.object.get(
+            // b. Let fromValue be TypedArrayGetElement(obj, 𝔽(from)).
+            const from_value = try typedArrayGetElement(
                 agent,
-                from,
+                typed_array,
+                .{ .integer_index = from },
+            );
+
+            // c. Perform ! TypedArraySetElement(resultArray, 𝔽(k), fromValue).
+            typedArraySetElement(
+                agent,
+                result_array,
+                .{ .integer_index = k },
+                from_value,
             ) catch |err| try noexcept(err);
 
-            // d. Perform ! Set(resultArray, propertyKey, fromValue, true).
-            result_array.object.set(agent, property_key, from_value, .throw) catch |err| try noexcept(err);
-
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 7. Return resultArray.
@@ -2896,24 +2857,24 @@ pub const prototype = struct {
         const sorted_list = try sortIndexedProperties(
             agent,
             &typed_array.object,
-            @intFromEnum(length_),
+            @backingInt(length_),
             .{
                 .impl = sortCompare,
                 .comparator = if (!comparator.isUndefined()) comparator.asObject() else null,
             },
             .read_through_holes,
         );
-        std.debug.assert(sorted_list.len == @intFromEnum(length_));
+        std.debug.assert(sorted_list.len == @backingInt(length_));
 
         // 9. Let j be 0.
         // 10. Repeat, while j < length,
         for (sorted_list, 0..) |value, j| {
-            // a. Perform ! Set(resultArray, ! ToString(𝔽(j)), sortedList[j], true).
-            result_array.object.set(
+            // a. Perform ! TypedArraySetElement(resultArray, 𝔽(j), sortedList[j]).
+            typedArraySetElement(
                 agent,
-                PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(j))),
+                result_array,
+                .{ .integer_index = @intCast(j) },
                 value,
-                .throw,
             ) catch |err| try noexcept(err);
 
             // b. Set j to j + 1.
@@ -2951,7 +2912,7 @@ pub const prototype = struct {
         const length_ = typedArrayLength(ta_record);
 
         // 4. Let actualIndex be ? ToAbsoluteIndex(index, length).
-        const actual_index_f64 = try index.toAbsoluteIndex(agent, @intFromEnum(length_));
+        const actual_index_f64 = try index.toAbsoluteIndex(agent, @backingInt(length_));
 
         // 5. If obj.[[ContentType]] is bigint, let numericValue be ? ToBigInt(value).
         // 6. Else, let numericValue be ? ToNumber(value).
@@ -2980,26 +2941,23 @@ pub const prototype = struct {
         var k: u53 = 0;
 
         // 10. Repeat, while k < length,
-        while (k < @intFromEnum(length_)) : (k += 1) {
-            // a. Let propertyKey be ! ToString(𝔽(k)).
-            const property_key = PropertyKey.from(k);
-
-            // b. If k = actualIndex, let fromValue be numericValue.
-            // c. Else, let fromValue be ! Get(obj, propertyKey).
+        while (k < @backingInt(length_)) : (k += 1) {
+            // a. If k = actualIndex, let fromValue be numericValue.
+            // b. Else, let fromValue be TypedArrayGetElement(obj, 𝔽(k)).
             const from_value = if (k == actual_index)
                 numeric_value
             else
-                typed_array.object.get(agent, property_key) catch |err| try noexcept(err);
+                try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // d. Perform ! Set(resultArray, propertyKey, fromValue, true).
-            result_array.object.set(
+            // c. Perform ! TypedArraySetElement(resultArray, 𝔽(k), fromValue).
+            typedArraySetElement(
                 agent,
-                property_key,
+                result_array,
+                .{ .integer_index = k },
                 from_value,
-                .throw,
             ) catch |err| try noexcept(err);
 
-            // e. Set k to k + 1.
+            // d. Set k to k + 1.
         }
 
         // 11. Return resultArray.
@@ -3050,7 +3008,7 @@ fn typedArrayCreateFromConstructor(
         const length = typedArrayLength(ta_record);
 
         // c. If length < ℝ(argList[0]), throw a TypeError exception.
-        if (@as(f64, @floatFromInt(@intFromEnum(length))) < arg_list[0].asNumber().asFloat()) {
+        if (@as(f64, @floatFromInt(@backingInt(length))) < arg_list[0].asNumber().asFloat()) {
             return agent.throwException(
                 .type_error,
                 "Typed array must have at least length {d}, got {d}",
@@ -3082,7 +3040,7 @@ fn typedArrayCreateSameType(
     const result_array = try typedArrayCreateFromConstructor(
         agent,
         ctor,
-        &.{Value.from(@intFromEnum(length))},
+        &.{Value.from(@backingInt(length))},
     );
 
     // 3. Assert: result has [[TypedArrayName]] and [[ContentType]] internal slots.
@@ -3351,7 +3309,7 @@ fn initializeTypedArrayFromTypedArray(
     const element_length = typedArrayLength(source_record);
 
     // 9. Let byteLength be elementSize × elementLength.
-    const byte_length: ByteLength = @enumFromInt(std.math.mul(u53, element_size, @intFromEnum(element_length)) catch {
+    const byte_length: ByteLength = @fromBackingInt(std.math.mul(u53, element_size, @backingInt(element_length)) catch {
         return agent.throwException(
             .range_error,
             "Invalid typed array length {d}",
@@ -3389,13 +3347,13 @@ fn initializeTypedArrayFromTypedArray(
         }
 
         // c. Let sourceByteIndex be sourceByteOffset.
-        var source_byte_index = @intFromEnum(source_byte_offset);
+        var source_byte_index = @backingInt(source_byte_offset);
 
         // d. Let targetByteIndex be 0.
         var target_byte_index: u53 = 0;
 
         // e. Let count be elementLength.
-        var count = @intFromEnum(element_length);
+        var count = @backingInt(element_length);
 
         // f. Repeat, while count > 0,
         while (count > 0) : (count -= 1) {
@@ -3476,10 +3434,10 @@ fn initializeTypedArrayFromArrayBuffer(
     const element_size = typedArrayElementSize(typed_array);
 
     // 2. Let offset be ? ToIndex(byteOffset).
-    const offset: ByteOffset = @enumFromInt(try byte_offset.toIndex(agent));
+    const offset: ByteOffset = @fromBackingInt(try byte_offset.toIndex(agent));
 
     // 3. If offset modulo elementSize ≠ 0, throw a RangeError exception.
-    if (@mod(@intFromEnum(offset), element_size) != 0) {
+    if (@mod(@backingInt(offset), element_size) != 0) {
         return agent.throwException(
             .range_error,
             "Offset must be multiple of {d}, got {d}",
@@ -3505,7 +3463,7 @@ fn initializeTypedArrayFromArrayBuffer(
     // 8. If length is undefined and bufferIsFixedLength is false, then
     if (length.isUndefined() and !buffer_is_fixed_length) {
         // a. If offset > bufferByteLength, throw a RangeError exception.
-        if (@intFromEnum(offset) > @intFromEnum(buffer_byte_length)) {
+        if (@backingInt(offset) > @backingInt(buffer_byte_length)) {
             return agent.throwException(
                 .range_error,
                 "Offset must not exceed buffer byte length {d}, got {d}",
@@ -3523,7 +3481,7 @@ fn initializeTypedArrayFromArrayBuffer(
         // a. If length is undefined, then
         const new_byte_length: ByteLength = if (length.isUndefined()) blk: {
             // i. If bufferByteLength modulo elementSize ≠ 0, throw a RangeError exception.
-            if (@mod(@intFromEnum(buffer_byte_length), element_size) != 0) {
+            if (@mod(@backingInt(buffer_byte_length), element_size) != 0) {
                 return agent.throwException(
                     .range_error,
                     "Buffer byte length must be multiple of {d}, got {d}",
@@ -3534,8 +3492,8 @@ fn initializeTypedArrayFromArrayBuffer(
             // ii. Let newByteLength be bufferByteLength - offset.
             const new_byte_length = std.math.sub(
                 u53,
-                @intFromEnum(buffer_byte_length),
-                @intFromEnum(offset),
+                @backingInt(buffer_byte_length),
+                @backingInt(offset),
             ) catch {
                 // iii. If newByteLength < 0, throw a RangeError exception.
                 return agent.throwException(
@@ -3545,7 +3503,7 @@ fn initializeTypedArrayFromArrayBuffer(
                 );
             };
 
-            break :blk @enumFromInt(new_byte_length);
+            break :blk @fromBackingInt(new_byte_length);
         } else blk: {
             // b. Else,
             // i. Let newByteLength be newLength × elementSize.
@@ -3558,8 +3516,8 @@ fn initializeTypedArrayFromArrayBuffer(
             };
 
             // ii. If offset + newByteLength > bufferByteLength, throw a RangeError exception.
-            if (if (std.math.add(u53, @intFromEnum(offset), new_byte_length)) |x|
-                x > @intFromEnum(buffer_byte_length)
+            if (if (std.math.add(u53, @backingInt(offset), new_byte_length)) |x|
+                x > @backingInt(buffer_byte_length)
             else |_|
                 true)
             {
@@ -3570,14 +3528,14 @@ fn initializeTypedArrayFromArrayBuffer(
                 );
             }
 
-            break :blk @enumFromInt(new_byte_length);
+            break :blk @fromBackingInt(new_byte_length);
         };
 
         // c. Set obj.[[ByteLength]] to newByteLength.
         typed_array.fields.byte_length = new_byte_length.toAuto();
 
         // d. Set obj.[[ArrayLength]] to newByteLength / elementSize.
-        typed_array.fields.array_length = @enumFromInt(@divExact(@intFromEnum(new_byte_length), element_size));
+        typed_array.fields.array_length = @fromBackingInt(@divExact(@backingInt(new_byte_length), element_size));
     }
 
     // 10. Set obj.[[ViewedArrayBuffer]] to buffer.
@@ -3598,7 +3556,7 @@ fn initializeTypedArrayFromList(
 ) Agent.Error!void {
     // 1. Let length be the number of elements in values.
     // NOTE: allocateTypedArrayBuffer() will throw a nice error if this is too large, so truncating is fine
-    const length: ArrayLength = @enumFromInt(values.len);
+    const length: ArrayLength = @fromBackingInt(@intCast(values.len));
 
     // 2. Perform ? AllocateTypedArrayBuffer(obj, length).
     try allocateTypedArrayBuffer(agent, typed_array, length);
@@ -3606,15 +3564,17 @@ fn initializeTypedArrayFromList(
     // 3. Let k be 0.
     // 4. Repeat, while k < length,
     for (values, 0..) |k_value, k| {
-        // a. Let propertyKey be ! ToString(𝔽(k)).
-        const property_key = PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(k)));
+        // a. Let kValue be values[k].
 
-        // b. Let kValue be values[k].
+        // b. Perform ? TypedArraySetElement(obj, 𝔽(k), kValue).
+        try typedArraySetElement(
+            agent,
+            typed_array,
+            .{ .integer_index = @intCast(k) },
+            k_value,
+        );
 
-        // c. Perform ? Set(obj, propertyKey, kValue, true).
-        try typed_array.object.set(agent, property_key, k_value, .throw);
-
-        // d. Set k to k + 1.
+        // c. Set k to k + 1.
     }
 
     // 5. Return unused.
@@ -3628,7 +3588,7 @@ fn initializeTypedArrayFromArrayLike(
     array_like: *Object,
 ) Agent.Error!void {
     // 1. Let length be ? LengthOfArrayLike(arrayLike).
-    const length: ArrayLength = @enumFromInt(try array_like.lengthOfArrayLike(agent));
+    const length: ArrayLength = @fromBackingInt(try array_like.lengthOfArrayLike(agent));
 
     // 2. Perform ? AllocateTypedArrayBuffer(obj, length).
     try allocateTypedArrayBuffer(agent, typed_array, length);
@@ -3637,15 +3597,15 @@ fn initializeTypedArrayFromArrayLike(
     var k: u53 = 0;
 
     // 4. Repeat, while k < length,
-    while (k < @intFromEnum(length)) : (k += 1) {
+    while (k < @backingInt(length)) : (k += 1) {
         // a. Let propertyKey be ! ToString(𝔽(k)).
         const property_key = PropertyKey.from(k);
 
         // b. Let kValue be ? Get(arrayLike, propertyKey).
         const k_value = try array_like.get(agent, property_key);
 
-        // c. Perform ? Set(obj, propertyKey, kValue, true).
-        try typed_array.object.set(agent, property_key, k_value, .throw);
+        // c. Perform ? TypedArraySetElement(obj, 𝔽(k), kValue).
+        try typedArraySetElement(agent, typed_array, .{ .integer_index = k }, k_value);
 
         // d. Set k to k + 1.
     }
@@ -3668,7 +3628,7 @@ fn allocateTypedArrayBuffer(
     const element_size = typedArrayElementSize(typed_array);
 
     // 3. Let byteLength be elementSize × length.
-    const byte_length: ByteLength = @enumFromInt(std.math.mul(u53, element_size, @intFromEnum(length)) catch {
+    const byte_length: ByteLength = @fromBackingInt(std.math.mul(u53, element_size, @backingInt(length)) catch {
         return agent.throwException(
             .range_error,
             "Invalid typed array length {d}",
@@ -3739,7 +3699,7 @@ pub fn getUint8ArrayBytes(agent: *Agent, typed_array: *const TypedArray) Agent.E
     //     c. Append byte to bytes.
     //     d. Set index to index + 1.
     // 8. Return bytes.
-    return buffer.fields.data_block.?.bytes[@intCast(@intFromEnum(byte_offset))..@intCast(@intFromEnum(byte_offset) + @intFromEnum(length))];
+    return buffer.fields.data_block.?.bytes[@intCast(@backingInt(byte_offset))..@intCast(@backingInt(byte_offset) + @backingInt(length))];
 }
 
 /// 23.3.3.3 SetUint8ArrayBytes ( into, bytes )
@@ -3756,7 +3716,7 @@ fn setUint8ArrayBytes(agent: *Agent, into: *TypedArray, bytes: []const u8) void 
     for (bytes, 0..) |byte, index| {
         // a. Let byte be bytes[index].
         // b. Let byteIndexInBuffer be index + offset.
-        const byte_index_in_buffer = @as(u53, @intCast(index)) + @intFromEnum(offset);
+        const byte_index_in_buffer = @as(u53, @intCast(index)) + @backingInt(offset);
 
         // c. Perform SetValueInBuffer(into.[[ViewedArrayBuffer]], byteIndexInBuffer, uint8,
         //    𝔽(byte), true, unordered).
@@ -4029,7 +3989,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                     element_type,
                     new_target.?,
                     proto_intrinsic,
-                    @enumFromInt(0),
+                    @fromBackingInt(0),
                 );
                 return Value.from(&typed_array.object);
             }
@@ -4126,7 +4086,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             std.debug.assert(!first_arg.isObject());
 
             // 9. Let elementLength be ? ToIndex(firstArg).
-            const element_length: ArrayLength = @enumFromInt(try first_arg.toIndex(agent));
+            const element_length: ArrayLength = @fromBackingInt(try first_arg.toIndex(agent));
 
             // 10. Return ? AllocateTypedArray(ctorName, NewTarget, proto, elementLength).
             const typed_array = try allocateTypedArray(
@@ -4152,10 +4112,10 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
             const string = string_value.asString();
 
-            // 2. Let opts be ? GetOptionsObject(options).
+            // 2. Let optionsObj be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 3. Let alphabet be ? Get(opts, "alphabet").
+            // 3. Let alphabet be ? Get(optionsObj, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 4. If alphabet is undefined, set alphabet to "base64".
@@ -4169,7 +4129,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 6. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            // 6. Let lastChunkHandling be ? Get(optionsObj, "lastChunkHandling").
             var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 7. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
@@ -4203,7 +4163,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
 
             // 11. Let resultLength be the number of elements in result.[[Bytes]].
-            const result_length: OptionalArrayLength = @enumFromInt(result.bytes.len);
+            const result_length: OptionalArrayLength = @fromBackingInt(@intCast(result.bytes.len));
 
             // 12. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
             //     "%Uint8Array.prototype%", resultLength).
@@ -4218,7 +4178,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             // 13. Assert: ta.[[ViewedArrayBuffer]].[[ArrayBufferByteLength]] is the number of
             //     elements in result.[[Bytes]].
             std.debug.assert(
-                @intFromEnum(typed_array.fields.viewed_array_buffer.fields.byte_length) == result.bytes.len,
+                @backingInt(typed_array.fields.viewed_array_buffer.fields.byte_length) == result.bytes.len,
             );
 
             // 14. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to
@@ -4256,7 +4216,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             }
 
             // 4. Let resultLength be the number of elements in result.[[Bytes]].
-            const result_length: OptionalArrayLength = @enumFromInt(result.bytes.len);
+            const result_length: OptionalArrayLength = @fromBackingInt(@intCast(result.bytes.len));
 
             // 5. Let ta be ? AllocateTypedArray("Uint8Array", %Uint8Array%,
             //    "%Uint8Array.prototype%", resultLength).
@@ -4271,7 +4231,7 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
             // 6. Assert: ta.[[ViewedArrayBuffer]].[[ArrayBufferByteLength]] is the number of
             //    elements in result.[[Bytes]].
             std.debug.assert(
-                @intFromEnum(typed_array.fields.viewed_array_buffer.fields.byte_length) == result.bytes.len,
+                @backingInt(typed_array.fields.viewed_array_buffer.fields.byte_length) == result.bytes.len,
             );
 
             // 7. Set the value at each index of ta.[[ViewedArrayBuffer]].[[ArrayBufferData]] to the
@@ -4337,10 +4297,10 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             }
             const string = string_value.asString();
 
-            // 4. Let opts be ? GetOptionsObject(options).
+            // 4. Let optionsObj be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 5. Let alphabet be ? Get(opts, "alphabet").
+            // 5. Let alphabet be ? Get(optionsObj, "alphabet").
             var alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 6. If alphabet is undefined, set alphabet to "base64".
@@ -4354,7 +4314,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 8. Let lastChunkHandling be ? Get(opts, "lastChunkHandling").
+            // 8. Let lastChunkHandling be ? Get(optionsObj, "lastChunkHandling").
             var last_chunk_handling_value = try options.get(agent, PropertyKey.from("lastChunkHandling"));
 
             // 9. If lastChunkHandling is undefined, set lastChunkHandling to "loose".
@@ -4378,7 +4338,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const ta_record = try validateTypedArrayBounds(agent, into, .seq_cst);
 
             // 12. Let byteLength be TypedArrayLength(taRecord).
-            const byte_length = @intFromEnum(typedArrayLength(ta_record));
+            const byte_length = @backingInt(typedArrayLength(ta_record));
 
             // 13. Let result be FromBase64(string, alphabet, lastChunkHandling, byteLength).
             const result = try fromBase64Impl(
@@ -4461,7 +4421,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             const byte_length = typedArrayLength(ta_record);
 
             // 6. Let result be FromHex(string, byteLength).
-            const result = try fromHexImpl(agent, string, @intFromEnum(byte_length));
+            const result = try fromHexImpl(agent, string, @backingInt(byte_length));
 
             // 7. Let bytes be result.[[Bytes]].
             const bytes = result.bytes;
@@ -4473,7 +4433,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             //    cannot have been detached or shrunk.
 
             // 10. Assert: written ≤ byteLength.
-            std.debug.assert(written <= @intFromEnum(byte_length));
+            std.debug.assert(written <= @backingInt(byte_length));
 
             // 11. Perform SetUint8ArrayBytes(into, bytes).
             setUint8ArrayBytes(agent, into, bytes);
@@ -4521,10 +4481,10 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             // 2. Perform ? ValidateUint8Array(obj).
             const typed_array = try validateUint8Array(agent, this_value);
 
-            // 3. Let opts be ? GetOptionsObject(options).
+            // 3. Let optionsObj be ? GetOptionsObject(options).
             const options = try options_value.getOptionsObject(agent);
 
-            // 4. Let alphabet be ? Get(opts, "alphabet").
+            // 4. Let alphabet be ? Get(optionsObj, "alphabet").
             const alphabet_value = try options.get(agent, PropertyKey.from("alphabet"));
 
             // 5. If alphabet is undefined, set alphabet to "base64".
@@ -4538,7 +4498,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
                 return agent.throwException(.type_error, "Invalid alphabet {f}", .{alphabet_value});
             };
 
-            // 7. Let omitPadding be ToBoolean(? Get(opts, "omitPadding")).
+            // 7. Let omitPadding be ToBoolean(? Get(optionsObj, "omitPadding")).
             const omit_padding = (try options.get(agent, PropertyKey.from("omitPadding"))).toBoolean();
 
             // 8. Let toEncode be ? GetUint8ArrayBytes(obj).
@@ -4585,8 +4545,7 @@ fn MakeTypedArrayPrototype(comptime element_type: ElementType) type {
             //     b. Set hex to StringPad(hex, 2, "0", start).
             //     c. Set out to the string-concatenation of out and hex.
             // 6. Return out.
-            return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
+            return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
                 "{x}",
                 .{to_encode},
             )));

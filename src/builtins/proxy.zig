@@ -432,10 +432,10 @@ fn defineOwnProperty(
 
     // 12. If propertyDesc has a [[Configurable]] field and propertyDesc.[[Configurable]] is false,
     //     then
-    //     a. Let settingConfigFalse be true.
+    //     a. Let settingConfigurableFalse be true.
     // 13. Else,
-    //     a. Let settingConfigFalse be false.
-    const setting_config_false = property_desc.configurable == false;
+    //     a. Let settingConfigurableFalse be false.
+    const setting_configurable_false = property_desc.configurable == false;
 
     // 14. If targetDesc is undefined, then
     if (target_desc == null) {
@@ -448,8 +448,8 @@ fn defineOwnProperty(
             );
         }
 
-        // b. If settingConfigFalse is true, throw a TypeError exception.
-        if (setting_config_false) {
+        // b. If settingConfigurableFalse is true, throw a TypeError exception.
+        if (setting_configurable_false) {
             return agent.throwException(
                 .type_error,
                 "Proxy 'defineProperty' trap must not return 'configurable: false' for missing property on target",
@@ -468,9 +468,9 @@ fn defineOwnProperty(
             );
         }
 
-        // b. If settingConfigFalse is true and targetDesc.[[Configurable]] is true, throw a
+        // b. If settingConfigurableFalse is true and targetDesc.[[Configurable]] is true, throw a
         //    TypeError exception.
-        if (setting_config_false and target_desc.?.configurable == true) {
+        if (setting_configurable_false and target_desc.?.configurable == true) {
             return agent.throwException(
                 .type_error,
                 "Proxy 'defineProperty' trap must not return 'configurable: false' for configurable property on target",

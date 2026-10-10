@@ -379,8 +379,8 @@ fn asyncFromSyncIteratorContinuation(
     const unwrap_closure_captures = try agent.gc_allocator.create(UnwrapClosureCaptures);
     unwrap_closure_captures.* = .{ .done = done };
 
-    // 9. Let unwrap be a new Abstract Closure with parameters (v) that captures done and performs
-    //    the following steps when called:
+    // 9. Let unwrap be a new Abstract Closure with parameters (value) that captures done and
+    //    performs the following steps when called:
     const unwrap = struct {
         fn func(agent_: *Agent, _: Value, arguments_: Arguments) Agent.Error!Value {
             const function = agent_.activeFunctionObject();
@@ -388,7 +388,7 @@ fn asyncFromSyncIteratorContinuation(
             const done_ = captures.done;
             const value_ = arguments_.get(0);
 
-            // a. Return CreateIteratorResultObject(v, done).
+            // a. Return CreateIteratorResultObject(value, done).
             return Value.from(try createIteratorResultObject(agent_, value_, done_));
         }
     }.func;

@@ -54,13 +54,14 @@ pub fn parse(
 ) Parser.Error!*Script {
     const agent = realm.agent;
 
+    const source = try agent.gc_allocator.dupeSentinel(u8, source_text, 0);
+
     // 1. Let script be ParseText(sourceText, Script).
     // 2. If script is a List of errors, return script.
-    const script = try Parser.parse(ast.Script, agent.gc_allocator, source_text, options);
+    const script = try Parser.parse(ast.Script, agent.gc_allocator, source, options);
 
     // 3. Return Script Record { [[Realm]]: realm, [[ECMAScriptCode]]: script,
     //    [[LoadedModules]]: « », [[HostDefined]]: hostDefined }.
-    const source = try agent.gc_allocator.dupe(u8, source_text);
     const self = try agent.gc_allocator.create(Script);
     self.* = .{
         .realm = realm,

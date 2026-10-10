@@ -295,7 +295,7 @@ pub const SetProperty = struct {
             },
             .accessor => {
                 const setter_value = holder.getValueAtPropertyOffset(
-                    @enumFromInt(@intFromEnum(entry.offset) + 1),
+                    @fromBackingInt(@backingInt(entry.offset) + 1),
                 );
                 if (setter_value.isNull()) {
                     @branchHint(.unlikely);
@@ -384,7 +384,7 @@ pub const SetPropertyComputed = struct {
             },
             .accessor => {
                 const setter_value = holder.getValueAtPropertyOffset(
-                    @enumFromInt(@intFromEnum(entry.offset) + 1),
+                    @fromBackingInt(@backingInt(entry.offset) + 1),
                 );
                 if (setter_value.isNull()) {
                     @branchHint(.unlikely);

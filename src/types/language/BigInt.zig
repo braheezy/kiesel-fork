@@ -95,8 +95,8 @@ pub fn orderWithFloat(
 
     const Repr = std.math.FloatRepr(f64);
     const repr: Repr = @bitCast(value);
-    const biased_exp = @intFromEnum(repr.exponent);
-    const bias = @intFromEnum(Repr.BiasedExponent.zero);
+    const biased_exp = @backingInt(repr.exponent);
+    const bias = @backingInt(Repr.BiasedExponent.zero);
     const int_bits = (biased_exp -| (bias - 1));
     const limb_bits = @bitSizeOf(std.math.big.Limb);
     const needed = std.math.divCeil(usize, int_bits, limb_bits) catch unreachable;

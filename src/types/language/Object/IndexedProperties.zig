@@ -109,7 +109,7 @@ pub fn migrateStorage(
     new_storage_type: Storage.Type,
 ) std.mem.Allocator.Error!void {
     const old_storage_type = std.meta.activeTag(self.storage);
-    std.debug.assert(@intFromEnum(old_storage_type) < @intFromEnum(new_storage_type) or
+    std.debug.assert(@backingInt(old_storage_type) < @backingInt(new_storage_type) or
         new_storage_type == .none);
     self.storage = switch (new_storage_type) {
         .none => blk: {

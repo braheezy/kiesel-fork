@@ -639,11 +639,7 @@ fn encode(
                 //    "0", start).
                 try result.appendString(
                     agent.gc_allocator,
-                    try String.fromAscii(agent, try std.fmt.allocPrint(
-                        agent.gc_allocator,
-                        "%{X:0>2}",
-                        .{byte},
-                    )),
+                    try String.fromAscii(agent, try agent.gc_allocator.print("%{X:0>2}", .{byte})),
                 );
             }
         }
@@ -661,11 +657,12 @@ fn decode(
     comptime preserve_escape_set: []const u8,
 ) Agent.Error!*const String {
     const gpa = agent.gpa;
-    var stack_fallback = std.heap.stackFallback(@sizeOf(u16) * 64, gpa);
-    const sfa = stack_fallback.get();
+    var buffer: [@sizeOf(u16) * 64]u8 = undefined;
+    var bfa_state: std.heap.BufferFirstAllocator = .init(&buffer, gpa);
+    const bfa = bfa_state.allocator();
 
-    const input = try string.toUtf16(sfa);
-    defer sfa.free(input);
+    const input = try string.toUtf16(bfa);
+    defer bfa.free(input);
 
     // 1. Let length be the length of string.
     const length = input.len;
@@ -844,8 +841,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 // 2. Let nextPart be the string-concatenation of "%" and StringPad(hex, 2, "0",
                 //    start).
                 break :blk .{
-                    .string = try String.fromAscii(agent, try std.fmt.allocPrint(
-                        agent.gc_allocator,
+                    .string = try String.fromAscii(agent, try agent.gc_allocator.print(
                         "%{X}",
                         .{&.{@as(u8, @intCast(code_unit))}},
                     )),
@@ -859,8 +855,7 @@ fn escape(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                 var bytes = std.mem.toBytes(code_unit);
                 std.mem.reverse(u8, &bytes);
                 break :blk .{
-                    .string = try String.fromAscii(agent, try std.fmt.allocPrint(
-                        agent.gc_allocator,
+                    .string = try String.fromAscii(agent, try agent.gc_allocator.print(
                         "%u{X}",
                         .{&bytes},
                     )),

@@ -1890,9 +1890,9 @@ pub const prototype = struct {
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
 
-        // 3. If separator is undefined, let sep be ",".
-        // 4. Else, let sep be ? ToString(separator).
-        const sep: String.Builder.Segment = if (separator.isUndefined())
+        // 3. If separator is undefined, let separatorString be ",".
+        // 4. Else, let separatorString be ? ToString(separator).
+        const separator_string: String.Builder.Segment = if (separator.isUndefined())
             .{ .char = ',' }
         else
             .{ .string = try separator.toString(agent) };
@@ -1911,8 +1911,8 @@ pub const prototype = struct {
 
         // 7. Repeat, while k < length,
         while (k < length) : (k += 1) {
-            // a. If k > 0, set result to the string-concatenation of result and sep.
-            if (k > 0) result.appendSegmentAssumeCapacity(sep);
+            // a. If k > 0, set result to the string-concatenation of result and separatorString.
+            if (k > 0) result.appendSegmentAssumeCapacity(separator_string);
 
             // b. Let element be ? Get(obj, ! ToString(𝔽(k))).
             const element = try obj.get(agent, PropertyKey.from(k));

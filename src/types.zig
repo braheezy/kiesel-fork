@@ -50,19 +50,19 @@ pub const ByteLength = enum(u53) {
     _,
 
     pub fn toAuto(self: ByteLength) AutoByteLength {
-        const result: AutoByteLength = @enumFromInt(@intFromEnum(self));
+        const result: AutoByteLength = @fromBackingInt(@backingInt(self));
         std.debug.assert(result != .auto);
         return result;
     }
 
     pub fn toDetached(self: ByteLength) DetachedByteLength {
-        const result: DetachedByteLength = @enumFromInt(@intFromEnum(self));
+        const result: DetachedByteLength = @fromBackingInt(@backingInt(self));
         std.debug.assert(result != .detached);
         return result;
     }
 
     pub fn toOptional(self: ByteLength) OptionalByteLength {
-        const result: OptionalByteLength = @enumFromInt(@intFromEnum(self));
+        const result: OptionalByteLength = @fromBackingInt(@backingInt(self));
         std.debug.assert(result != .none);
         return result;
     }
@@ -74,7 +74,7 @@ pub const AutoByteLength = enum(u54) {
     _,
 
     pub fn unwrap(self: AutoByteLength) ?ByteLength {
-        return if (self == .auto) null else @enumFromInt(@intFromEnum(self));
+        return if (self == .auto) null else @fromBackingInt(@intCast(@backingInt(self)));
     }
 };
 
@@ -84,7 +84,7 @@ pub const DetachedByteLength = enum(u54) {
     _,
 
     pub fn unwrap(self: DetachedByteLength) ?ByteLength {
-        return if (self == .detached) null else @enumFromInt(@intFromEnum(self));
+        return if (self == .detached) null else @fromBackingInt(@intCast(@backingInt(self)));
     }
 };
 
@@ -94,7 +94,7 @@ pub const OptionalByteLength = enum(u54) {
     _,
 
     pub fn unwrap(self: OptionalByteLength) ?ByteLength {
-        return if (self == .none) null else @enumFromInt(@intFromEnum(self));
+        return if (self == .none) null else @fromBackingInt(@intCast(@backingInt(self)));
     }
 };
 
@@ -103,13 +103,13 @@ pub const ArrayLength = enum(u53) {
     _,
 
     pub fn toAuto(self: ArrayLength) AutoArrayLength {
-        const result: AutoArrayLength = @enumFromInt(@intFromEnum(self));
+        const result: AutoArrayLength = @fromBackingInt(@backingInt(self));
         std.debug.assert(result != .auto);
         return result;
     }
 
     pub fn toOptional(self: ArrayLength) OptionalArrayLength {
-        const result: OptionalArrayLength = @enumFromInt(@intFromEnum(self));
+        const result: OptionalArrayLength = @fromBackingInt(@backingInt(self));
         std.debug.assert(result != .none);
         return result;
     }
@@ -121,7 +121,7 @@ pub const AutoArrayLength = enum(u54) {
     _,
 
     pub fn unwrap(self: AutoArrayLength) ?ArrayLength {
-        return if (self == .auto) null else @enumFromInt(@intFromEnum(self));
+        return if (self == .auto) null else @fromBackingInt(@intCast(@backingInt(self)));
     }
 };
 
@@ -131,7 +131,7 @@ pub const OptionalArrayLength = enum(u54) {
     _,
 
     pub fn unwrap(self: OptionalArrayLength) ?ArrayLength {
-        return if (self == .none) null else @enumFromInt(@intFromEnum(self));
+        return if (self == .none) null else @fromBackingInt(@intCast(@backingInt(self)));
     }
 };
 

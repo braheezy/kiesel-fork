@@ -62,7 +62,7 @@ fn toIntegerOrInfinity(x: f64) f64 {
 fn toZeroPaddedDecimalString(buf: []u8, n: anytype, min_length: usize) []const u8 {
     // NOTE: std.fmt does a weird thing where padded 1 becomes '00+1', so we do this ourselves.
     var tmp: [100]u8 = undefined;
-    const s = std.fmt.bufPrint(&tmp, "{d}", .{@abs(n)}) catch unreachable;
+    const s = std.mem.print(&tmp, "{d}", .{@abs(n)}) catch unreachable;
 
     @memset(buf[0 .. buf.len - s.len], '0');
     @memcpy(buf[buf.len - s.len ..], s);
@@ -808,14 +808,20 @@ pub fn formatTimeZoneString(data: FormatTimeZoneStringData, writer: *std.Io.Writ
     // 8. Let offsetHour be ToZeroPaddedDecimalString(HourFromTime(𝔽(absOffsetMilliseconds)), 2).
     const offset_hour = hourFromTime(abs_offset_milliseconds);
 
-    // 9. Let tzName be an implementation-defined string that is either the empty String or the
-    //    string-concatenation of the code unit 0x0020 (SPACE), the code unit 0x0028 (LEFT
-    //    PARENTHESIS), an implementation-defined timezone name, and the code unit 0x0029 (RIGHT
+    // 9. Let timeZoneName be an implementation-defined string that is either the empty String or
+    //    the string-concatenation of the code unit 0x0020 (SPACE), the code unit 0x0028 (LEFT
+    //    PARENTHESIS), an implementation-defined time zone name, and the code unit 0x0029 (RIGHT
     //    PARENTHESIS).
-    const tz_name = if (offset_milliseconds == 0) " (GMT)" else "";
+    const time_zone_name = if (offset_milliseconds == 0) " (GMT)" else "";
 
-    // 10. Return the string-concatenation of offsetSign, offsetHour, offsetMinute, and tzName.
-    try writer.print("{c}{d:0>2}{d:0>2}{s}", .{ offset_sign, offset_hour, offset_minute, tz_name });
+    // 10. Return the string-concatenation of offsetSign, offsetHour, offsetMinute, and
+    //     timeZoneName.
+    try writer.print("{c}{d:0>2}{d:0>2}{s}", .{
+        offset_sign,
+        offset_hour,
+        offset_minute,
+        time_zone_name,
+    });
 }
 
 pub fn fmtToDateString(
@@ -895,8 +901,7 @@ pub const constructor = struct {
             const now_: f64 = @floatFromInt(timestamp.toMilliseconds());
 
             // b. Return ToDateString(now).
-            return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
+            return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
                 "{f}",
                 .{fmtToDateString(agent.platform, now_)},
             )));
@@ -921,20 +926,20 @@ pub const constructor = struct {
                 break :blk_tv date.fields.date_value;
             } else blk_tv: {
                 // c. Else,
-                // i. Let v be ? ToPrimitive(value).
-                const primitive_value = try value.toPrimitive(agent, null);
+                // i. Let primitive be ? ToPrimitive(value).
+                const primitive = try value.toPrimitive(agent, null);
 
-                // ii. If v is a String, then
-                if (primitive_value.isString()) {
-                    // 1. Assert: The next step never returns an abrupt completion because v is a
-                    //    String.
-                    // 2. Let tv be the result of parsing v as a date, in exactly the same manner as
-                    //    for the `parse` method (21.4.3.2).
-                    break :blk_tv parseImpl(primitive_value.asString());
+                // ii. If primitive is a String, then
+                if (primitive.isString()) {
+                    // 1. Assert: The next step never returns an abrupt completion because primitive
+                    //    is a String.
+                    // 2. Let tv be the result of parsing primitive as a date, in exactly the same
+                    //    manner as for the `parse` method (21.4.3.2).
+                    break :blk_tv parseImpl(primitive.asString());
                 } else {
                     // iii. Else,
-                    // 1. Let tv be ? ToNumber(v).
-                    break :blk_tv (try primitive_value.toNumber(agent)).asFloat();
+                    // 1. Let tv be ? ToNumber(primitive).
+                    break :blk_tv (try primitive.toNumber(agent)).asFloat();
                 }
             };
 
@@ -2195,8 +2200,7 @@ pub const prototype = struct {
         const t = localTime(agent.platform, tv);
 
         // 6. Return DateString(t).
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{f}",
             .{fmtDateString(t)},
         )));
@@ -2232,8 +2236,7 @@ pub const prototype = struct {
             if (year >= 0 and year <= 9999) 4 else 6,
         );
 
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{s}{s}-{d:0>2}-{d:0>2}T{d:0>2}:{d:0>2}:{d:0>2}.{d:0>3}Z",
             .{
                 year_sign,
@@ -2424,8 +2427,7 @@ pub const prototype = struct {
         const time_value = date_object.fields.date_value;
 
         // 4. Return ToDateString(tv).
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{f}",
             .{fmtToDateString(agent.platform, time_value)},
         )));
@@ -2483,8 +2485,7 @@ pub const prototype = struct {
         const local_time = localTime(agent.platform, tv);
 
         // 6. Return the string-concatenation of TimeString(localTime) and TimeZoneString(tv).
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{f}{f}",
             .{
                 fmtTimeString(local_time),
@@ -2528,8 +2529,7 @@ pub const prototype = struct {
         // 11. Return the string-concatenation of weekday, ",", the code unit 0x0020 (SPACE), day,
         //     the code unit 0x0020 (SPACE), month, the code unit 0x0020 (SPACE), yearSign,
         //     paddedYear, the code unit 0x0020 (SPACE), and TimeString(tv).
-        return Value.from(try String.fromAscii(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        return Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
             "{s}, {d:0>2} {s} {s}{s} {f}",
             .{
                 weekday,

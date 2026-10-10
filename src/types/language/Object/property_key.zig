@@ -139,7 +139,7 @@ pub const PropertyKey = union(enum) {
     fn eqlStringAndIntegerIndex(string: *const String, index: IntegerIndex) bool {
         const len = comptime std.fmt.count("{d}", .{std.math.maxInt(IntegerIndex)});
         var buf: [len]u8 = undefined;
-        const ascii = std.fmt.bufPrint(&buf, "{d}", .{index}) catch unreachable;
+        const ascii = std.mem.print(&buf, "{d}", .{index}) catch unreachable;
         const index_string: *const String = &.{
             .data = .{ .owned_ascii = ascii.ptr },
             .length = @intCast(ascii.len),
@@ -154,13 +154,10 @@ pub const PropertyKey = union(enum) {
         return switch (self) {
             .string => |string| Value.from(string),
             .symbol => |symbol| Value.from(symbol),
-            .integer_index => |integer_index| Value.from(
-                try String.fromAscii(agent, try std.fmt.allocPrint(
-                    agent.gc_allocator,
-                    "{d}",
-                    .{integer_index},
-                )),
-            ),
+            .integer_index => |integer_index| Value.from(try String.fromAscii(agent, try agent.gc_allocator.print(
+                "{d}",
+                .{integer_index},
+            ))),
         };
     }
 
@@ -174,8 +171,7 @@ pub const PropertyKey = union(enum) {
             .string => |string| .{ .string = string },
             .symbol => |symbol| .{ .symbol = symbol },
             .integer_index => |integer_index| .{
-                .string = try String.fromAscii(agent, try std.fmt.allocPrint(
-                    agent.gc_allocator,
+                .string = try String.fromAscii(agent, try agent.gc_allocator.print(
                     "{d}",
                     .{integer_index},
                 )),

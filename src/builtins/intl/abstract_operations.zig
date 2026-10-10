@@ -509,7 +509,7 @@ fn ResolutionOptions(comptime resolution_option_descriptors: anytype) type {
     const fields_len = resolution_option_descriptors.len;
     var field_names: [fields_len][]const u8 = undefined;
     var field_types: [fields_len]type = undefined;
-    const field_attrs: [fields_len]std.builtin.Type.StructField.Attributes = @splat(.{});
+    const field_attrs: [fields_len]std.lang.Type.Struct.FieldAttributes = @splat(.{});
     for (resolution_option_descriptors, &field_names, &field_types) |desc, *name, *Type| {
         const @"type": Object.OptionType = if (@hasField(@TypeOf(desc), "type")) desc.type else .string;
         name.* = desc.key;

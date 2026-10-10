@@ -187,8 +187,7 @@ pub const prototype = struct {
             .value = Value.from(&@"error".object),
             .stack_trace = @"error".fields.stack_trace,
         };
-        const string = try String.fromUtf8(agent, try std.fmt.allocPrint(
-            agent.gc_allocator,
+        const string = try String.fromUtf8(agent, try agent.gc_allocator.print(
             "{f}",
             .{exception.fmtPretty(agent, .no_color)},
         ));

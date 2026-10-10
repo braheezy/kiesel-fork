@@ -45,8 +45,8 @@ pub const Weak = union(enum) {
             pub fn hash(_: @This(), weak: Weak) u64 {
                 // Store the masked version of the pointers.
                 return switch (weak) {
-                    .object => |object| @intFromEnum(object),
-                    .symbol => |symbol| @intFromEnum(symbol),
+                    .object => |object| @backingInt(object),
+                    .symbol => |symbol| @backingInt(symbol),
                 };
             }
             pub fn eql(_: @This(), a: Weak, b: Weak) bool {
@@ -63,11 +63,11 @@ fn MaskedPtr(comptime T: type) type {
         _,
 
         pub fn init(ptr: T) @This() {
-            return @enumFromInt(~@intFromPtr(ptr));
+            return @fromBackingInt(~@intFromPtr(ptr));
         }
 
         pub fn get(masked_ptr: @This()) T {
-            const masked_bits: usize = @intFromEnum(masked_ptr);
+            const masked_bits: usize = @backingInt(masked_ptr);
             return @ptrFromInt(~masked_bits);
         }
     };

@@ -334,22 +334,13 @@ pub const prototype = struct {
 
         // 9-15.
         var formatted = if (fraction_digits_value.isUndefined())
-            try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "{s}{e}",
-                .{ sign, x },
-            )
+            try agent.gc_allocator.print("{s}{e}", .{ sign, x })
         else
-            try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "{s}{e:.[2]}",
-                .{ sign, x, fraction_digits },
-            );
+            try agent.gc_allocator.print("{s}{e:.[2]}", .{ sign, x, fraction_digits });
         // Zig omits the '+' for positive exponents, so we need to add it ourselves
         if (std.mem.find(u8, formatted, "e-") == null) {
             const index = std.mem.find(u8, formatted, "e").?;
-            formatted = try std.fmt.allocPrint(
-                agent.gc_allocator,
+            formatted = try agent.gc_allocator.print(
                 "{s}e+{s}",
                 .{ formatted[0..index], formatted[index + 1 ..] },
             );
@@ -428,8 +419,7 @@ pub const prototype = struct {
         //            fractionalPart.
         // 12. Return the string-concatenation of sign and digitString.
         return Value.from(
-            try String.fromAscii(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
+            try String.fromAscii(agent, try agent.gc_allocator.print(
                 "{s}{d:.[2]}",
                 .{ sign, number_f64, fraction_digits },
             )),
@@ -492,11 +482,7 @@ pub const prototype = struct {
         if (number_f64 == 0) {
             // a. Let significand be the String value consisting of precisionCount occurrences of
             //    the code unit 0x0030 (DIGIT ZERO).
-            significand = try std.fmt.allocPrint(
-                agent.gc_allocator,
-                "{s:0>[1]}",
-                .{ "", precision },
-            );
+            significand = try agent.gc_allocator.print("{s:0>[1]}", .{ "", precision });
 
             // b. Let exponent be 0.
             exponent = 0;
@@ -519,7 +505,7 @@ pub const prototype = struct {
 
             // b. Let significand be the String value consisting of the digits of the decimal
             //    representation of intSignificand (in order, with no leading zeroes).
-            significand = try std.fmt.allocPrint(agent.gc_allocator, "{d}", .{int_significand});
+            significand = try agent.gc_allocator.print("{d}", .{int_significand});
 
             // c. If exponent < -6 or exponent ≥ precisionCount, then
             if (exponent < -6 or exponent >= precision) {
@@ -537,8 +523,7 @@ pub const prototype = struct {
 
                     // 3. Set significand to the string-concatenation of intPart, ".", and
                     //    fractionalPart.
-                    significand = try std.fmt.allocPrint(
-                        agent.gc_allocator,
+                    significand = try agent.gc_allocator.print(
                         "{s}.{s}",
                         .{ int_part, fractional_part },
                     );
@@ -567,8 +552,7 @@ pub const prototype = struct {
                 // vi. Return the string-concatenation of sign, significand, the code unit 0x0065
                 //     (LATIN SMALL LETTER E), exponentSign, and exponentDigits.
                 return Value.from(
-                    try String.fromAscii(agent, try std.fmt.allocPrint(
-                        agent.gc_allocator,
+                    try String.fromAscii(agent, try agent.gc_allocator.print(
                         "{s}{s}e{c}{d}",
                         .{ sign, significand, exponent_sign, exponent },
                     )),
@@ -580,8 +564,7 @@ pub const prototype = struct {
         //     significand.
         if (exponent == precision - 1) {
             return Value.from(
-                try String.fromAscii(agent, try std.fmt.allocPrint(
-                    agent.gc_allocator,
+                try String.fromAscii(agent, try agent.gc_allocator.print(
                     "{s}{s}",
                     .{ sign, significand },
                 )),
@@ -593,8 +576,7 @@ pub const prototype = struct {
             // a. Set significand to the string-concatenation of the first exponent + 1 code units
             //    of significand, the code unit 0x002E (FULL STOP), and the remaining
             //    precisionCount - (exponent + 1) code units of significand.
-            significand = try std.fmt.allocPrint(
-                agent.gc_allocator,
+            significand = try agent.gc_allocator.print(
                 "{s}.{s}",
                 .{ significand[0..@intCast(exponent + 1)], significand[@intCast(exponent + 1)..] },
             );
@@ -603,8 +585,7 @@ pub const prototype = struct {
             // a. Set significand to the string-concatenation of the code unit 0x0030 (DIGIT ZERO),
             //    the code unit 0x002E (FULL STOP), -(exponent + 1) occurrences of the code unit
             //    0x0030 (DIGIT ZERO), and the String significand.
-            significand = try std.fmt.allocPrint(
-                agent.gc_allocator,
+            significand = try agent.gc_allocator.print(
                 "0.{s:0>[2]}{s}",
                 .{ "", significand, @as(usize, @intCast(-(exponent + 1))) },
             );
@@ -612,8 +593,7 @@ pub const prototype = struct {
 
         // 14. Return the string-concatenation of sign and significand.
         return Value.from(
-            try String.fromAscii(agent, try std.fmt.allocPrint(
-                agent.gc_allocator,
+            try String.fromAscii(agent, try agent.gc_allocator.print(
                 "{s}{s}",
                 .{ sign, significand },
             )),

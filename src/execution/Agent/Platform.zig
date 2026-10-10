@@ -68,14 +68,14 @@ fn checkStackOverflowImpl() bool {
     const remaining_stack = @frameAddress() - stack_info.base;
     // Determined empirically using `kiesel -c '(function f() { f(); })();'` on
     // x86_64-linux-musl and Zig 0.16.0. Observed required minimum values:
-    // - Debug, stage2_llvm: 116 KB
-    // - Debug, stage2_x86_64: 49 KB
-    // - ReleaseSafe, stage2_llvm: 37 KB
-    // - ReleaseFast, stage2_llvm: 37 KB
-    // - ReleaseSmall, stage2_llvm: 42 KB
+    // - debug, stage2_llvm: 116 KB
+    // - debug, stage2_x86_64: 49 KB
+    // - safe, stage2_llvm: 37 KB
+    // - fast, stage2_llvm: 37 KB
+    // - small, stage2_llvm: 42 KB
     // Since these will vary a lot across platforms we pad generously.
-    const required_stack = switch (builtin.mode) {
-        .Debug => 128 * 1024,
+    const required_stack = switch (builtin.optimize) {
+        .debug => 128 * 1024,
         else => 64 * 1024,
     };
     return remaining_stack < required_stack;

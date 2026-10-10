@@ -823,11 +823,12 @@ pub const namespace = struct {
         // 4. Let sum be 0.
         const initial_partials_count = 32;
 
-        var stack_fallback = std.heap.stackFallback(@sizeOf(f64) * initial_partials_count, gpa);
-        const sfa = stack_fallback.get();
+        var buffer: [@sizeOf(f64) * initial_partials_count]u8 = undefined;
+        var bfa_state: std.heap.BufferFirstAllocator = .init(&buffer, gpa);
+        const bfa = bfa_state.allocator();
 
-        var partials = try std.ArrayList(f64).initCapacity(sfa, initial_partials_count);
-        defer partials.deinit(sfa);
+        var partials = try std.ArrayList(f64).initCapacity(bfa, initial_partials_count);
+        defer partials.deinit(bfa);
         var overflow: f64 = 0.0;
 
         const max_f64 = std.math.floatMax(f64);
@@ -917,7 +918,7 @@ pub const namespace = struct {
                     partials.shrinkRetainingCapacity(written_partials_len);
 
                     if (x != 0.0) {
-                        try partials.append(sfa, x);
+                        try partials.append(bfa, x);
                     }
                 }
             }

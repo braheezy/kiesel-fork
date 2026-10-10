@@ -88,7 +88,7 @@ fn validateAtomicAccess(
 
     // 3. Assert: accessIndex ≥ 0.
     // 4. If accessIndex ≥ length, throw a RangeError exception.
-    if (access_index >= @intFromEnum(length)) {
+    if (access_index >= @backingInt(length)) {
         return agent.throwException(
             .range_error,
             "Invalid index {d} for typed array with length {d}",
@@ -106,7 +106,7 @@ fn validateAtomicAccess(
     const offset = typed_array.fields.byte_offset;
 
     // 8. Return (accessIndex × elementSize) + offset.
-    return (access_index * element_size) + @intFromEnum(offset);
+    return (access_index * element_size) + @backingInt(offset);
 }
 
 /// 25.4.3.3 ValidateAtomicAccessOnIntegerTypedArray ( ta, requestIndex )
@@ -137,10 +137,10 @@ fn revalidateAtomicAccess(
     const ta = try validateTypedArrayBounds(agent, typed_array, .unordered);
 
     // 3. Assert: byteIndexInBuffer ≥ ta.[[ByteOffset]].
-    std.debug.assert(byte_index_in_buffer >= @intFromEnum(typed_array.fields.byte_offset));
+    std.debug.assert(byte_index_in_buffer >= @backingInt(typed_array.fields.byte_offset));
 
     // 4. If byteIndexInBuffer ≥ taRecord.[[CachedBufferByteLength]], throw a RangeError exception.
-    if (byte_index_in_buffer >= @intFromEnum(ta.cached_buffer_byte_length)) {
+    if (byte_index_in_buffer >= @backingInt(ta.cached_buffer_byte_length)) {
         return agent.throwException(
             .range_error,
             "Invalid index {d} for buffer with byte length {d}",
@@ -342,7 +342,7 @@ fn atomicReadModifyWrite(
     typed_array_value: Value,
     index: Value,
     value: Value,
-    comptime op: std.builtin.AtomicRmwOp,
+    comptime op: std.lang.AtomicRmwOp,
 ) Agent.Error!Value {
     // 1. Let byteIndexInBuffer be ? ValidateAtomicAccessOnIntegerTypedArray(ta, index).
     const byte_index_in_buffer = try validateAtomicAccessOnIntegerTypedArray(

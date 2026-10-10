@@ -75,7 +75,7 @@ export fn __sanitizer_cov_trace_pc_guard_init(start: [*]u32, stop: [*]u32) void 
         );
         defer _ = std.c.close(fd);
         if (fd <= -1) {
-            const err: std.c.E = @enumFromInt(std.c._errno().*);
+            const err: std.c.E = @fromBackingInt(@intCast(std.c._errno().*));
             stderr.print("Failed to open shared memory region: {t}\n", .{err}) catch {};
             stderr.flush() catch {};
             std.c._exit(-1);

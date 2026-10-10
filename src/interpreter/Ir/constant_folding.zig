@@ -1,9 +1,11 @@
 const std = @import("std");
 
 const ast = @import("../../language/ast.zig");
+const language = @import("../../language.zig");
 const types = @import("../../types.zig");
 
 const Number = types.Number;
+const Tokenizer = language.Tokenizer;
 
 pub const Constant = union(enum) {
     undefined,
@@ -51,7 +53,7 @@ pub const Constant = union(enum) {
     }
 
     pub fn isStrictlyEqual(lhs: Constant, rhs: Constant) ?bool {
-        if (@intFromEnum(lhs) != @intFromEnum(rhs)) return false;
+        if (@backingInt(lhs) != @backingInt(rhs)) return false;
         return switch (lhs) {
             .undefined, .null => true,
             .number => |number| {
@@ -70,7 +72,7 @@ pub const Constant = union(enum) {
     }
 
     pub fn isLooselyEqual(lhs: Constant, rhs: Constant) ?bool {
-        if (@intFromEnum(lhs) == @intFromEnum(rhs)) return lhs.isStrictlyEqual(rhs);
+        if (@backingInt(lhs) == @backingInt(rhs)) return lhs.isStrictlyEqual(rhs);
         if (lhs == .null and rhs == .undefined) return true;
         if (lhs == .undefined and rhs == .null) return true;
         // The rest requires type coercion, bail out
@@ -134,7 +136,14 @@ fn constantFoldLiteral(
                 } };
             }
         },
-        .string => |s| .{ .string = try gpa.dupe(u8, s.text[1 .. s.text.len - 1]) },
+        .string => |s| blk: {
+            const sl: Tokenizer.StringLiteral = .{ .text = s.text };
+            var aw: std.Io.Writer.Allocating = .init(gpa);
+            errdefer aw.deinit();
+            const valid = sl.value(&aw.writer) catch return error.OutOfMemory;
+            std.debug.assert(valid);
+            break :blk .{ .string = try aw.toOwnedSlice() };
+        },
     };
 }
 
@@ -184,6 +193,7 @@ fn constantFoldUnaryExpression(
     return null;
 }
 
+/// See: https://tc39.es/ecma262/#sec-applystringornumericbinaryoperator
 fn constantFoldBinaryExpression(
     gpa: std.mem.Allocator,
     bin_expr: *const ast.BinaryExpression,
@@ -239,17 +249,8 @@ fn constantFoldBinaryExpression(
                         const result = lhs.number + rhs.number;
                         return .{ .number = result };
                     } else if (lhs == .big_int and rhs == .big_int) {
-                        var result_managed: std.math.big.int.Managed = try .init(gpa);
-                        defer result_managed.deinit();
-                        try result_managed.ensureCapacity(@max(lhs.big_int.limbs.len, rhs.big_int.limbs.len) + 1);
-                        var result_mutable = result_managed.toMutable();
-                        result_mutable.add(lhs.big_int, rhs.big_int);
-                        result_managed.setMetadata(result_mutable.positive, result_mutable.len);
-                        const result: std.math.big.int.Const = .{
-                            .limbs = try gpa.dupe(std.math.big.Limb, result_managed.toConst().limbs),
-                            .positive = result_managed.toConst().positive,
-                        };
-                        return .{ .big_int = result };
+                        const big_int = try constantFoldBinaryBigIntExpression(gpa, .add, lhs.big_int, rhs.big_int);
+                        return .{ .big_int = big_int };
                     } else if (lhs == .boolean and rhs == .boolean) {
                         // Y tho
                         const number: f64 = if (lhs.boolean and rhs.boolean)
@@ -261,11 +262,41 @@ fn constantFoldBinaryExpression(
                         return .{ .number = number };
                     }
                 },
+                .@"-" => {
+                    // At this point, non-numerics and !SameType(lhs, rhs)
+                    // cause TypeErrors
+                    if (lhs == .number and rhs == .number) {
+                        return .{ .number = lhs.number - rhs.number };
+                    } else if (lhs == .big_int and rhs == .big_int) {
+                        const big_int = try constantFoldBinaryBigIntExpression(gpa, .sub, lhs.big_int, rhs.big_int);
+                        return .{ .big_int = big_int };
+                    }
+                },
                 else => {},
             }
         }
     }
     return null;
+}
+
+fn constantFoldBinaryBigIntExpression(
+    gpa: std.mem.Allocator,
+    comptime op: enum { add, sub },
+    lhs: std.math.big.int.Const,
+    rhs: std.math.big.int.Const,
+) std.mem.Allocator.Error!std.math.big.int.Const {
+    var result_managed: std.math.big.int.Managed = try .init(gpa);
+    errdefer result_managed.deinit();
+    try result_managed.ensureCapacity(@max(lhs.limbs.len, rhs.limbs.len) + 1);
+    var result = result_managed.toMutable();
+    switch (op) {
+        .add => result.add(lhs, rhs),
+        .sub => result.sub(lhs, rhs),
+    }
+    return .{
+        .limbs = try gpa.realloc(result_managed.limbs, result.len),
+        .positive = result.positive,
+    };
 }
 
 fn constantFoldRelationalExpression(

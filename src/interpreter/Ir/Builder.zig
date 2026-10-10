@@ -11,6 +11,7 @@ const computeLiveness = @import("liveness.zig").computeLiveness;
 const computeLiveRanges = @import("live_ranges.zig").computeLiveRanges;
 const constantFold = @import("constant_folding.zig").constantFold;
 const containsSlice = utils.containsSlice;
+const foldInst = @import("inst_folding.zig").foldInst;
 
 pub const Builder = @This();
 
@@ -20,7 +21,7 @@ root_node: Ast,
 in_strict_mode: bool,
 instructions: std.MultiArrayList(Ir.Inst),
 extra: std.ArrayList(u32),
-strings: StringArrayHashMap(void),
+strings: std.StringArrayHashMapUnmanaged(void),
 big_ints: BigIntArrayHashMap(void),
 functions: std.ArrayList(Ir.Function),
 classes: std.ArrayList(Ir.Class),
@@ -40,30 +41,6 @@ pub const Ast = union(enum) {
         strict: bool,
     },
 };
-
-const StringKey = struct {
-    string: []const u8,
-    kind: Ir.StringKind,
-};
-
-const StringKind = Ir.StringKind;
-
-const StringContext = struct {
-    pub fn hash(_: @This(), key: StringKey) u32 {
-        var hasher: std.hash.Wyhash = .init(0);
-        hasher.update(@ptrCast(&key.kind));
-        hasher.update(key.string);
-        return @truncate(hasher.final());
-    }
-
-    pub fn eql(_: @This(), a: StringKey, b: StringKey, _: usize) bool {
-        return a.kind == b.kind and std.mem.eql(u8, a.string, b.string);
-    }
-};
-
-fn StringArrayHashMap(comptime V: type) type {
-    return std.array_hash_map.Custom(StringKey, V, StringContext, true);
-}
 
 const BigIntContext = struct {
     pub fn hash(_: @This(), key: std.math.big.int.Const) u32 {
@@ -161,7 +138,7 @@ pub fn init(gpa: std.mem.Allocator, name: []const u8, root_node: Ast) Builder {
 pub fn deinit(b: *Builder) void {
     b.instructions.deinit(b.gpa);
     b.extra.deinit(b.gpa);
-    for (b.strings.keys()) |key| b.gpa.free(key.string);
+    for (b.strings.keys()) |key| b.gpa.free(key);
     b.strings.deinit(b.gpa);
     for (b.big_ints.keys()) |big_int| b.gpa.free(big_int.limbs);
     b.big_ints.deinit(b.gpa);
@@ -196,14 +173,8 @@ pub fn build(b: *Builder) Error!Ir {
     const extra = try b.extra.toOwnedSlice(b.gpa);
     errdefer b.gpa.free(extra);
 
-    const strings = try b.gpa.alloc([]const u8, b.strings.count());
+    const strings = try b.gpa.dupe([]const u8, b.strings.keys());
     errdefer b.gpa.free(strings);
-    const string_kinds = try b.gpa.alloc(Ir.StringKind, b.strings.count());
-    errdefer b.gpa.free(string_kinds);
-    for (b.strings.keys(), strings, string_kinds) |key, *string, *kind| {
-        string.* = key.string;
-        kind.* = key.kind;
-    }
     b.strings.clearRetainingCapacity(); // Transfer ownership
     errdefer for (strings) |string| b.gpa.free(string);
 
@@ -226,7 +197,6 @@ pub fn build(b: *Builder) Error!Ir {
         .instructions = instructions,
         .extra = extra,
         .strings = strings,
-        .string_kinds = string_kinds,
         .big_ints = big_ints,
         .functions = functions,
         .classes = classes,
@@ -244,7 +214,8 @@ pub fn build(b: *Builder) Error!Ir {
 }
 
 fn addInst(b: *Builder, inst: Ir.Inst) std.mem.Allocator.Error!Ir.Inst.Ref {
-    const index: Ir.Inst.Index = @enumFromInt(b.instructions.len);
+    if (foldInst(b, inst)) |ref| return ref;
+    const index: Ir.Inst.Index = @fromBackingInt(@intCast(b.instructions.len));
     try b.instructions.append(b.gpa, inst);
     return index.toRef();
 }
@@ -261,20 +232,20 @@ const Deferred = struct {
 
     fn set(d: Deferred, data: Data) void {
         const slice = d.b.instructions.slice();
-        const i = @intFromEnum(d.index);
+        const i = @backingInt(d.index);
         switch (slice.items(.tag)[i]) {
             .br => slice.items(.data)[i] = .{ .br = data.br },
             .br_cond => {
-                const ei = @intFromEnum(slice.items(.data)[i].br_cond);
-                d.b.extra.items[ei] = @intFromEnum(data.br_cond.condition);
-                d.b.extra.items[ei + 1] = @intFromEnum(data.br_cond.then_target);
-                d.b.extra.items[ei + 2] = @intFromEnum(data.br_cond.else_target);
+                const ei = @backingInt(slice.items(.data)[i].br_cond);
+                d.b.extra.items[ei] = @backingInt(data.br_cond.condition);
+                d.b.extra.items[ei + 1] = @backingInt(data.br_cond.then_target);
+                d.b.extra.items[ei + 2] = @backingInt(data.br_cond.else_target);
             },
             .exception_handler => {
-                const ei = @intFromEnum(slice.items(.data)[i].exception_handler);
-                d.b.extra.items[ei] = @intFromEnum(data.exception_handler.start);
-                d.b.extra.items[ei + 1] = @intFromEnum(data.exception_handler.end);
-                d.b.extra.items[ei + 2] = @intFromEnum(data.exception_handler.target);
+                const ei = @backingInt(slice.items(.data)[i].exception_handler);
+                d.b.extra.items[ei] = @backingInt(data.exception_handler.start);
+                d.b.extra.items[ei + 1] = @backingInt(data.exception_handler.end);
+                d.b.extra.items[ei + 2] = @backingInt(data.exception_handler.target);
                 d.b.extra.items[ei + 3] = data.exception_handler.scope_depth;
             },
             else => unreachable,
@@ -286,12 +257,12 @@ fn addInstDeferred(b: *Builder, tag: Ir.Inst.Tag) std.mem.Allocator.Error!Deferr
     const data: Ir.Inst.Data = switch (tag) {
         .br => .{ .br = undefined },
         .br_cond => blk: {
-            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
             try b.extra.appendNTimes(b.gpa, undefined, 3);
             break :blk .{ .br_cond = extra_index };
         },
         .exception_handler => blk: {
-            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
             try b.extra.appendNTimes(b.gpa, undefined, 4);
             break :blk .{ .exception_handler = extra_index };
         },
@@ -312,16 +283,16 @@ fn addLabel(b: *Builder) std.mem.Allocator.Error!Ir.Inst.Ref {
 }
 
 fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.ExtraIndex {
-    const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
-    const fields = @typeInfo(T).@"struct".fields;
-    try b.extra.ensureUnusedCapacity(b.gpa, fields.len);
-    inline for (fields) |field| {
-        const value = @field(extra, field.name);
-        b.extra.appendAssumeCapacity(switch (field.type) {
+    const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
+    const info = @typeInfo(T).@"struct";
+    try b.extra.ensureUnusedCapacity(b.gpa, info.field_names.len);
+    inline for (info.field_names, info.field_types) |field_name, field_type| {
+        const value = @field(extra, field_name);
+        b.extra.appendAssumeCapacity(switch (field_type) {
             u32 => value,
             Ir.Inst.Ref,
             Ir.StringIndex,
-            => @intFromEnum(value),
+            => @backingInt(value),
             else => comptime unreachable,
         });
     }
@@ -329,31 +300,31 @@ fn addExtra(b: *Builder, comptime T: type, extra: T) std.mem.Allocator.Error!Ir.
 }
 
 fn addFunction(b: *Builder, function: Ir.Function) std.mem.Allocator.Error!Ir.Function.Index {
-    const index: Ir.Function.Index = @enumFromInt(b.functions.items.len);
+    const index: Ir.Function.Index = @fromBackingInt(@intCast(b.functions.items.len));
     try b.functions.append(b.gpa, function);
     return index;
 }
 
 fn addClass(b: *Builder, class: Ir.Class) std.mem.Allocator.Error!Ir.Class.Index {
-    const index: Ir.Class.Index = @enumFromInt(b.classes.items.len);
+    const index: Ir.Class.Index = @fromBackingInt(@intCast(b.classes.items.len));
     try b.classes.append(b.gpa, class);
     return index;
 }
 
 fn setAnonymousFunctionName(b: *Builder, ref: Ir.Inst.Ref, string_index: Ir.StringIndex) void {
     const index = ref.toIndex().?;
-    const inst = b.instructions.get(@intFromEnum(index));
+    const inst = b.instructions.get(@backingInt(index));
     switch (inst.tag) {
         .create_function => {
             const function_index = inst.data.create_function;
-            const function = &b.functions.items[@intFromEnum(function_index)];
+            const function = &b.functions.items[@backingInt(function_index)];
             if (function.name == .none) {
                 function.name = .{ .default = string_index };
             }
         },
         .create_class => {
             const class_index = inst.data.create_class;
-            const class = &b.classes.items[@intFromEnum(class_index)];
+            const class = &b.classes.items[@backingInt(class_index)];
             if (class.name == .none) {
                 class.name = .{ .default = string_index };
             }
@@ -388,22 +359,15 @@ fn findBreakableContext(b: *Builder, label: ?[]const u8) *BreakableContext {
         }
         unreachable;
     }
-    return b.breakable_stack.items[b.breakable_stack.items.len - 1];
+    return b.breakable_stack.last().?;
 }
 
-fn internString(b: *Builder, string: []const u8, kind: StringKind) std.mem.Allocator.Error!Ir.StringIndex {
-    const canonical_kind: Ir.StringKind = switch (kind) {
-        .literal => .literal,
-        .escaped => if (std.mem.findScalar(u8, string, '\\') == null)
-            .literal
-        else
-            .escaped,
-    };
-    const gop = try b.strings.getOrPut(b.gpa, .{ .string = string, .kind = canonical_kind });
+fn internString(b: *Builder, string: []const u8) std.mem.Allocator.Error!Ir.StringIndex {
+    const gop = try b.strings.getOrPut(b.gpa, string);
     if (!gop.found_existing) {
-        gop.key_ptr.string = try b.gpa.dupe(u8, string);
+        gop.key_ptr.* = try b.gpa.dupe(u8, string);
     }
-    return @enumFromInt(gop.index);
+    return @fromBackingInt(@intCast(gop.index));
 }
 
 fn internBigInt(b: *Builder, big_int: std.math.big.int.Const) std.mem.Allocator.Error!Ir.BigIntIndex {
@@ -411,7 +375,7 @@ fn internBigInt(b: *Builder, big_int: std.math.big.int.Const) std.mem.Allocator.
     if (!gop.found_existing) {
         gop.key_ptr.limbs = try b.gpa.dupe(std.math.big.Limb, big_int.limbs);
     }
-    return @enumFromInt(gop.index);
+    return @fromBackingInt(@intCast(gop.index));
 }
 
 fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
@@ -440,7 +404,7 @@ fn lowerConstant(b: *Builder, constant: Constant) Error!Ir.Inst.Ref {
             });
         },
         .string => |string| {
-            const string_index = try b.internString(string, .escaped);
+            const string_index = try b.internString(string);
             return b.addInst(.{
                 .tag = .string,
                 .data = .{ .string = string_index },
@@ -492,7 +456,7 @@ fn lowerExportDeclaration(b: *Builder, export_decl: *const ast.ExportDeclaration
         .default_class_declaration => |*class_decl| {
             const value = try b.lowerClassDeclaration(class_decl);
             if (class_decl.identifier == null) {
-                const string_index = try b.internString("*default*", .literal);
+                const string_index = try b.internString("*default*");
                 _ = try b.addInst(.{
                     .tag = .initialize_binding,
                     .data = .{ .set_binding = .{
@@ -505,7 +469,7 @@ fn lowerExportDeclaration(b: *Builder, export_decl: *const ast.ExportDeclaration
         },
         .default_expression => |*expr| {
             const value = try b.lowerExpression(expr);
-            const string_index = try b.internString("*default*", .literal);
+            const string_index = try b.internString("*default*");
             if (expr.isAnonymousFunctionDefinition()) {
                 b.setAnonymousFunctionName(value, string_index);
             }
@@ -708,7 +672,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         // c. If alreadyDeclared is false, then
         if (!gop.found_existing) {
             // i. Perform ! envRecord.CreateMutableBinding(paramName, false).
-            const string_index = try b.internString(param_name, .literal);
+            const string_index = try b.internString(param_name);
             _ = try b.addInst(.{
                 .tag = .create_mutable_binding,
                 .data = .{ .string = string_index },
@@ -756,7 +720,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         };
 
         // c. If strict is true, then
-        const arguments_string = try b.internString("arguments", .literal);
+        const arguments_string = try b.internString("arguments");
         if (strict) {
             // i. Perform ! envRecord.CreateImmutableBinding("arguments", false).
             _ = try b.addInst(.{
@@ -813,7 +777,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     for (formal_parameters.items, 0..) |item, i| switch (item) {
         .formal_parameter => |param| switch (param.binding_element) {
             .single_name_binding => |binding| {
-                const string_index = try b.internString(binding.binding_identifier, .literal);
+                const string_index = try b.internString(binding.binding_identifier);
                 const arg_value = try b.addInst(.{
                     .tag = .get_argument,
                     .data = .{ .argument = @intCast(i) },
@@ -842,7 +806,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         },
         .function_rest_parameter => |rest_param| switch (rest_param.binding_rest_element) {
             .binding_identifier => |identifier| {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 const rest_value = try b.addInst(.{
                     .tag = .get_rest_arguments,
                     .data = .{ .argument = @intCast(i) },
@@ -888,7 +852,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
                 // 1. Append name to instantiatedVariableNames.
                 // 2. Perform ! envRecord.CreateMutableBinding(name, false).
                 // 3. Perform ! envRecord.InitializeBinding(name, undefined).
-                const string_index = try b.internString(name, .literal);
+                const string_index = try b.internString(name);
                 _ = try b.addInst(.{
                     .tag = .create_var_binding,
                     .data = .{ .string = string_index },
@@ -930,7 +894,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
                     // a. Let initialValue be undefined.
                     // 2. Perform ! variableEnv.CreateMutableBinding(name, false).
                     // 5. Perform ! variableEnv.InitializeBinding(name, initialValue).
-                    const string_index = try b.internString(name, .literal);
+                    const string_index = try b.internString(name);
                     _ = try b.addInst(.{
                         .tag = .create_var_binding,
                         .data = .{ .string = string_index },
@@ -942,7 +906,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
                     //       get_binding walks the environment chain and would find the uninitialized
                     //       binding in varEnv instead of the initialized one in env. This reorder is
                     //       equivalent because env.GetBindingValue has no side effects on varEnv.
-                    const string_index = try b.internString(name, .literal);
+                    const string_index = try b.internString(name);
                     const initial_value = try b.addInst(.{
                         .tag = .get_binding,
                         .data = .{ .string = string_index },
@@ -1016,7 +980,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         try lexical_decl.collectBoundNames(b.gpa, &bound_names);
 
         for (bound_names.items) |name| {
-            const string_index = try b.internString(name, .literal);
+            const string_index = try b.internString(name);
 
             // i. If IsConstantDeclaration of lexicalDecl is true, then
             if (lexical_decl.isConstantDeclaration()) {
@@ -1047,7 +1011,7 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
         //    privateEnv.
         const string_index, const func_ref = switch (hoistable_decl) {
             inline else => |func_decl, tag| blk: {
-                const string_index = try b.internString(func_decl.identifier.?, .literal);
+                const string_index = try b.internString(func_decl.identifier.?);
                 const function_index = try b.addFunction(.{
                     .source_range = func_decl.source_range,
                     .name = .{ .identifier = string_index },
@@ -1121,7 +1085,7 @@ fn lowerBlockDeclarationInstantiation(
                 .create_immutable_binding
             else
                 .create_mutable_binding;
-            const string_index = try b.internString(name, .literal);
+            const string_index = try b.internString(name);
             _ = try b.addInst(.{
                 .tag = tag,
                 .data = .{ .string = string_index },
@@ -1143,7 +1107,7 @@ fn lowerBlockDeclarationInstantiation(
             //     1. Perform ! envRecord.InitializeBinding(funcName, funcObj).
             const string_index, const function_ref = switch (hoistable_decl) {
                 inline else => |func_decl, tag| blk: {
-                    const string_index = try b.internString(func_decl.identifier.?, .literal);
+                    const string_index = try b.internString(func_decl.identifier.?);
                     const function_index = try b.addFunction(.{
                         .source_range = func_decl.source_range,
                         .name = .{ .identifier = string_index },
@@ -1271,7 +1235,7 @@ fn lowerVariableDeclaration(b: *Builder, var_decl: *const ast.VariableDeclaratio
         .binding_identifier => |binding| {
             if (binding.initializer) |*init_expr| {
                 const value = try b.lowerExpression(init_expr);
-                const string_index = try b.internString(binding.binding_identifier, .literal);
+                const string_index = try b.internString(binding.binding_identifier);
                 if (init_expr.isAnonymousFunctionDefinition()) {
                     b.setAnonymousFunctionName(value, string_index);
                 }
@@ -1540,7 +1504,7 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
         for (lex_decl.binding_list.items) |lex_binding| {
             switch (lex_binding) {
                 .binding_identifier => |binding| {
-                    const string_index = try b.internString(binding.binding_identifier, .literal);
+                    const string_index = try b.internString(binding.binding_identifier);
                     _ = try b.addInst(.{
                         .tag = binding_tag,
                         .data = .{ .string = string_index },
@@ -1551,7 +1515,7 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
                     defer bound_names.deinit(b.gpa);
                     try pattern.binding_pattern.collectBoundNames(b.gpa, &bound_names);
                     for (bound_names.items) |name| {
-                        const string_index = try b.internString(name, .literal);
+                        const string_index = try b.internString(name);
                         _ = try b.addInst(.{
                             .tag = binding_tag,
                             .data = .{ .string = string_index },
@@ -1678,7 +1642,7 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     } });
     continue_br.set(.{ .br = .{
         .target = test_label,
-        .value = body_result,
+        .value = continue_label,
     } });
     exit_br.set(.{ .br = .{
         .target = end_label,
@@ -1686,6 +1650,111 @@ fn lowerForStatement(b: *Builder, for_stmt: *const ast.ForStatement, label: ?[]c
     } });
 
     return end_label;
+}
+
+const IterationKind = enum {
+    enumerate,
+    iterate,
+    async_iterate,
+};
+
+const ForInOfHeadEvaluation = struct {
+    iterator: Ir.Inst.Ref,
+    skip_br_cond: ?Deferred,
+};
+
+/// 14.7.5.6 ForIn/OfHeadEvaluation ( uninitializedBoundNames, expr, iterationKind )
+/// https://tc39.es/ecma262/#sec-runtime-semantics-forinofheadevaluation
+fn lowerForInOfHeadEvaluation(
+    b: *Builder,
+    uninitialized_bound_names: []const ast.Identifier,
+    expr: *const ast.Expression,
+    iteration_kind: IterationKind,
+) Error!ForInOfHeadEvaluation {
+    // 1. Let oldEnv be the running execution context's LexicalEnvironment.
+
+    // 2. If uninitializedBoundNames is not empty, then
+    if (uninitialized_bound_names.len > 0) {
+        // a. Assert: uninitializedBoundNames has no duplicate entries.
+        // b. Let newEnv be NewDeclarativeEnvironment(oldEnv).
+        _ = try b.addInst(.{
+            .tag = .push_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth += 1;
+
+        // c. For each String name of uninitializedBoundNames, do
+        for (uninitialized_bound_names) |name| {
+            // i. Perform ! newEnv.CreateMutableBinding(name, false).
+            const string_index = try b.internString(name);
+            _ = try b.addInst(.{
+                .tag = .create_mutable_binding,
+                .data = .{ .string = string_index },
+            });
+        }
+
+        // d. Set the running execution context's LexicalEnvironment to newEnv.
+    }
+
+    // 3. Let exprRef be Completion(Evaluation of expr).
+    const expr_value = try b.lowerExpression(expr);
+
+    // 4. Set the running execution context's LexicalEnvironment to oldEnv.
+    if (uninitialized_bound_names.len > 0) {
+        _ = try b.addInst(.{
+            .tag = .pop_scope,
+            .data = .{ .none = {} },
+        });
+        b.scope_depth -= 1;
+    }
+
+    // 5. Let exprValue be ? GetValue(? exprRef).
+    // 6. If iterationKind is enumerate, then
+    //    a. If exprValue is either undefined or null, then
+    //       i. Return Completion Record { [[Type]]: break, [[Value]]: empty, [[Target]]: empty }.
+    //    b. Let obj be ! ToObject(exprValue).
+    //    c. Let iterator be EnumerateObjectProperties(obj).
+    //    d. Let nextMethod be ! GetV(iterator, "next").
+    //    e. Return the Iterator Record { [[Iterator]]: iterator, [[NextMethod]]: nextMethod,
+    //       [[Done]]: false }.
+    // 7. Assert: iterationKind is either iterate or async-iterate.
+    // 8. If iterationKind is async-iterate, let iteratorKind be async.
+    // 9. Else, let iteratorKind be sync.
+    // 10. Return ? GetIterator(exprValue, iteratorKind).
+    var skip_br_cond: ?Deferred = null;
+    if (iteration_kind == .enumerate) {
+        const null_ref = try b.addInst(.{
+            .tag = .null,
+            .data = .{ .none = {} },
+        });
+        const is_nullish = try b.addInst(.{
+            .tag = .eq,
+            .data = .{ .binary = .{
+                .lhs = expr_value,
+                .rhs = null_ref,
+            } },
+        });
+        skip_br_cond = try b.addInstDeferred(.br_cond);
+        const setup_label = try b.addLabel();
+        skip_br_cond.?.set(.{ .br_cond = .{
+            .condition = is_nullish,
+            .then_target = .none,
+            .else_target = setup_label,
+        } });
+    }
+    const iterator = try b.addInst(.{
+        .tag = switch (iteration_kind) {
+            .enumerate => .get_for_in_iterator,
+            .iterate => .get_iterator,
+            .async_iterate => .get_async_iterator,
+        },
+        .data = .{ .ref = expr_value },
+    });
+
+    return .{
+        .iterator = iterator,
+        .skip_br_cond = skip_br_cond,
+    };
 }
 
 fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatement, label: ?[]const u8) Error!Ir.Inst.Ref {
@@ -1703,51 +1772,42 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         break :blk .{ false, false };
     };
 
-    const expr_value = try b.lowerExpression(&for_in_of_stmt.expression);
+    const iteration_kind: IterationKind = switch (for_in_of_stmt.type) {
+        .in => .enumerate,
+        .of => .iterate,
+        .async_of => .async_iterate,
+    };
+
+    var uninitialized_bound_names: std.ArrayList(ast.Identifier) = .empty;
+    defer uninitialized_bound_names.deinit(b.gpa);
+    switch (for_in_of_stmt.initializer) {
+        .for_declaration => |for_decl| {
+            try for_decl.for_binding.collectBoundNames(b.gpa, &uninitialized_bound_names);
+        },
+        else => {},
+    }
 
     const undefined_ref = try b.addInst(.{
         .tag = .undefined,
         .data = .{ .none = {} },
     });
 
-    var skip_br_cond: Deferred = undefined;
-    var skip_condition: Ir.Inst.Ref = .none;
-    var setup_label: Ir.Inst.Ref = undefined;
+    const head_eval = try b.lowerForInOfHeadEvaluation(
+        uninitialized_bound_names.items,
+        &for_in_of_stmt.expression,
+        iteration_kind,
+    );
+    const iterator = head_eval.iterator;
+
     var skip_label: Ir.Inst.Ref = .none;
     var skip_br: Deferred = undefined;
-
-    if (for_in_of_stmt.type == .in) {
-        std.debug.assert(!has_using);
-        const null_ref = try b.addInst(.{
-            .tag = .null,
-            .data = .{ .none = {} },
-        });
-        skip_condition = try b.addInst(.{
-            .tag = .eq,
-            .data = .{ .binary = .{
-                .lhs = expr_value,
-                .rhs = null_ref,
-            } },
-        });
-        skip_br_cond = try b.addInstDeferred(.br_cond);
-        setup_label = try b.addLabel();
-    }
-
-    const iterator = try b.addInst(.{
-        .tag = switch (for_in_of_stmt.type) {
-            .in => .get_for_in_iterator,
-            .of => .get_iterator,
-            .async_of => .get_async_iterator,
-        },
-        .data = .{ .ref = expr_value },
-    });
 
     const entry_br = try b.addInstDeferred(.br);
 
     const test_label = try b.addLabel();
 
     const next_value = try b.addInst(.{
-        .tag = if (for_in_of_stmt.type == .async_of) .iterator_step_value_async else .iterator_step_value,
+        .tag = if (iteration_kind == .async_iterate) .iterator_step_value_async else .iterator_step_value,
         .data = .{ .ref = iterator },
     });
     const is_done = try b.addInst(.{
@@ -1770,7 +1830,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         .continue_target = .{ .deferred = .empty },
         .break_target = .{ .deferred = .empty },
         .result_ref = undefined_ref,
-        .iterator_ref = if (for_in_of_stmt.type != .in) iterator else .none,
+        .iterator_ref = if (iteration_kind != .enumerate) iterator else .none,
     });
     defer b.popBreakableContext();
 
@@ -1778,7 +1838,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         .expression => |*expr| switch (expr.*) {
             .primary_expression => |prim_expr| switch (prim_expr) {
                 .identifier_reference => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     _ = try b.addInst(.{
                         .tag = if (b.in_strict_mode) .set_binding_strict else .set_binding,
                         .data = .{ .set_binding = .{
@@ -1793,7 +1853,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                 const base = try b.lowerExpression(member_expr.expression);
                 switch (member_expr.property) {
                     .identifier => |identifier| {
-                        const string_index = try b.internString(identifier, .literal);
+                        const string_index = try b.internString(identifier);
                         const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                             .set_property_strict
                         else
@@ -1844,7 +1904,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                         });
                     },
                     .private_identifier => |private_identifier| {
-                        const string_index = try b.internString(private_identifier, .literal);
+                        const string_index = try b.internString(private_identifier);
                         const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
                             .base = base,
                             .name = string_index,
@@ -1859,7 +1919,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
             },
             .super_property => |super_prop| switch (super_prop) {
                 .identifier => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                         .set_super_property_strict
                     else
@@ -1905,7 +1965,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
         },
         .for_binding => |for_binding| switch (for_binding) {
             .binding_identifier => |identifier| {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                     .set_binding_strict
                 else
@@ -1935,7 +1995,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                         .let => .create_mutable_binding,
                         .@"const", .using, .await_using => .create_immutable_binding,
                     };
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     _ = try b.addInst(.{
                         .tag = tag,
                         .data = .{ .string = string_index },
@@ -1969,7 +2029,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
                     defer bound_names.deinit(b.gpa);
                     try binding_pattern.collectBoundNames(b.gpa, &bound_names);
                     for (bound_names.items) |name| {
-                        const string_index = try b.internString(name, .literal);
+                        const string_index = try b.internString(name);
                         _ = try b.addInst(.{
                             .tag = tag,
                             .data = .{ .string = string_index },
@@ -2009,7 +2069,7 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     const exit_label = try b.addLabel();
     const exit_br = try b.addInstDeferred(.br);
 
-    if (for_in_of_stmt.type == .in) {
+    if (iteration_kind == .enumerate) {
         skip_label = try b.addLabel();
         skip_br = try b.addInstDeferred(.br);
     }
@@ -2019,12 +2079,11 @@ fn lowerForInOfStatement(b: *Builder, for_in_of_stmt: *const ast.ForInOfStatemen
     breakable_ctx.setDeferredContinues(test_label);
     breakable_ctx.setDeferredBreaks(end_label);
 
-    if (for_in_of_stmt.type == .in) {
-        skip_br_cond.set(.{ .br_cond = .{
-            .condition = skip_condition,
-            .then_target = skip_label,
-            .else_target = setup_label,
-        } });
+    if (head_eval.skip_br_cond) |skip_br_cond| {
+        const inst = b.instructions.get(@backingInt(skip_br_cond.index));
+        const extra_index = @backingInt(inst.data.br_cond);
+        // Set then_target which was initialized as .none
+        b.extra.items[extra_index + 1] = @backingInt(skip_label);
         skip_br.set(.{ .br = .{
             .target = end_label,
             .value = undefined_ref,
@@ -2163,10 +2222,10 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
         .value = undefined_ref,
     } });
     for (case_branches.items) |item| {
-        const inst = b.instructions.get(@intFromEnum(item.br_cond.index));
-        const extra_index = @intFromEnum(inst.data.br_cond);
+        const inst = b.instructions.get(@backingInt(item.br_cond.index));
+        const extra_index = @backingInt(inst.data.br_cond);
         // Set then_target which was initialized as .none
-        b.extra.items[extra_index + 1] = @intFromEnum(body_labels[item.index]);
+        b.extra.items[extra_index + 1] = @backingInt(body_labels[item.index]);
     }
     default_br.set(.{ .br = .{
         .target = if (default_index) |index| body_labels[index] else end_label,
@@ -2181,7 +2240,7 @@ fn lowerSwitchStatement(b: *Builder, switch_stmt: *const ast.SwitchStatement, la
 }
 
 fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) Error!Ir.Inst.Ref {
-    const current_ctx = b.breakable_stack.items[b.breakable_stack.items.len - 1];
+    const current_ctx = b.breakable_stack.last().?;
     const target_ctx = b.findBreakableContext(cont_stmt.label);
     const value = current_ctx.result_ref;
 
@@ -2226,7 +2285,7 @@ fn lowerContinueStatement(b: *Builder, cont_stmt: *const ast.ContinueStatement) 
 }
 
 fn lowerBreakStatement(b: *Builder, brk_stmt: *const ast.BreakStatement) Error!Ir.Inst.Ref {
-    const current_ctx = b.breakable_stack.items[b.breakable_stack.items.len - 1];
+    const current_ctx = b.breakable_stack.last().?;
     const target_ctx = b.findBreakableContext(brk_stmt.label);
     const value = current_ctx.result_ref;
 
@@ -2406,7 +2465,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
             defer bound_names.deinit(b.gpa);
             try catch_parameter.collectBoundNames(b.gpa, &bound_names);
             for (bound_names.items) |name| {
-                const string_index = try b.internString(name, .literal);
+                const string_index = try b.internString(name);
                 _ = try b.addInst(.{
                     .tag = .create_mutable_binding,
                     .data = .{ .string = string_index },
@@ -2415,7 +2474,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
 
             switch (catch_parameter) {
                 .binding_identifier => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     _ = try b.addInst(.{
                         .tag = .initialize_binding,
                         .data = .{ .set_binding = .{
@@ -2507,9 +2566,9 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
 
 fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) Error!Ir.Inst.Ref {
     const name: Ir.Class.Name = if (class_decl.identifier) |identifier|
-        .{ .identifier = try b.internString(identifier, .literal) }
+        .{ .identifier = try b.internString(identifier) }
     else
-        .{ .default = try b.internString("default", .literal) };
+        .{ .default = try b.internString("default") };
 
     const heritage = try b.lowerClassHeritage(class_decl.class_tail.class_heritage);
 
@@ -2535,7 +2594,7 @@ fn lowerClassDeclaration(b: *Builder, class_decl: *const ast.ClassDeclaration) E
         .data = .{ .none = {} },
     });
     if (class_decl.identifier) |identifier| {
-        const string_index = try b.internString(identifier, .literal);
+        const string_index = try b.internString(identifier);
         _ = try b.addInst(.{
             .tag = .initialize_binding,
             .data = .{ .set_binding = .{
@@ -2569,7 +2628,7 @@ fn lowerLexicalBinding(
                     .tag = .undefined,
                     .data = .{ .none = {} },
                 });
-            const string_index = try b.internString(binding.binding_identifier, .literal);
+            const string_index = try b.internString(binding.binding_identifier);
             if (binding.initializer != null and binding.initializer.?.isAnonymousFunctionDefinition()) {
                 b.setAnonymousFunctionName(value, string_index);
             }
@@ -2603,7 +2662,7 @@ fn lowerPropertyName(b: *Builder, property_name: *const ast.PropertyName) Error!
     return switch (property_name.*) {
         .literal_property_name => |literal| switch (literal) {
             .identifier => |identifier| blk: {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 break :blk try b.addInst(.{
                     .tag = .string,
                     .data = .{ .string = string_index },
@@ -2718,7 +2777,7 @@ fn lowerArrayAssignmentPattern(b: *Builder, pattern: *const ast.ArrayAssignmentP
                     last_ref = try b.lowerAssignmentPattern(assignment_pattern, value);
                 },
                 .identifier_reference => |identifier_reference| {
-                    const string_index = try b.internString(identifier_reference, .literal);
+                    const string_index = try b.internString(identifier_reference);
                     const default_expr, const anonymous_function_name = if (assignment_element.initializer) |*expr|
                         .{ expr, if (expr.isAnonymousFunctionDefinition()) string_index else null }
                     else
@@ -2776,7 +2835,7 @@ fn lowerObjectAssignmentPattern(b: *Builder, pattern: *const ast.ObjectAssignmen
     for (pattern.properties) |property| switch (property) {
         .assignment_property => |assignment_property| switch (assignment_property) {
             .identifier_reference_and_expression => |binding| {
-                const string_index = try b.internString(binding.identifier_reference, .literal);
+                const string_index = try b.internString(binding.identifier_reference);
                 const prop_value = try b.addInst(.{
                     .tag = .get_property,
                     .data = .{ .get_property = .{
@@ -2814,7 +2873,7 @@ fn lowerObjectAssignmentPattern(b: *Builder, pattern: *const ast.ObjectAssignmen
                         last_ref = try b.lowerAssignmentPattern(assignment_pattern, value);
                     },
                     .identifier_reference => |identifier_reference| {
-                        const string_index = try b.internString(identifier_reference, .literal);
+                        const string_index = try b.internString(identifier_reference);
                         const default_expr, const anonymous_function_name = if (pnae.assignment_element.initializer) |*expr|
                             .{ expr, if (expr.isAnonymousFunctionDefinition()) string_index else null }
                         else
@@ -2837,7 +2896,7 @@ fn lowerObjectAssignmentPattern(b: *Builder, pattern: *const ast.ObjectAssignmen
             for (pattern.properties) |p| switch (p) {
                 .assignment_property => |ap| switch (ap) {
                     .identifier_reference_and_expression => |binding| {
-                        const string_index = try b.internString(binding.identifier_reference, .literal);
+                        const string_index = try b.internString(binding.identifier_reference);
                         const name_ref = try b.addInst(.{
                             .tag = .string,
                             .data = .{ .string = string_index },
@@ -2852,9 +2911,9 @@ fn lowerObjectAssignmentPattern(b: *Builder, pattern: *const ast.ObjectAssignmen
                 .assignment_rest_property => {},
             };
 
-            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
             const excluded_len: u32 = @intCast(excluded_names.items.len);
-            try b.extra.append(b.gpa, @intFromEnum(object));
+            try b.extra.append(b.gpa, @backingInt(object));
             try b.extra.append(b.gpa, excluded_len);
             try b.extra.appendSlice(b.gpa, @ptrCast(excluded_names.items));
 
@@ -2873,7 +2932,7 @@ fn lowerObjectAssignmentPattern(b: *Builder, pattern: *const ast.ObjectAssignmen
 fn lowerDestructuringAssignmentTarget(b: *Builder, target: *const ast.DestructuringAssignmentTarget, value: Ir.Inst.Ref) Error!Ir.Inst.Ref {
     switch (target.*) {
         .identifier_reference => |identifier_reference| {
-            const string_index = try b.internString(identifier_reference, .literal);
+            const string_index = try b.internString(identifier_reference);
             const tag: Ir.Inst.Tag = if (b.in_strict_mode) .set_binding_strict else .set_binding;
             return b.addInst(.{
                 .tag = tag,
@@ -2887,7 +2946,7 @@ fn lowerDestructuringAssignmentTarget(b: *Builder, target: *const ast.Destructur
             const base = try b.lowerExpression(member_expr.expression);
             switch (member_expr.property) {
                 .identifier => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                         .set_property_strict
                     else
@@ -2937,7 +2996,7 @@ fn lowerDestructuringAssignmentTarget(b: *Builder, target: *const ast.Destructur
                     });
                 },
                 .private_identifier => |private_identifier| {
-                    const string_index = try b.internString(private_identifier, .literal);
+                    const string_index = try b.internString(private_identifier);
                     const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
                         .base = base,
                         .name = string_index,
@@ -2952,7 +3011,7 @@ fn lowerDestructuringAssignmentTarget(b: *Builder, target: *const ast.Destructur
         },
         .super_property => |super_prop| switch (super_prop) {
             .identifier => |identifier| {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                     .set_super_property_strict
                 else
@@ -3021,7 +3080,7 @@ fn lowerArrayBindingPattern(b: *Builder, pattern: *const ast.ArrayBindingPattern
             });
             switch (binding_element) {
                 .single_name_binding => |binding| {
-                    const string_index = try b.internString(binding.binding_identifier, .literal);
+                    const string_index = try b.internString(binding.binding_identifier);
                     const default_expr, const anonymous_function_name = if (binding.initializer) |*expr|
                         .{ expr, if (expr.isAnonymousFunctionDefinition()) string_index else null }
                     else
@@ -3053,7 +3112,7 @@ fn lowerArrayBindingPattern(b: *Builder, pattern: *const ast.ArrayBindingPattern
             });
             switch (rest) {
                 .binding_identifier => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     const tag: Ir.Inst.Tag = switch (binding_op) {
                         .initialize => .initialize_binding,
                         .set => if (b.in_strict_mode) .set_binding_strict else .set_binding,
@@ -3107,7 +3166,7 @@ fn lowerObjectBindingPattern(b: *Builder, pattern: *const ast.ObjectBindingPatte
     for (pattern.properties) |property| switch (property) {
         .binding_property => |binding_property| switch (binding_property) {
             .single_name_binding => |binding| {
-                const string_index = try b.internString(binding.binding_identifier, .literal);
+                const string_index = try b.internString(binding.binding_identifier);
                 const prop_value = try b.addInst(.{
                     .tag = .get_property,
                     .data = .{ .get_property = .{
@@ -3143,7 +3202,7 @@ fn lowerObjectBindingPattern(b: *Builder, pattern: *const ast.ObjectBindingPatte
                 });
                 switch (pnbe.binding_element) {
                     .single_name_binding => |binding| {
-                        const string_index = try b.internString(binding.binding_identifier, .literal);
+                        const string_index = try b.internString(binding.binding_identifier);
                         const default_expr, const anonymous_function_name = if (binding.initializer) |*expr|
                             .{ expr, if (expr.isAnonymousFunctionDefinition()) string_index else null }
                         else
@@ -3176,7 +3235,7 @@ fn lowerObjectBindingPattern(b: *Builder, pattern: *const ast.ObjectBindingPatte
             for (pattern.properties) |p| switch (p) {
                 .binding_property => |binding_property| switch (binding_property) {
                     .single_name_binding => |binding| {
-                        const string_index = try b.internString(binding.binding_identifier, .literal);
+                        const string_index = try b.internString(binding.binding_identifier);
                         const name_ref = try b.addInst(.{
                             .tag = .string,
                             .data = .{ .string = string_index },
@@ -3191,9 +3250,9 @@ fn lowerObjectBindingPattern(b: *Builder, pattern: *const ast.ObjectBindingPatte
                 .binding_rest_property => {},
             };
 
-            const extra_index: Ir.ExtraIndex = @enumFromInt(b.extra.items.len);
+            const extra_index: Ir.ExtraIndex = @fromBackingInt(@intCast(b.extra.items.len));
             const excluded_len: u32 = @intCast(excluded_names.items.len);
-            try b.extra.append(b.gpa, @intFromEnum(object));
+            try b.extra.append(b.gpa, @backingInt(object));
             try b.extra.append(b.gpa, excluded_len);
             try b.extra.appendSlice(b.gpa, @ptrCast(excluded_names.items));
 
@@ -3202,7 +3261,7 @@ fn lowerObjectBindingPattern(b: *Builder, pattern: *const ast.ObjectBindingPatte
                 .data = .{ .copy_data_properties = extra_index },
             });
 
-            const string_index = try b.internString(rest_property.binding_identifier, .literal);
+            const string_index = try b.internString(rest_property.binding_identifier);
             const tag: Ir.Inst.Tag = switch (binding_op) {
                 .initialize => .initialize_binding,
                 .set => if (b.in_strict_mode) .set_binding_strict else .set_binding,
@@ -3277,7 +3336,7 @@ fn lowerThis(b: *Builder) Error!Ir.Inst.Ref {
 }
 
 fn lowerIdentifierReference(b: *Builder, identifier: []const u8) Error!Ir.Inst.Ref {
-    const string_index = try b.internString(identifier, .literal);
+    const string_index = try b.internString(identifier);
     return b.addInst(.{
         .tag = .get_binding,
         .data = .{ .string = string_index },
@@ -3290,7 +3349,7 @@ fn lowerArrayLiteral(b: *Builder, array_lit: *const ast.ArrayLiteral) Error!Ir.I
     } else false;
 
     const array_ref = try b.addInst(.{
-        .tag = .array_create,
+        .tag = .create_array,
         .data = .{ .array = .{
             .len = @intCast(array_lit.element_list.len),
             .has_spread = has_spread,
@@ -3340,15 +3399,17 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
         computed: Ir.Inst.Ref,
     };
 
+    const property_count = try object_lit.property_definition_list.propertyCount(b.gpa);
+
     const object_ref = try b.addInst(.{
-        .tag = .object_create,
-        .data = .{ .none = {} },
+        .tag = .create_object,
+        .data = .{ .object = .{ .property_count = @intCast(property_count) } },
     });
 
     for (object_lit.property_definition_list.items) |prop_def| {
         switch (prop_def) {
             .identifier_reference => |identifier| {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 const value_ref = try b.addInst(.{
                     .tag = .get_binding,
                     .data = .{ .string = string_index },
@@ -3379,12 +3440,11 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     property_name.literal_property_name == .identifier)
                     .{ .string = try b.internString(
                         property_name.literal_property_name.identifier,
-                        .literal,
                     ) }
                 else blk: {
                     const key_ref = try b.lowerPropertyName(property_name);
                     const key_index = key_ref.toIndex().?;
-                    const key_inst = b.instructions.get(@intFromEnum(key_index));
+                    const key_inst = b.instructions.get(@backingInt(key_index));
                     break :blk if (key_inst.tag == .string)
                         .{ .string = key_inst.data.string }
                     else
@@ -3397,9 +3457,9 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                         name: {
                             const prefix: []const u8 = if (method_def.method == .get) "get " else "set ";
                             const identifier = property_name.literal_property_name.identifier;
-                            const prefixed = try std.fmt.allocPrint(b.gpa, "{s}{s}", .{ prefix, identifier });
+                            const prefixed = try b.gpa.print("{s}{s}", .{ prefix, identifier });
                             defer b.gpa.free(prefixed);
-                            break :name .{ .default = try b.internString(prefixed, .literal) };
+                            break :name .{ .default = try b.internString(prefixed) };
                         } else .none;
                         const function_index = try b.addFunction(.{
                             .source_range = func_expr.source_range,
@@ -3413,7 +3473,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                             .data = .{ .create_function = function_index },
                         });
                         break :blk try b.addInst(.{
-                            .tag = if (method_def.method == .get) .getter else .setter,
+                            .tag = if (method_def.method == .get) .as_getter else .as_setter,
                             .data = .{ .ref = func_ref },
                         });
                     },
@@ -3422,7 +3482,6 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                             property_name.literal_property_name == .identifier)
                             .{ .default = try b.internString(
                                 property_name.literal_property_name.identifier,
-                                .literal,
                             ) }
                         else
                             .none;
@@ -3470,7 +3529,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     },
                 }
             },
-            .property_name_and_expression => |*prop| if (try prop.property_name.isProtoSetter(b.gpa)) {
+            .property_name_and_expression => |*prop| if (try prop.property_name.eql(b.gpa, "__proto__")) {
                 const value_ref = try b.lowerExpression(&prop.expression);
                 _ = try b.addInst(.{
                     .tag = .object_set_prototype,
@@ -3484,12 +3543,11 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
                     prop.property_name.literal_property_name == .identifier)
                     .{ .string = try b.internString(
                         prop.property_name.literal_property_name.identifier,
-                        .literal,
                     ) }
                 else blk: {
                     const key_ref = try b.lowerPropertyName(&prop.property_name);
                     const key_index = key_ref.toIndex().?;
-                    const key_inst = b.instructions.get(@intFromEnum(key_index));
+                    const key_inst = b.instructions.get(@backingInt(key_index));
                     break :blk if (key_inst.tag == .string)
                         .{ .string = key_inst.data.string }
                     else
@@ -3532,7 +3590,7 @@ fn lowerObjectLiteral(b: *Builder, object_lit: *const ast.ObjectLiteral) Error!I
 
 fn lowerClassExpression(b: *Builder, class_expr: *const ast.ClassExpression) Error!Ir.Inst.Ref {
     const name: Ir.Class.Name = if (class_expr.identifier) |identifier|
-        .{ .identifier = try b.internString(identifier, .literal) }
+        .{ .identifier = try b.internString(identifier) }
     else
         .none;
 
@@ -3574,7 +3632,7 @@ fn lowerClassElementNames(b: *Builder, class_body: *const ast.ClassBody) Error![
     var private_names: std.StringHashMapUnmanaged(Ir.Inst.Ref) = .empty;
     defer private_names.deinit(b.gpa);
     for (class_body.class_element_list.items) |class_element| {
-        switch (class_element.classElementKind()) {
+        switch (try class_element.classElementKind(b.gpa)) {
             .constructor_method, .empty => continue,
             .non_constructor_method => {},
         }
@@ -3596,7 +3654,7 @@ fn lowerClassElementName(b: *Builder, class_element_name: *const ast.ClassElemen
             if (gop.found_existing) {
                 return gop.value_ptr.*;
             }
-            const string_index = try b.internString(private_identifier, .literal);
+            const string_index = try b.internString(private_identifier);
             const ref = try b.addInst(.{
                 .tag = .create_private_element,
                 .data = .{ .string = string_index },
@@ -3609,7 +3667,7 @@ fn lowerClassElementName(b: *Builder, class_element_name: *const ast.ClassElemen
 
 fn lowerFunctionExpression(b: *Builder, func_expr: anytype) Error!Ir.Inst.Ref {
     const name: Ir.Function.Name = if (func_expr.identifier) |identifier|
-        .{ .identifier = try b.internString(identifier, .literal) }
+        .{ .identifier = try b.internString(identifier) }
     else
         .none;
 
@@ -3633,10 +3691,10 @@ fn lowerFunctionExpression(b: *Builder, func_expr: anytype) Error!Ir.Inst.Ref {
 }
 
 fn lowerRegularExpressionLiteral(b: *Builder, regexp_lit: *const ast.RegularExpressionLiteral) Error!Ir.Inst.Ref {
-    const pattern_index = try b.internString(regexp_lit.pattern, .literal);
-    const flags_index = try b.internString(regexp_lit.flags, .literal);
+    const pattern_index = try b.internString(regexp_lit.pattern);
+    const flags_index = try b.internString(regexp_lit.flags);
     return b.addInst(.{
-        .tag = .reg_exp,
+        .tag = .create_reg_exp,
         .data = .{ .reg_exp = .{
             .pattern = pattern_index,
             .flags = flags_index,
@@ -3647,7 +3705,7 @@ fn lowerRegularExpressionLiteral(b: *Builder, regexp_lit: *const ast.RegularExpr
 fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) Error!Ir.Inst.Ref {
     var result: Ir.Inst.Ref = .none;
     for (template_lit.spans, 0..) |span, i| {
-        std.debug.assert(if (i % 2 == 0) span == .text else span == .expression);
+        std.debug.assert(if (i % 2 == 0) span == .template else span == .expression);
         const span_ref: Ir.Inst.Ref = switch (span) {
             .expression => |expr| blk: {
                 const expr_ref = try b.lowerExpression(&expr);
@@ -3656,19 +3714,13 @@ fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) E
                     .data = .{ .ref = expr_ref },
                 });
             },
-            .text => blk: {
-                const chars = span.templateCharacters();
-                if (chars.len == 0) continue;
-                const normalized = try std.mem.replaceOwned(
-                    u8,
-                    b.gpa,
-                    chars,
-                    "\r\n",
-                    "\n",
-                );
-                defer b.gpa.free(normalized);
-                _ = std.mem.replaceScalar(u8, normalized, '\r', '\n');
-                const string_index = try b.internString(normalized, .escaped);
+            .template => |template| blk: {
+                var aw: std.Io.Writer.Allocating = .init(b.gpa);
+                defer aw.deinit();
+                const valid = template.value(&aw.writer) catch return error.OutOfMemory;
+                std.debug.assert(valid);
+                if (aw.written().len == 0) continue;
+                const string_index = try b.internString(aw.written());
                 break :blk try b.addInst(.{
                     .tag = .string,
                     .data = .{ .string = string_index },
@@ -3690,7 +3742,7 @@ fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) E
     }
     // There is always at least one span, but it may have been skipped if empty.
     if (result == .none) {
-        const string_index = try b.internString("", .literal);
+        const string_index = try b.internString("");
         return b.addInst(.{
             .tag = .string,
             .data = .{ .string = string_index },
@@ -3735,7 +3787,7 @@ fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, 
                     });
                 }
                 if (constant == .string) {
-                    const string_index = try b.internString(constant.string, .escaped);
+                    const string_index = try b.internString(constant.string);
                     return b.addInst(.{
                         .tag = .get_property,
                         .data = .{ .get_property = .{
@@ -3755,7 +3807,7 @@ fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, 
             });
         },
         .identifier => |identifier| {
-            const string_index = try b.internString(identifier, .literal);
+            const string_index = try b.internString(identifier);
             return b.addInst(.{
                 .tag = .get_property,
                 .data = .{ .get_property = .{
@@ -3765,7 +3817,7 @@ fn lowerMemberExpression(b: *Builder, member_expr: *const ast.MemberExpression, 
             });
         },
         .private_identifier => |private_identifier| {
-            const string_index = try b.internString(private_identifier, .literal);
+            const string_index = try b.internString(private_identifier);
             return b.addInst(.{
                 .tag = .get_private_element,
                 .data = .{ .get_property = .{
@@ -3802,7 +3854,7 @@ fn lowerSuperProperty(b: *Builder, super_prop: *const ast.SuperProperty, base_ou
     if (base_out) |ptr| ptr.* = try b.lowerThis();
     return switch (super_prop.*) {
         .identifier => |identifier| blk: {
-            const string_index = try b.internString(identifier, .literal);
+            const string_index = try b.internString(identifier);
             break :blk try b.addInst(.{
                 .tag = .get_super_property,
                 .data = .{ .string = string_index },
@@ -3980,7 +4032,7 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
                         });
                     }
                     if (constant == .string) {
-                        const string_index = try b.internString(constant.string, .escaped);
+                        const string_index = try b.internString(constant.string);
                         break :blk try b.addInst(.{
                             .tag = .get_property,
                             .data = .{ .get_property = .{
@@ -4002,7 +4054,7 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
             .identifier => |identifier| blk: {
                 if (next_is_call) this_value = current;
 
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 break :blk try b.addInst(.{
                     .tag = .get_property,
                     .data = .{ .get_property = .{
@@ -4012,7 +4064,7 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
                 });
             },
             .private_identifier => |private_identifier| blk: {
-                const string_index = try b.internString(private_identifier, .literal);
+                const string_index = try b.internString(private_identifier);
                 break :blk try b.addInst(.{
                     .tag = .get_private_element,
                     .data = .{ .get_property = .{
@@ -4066,7 +4118,7 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
     const current_value = switch (update_expr.expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .identifier_reference => |identifier| blk: {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 lhs = .{ .binding = string_index };
                 break :blk try b.addInst(.{
                     .tag = .get_binding,
@@ -4079,7 +4131,7 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
             const base = try b.lowerExpression(member_expr.expression);
             switch (member_expr.property) {
                 .identifier => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     lhs = .{ .property = .{ .base = base, .name = string_index } };
                     break :blk try b.addInst(.{
                         .tag = .get_property,
@@ -4114,7 +4166,7 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
                     });
                 },
                 .private_identifier => |private_identifier| {
-                    const string_index = try b.internString(private_identifier, .literal);
+                    const string_index = try b.internString(private_identifier);
                     lhs = .{ .private_element = .{ .base = base, .name = string_index } };
                     break :blk try b.addInst(.{
                         .tag = .get_private_element,
@@ -4128,7 +4180,7 @@ fn lowerUpdateExpression(b: *Builder, update_expr: *const ast.UpdateExpression) 
         },
         .super_property => |super_prop| switch (super_prop) {
             .identifier => |identifier| blk: {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 lhs = .{ .super_property = string_index };
                 break :blk try b.addInst(.{
                     .tag = .get_super_property,
@@ -4281,7 +4333,7 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
         unary_expr.expression.primary_expression == .identifier_reference)
     {
         const identifier = unary_expr.expression.primary_expression.identifier_reference;
-        const string_index = try b.internString(identifier, .literal);
+        const string_index = try b.internString(identifier);
         return b.addInst(.{
             .tag = .typeof_binding,
             .data = .{ .string = string_index },
@@ -4292,7 +4344,7 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
         unary_expr.expression.primary_expression == .identifier_reference)
     {
         const identifier = unary_expr.expression.primary_expression.identifier_reference;
-        const string_index = try b.internString(identifier, .literal);
+        const string_index = try b.internString(identifier);
         return b.addInst(.{
             .tag = .delete_binding,
             .data = .{ .string = string_index },
@@ -4333,7 +4385,7 @@ fn lowerUnaryExpression(b: *Builder, unary_expr: *const ast.UnaryExpression) Err
                 });
             },
             .identifier => |identifier| {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                     .delete_property_strict
                 else
@@ -4430,7 +4482,7 @@ fn lowerRelationalExpression(b: *Builder, rel_expr: *const ast.RelationalExpress
             });
         },
         .private_identifier => |private_identifier| {
-            const string_index = try b.internString(private_identifier, .literal);
+            const string_index = try b.internString(private_identifier);
             const name = try b.addInst(.{
                 .tag = .resolve_private_element,
                 .data = .{ .string = string_index },
@@ -4575,7 +4627,7 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
         .primary_expression => |prim_expr| switch (prim_expr) {
             .identifier_reference => |identifier| {
                 const value = try b.lowerExpression(assign_expr.rhs_expression);
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 if (assign_expr.rhs_expression.isAnonymousFunctionDefinition()) {
                     b.setAnonymousFunctionName(value, string_index);
                 }
@@ -4597,7 +4649,7 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
             switch (member_expr.property) {
                 .identifier => |identifier| {
                     const value = try b.lowerExpression(assign_expr.rhs_expression);
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                         .set_property_strict
                     else
@@ -4649,7 +4701,7 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
                     });
                 },
                 .private_identifier => |private_identifier| {
-                    const string_index = try b.internString(private_identifier, .literal);
+                    const string_index = try b.internString(private_identifier);
                     const value = try b.lowerExpression(assign_expr.rhs_expression);
                     const extra_index = try b.addExtra(Ir.Inst.SetProperty, .{
                         .base = base,
@@ -4666,7 +4718,7 @@ fn lowerSimpleAssignmentExpression(b: *Builder, assign_expr: *const ast.Assignme
         .super_property => |super_prop| switch (super_prop) {
             .identifier => |identifier| {
                 const value = try b.lowerExpression(assign_expr.rhs_expression);
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 const tag: Ir.Inst.Tag = if (b.in_strict_mode)
                     .set_super_property_strict
                 else
@@ -4734,7 +4786,7 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
     switch (assign_expr.lhs_expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .identifier_reference => |identifier| {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 const current_value = try b.addInst(.{
                     .tag = .get_binding,
                     .data = .{ .string = string_index },
@@ -4761,7 +4813,7 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
             const base = try b.lowerExpression(member_expr.expression);
             switch (member_expr.property) {
                 .identifier => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     const current_value = try b.addInst(.{
                         .tag = .get_property,
                         .data = .{ .get_property = .{
@@ -4825,7 +4877,7 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                             });
                         }
                         if (constant == .string) {
-                            const string_index = try b.internString(constant.string, .escaped);
+                            const string_index = try b.internString(constant.string);
                             const current_value = try b.addInst(.{
                                 .tag = .get_property,
                                 .data = .{ .get_property = .{
@@ -4887,7 +4939,7 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
                     });
                 },
                 .private_identifier => |private_identifier| {
-                    const string_index = try b.internString(private_identifier, .literal);
+                    const string_index = try b.internString(private_identifier);
                     const current_value = try b.addInst(.{
                         .tag = .get_private_element,
                         .data = .{ .get_property = .{
@@ -4917,7 +4969,7 @@ fn lowerBinaryCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast.
         },
         .super_property => |super_prop| switch (super_prop) {
             .identifier => |identifier| {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 const current_value = try b.addInst(.{
                     .tag = .get_super_property,
                     .data = .{ .string = string_index },
@@ -4999,7 +5051,7 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
     const current_value: Ir.Inst.Ref = switch (assign_expr.lhs_expression.*) {
         .primary_expression => |prim_expr| switch (prim_expr) {
             .identifier_reference => |identifier| blk: {
-                const string_index = try b.internString(identifier, .literal);
+                const string_index = try b.internString(identifier);
                 lhs = .{ .binding = string_index };
                 break :blk try b.addInst(.{
                     .tag = .get_binding,
@@ -5012,7 +5064,7 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
             const base = try b.lowerExpression(member_expr.expression);
             switch (member_expr.property) {
                 .identifier => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     lhs = .{ .property = .{
                         .base = base,
                         .name = string_index,
@@ -5042,7 +5094,7 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                             });
                         }
                         if (constant == .string) {
-                            const string_index = try b.internString(constant.string, .escaped);
+                            const string_index = try b.internString(constant.string);
                             lhs = .{ .property = .{
                                 .base = base,
                                 .name = string_index,
@@ -5070,7 +5122,7 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
                     });
                 },
                 .private_identifier => |private_identifier| {
-                    const string_index = try b.internString(private_identifier, .literal);
+                    const string_index = try b.internString(private_identifier);
                     lhs = .{ .private_element = .{
                         .base = base,
                         .name = string_index,
@@ -5088,7 +5140,7 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
         .super_property => |super_prop| blk: {
             switch (super_prop) {
                 .identifier => |identifier| {
-                    const string_index = try b.internString(identifier, .literal);
+                    const string_index = try b.internString(identifier);
                     lhs = .{ .super_property = string_index };
                     break :blk try b.addInst(.{
                         .tag = .get_super_property,
@@ -5326,10 +5378,10 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
 
     const template_literal = &tagged_template.template_literal;
 
-    var cooked_indices: std.ArrayList(Ir.StringIndex) = .empty;
-    defer cooked_indices.deinit(b.gpa);
     var raw_indices: std.ArrayList(Ir.StringIndex) = .empty;
     defer raw_indices.deinit(b.gpa);
+    var cooked_indices: std.ArrayList(?Ir.StringIndex) = .empty;
+    defer cooked_indices.deinit(b.gpa);
 
     for (template_literal.spans, 0..) |span, i| {
         if (i % 2 != 0) {
@@ -5337,24 +5389,32 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
             continue;
         }
 
-        const text = span.templateCharacters();
-        const normalized = try std.mem.replaceOwned(u8, b.gpa, text, "\r\n", "\n");
-        defer b.gpa.free(normalized);
-        _ = std.mem.replaceScalar(u8, normalized, '\r', '\n');
-
-        try cooked_indices.append(b.gpa, try b.internString(normalized, .escaped));
-        try raw_indices.append(b.gpa, try b.internString(normalized, .literal));
+        var aw: std.Io.Writer.Allocating = .init(b.gpa);
+        defer aw.deinit();
+        {
+            const valid = span.template.rawValue(&aw.writer) catch return error.OutOfMemory;
+            std.debug.assert(valid);
+            try raw_indices.append(b.gpa, try b.internString(aw.written()));
+        }
+        aw.clearRetainingCapacity();
+        {
+            const valid = span.template.value(&aw.writer) catch return error.OutOfMemory;
+            if (valid)
+                try cooked_indices.append(b.gpa, try b.internString(aw.written()))
+            else
+                try cooked_indices.append(b.gpa, null);
+        }
     }
 
-    const cooked_array = blk: {
+    const raw_array = blk: {
         const array_ref = try b.addInst(.{
-            .tag = .array_create,
+            .tag = .create_array,
             .data = .{ .array = .{
-                .len = @intCast(cooked_indices.items.len),
+                .len = @intCast(raw_indices.items.len),
                 .has_spread = false,
             } },
         });
-        for (cooked_indices.items) |string_index| {
+        for (raw_indices.items) |string_index| {
             const ref = try b.addInst(.{ .tag = .string, .data = .{
                 .string = string_index,
             } });
@@ -5369,19 +5429,25 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
         break :blk array_ref;
     };
 
-    const raw_array = blk: {
+    const cooked_array = blk: {
         const array_ref = try b.addInst(.{
-            .tag = .array_create,
+            .tag = .create_array,
             .data = .{ .array = .{
-                .len = @intCast(raw_indices.items.len),
+                .len = @intCast(cooked_indices.items.len),
                 .has_spread = false,
             } },
         });
-        for (raw_indices.items) |string_index| {
-            const ref = try b.addInst(.{
-                .tag = .string,
-                .data = .{ .string = string_index },
-            });
+        for (cooked_indices.items) |maybe_string_index| {
+            const ref = if (maybe_string_index) |string_index|
+                try b.addInst(.{
+                    .tag = .string,
+                    .data = .{ .string = string_index },
+                })
+            else
+                try b.addInst(.{
+                    .tag = .undefined,
+                    .data = .{ .none = {} },
+                });
             _ = try b.addInst(.{
                 .tag = .array_push,
                 .data = .{ .binary = .{
@@ -5396,8 +5462,8 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
     const template_id = b.template_object_count;
     b.template_object_count += 1;
     const get_template_object_extra_index = try b.addExtra(Ir.Inst.GetTemplateObject, .{
-        .cooked = cooked_array,
         .raw = raw_array,
+        .cooked = cooked_array,
         .id = template_id,
     });
 
@@ -5413,7 +5479,7 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
 
     for (template_literal.spans, 0..) |span, i| {
         if (i % 2 == 0) {
-            std.debug.assert(span == .text);
+            std.debug.assert(span == .template);
             continue;
         }
         const expr_ref = try b.lowerExpression(&span.expression);

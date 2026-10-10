@@ -18,11 +18,14 @@ const ImportedModuleReferrer = kiesel.language.ImportedModuleReferrer;
 const Module = kiesel.language.Module;
 const ModuleRequest = kiesel.language.ModuleRequest;
 const Object = kiesel.types.Object;
+const PropertyKey = kiesel.types.PropertyKey;
 const Realm = kiesel.execution.Realm;
 const Script = kiesel.language.Script;
 const ScriptOrModule = kiesel.execution.ScriptOrModule;
 const SourceTextModule = kiesel.language.SourceTextModule;
 const String = kiesel.types.String;
+const Token = kiesel.language.Token;
+const Tokenizer = kiesel.language.Tokenizer;
 const Value = kiesel.types.Value;
 const createTextModule = kiesel.language.createTextModule;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
@@ -50,12 +53,17 @@ const repl_preamble = std.fmt.comptimePrint(
 , .{
     .kiesel = kiesel.version,
     .zig = builtin.zig_version,
-    .os = builtin.os.tag,
-    .eof = if (builtin.os.tag == .windows) "Ctrl+Z followed by Enter" else "Ctrl+D",
+    .os = builtin.target.os.tag,
+    .eof = if (builtin.target.os.tag == .windows) "Ctrl+Z followed by Enter" else "Ctrl+D",
 });
 
 const ScriptOrModuleHostDefined = struct {
     base_dir: []const u8,
+};
+
+const RealmHostDefined = struct {
+    args: []const []const u8,
+    environ_map: *const std.process.Environ.Map,
 };
 
 fn resolveModulePath(
@@ -123,11 +131,80 @@ fn initializeRealm(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!void {
 const Kiesel = struct {
     pub fn create(agent: *Agent, realm: *Realm) std.mem.Allocator.Error!*Object {
         const kiesel_object = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
+        try kiesel_object.defineBuiltinPropertyLazy(
+            agent,
+            "args",
+            struct {
+                fn initializer(agent_: *Agent, realm_: *Realm) std.mem.Allocator.Error!Value {
+                    const gpa = agent_.gpa;
+                    const io = agent_.io;
+                    const host_defined: *RealmHostDefined = @ptrCast(@alignCast(realm_.host_defined.?));
+
+                    const exe_path = std.process.executablePathAlloc(io, gpa) catch |err| switch (err) {
+                        error.OutOfMemory => |e| return e,
+                        else => null,
+                    };
+                    defer if (exe_path) |path| gpa.free(path);
+
+                    const args_array = try kiesel.builtins.arrayCreateFast(agent_, @intCast(host_defined.args.len + 1));
+                    try args_array.object.createDataPropertyDirect(
+                        agent_,
+                        PropertyKey.from(0),
+                        if (exe_path) |path| blk: {
+                            // paths are not guaranteed to be valid UTF-8
+                            const path_utf8 = try agent_.gc_allocator.print("{f}", .{std.unicode.fmtUtf8(path)});
+                            break :blk Value.from(try String.fromUtf8(agent_, path_utf8));
+                        } else Value.from(""),
+                    );
+                    for (host_defined.args, 0..) |arg, i| {
+                        // argv entries are not guaranteed to be valid UTF-8
+                        const arg_utf8 = try agent_.gc_allocator.print("{f}", .{std.unicode.fmtUtf8(arg)});
+                        try args_array.object.createDataPropertyDirect(
+                            agent_,
+                            PropertyKey.from(@as(PropertyKey.IntegerIndex, @intCast(i + 1))),
+                            Value.from(try String.fromUtf8(agent_, arg_utf8)),
+                        );
+                    }
+                    _ = args_array.object.setIntegrityLevel(
+                        agent_,
+                        .frozen,
+                    ) catch |err| try noexcept(err);
+                    return Value.from(&args_array.object);
+                }
+            }.initializer,
+            realm,
+            .builtin_default,
+        );
         if (kiesel.build_options.enable_annex_b) {
             try kiesel_object.defineBuiltinFunction(agent, "createIsHTMLDDA", createIsHTMLDDA, 0, realm);
         }
         try kiesel_object.defineBuiltinFunction(agent, "createRealm", createRealm, 0, realm);
         try kiesel_object.defineBuiltinFunction(agent, "detachArrayBuffer", detachArrayBuffer, 1, realm);
+        try kiesel_object.defineBuiltinPropertyLazy(
+            agent,
+            "env",
+            struct {
+                fn initializer(agent_: *Agent, realm_: *Realm) std.mem.Allocator.Error!Value {
+                    const host_defined: *RealmHostDefined = @ptrCast(@alignCast(realm_.host_defined.?));
+
+                    const env_object = try ordinaryObjectCreate(agent_, null);
+                    for (host_defined.environ_map.keys(), host_defined.environ_map.values()) |key, value| {
+                        // Environment variables are not guaranteed to be valid UTF-8
+                        const key_utf8 = try agent_.gc_allocator.print("{f}", .{std.unicode.fmtUtf8(key)});
+                        const value_utf8 = try agent_.gc_allocator.print("{f}", .{std.unicode.fmtUtf8(value)});
+                        try env_object.createDataPropertyDirect(
+                            agent_,
+                            PropertyKey.from(try String.fromUtf8(agent_, key_utf8)),
+                            Value.from(try String.fromUtf8(agent_, value_utf8)),
+                        );
+                    }
+                    _ = env_object.setIntegrityLevel(agent_, .frozen) catch |err| try noexcept(err);
+                    return Value.from(env_object);
+                }
+            }.initializer,
+            realm,
+            .builtin_default,
+        );
         try kiesel_object.defineBuiltinFunction(agent, "evalScript", evalScript, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "isMerlin", isMerlin, 1, realm);
         try kiesel_object.defineBuiltinFunction(agent, "print", print, 1, realm);
@@ -142,19 +219,30 @@ const Kiesel = struct {
             try gc_object.defineBuiltinFunction(agent, "collect", collect, 0, realm);
             try kiesel_object.defineBuiltinProperty(agent, "gc", Value.from(gc_object));
         }
-        if (builtin.os.tag == .linux) {
+        if (builtin.target.os.tag == .linux) {
             try kiesel_object.defineBuiltinFunction(agent, "asm", @"asm", 1, realm);
             try kiesel_object.defineBuiltinFunction(agent, "syscall", syscall, 1, realm);
             const sysno_object = try ordinaryObjectCreate(agent, try realm.intrinsic(.object_prototype));
-            inline for (std.meta.fields(std.os.linux.SYS)) |field| {
+            const sysno_names = comptime blk: {
                 @setEvalBranchQuota(100_000);
-                const name: []const u8 = comptime blk: {
-                    var name: [field.name.len]u8 = undefined;
-                    _ = std.ascii.upperString(&name, field.name);
-                    const final = name;
-                    break :blk &final;
-                };
-                try sysno_object.defineBuiltinProperty(agent, name, Value.from(@as(u53, @intCast(field.value))));
+                var names: [std.enums.values(std.os.linux.SYS).len]*const String = undefined;
+                for (std.enums.values(std.os.linux.SYS), 0..) |value, i| {
+                    var buf: [@tagName(value).len]u8 = undefined;
+                    _ = std.ascii.upperString(&buf, @tagName(value));
+                    const final = buf;
+                    names[i] = String.fromLiteral(&final);
+                }
+                break :blk names;
+            };
+            for (sysno_names, std.enums.values(std.os.linux.SYS)) |name, value| {
+                try sysno_object.definePropertyDirect(
+                    agent,
+                    PropertyKey.from(name),
+                    .{
+                        .value_or_accessor = .{ .value = Value.from(@as(u53, @intCast(@backingInt(value)))) },
+                        .attributes = .builtin_default,
+                    },
+                );
             }
             try kiesel_object.defineBuiltinProperty(agent, "Sysno", Value.from(sysno_object));
         }
@@ -221,8 +309,10 @@ const Kiesel = struct {
     }
 
     fn createRealm(agent: *Agent, _: Value, _: Arguments) Agent.Error!Value {
+        const caller_realm = agent.currentRealm();
         try Realm.initializeHostDefinedRealm(agent, .{});
         const realm = agent.currentRealm();
+        realm.host_defined = caller_realm.host_defined;
         try initializeRealm(agent, realm);
         _ = agent.execution_context_stack.pop().?;
         return Value.from(realm.global_object);
@@ -691,10 +781,11 @@ fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
     const enabled_features, const disabled_features = comptime blk: {
         var enabled_features: []const []const u8 = &.{};
         var disabled_features: []const []const u8 = &.{};
-        for (@typeInfo(kiesel.build_options).@"struct".decls) |decl| {
-            if (std.mem.startsWith(u8, decl.name, "enable_")) {
-                const feature = decl.name["enable_".len..];
-                if (@field(kiesel.build_options, decl.name)) {
+        const info = @typeInfo(kiesel.build_options).@"struct";
+        for (info.decl_names) |decl_name| {
+            if (std.mem.startsWith(u8, decl_name, "enable_")) {
+                const feature = decl_name["enable_".len..];
+                if (@field(kiesel.build_options, decl_name)) {
                     enabled_features = enabled_features ++ .{feature};
                 } else {
                     disabled_features = disabled_features ++ .{feature};
@@ -709,7 +800,7 @@ fn printVersionInfo(writer: *std.Io.Writer) std.Io.Writer.Error!void {
         try writer.print("Rust version       {s}\n", .{kiesel.zement.rustcVersion()});
     }
     try writer.print("Target             {t}-{t}-{t}\n", .{ builtin.target.cpu.arch, builtin.target.os.tag, builtin.target.abi });
-    try writer.print("Optimize mode      {t}\n", .{builtin.mode});
+    try writer.print("Optimize           {t}\n", .{builtin.optimize});
     if (enabled_features.len > 0) {
         try writer.writeAll("Enabled features   ");
         for (enabled_features, 0..) |feature, i| {
@@ -792,75 +883,67 @@ fn repl(
             defer self.editor.allocator.free(line);
 
             // NOTE: zigline always returns valid UTF-8.
-            var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
-            const change = kiesel.utils.temporaryChange(
-                &kiesel.language.tokenizer.state,
-                .{
-                    .tokenizer = &tokenizer,
-                    // Workaround to ensure the tokenizer generates template literal middle and
-                    // tail tokens even though there is no parser setting this.
-                    .parsing_template_literal = true,
-                },
-            );
-            defer change.restore();
+            const source = self.editor.allocator.dupeSentinel(u8, line, 0) catch return;
+            defer self.editor.allocator.free(source);
+
+            var tokenizer: Tokenizer = .init(self.editor.allocator, source);
+            defer tokenizer.deinit();
 
             while (tokenizer.next() catch null) |token| {
                 self.editor.stylize(
-                    .{
-                        .begin = tokenizer.offset - token.text.len,
-                        .end = tokenizer.offset,
-                    },
-                    switch (token.type) {
-                        .await,
-                        .@"break",
-                        .@"catch",
-                        .class,
-                        .@"const",
-                        .@"continue",
-                        .debugger,
-                        .default,
-                        .delete,
-                        .@"enum",
-                        .@"export",
-                        .extends,
-                        .function,
-                        .hashbang_comment,
-                        .import,
-                        .in,
-                        .instanceof,
-                        .new,
-                        .@"return",
-                        .super,
-                        .this,
-                        .typeof,
-                        .@"var",
-                        .void,
+                    .{ .begin = @backingInt(token.start), .end = @backingInt(token.end) },
+                    switch (token.tag) {
+                        .keyword_await,
+                        .keyword_break,
+                        .keyword_catch,
+                        .keyword_class,
+                        .keyword_const,
+                        .keyword_continue,
+                        .keyword_debugger,
+                        .keyword_default,
+                        .keyword_delete,
+                        .keyword_enum,
+                        .keyword_export,
+                        .keyword_extends,
+                        .keyword_function,
+                        .keyword_import,
+                        .keyword_in,
+                        .keyword_instanceof,
+                        .keyword_new,
+                        .keyword_return,
+                        .keyword_super,
+                        .keyword_this,
+                        .keyword_typeof,
+                        .keyword_var,
+                        .keyword_void,
                         => .{ .foreground = .{ .xterm = .blue }, .bold = true },
 
-                        .case,
-                        .comment,
-                        .do,
-                        .@"else",
-                        .finally,
-                        .@"for",
-                        .@"if",
-                        .@"switch",
-                        .throw,
-                        .@"try",
-                        .@"while",
-                        .with,
-                        .yield,
+                        .line_comment,
+                        .multiline_comment,
+                        .hashbang_comment,
+                        .keyword_case,
+                        .keyword_do,
+                        .keyword_else,
+                        .keyword_finally,
+                        .keyword_for,
+                        .keyword_if,
+                        .keyword_switch,
+                        .keyword_throw,
+                        .keyword_try,
+                        .keyword_while,
+                        .keyword_with,
+                        .keyword_yield,
                         => .{ .foreground = .{ .xterm = .cyan } },
 
-                        .false, .true => .{ .foreground = .{ .xterm = .blue } },
-                        .null => .{ .foreground = .{ .xterm = .yellow } },
-                        .numeric => .{ .foreground = .{ .xterm = .magenta } },
-                        .regular_expression,
-                        .string,
-                        .template,
-                        .template_head,
-                        .template_middle,
-                        .template_tail,
+                        .keyword_false, .keyword_true => .{ .foreground = .{ .xterm = .blue } },
+                        .keyword_null => .{ .foreground = .{ .xterm = .yellow } },
+                        .number_literal, .bigint_literal => .{ .foreground = .{ .xterm = .magenta } },
+                        .regexp_literal,
+                        .string_literal,
+                        .template_literal,
+                        .template_literal_head,
+                        .template_literal_middle,
+                        .template_literal_tail,
                         => .{ .foreground = .{ .xterm = .green } },
                         else => .{},
                     },
@@ -878,20 +961,18 @@ fn repl(
             defer self.editor.allocator.free(line);
 
             // NOTE: zigline always returns valid UTF-8.
-            var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
-            const change = kiesel.utils.temporaryChange(
-                &kiesel.language.tokenizer.state,
-                .{
-                    .tokenizer = &tokenizer,
-                    // Workaround to ensure the tokenizer generates template literal middle and
-                    // tail tokens even though there is no parser setting this.
-                    .parsing_template_literal = true,
-                },
-            );
-            defer change.restore();
+            const source = self.editor.allocator.dupeSentinel(u8, line, 0) catch return &.{};
+            defer self.editor.allocator.free(source);
 
-            var token_window: [3]?kiesel.language.tokenizer.Tokenizer.Token = .{ null, null, null };
+            var tokenizer: Tokenizer = .init(self.editor.allocator, source);
+            defer tokenizer.deinit();
+
+            var token_window: [3]?Token = .{ null, null, null };
             while (tokenizer.next() catch null) |token| {
+                switch (token.tag) {
+                    .line_comment, .multiline_comment, .hashbang_comment => continue,
+                    else => {},
+                }
                 // Shift tokens in the window to the left
                 token_window[0] = token_window[1];
                 token_window[1] = token_window[2];
@@ -899,7 +980,7 @@ fn repl(
             }
 
             if (token_window[2] == null)
-                token_window[2] = .{ .type = .identifier, .text = "", .location = .{ .line = 0, .column = 0 } };
+                token_window[2] = .{ .tag = .identifier, .start = @fromBackingInt(0), .end = @fromBackingInt(0) };
 
             if (self.completion_buffer == null)
                 self.completion_buffer = try self.editor.allocator.alloc(Editor.CompletionSuggestion, 256);
@@ -910,12 +991,12 @@ fn repl(
 
             // (k1)(.)(prop) OR (_)(k1)(.) -> complete property names of k1, starting with prop (if present)
             // (_)(_)(ident) -> complete global object property names starting with ident.
-            const is_property_completion_partial = token_window[2].?.type == .@"." and token_window[1] != null and token_window[1].?.type == .identifier;
-            const is_property_completion_full = token_window[2].?.type == .identifier and token_window[1] != null and token_window[1].?.type == .@"." and token_window[0] != null and token_window[0].?.type == .identifier;
-            const is_global_object_property_completion = token_window[2].?.type == .identifier and (token_window[1] == null or token_window[1].?.type != .@".");
+            const is_property_completion_partial = token_window[2].?.tag == .period and token_window[1] != null and token_window[1].?.tag == .identifier;
+            const is_property_completion_full = token_window[2].?.tag == .identifier and token_window[1] != null and token_window[1].?.tag == .period and token_window[0] != null and token_window[0].?.tag == .identifier;
+            const is_global_object_property_completion = token_window[2].?.tag == .identifier and (token_window[1] == null or token_window[1].?.tag != .period);
 
             const object = if (is_property_completion_partial or is_property_completion_full) b: {
-                const object_name = if (is_property_completion_partial) token_window[1].?.text else token_window[0].?.text;
+                const object_name = if (is_property_completion_partial) token_window[1].?.text(source) else token_window[0].?.text(source);
                 const object_name_string = String.fromUtf8(self.realm.agent, object_name) catch return &.{};
                 if (!(self.realm.global_env.hasBinding(self.realm.agent, object_name_string) catch false)) return &.{};
 
@@ -924,7 +1005,7 @@ fn repl(
                 break :b object_value.asObject();
             } else if (is_global_object_property_completion) self.realm.global_object else return &.{};
 
-            const prefix_utf8 = if (token_window[2].?.type == .identifier) token_window[2].?.text else "";
+            const prefix_utf8 = if (token_window[2].?.tag == .identifier) token_window[2].?.text(source) else "";
             const prefix = String.fromUtf8(self.realm.agent, prefix_utf8) catch return &.{};
 
             for (object.shape.properties.keys()) |key| {
@@ -985,14 +1066,14 @@ fn repl(
         handler.string_arena.deinit();
     }
 
-    const history_path = if (builtin.os.tag != .wasi) try getHistoryPath(gpa, io, environ_map);
-    defer if (builtin.os.tag != .wasi) gpa.free(history_path);
+    const history_path = if (builtin.target.os.tag != .wasi) try getHistoryPath(gpa, io, environ_map);
+    defer if (builtin.target.os.tag != .wasi) gpa.free(history_path);
 
-    if (builtin.os.tag != .wasi) editor.loadHistory(history_path) catch {
+    if (builtin.target.os.tag != .wasi) editor.loadHistory(history_path) catch {
         try stdout.writeAll("Failed to load history\n");
         try stdout.flush();
     };
-    defer if (builtin.os.tag != .wasi) editor.saveHistory(history_path) catch {
+    defer if (builtin.target.os.tag != .wasi) editor.saveHistory(history_path) catch {
         stdout.writeAll("Failed to save history\n") catch {};
         stdout.flush() catch {};
     };
@@ -1104,7 +1185,10 @@ pub fn main(init: std.process.Init) !u8 {
     const parsed_args = args.parseForCurrentProcess(Options, init, .print) catch return 1;
     defer parsed_args.deinit();
 
-    const maybe_path = if (parsed_args.positionals.len > 0) parsed_args.positionals[0] else null;
+    const maybe_path = if (parsed_args.options.command == null and parsed_args.positionals.len > 0)
+        parsed_args.positionals[0]
+    else
+        null;
 
     if (parsed_args.options.version) {
         try printVersionInfo(stdout);
@@ -1259,7 +1343,7 @@ pub fn main(init: std.process.Init) !u8 {
             };
             defer gpa_.free(raw_source_text);
 
-            const source_text = try std.fmt.allocPrint(gpa_, "{f}", .{
+            const source_text = try gpa_.print("{f}", .{
                 std.unicode.fmtUtf8(raw_source_text),
             });
             defer gpa_.free(source_text);
@@ -1340,8 +1424,14 @@ pub fn main(init: std.process.Init) !u8 {
         }
     }.func;
 
+    var host_defined: RealmHostDefined = .{
+        .args = parsed_args.positionals,
+        .environ_map = environ_map,
+    };
+
     try Realm.initializeHostDefinedRealm(&agent, .{});
     const realm = agent.currentRealm();
+    realm.host_defined = &host_defined;
     try initializeRealm(&agent, realm);
 
     const cwd = try std.process.currentPathAlloc(io, gpa);
@@ -1357,7 +1447,7 @@ pub fn main(init: std.process.Init) !u8 {
         const raw_source_text = try readFile(gpa, io, path);
         defer gpa.free(raw_source_text);
         // The parser assumes valid UTF-8, replace invalid byte sequences with U+FFFD.
-        const source_text = try std.fmt.allocPrint(gpa, "{f}", .{
+        const source_text = try gpa.print("{f}", .{
             std.unicode.fmtUtf8(raw_source_text),
         });
         defer gpa.free(source_text);
@@ -1381,7 +1471,7 @@ pub fn main(init: std.process.Init) !u8 {
     } else if (parsed_args.options.command) |raw_source_text| {
         std.debug.assert(!run_as_module);
         // The parser assumes valid UTF-8, replace invalid byte sequences with U+FFFD.
-        const source_text = try std.fmt.allocPrint(gpa, "{f}", .{
+        const source_text = try gpa.print("{f}", .{
             std.unicode.fmtUtf8(raw_source_text),
         });
         defer gpa.free(source_text);

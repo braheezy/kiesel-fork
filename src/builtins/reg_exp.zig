@@ -129,12 +129,7 @@ fn compileRegexp(
     // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
     const buf = switch (pattern.asAsciiOrUtf16()) {
         .ascii => |ascii| try gpa.dupeSentinel(u8, ascii, 0),
-        .utf16 => |utf16| try std.fmt.allocPrintSentinel(
-            gpa,
-            "{f}",
-            .{std.unicode.fmtUtf16Le(utf16)},
-            0,
-        ),
+        .utf16 => |utf16| try gpa.printSentinel("{f}", .{std.unicode.fmtUtf16Le(utf16)}, 0),
     };
     defer gpa.free(buf);
 
@@ -898,7 +893,7 @@ pub const constructor = struct {
                     agent.gc_allocator,
                     try String.fromAscii(
                         agent,
-                        try std.fmt.allocPrint(agent.gc_allocator, "\\x{x}", .{code_point.code_point}),
+                        try agent.gc_allocator.print("\\x{x}", .{code_point.code_point}),
                     ),
                 );
             } else {
@@ -967,7 +962,7 @@ pub const constructor = struct {
                 // i. Let hex be Number::toString(𝔽(codePointNumber), 16).
                 // ii. Return the string-concatenation of the code unit 0x005C (REVERSE SOLIDUS),
                 //     "x", and StringPad(hex, 2, "0", start).
-                const hex = try std.fmt.allocPrint(allocator, "\\x{x:0>2}", .{code_point.code_point});
+                const hex = try allocator.print("\\x{x:0>2}", .{code_point.code_point});
                 // TODO: Support appending an ASCII slice to String.Builder
                 for (hex) |c| {
                     try escaped.appendChar(allocator, c);
@@ -980,7 +975,7 @@ pub const constructor = struct {
             // e. For each code unit codeUnit of codeUnits, do
             // i. Set escaped to the string-concatenation of escaped and UnicodeEscape(codeUnit).
             // f. Return escaped.
-            const hex = try std.fmt.allocPrint(allocator, "\\u{x:0>4}", .{code_point.code_point});
+            const hex = try allocator.print("\\u{x:0>4}", .{code_point.code_point});
             // TODO: Support appending an ASCII slice to String.Builder
             for (hex) |c| {
                 try escaped.appendChar(allocator, c);

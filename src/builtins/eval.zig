@@ -92,8 +92,10 @@ pub fn performEval(
     // 11. Perform the following substeps in an implementation-defined order, possibly interleaving
     //     parsing and error detection:
 
+    const source_utf8 = try source.asString().toUtf8(gpa);
+    defer gpa.free(source_utf8);
     // Stored in ExecutionContext.origin, must be GC'd
-    const source_text = try source.asString().toUtf8(agent.gc_allocator);
+    const source_text = try agent.gc_allocator.dupeSentinel(u8, source_utf8, 0);
 
     var diagnostics = Diagnostics.init(gpa);
     defer diagnostics.deinit();
@@ -103,14 +105,15 @@ pub fn performEval(
         .diagnostics = &diagnostics,
         .file_name = "eval",
         .state = .{
-            // e-h.
+            // e-g.
             .in_strict_mode = strict_caller,
             .new_target_allowed = in_func,
             .in_method_definition = in_method,
             // TODO: The state should track whether we're in a *derived* constructor
             .in_class_constructor = in_derived_ctor,
-            // TODO: The state should track whether we're in a class field initializer
-            // .in_class_field_initializer = in_class_field_initializer,
+            // h. If inClassFieldInitializer is true and ContainsArguments of body is true, throw
+            //    a SyntaxError exception.
+            .arguments_disallowed = in_class_field_initializer,
         },
     }) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,

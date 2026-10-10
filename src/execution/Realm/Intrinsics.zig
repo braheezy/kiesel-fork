@@ -188,7 +188,8 @@ wrap_for_valid_iterator_prototype: ?*Object,
 
 pub const init: Intrinsics = blk: {
     var intrinsics: Intrinsics = undefined;
-    for (std.meta.fieldNames(Intrinsics)) |field_name| {
+    const info = @typeInfo(Intrinsics).@"struct";
+    for (info.field_names) |field_name| {
         @field(intrinsics, field_name) = null;
     }
     break :blk intrinsics;

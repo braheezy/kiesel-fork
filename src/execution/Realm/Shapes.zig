@@ -24,7 +24,8 @@ reg_exp_exec_object: ?*Object.Shape,
 
 pub const init: Shapes = blk: {
     var shapes: Shapes = undefined;
-    for (std.meta.fieldNames(Shapes)) |field_name| {
+    const info = @typeInfo(Shapes).@"struct";
+    for (info.field_names) |field_name| {
         @field(shapes, field_name) = null;
     }
     break :blk shapes;
@@ -99,9 +100,9 @@ const OrdinaryFunctionOffsets = struct {
     prototype: Object.Shape.Property.Offset,
 
     const init: OrdinaryFunctionOffsets = .{
-        .length = @enumFromInt(0),
-        .name = @enumFromInt(1),
-        .prototype = @enumFromInt(2),
+        .length = @fromBackingInt(0),
+        .name = @fromBackingInt(1),
+        .prototype = @fromBackingInt(2),
     };
 };
 
@@ -135,7 +136,7 @@ const OrdinaryFunctionPrototypeOffsets = struct {
     constructor: Object.Shape.Property.Offset,
 
     pub const init: OrdinaryFunctionPrototypeOffsets = .{
-        .constructor = @enumFromInt(0),
+        .constructor = @fromBackingInt(0),
     };
 };
 
@@ -158,9 +159,9 @@ const UnmappedArgumentsObjectOffsets = struct {
     callee: Object.Shape.Property.Offset,
 
     const init: UnmappedArgumentsObjectOffsets = .{
-        .length = @enumFromInt(0),
-        .symbol_iterator = @enumFromInt(1),
-        .callee = @enumFromInt(2),
+        .length = @fromBackingInt(0),
+        .symbol_iterator = @fromBackingInt(1),
+        .callee = @fromBackingInt(2),
     };
 };
 
@@ -195,9 +196,9 @@ const MappedArgumentsObjectOffsets = struct {
     callee: Object.Shape.Property.Offset,
 
     const init: MappedArgumentsObjectOffsets = .{
-        .length = @enumFromInt(0),
-        .symbol_iterator = @enumFromInt(1),
-        .callee = @enumFromInt(2),
+        .length = @fromBackingInt(0),
+        .symbol_iterator = @fromBackingInt(1),
+        .callee = @fromBackingInt(2),
     };
 };
 
@@ -231,7 +232,7 @@ const RegExpObjectOffsets = struct {
     last_index: Object.Shape.Property.Offset,
 
     const init: RegExpObjectOffsets = .{
-        .last_index = @enumFromInt(0),
+        .last_index = @fromBackingInt(0),
     };
 };
 
@@ -254,9 +255,9 @@ const RegExpExecObjectOffsets = struct {
     groups: Object.Shape.Property.Offset,
 
     const init: RegExpExecObjectOffsets = .{
-        .index = @enumFromInt(0),
-        .input = @enumFromInt(1),
-        .groups = @enumFromInt(2),
+        .index = @fromBackingInt(0),
+        .input = @fromBackingInt(1),
+        .groups = @fromBackingInt(2),
     };
 };
 

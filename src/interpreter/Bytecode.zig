@@ -13,7 +13,6 @@ get_property_computed_ic_count: u16,
 set_property_ic_count: u16,
 set_property_computed_ic_count: u16,
 strings: []const []const u8,
-string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
 classes: []const Class,
@@ -33,24 +32,15 @@ pub const StringIndex = enum(u32) {
     _,
 
     pub fn slice(index: StringIndex, bc: *const Bytecode) []const u8 {
-        return bc.strings[@intFromEnum(index)];
+        return bc.strings[@backingInt(index)];
     }
-
-    pub fn kind(index: StringIndex, bc: *const Bytecode) StringKind {
-        return bc.string_kinds[@intFromEnum(index)];
-    }
-};
-
-pub const StringKind = enum(u1) {
-    escaped,
-    literal,
 };
 
 pub const BigIntIndex = enum(u16) {
     _,
 
     pub fn value(index: BigIntIndex, bc: *const Bytecode) std.math.big.int.Const {
-        return bc.big_ints[@intFromEnum(index)];
+        return bc.big_ints[@backingInt(index)];
     }
 };
 
@@ -70,7 +60,7 @@ pub const Function = struct {
         _,
 
         pub fn ptr(index: Index, bc: *const Bytecode) *const Function {
-            return &bc.functions[@intFromEnum(index)];
+            return &bc.functions[@backingInt(index)];
         }
     };
 
@@ -101,7 +91,7 @@ pub const Class = struct {
         _,
 
         pub fn ptr(index: Index, bc: *const Bytecode) *const Class {
-            return &bc.classes[@intFromEnum(index)];
+            return &bc.classes[@backingInt(index)];
         }
     };
 
@@ -140,13 +130,13 @@ pub const Inst = struct {
         load_big_int,
         move,
 
-        array_create,
+        create_array,
         array_push,
         array_push_hole,
         array_set,
         array_spread,
 
-        object_create,
+        create_object,
         object_set,
         object_set_computed,
         object_set_getter,
@@ -156,7 +146,7 @@ pub const Inst = struct {
         object_set_prototype,
         object_spread,
 
-        reg_exp_create,
+        create_reg_exp,
 
         resolve_this_binding,
 
@@ -346,12 +336,12 @@ pub const Inst = struct {
             .load_string = .reg_string,
             .load_big_int = .reg_big_int,
             .move = .reg_reg,
-            .array_create = .reg_u32,
+            .create_array = .reg_u32,
             .array_push = .reg_reg,
             .array_push_hole = .reg,
             .array_set = .reg_reg_u32,
             .array_spread = .reg_reg,
-            .object_create = .reg,
+            .create_object = .reg_u32,
             .object_set = .reg_string_reg,
             .object_set_computed = .reg_reg_reg,
             .object_set_getter = .reg_string_reg,
@@ -360,7 +350,7 @@ pub const Inst = struct {
             .object_set_setter_computed = .reg_reg_reg,
             .object_set_prototype = .reg_reg,
             .object_spread = .reg_reg,
-            .reg_exp_create = .reg_string_string,
+            .create_reg_exp = .reg_string_string,
             .resolve_this_binding = .reg,
             .to_boolean = .reg_reg,
             .to_number = .reg_reg,
@@ -510,14 +500,14 @@ pub const Inst = struct {
     ///
     /// Assumes the slice is non-empty and the first byte is a valid tag.
     pub inline fn decodeTag(code: []const u8) Tag {
-        return @enumFromInt(code[0]);
+        return @fromBackingInt(code[0]);
     }
 
     /// Decode instruction data from the given bytecode slice.
     ///
     /// Assumes the slice has enough bytes.
     pub inline fn decodeData(code: []const u8, tag: Tag) Data {
-        const data_tag = data_tags[@intFromEnum(tag)];
+        const data_tag = data_tags[@backingInt(tag)];
         switch (data_tag) {
             inline else => |field| {
                 const FieldType = @TypeOf(@field(@as(Data, undefined), @tagName(field)));
@@ -530,9 +520,10 @@ pub const Inst = struct {
                 if (type_info == .@"struct") {
                     var result: FieldType = undefined;
                     var offset: usize = 0;
-                    inline for (type_info.@"struct".fields, 0..) |struct_field, i| {
-                        result[i] = decodeField(struct_field.type, code[offset..]);
-                        offset += @sizeOf(struct_field.type);
+                    const info = type_info.@"struct";
+                    inline for (info.field_types, 0..) |field_type, i| {
+                        result[i] = decodeField(field_type, code[offset..]);
+                        offset += @sizeOf(field_type);
                     }
                     return @unionInit(Data, @tagName(field), result);
                 }
@@ -553,8 +544,8 @@ pub const Inst = struct {
             GetPropertyComputedIcIndex,
             SetPropertyIcIndex,
             SetPropertyComputedIcIndex,
-            => @enumFromInt(std.mem.readInt(u16, code[0..2], .little)),
-            StringIndex => @enumFromInt(std.mem.readInt(u32, code[0..4], .little)),
+            => @fromBackingInt(std.mem.readInt(u16, code[0..2], .little)),
+            StringIndex => @fromBackingInt(std.mem.readInt(u32, code[0..4], .little)),
             i8 => @bitCast(code[0]),
             u16 => std.mem.readInt(u16, code[0..2], .little),
             i32 => std.mem.readInt(i32, code[0..4], .little),
@@ -566,8 +557,8 @@ pub const Inst = struct {
     }
 
     pub fn encode(inst: Inst, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-        try writer.writeInt(u8, @intFromEnum(inst.tag), .little);
-        const data_tag = data_tags[@intFromEnum(inst.tag)];
+        try writer.writeInt(u8, @backingInt(inst.tag), .little);
+        const data_tag = data_tags[@backingInt(inst.tag)];
         switch (data_tag) {
             inline else => |field| {
                 const field_value = @field(inst.data, @tagName(field));
@@ -577,8 +568,9 @@ pub const Inst = struct {
                 if (FieldType == void) return;
 
                 if (type_info == .@"struct") {
-                    inline for (type_info.@"struct".fields, 0..) |struct_field, i| {
-                        try encodeField(struct_field.type, field_value[i], writer);
+                    const info = type_info.@"struct";
+                    inline for (info.field_types, 0..) |field_type, i| {
+                        try encodeField(field_type, field_value[i], writer);
                     }
                 } else {
                     try encodeField(FieldType, field_value, writer);
@@ -598,8 +590,8 @@ pub const Inst = struct {
             GetPropertyComputedIcIndex,
             SetPropertyIcIndex,
             SetPropertyComputedIcIndex,
-            => try writer.writeInt(u16, @intFromEnum(value), .little),
-            StringIndex => try writer.writeInt(u32, @intFromEnum(value), .little),
+            => try writer.writeInt(u16, @backingInt(value), .little),
+            StringIndex => try writer.writeInt(u32, @backingInt(value), .little),
             i8 => try writer.writeByte(@bitCast(value)),
             u16 => try writer.writeInt(u16, value, .little),
             i32 => try writer.writeInt(i32, value, .little),
@@ -611,17 +603,18 @@ pub const Inst = struct {
     }
 
     pub fn encodedSize(tag: Tag) u4 {
-        return encoded_sizes[@intFromEnum(tag)];
+        return encoded_sizes[@backingInt(tag)];
     }
 
     const encoded_sizes = blk: {
-        var sizes: [@typeInfo(Tag).@"enum".fields.len]u4 = @splat(1);
+        var sizes: [@typeInfo(Tag).@"enum".field_names.len]u4 = @splat(1);
         for (0..sizes.len) |i| {
             const FieldType = @TypeOf(@field(@as(Data, undefined), @tagName(data_tags[i])));
             const type_info = @typeInfo(FieldType);
             if (type_info == .@"struct") {
-                for (type_info.@"struct".fields) |f| {
-                    sizes[i] += @sizeOf(f.type);
+                const info = type_info.@"struct";
+                for (info.field_types) |field_type| {
+                    sizes[i] += @sizeOf(field_type);
                 }
             } else {
                 sizes[i] += @sizeOf(FieldType);
@@ -636,7 +629,6 @@ pub fn deinit(bc: *const Bytecode, gpa: std.mem.Allocator) void {
     gpa.free(bc.code);
     for (bc.strings) |string| gpa.free(string);
     gpa.free(bc.strings);
-    gpa.free(bc.string_kinds);
     for (bc.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(bc.big_ints);
     gpa.free(bc.functions);
@@ -740,7 +732,7 @@ fn printData(
     data: Inst.Data,
     terminal: std.Io.Terminal,
 ) PrintError!void {
-    const data_tag = Inst.data_tags[@intFromEnum(tag)];
+    const data_tag = Inst.data_tags[@backingInt(tag)];
     if (data_tag == .none) return;
     switch (tag) {
         .@"return" => if (data.reg == .none) return,
@@ -760,10 +752,10 @@ fn printData(
         },
         inline else => |dt| {
             const field_data = @field(data, @tagName(dt));
-            const field_type = @typeInfo(@TypeOf(field_data)).@"struct";
-            inline for (field_type.fields, 0..) |struct_field, idx| {
-                if (idx > 0) try terminal.writer.writeAll(", ");
-                const value = @field(field_data, struct_field.name);
+            const info = @typeInfo(@TypeOf(field_data)).@"struct";
+            inline for (info.field_names, 0..) |field_name, i| {
+                if (i > 0) try terminal.writer.writeAll(", ");
+                const value = @field(field_data, field_name);
                 try printField(bc, value, terminal);
             }
         },
@@ -789,18 +781,18 @@ fn printField(
         },
         Local => {
             try terminal.setColor(.cyan);
-            try terminal.writer.print("l{d}", .{@intFromEnum(value)});
+            try terminal.writer.print("l{d}", .{@backingInt(value)});
             try terminal.setColor(.reset);
         },
         Reg => {
             try terminal.setColor(.blue);
-            try terminal.writer.print("r{d}", .{@intFromEnum(value)});
+            try terminal.writer.print("r{d}", .{@backingInt(value)});
             try terminal.setColor(.reset);
         },
         StringIndex => {
             const str = value.slice(bc);
             try terminal.setColor(.yellow);
-            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.writer.print("@{d}", .{@backingInt(value)});
             try terminal.setColor(.reset);
             try terminal.writer.writeAll(" (");
             try terminal.setColor(.green);
@@ -811,7 +803,7 @@ fn printField(
         BigIntIndex => {
             const big_int = value.value(bc);
             try terminal.setColor(.yellow);
-            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.writer.print("@{d}", .{@backingInt(value)});
             try terminal.setColor(.reset);
             try terminal.writer.writeAll(" (");
             try terminal.setColor(.magenta);
@@ -828,7 +820,7 @@ fn printField(
         SetPropertyComputedIcIndex,
         => {
             try terminal.setColor(.yellow);
-            try terminal.writer.print("@{d}", .{@intFromEnum(value)});
+            try terminal.writer.print("@{d}", .{@backingInt(value)});
             try terminal.setColor(.reset);
         },
         else => comptime unreachable,

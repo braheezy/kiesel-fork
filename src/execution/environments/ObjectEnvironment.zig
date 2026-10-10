@@ -284,7 +284,7 @@ pub fn setMutableBindingIfExists(
             },
             .accessor => {
                 const setter_value = object.getValueAtPropertyOffset(
-                    @enumFromInt(@intFromEnum(property.offset) + 1),
+                    @fromBackingInt(@backingInt(property.offset) + 1),
                 );
                 if (setter_value.isNull()) {
                     @branchHint(.unlikely);

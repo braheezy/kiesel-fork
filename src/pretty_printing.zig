@@ -103,11 +103,11 @@ fn prettyPrintArrayBuffer(
         }
         try terminal.setColor(.reset);
         try terminal.writer.print("byteLength: {f}", .{
-            Value.from(@intFromEnum(array_buffer.fields.byte_length)).fmtPretty(terminal.mode),
+            Value.from(@backingInt(array_buffer.fields.byte_length)).fmtPretty(terminal.mode),
         });
         if (array_buffer.fields.max_byte_length.unwrap()) |max_byte_length| {
             try terminal.writer.print(", maxByteLength: {f}", .{
-                Value.from(@intFromEnum(max_byte_length)).fmtPretty(terminal.mode),
+                Value.from(@backingInt(max_byte_length)).fmtPretty(terminal.mode),
             });
         }
         if (data_block.bytes.len != 0) {
@@ -237,10 +237,10 @@ fn prettyPrintDataView(
     try terminal.setColor(.reset);
     try terminal.writer.print("arrayBuffer: {f}", .{Value.from(&viewed_array_buffer.object).fmtPretty(terminal.mode)});
     if (date.fields.byte_length.unwrap()) |byte_length| {
-        try terminal.writer.print(", byteLength: {f}", .{Value.from(@intFromEnum(byte_length)).fmtPretty(terminal.mode)});
+        try terminal.writer.print(", byteLength: {f}", .{Value.from(@backingInt(byte_length)).fmtPretty(terminal.mode)});
     }
     if (byte_offset != .zero) {
-        try terminal.writer.print(", byteOffset: {f}", .{Value.from(@intFromEnum(byte_offset)).fmtPretty(terminal.mode)});
+        try terminal.writer.print(", byteOffset: {f}", .{Value.from(@backingInt(byte_offset)).fmtPretty(terminal.mode)});
     }
     try terminal.setColor(.white);
     try terminal.writer.writeAll(")");
@@ -258,8 +258,7 @@ fn prettyPrintDate(
     try terminal.writer.writeAll("Date(");
     if (!std.math.isNan(date_value)) {
         try terminal.writer.print("{f}", .{
-            Value.from(asciiString(std.fmt.allocPrint(
-                arena.allocator(),
+            Value.from(asciiString(arena.allocator().print(
                 "{f}",
                 .{fmtToDateString(platform, date_value)},
             ) catch return)).fmtPretty(terminal.mode),
@@ -619,7 +618,7 @@ fn prettyPrintTypedArray(
         const ta = makeTypedArrayWithBufferWitnessRecord(@constCast(typed_array), .seq_cst);
         const array_length = typedArrayLength(ta);
         const byte_offset = typed_array.fields.byte_offset;
-        try terminal.writer.print("length: {f}", .{Value.from(@intFromEnum(array_length)).fmtPretty(terminal.mode)});
+        try terminal.writer.print("length: {f}", .{Value.from(@backingInt(array_length)).fmtPretty(terminal.mode)});
         if (data_block.bytes.len != 0) {
             try terminal.writer.writeAll(", data: ");
             try terminal.setColor(.white);
@@ -632,7 +631,7 @@ fn prettyPrintTypedArray(
                     var i: u53 = 0;
                     while (i < data_block.bytes.len) : (i += element_size) {
                         const bytes: *[element_size]u8 = @ptrCast(
-                            data_block.bytes[@intCast(@intFromEnum(byte_offset) + i)..@intCast(@intFromEnum(byte_offset) + i + element_size)],
+                            data_block.bytes[@intCast(@backingInt(byte_offset) + i)..@intCast(@backingInt(byte_offset) + i + element_size)],
                         );
                         const value = std.mem.bytesAsValue(@"type".type(), bytes).*;
                         const numeric = if (@"type".isBigIntElementType())
