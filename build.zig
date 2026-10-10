@@ -287,6 +287,23 @@ pub fn build(b: *std.Build) !void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);
 
+    const fuzz = b.addTest(.{
+        .name = "fuzz",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/fuzz.zig"),
+            .imports = &.{
+                .{ .name = "unicode-id", .module = unicode_id.module("unicode-id") },
+            },
+            .target = target,
+            .optimize = optimize,
+        }),
+        .use_llvm = use_llvm,
+    });
+    const run_fuzz = b.addRunArtifact(fuzz);
+
+    const fuzz_step = b.step("fuzz", "Run fuzz tests");
+    fuzz_step.dependOn(&run_fuzz.step);
+
     const docs = b.addObject(.{
         .name = "kiesel",
         .root_module = kiesel,

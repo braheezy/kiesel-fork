@@ -2375,3 +2375,35 @@ test "multi-byte identifier start" {
         .{ .tag = .identifier, .start = @fromBackingInt(0), .end = @fromBackingInt(6) },
     });
 }
+
+test "fuzz" {
+    try std.testing.fuzz({}, fuzzTokenizer, .{});
+}
+
+fn fuzzTokenizer(_: void, smith: *std.testing.Smith) !void {
+    const gpa = std.testing.allocator;
+
+    var buffer: [256:0]u8 = undefined;
+    const len = smith.sliceWeightedBytes(buffer[0..buffer.len], &.{
+        .rangeAtMost(u8, '\x00', '\x08', 1),
+        .rangeAtMost(u8, '\t', '\n', 8),
+        .rangeAtMost(u8, '\x0B', '\x0C', 1),
+        .rangeAtMost(u8, '\r', '\r', 8),
+        .rangeAtMost(u8, '\x0E', '\x1F', 1),
+        .rangeAtMost(u8, ' ', '~', 16),
+        .rangeAtMost(u8, '\x7F', '\xFF', 1),
+    });
+    buffer[len] = 0;
+    const source = buffer[0..len :0];
+
+    var t: Tokenizer = .init(gpa, source);
+    defer t.deinit();
+
+    var prev_end: Token.ByteOffset = @fromBackingInt(0);
+    while (try t.next()) |token| {
+        try std.testing.expect(@backingInt(token.start) <= @backingInt(token.end));
+        try std.testing.expect(@backingInt(token.end) <= source.len);
+        try std.testing.expect(@backingInt(prev_end) <= @backingInt(token.start));
+        prev_end = token.end;
+    }
+}

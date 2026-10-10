@@ -427,6 +427,11 @@ jobs:
       - name: Run tests
         run: |
           zig build -Denable-intl=false -Denable-temporal=false test
+      - name: Run fuzz tests
+        run: |
+          # NOTE: The regular test step fails with 'error: ld.lld: undefined symbol: __sanitizer_cov_trace_*'
+          #       in libregexp when running with fuzzing enabled, so we use a separate one
+          zig build -Denable-intl=false -Denable-temporal=false fuzz --fuzz=100K
       - name: Ensure test expectations are up to date
         run: |
           zig build -Denable-intl=false -Denable-temporal=false update-expectations
