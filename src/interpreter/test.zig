@@ -34,7 +34,7 @@ const ExpectedResult = union(enum) {
 };
 
 const TestCase = struct {
-    source: []const u8,
+    source: [:0]const u8,
     expected_result: ExpectedResult,
     expected_output: []const u8,
 };
@@ -45,7 +45,7 @@ fn testInterpreter(
     gpa: std.mem.Allocator,
     io: std.Io,
     environ_map: *const std.process.Environ.Map,
-    source: []const u8,
+    source: [:0]const u8,
     comptime expected_result: ExpectedResult,
     expected_output: []const u8,
 ) !void {

@@ -13,7 +13,7 @@ const Edit = struct {
 };
 
 const TestCase = struct {
-    source: []const u8,
+    source: [:0]const u8,
     expected_result: std.zig.Zoir.Node.Index,
     expected_output: std.zig.Zoir.Node.Index,
 };
@@ -105,7 +105,7 @@ pub fn main(init: std.process.Init) !u8 {
     return 0;
 }
 
-fn generateExpectedOutput(gpa: std.mem.Allocator, io: std.Io, source: []const u8) ![]const u8 {
+fn generateExpectedOutput(gpa: std.mem.Allocator, io: std.Io, source: [:0]const u8) ![]const u8 {
     var aw: std.Io.Writer.Allocating = .init(gpa);
     defer aw.deinit();
 

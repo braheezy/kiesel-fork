@@ -16,10 +16,9 @@ const LreOpaque = builtins.reg_exp.LreOpaque;
 const ModuleRequest = language.ModuleRequest;
 const ParsedFlags = builtins.reg_exp.ParsedFlags;
 const String = types.String;
+const Tokenizer = language.Tokenizer;
 const Value = types.Value;
 const containsSlice = utils.containsSlice;
-const parseUnicodeEscapeSequence = language.tokenizer.parseUnicodeEscapeSequence;
-const parseLegacyOctalEscapeSequence = language.tokenizer.parseLegacyOctalEscapeSequence;
 
 pub const SourceRange = struct {
     /// Byte offset into the UTF-8 source text, inclusive.
@@ -214,12 +213,7 @@ pub const Literal = union(enum) {
 
 /// https://tc39.es/ecma262/#prod-NumericLiteral
 pub const NumericLiteral = struct {
-    pub const System = enum {
-        binary,
-        octal,
-        decimal,
-        hexadecimal,
-    };
+    pub const System = Tokenizer.NumericLiteral.Base;
 
     pub const Production = enum {
         /// Anything else
@@ -230,10 +224,7 @@ pub const NumericLiteral = struct {
         non_octal_decimal_integer_literal,
     };
 
-    pub const Type = enum {
-        number,
-        big_int,
-    };
+    pub const Type = Tokenizer.NumericLiteral.Kind;
 
     text: []const u8,
     system: System,
@@ -246,38 +237,15 @@ pub const NumericLiteral = struct {
         self: NumericLiteral,
         allocator: std.mem.Allocator,
     ) std.mem.Allocator.Error!Value {
-        const base: u8 = switch (self.system) {
-            .binary => 2,
-            .octal => 8,
-            .decimal => 10,
-            .hexadecimal => 16,
+        const literal: Tokenizer.NumericLiteral = .{
+            .text = self.text,
+            .kind = self.type,
+            .base = self.system,
         };
-        const start: usize = if (self.production == .legacy_octal_integer_literal)
-            1 // Strip leading zero
-        else if (self.system != .decimal)
-            2 // Strip 0b/0o/0x prefix
-        else
-            0;
-        const end: usize = if (self.type == .big_int)
-            self.text.len - 1 // Strip trailing 'n'
-        else
-            self.text.len;
-        const str = self.text[start..end];
         switch (self.type) {
-            .number => {
-                const number: f64 = switch (self.system) {
-                    .decimal => std.fmt.parseFloat(f64, str) catch unreachable,
-                    else => @floatFromInt(std.fmt.parseInt(i128, str, base) catch unreachable),
-                };
-                return Value.from(number);
-            },
+            .number => return Value.from(try literal.numberValue(allocator)),
             .big_int => {
-                var managed = try std.math.big.int.Managed.init(allocator);
-                errdefer managed.deinit();
-                managed.setString(base, str) catch |err| switch (err) {
-                    error.InvalidBase, error.InvalidCharacter => unreachable,
-                    error.OutOfMemory => |e| return e,
-                };
+                const managed = try literal.bigIntValue(allocator);
                 const big_int = try allocator.create(BigInt);
                 big_int.* = .{ .managed = managed };
                 return Value.from(big_int);
@@ -285,78 +253,6 @@ pub const NumericLiteral = struct {
         }
     }
 };
-
-pub fn stringValueImpl(
-    allocator: std.mem.Allocator,
-    text: []const u8,
-) std.mem.Allocator.Error!*const String {
-    // NOTE: This allocates the maximum needed capacity upfront
-    var result = try String.Builder.initCapacity(allocator, @intCast(text.len));
-    defer result.deinit(allocator);
-    var it = std.unicode.Utf8View.initUnchecked(text).iterator();
-    while (it.nextCodepoint()) |code_point| {
-        switch (code_point) {
-            '\\' => for (language.tokenizer.line_terminators) |line_terminator| {
-                if (std.mem.startsWith(u8, text[it.i..], line_terminator)) {
-                    it.i += line_terminator.len;
-                    break;
-                }
-            } else switch (text[it.i]) {
-                '\\' => {
-                    result.appendCharAssumeCapacity('\\');
-                    it.i += 1;
-                },
-                'b' => {
-                    result.appendCharAssumeCapacity(0x08);
-                    it.i += 1;
-                },
-                'f' => {
-                    result.appendCharAssumeCapacity(0x0c);
-                    it.i += 1;
-                },
-                'n' => {
-                    result.appendCharAssumeCapacity('\n');
-                    it.i += 1;
-                },
-                'r' => {
-                    result.appendCharAssumeCapacity('\r');
-                    it.i += 1;
-                },
-                't' => {
-                    result.appendCharAssumeCapacity('\t');
-                    it.i += 1;
-                },
-                'v' => {
-                    result.appendCharAssumeCapacity(0x0b);
-                    it.i += 1;
-                },
-                'x' => {
-                    const chars = text[it.i + 1 .. it.i + 3];
-                    const parsed = std.fmt.parseInt(u8, chars, 16) catch unreachable;
-                    result.appendCharAssumeCapacity(parsed);
-                    it.i += 3;
-                },
-                'u' => {
-                    const parsed = parseUnicodeEscapeSequence(text[it.i - 1 ..]).?;
-                    result.appendCodePointAssumeCapacity(parsed.code_point);
-                    it.i += parsed.len - 1;
-                },
-                '0'...'7' => |c| {
-                    if (parseLegacyOctalEscapeSequence(text[it.i - 1 ..])) |parsed| {
-                        result.appendCharAssumeCapacity(parsed.code_point);
-                        it.i += parsed.len - 1;
-                    } else if (c == '0') {
-                        result.appendCharAssumeCapacity(0x00);
-                        it.i += 1;
-                    } else unreachable;
-                },
-                else => {},
-            },
-            else => result.appendCodePointAssumeCapacity(code_point),
-        }
-    }
-    return result.buildAlloc(allocator);
-}
 
 /// https://tc39.es/ecma262/#prod-StringLiteral
 pub const StringLiteral = struct {
@@ -369,7 +265,12 @@ pub const StringLiteral = struct {
         allocator: std.mem.Allocator,
     ) std.mem.Allocator.Error!*const String {
         std.debug.assert(self.text.len >= 2);
-        return stringValueImpl(allocator, self.text[1 .. self.text.len - 1]);
+        const literal: Tokenizer.StringLiteral = .{ .text = self.text };
+        var aw: std.Io.Writer.Allocating = .init(allocator);
+        errdefer aw.deinit();
+        const valid = literal.value(&aw.writer) catch return error.OutOfMemory;
+        std.debug.assert(valid);
+        return String.fromWtf8Alloc(allocator, try aw.toOwnedSlice());
     }
 };
 
@@ -527,89 +428,11 @@ pub const RegularExpressionLiteral = struct {
 /// https://tc39.es/ecma262/#prod-TemplateLiteral
 pub const TemplateLiteral = struct {
     pub const Span = union(enum) {
-        text: []const u8,
+        template: Tokenizer.Template,
         expression: Expression,
-
-        /// Text span without head/middle/tail components.
-        pub fn templateCharacters(self: Span) []const u8 {
-            std.debug.assert(self.text[0] == '`' or self.text[0] == '}');
-            if (self.text[self.text.len - 1] == '`') {
-                return self.text[1 .. self.text.len - 1];
-            } else {
-                std.debug.assert(std.mem.endsWith(u8, self.text, "${"));
-                return self.text[1 .. self.text.len - 2];
-            }
-        }
-
-        /// 12.9.6.1 Static Semantics: TV
-        /// https://tc39.es/ecma262/#sec-static-semantics-tv
-        pub fn templateValue(
-            self: Span,
-            allocator: std.mem.Allocator,
-        ) std.mem.Allocator.Error!*const String {
-            const text = self.templateCharacters();
-            if (std.mem.find(u8, text, "\r") == null) {
-                return stringValueImpl(allocator, text);
-            }
-            const cloned = try std.mem.replaceOwned(u8, allocator, text, "\r\n", "\n");
-            defer allocator.free(cloned);
-            _ = std.mem.replace(u8, cloned, "\r", "\n", cloned);
-            return stringValueImpl(allocator, cloned);
-        }
-
-        /// 12.9.6.2 Static Semantics: TRV
-        /// https://tc39.es/ecma262/#sec-static-semantics-trv
-        pub fn templateRawValue(
-            self: Span,
-            allocator: std.mem.Allocator,
-        ) std.mem.Allocator.Error!*const String {
-            const text = self.templateCharacters();
-            if (std.mem.find(u8, text, "\r") == null) {
-                return String.fromUtf8Alloc(allocator, text);
-            }
-            const cloned = try std.mem.replaceOwned(u8, allocator, text, "\r\n", "\n");
-            _ = std.mem.replace(u8, cloned, "\r", "\n", cloned);
-            // FIXME: Not knowing whether fromUtf8Alloc() will take ownership of the string is awkward
-            //        and prevents us from freeing it
-            return String.fromUtf8Alloc(allocator, cloned);
-        }
-
-        /// 13.2.8.3 Static Semantics: TemplateString ( templateToken, escapes )
-        /// https://tc39.es/ecma262/#sec-templatestring
-        pub fn templateString(
-            self: Span,
-            allocator: std.mem.Allocator,
-            escapes: enum { raw, cooked },
-        ) std.mem.Allocator.Error!*const String {
-            return switch (escapes) {
-                // 1. If escapes is raw, return the TRV of templateToken.
-                .raw => try self.templateRawValue(allocator),
-
-                // 2. Return the TV of templateToken.
-                .cooked => try self.templateValue(allocator),
-            };
-        }
     };
 
     spans: []const Span,
-
-    /// 13.2.8.2 Static Semantics: TemplateStrings
-    /// https://tc39.es/ecma262/#sec-static-semantics-templatestrings
-    pub fn templateStrings(
-        self: TemplateLiteral,
-        allocator: std.mem.Allocator,
-        raw: bool,
-    ) std.mem.Allocator.Error![]const *const String {
-        var template_strings: std.ArrayList(*const String) = .empty;
-        for (self.spans) |span| switch (span) {
-            .text => try template_strings.append(
-                allocator,
-                try span.templateString(allocator, raw),
-            ),
-            .expression => {},
-        };
-        return template_strings.toOwnedSlice(allocator);
-    }
 };
 
 /// https://tc39.es/ecma262/#prod-UpdateExpression

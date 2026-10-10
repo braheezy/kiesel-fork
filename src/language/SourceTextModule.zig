@@ -501,9 +501,11 @@ pub fn parse(
 ) Parser.Error!*SourceTextModule {
     const agent = realm.agent;
 
+    const source = try agent.gc_allocator.dupeSentinel(u8, source_text, 0);
+
     // 1. Let body be ParseText(sourceText, Module).
     // 2. If body is a List of errors, return body.
-    const body = try Parser.parse(ast.Module, agent.gc_allocator, source_text, options);
+    const body = try Parser.parse(ast.Module, agent.gc_allocator, source, options);
 
     // 3. Let requestedModules be the ModuleRequests of body.
     var requested_modules: std.ArrayList(ModuleRequest) = .empty;
@@ -607,7 +609,6 @@ pub fn parse(
     //     [[LocalExportEntries]]: localExportEntries,
     //     [[IndirectExportEntries]]: indirectExportEntries,
     //     [[StarExportEntries]]: starExportEntries, [[DFSAncestorIndex]]: empty }.
-    const source = try agent.gc_allocator.dupe(u8, source_text);
     const self = try agent.gc_allocator.create(SourceTextModule);
     self.* = .{
         .realm = realm,

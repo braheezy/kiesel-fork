@@ -1,6 +1,5 @@
 const std = @import("std");
 
-const ast = @import("../language/ast.zig");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
@@ -17,6 +16,7 @@ const Object = types.Object;
 const PrivateName = types.PrivateName;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
+const Tokenizer = language.Tokenizer;
 const Value = types.Value;
 
 const addDisposableResource = types.addDisposableResource;
@@ -54,7 +54,6 @@ const newObjectEnvironment = execution.newObjectEnvironment;
 const newPrivateEnvironment = execution.newPrivateEnvironment;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreateFast = builtins.ordinaryObjectCreateFast;
-const stringValueImpl = ast.stringValueImpl;
 const yield = builtins.yield;
 
 const ic = @import("Vm/ic.zig");
@@ -524,6 +523,7 @@ fn load(vm: *Vm, reg: Bytecode.Reg, value: Value) void {
 }
 
 fn getString(vm: *Vm, index: Bytecode.StringIndex) std.mem.Allocator.Error!*const String {
+    const gpa = vm.agent.gpa;
     const cache_index = @backingInt(index);
     if (vm.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
@@ -532,7 +532,20 @@ fn getString(vm: *Vm, index: Bytecode.StringIndex) std.mem.Allocator.Error!*cons
     const utf8 = index.slice(vm.frame.bytecode);
     const kind = index.kind(vm.frame.bytecode);
     const string = switch (kind) {
-        .escaped => try stringValueImpl(vm.agent.gc_allocator, utf8),
+        .escaped => blk: {
+            // TODO: Update bytecode to store something more convenient
+            const wrapped = try gpa.alloc(u8, utf8.len + 2);
+            defer gpa.free(wrapped);
+            wrapped[0] = '"';
+            @memcpy(wrapped[1 .. 1 + utf8.len], utf8);
+            wrapped[utf8.len + 1] = '"';
+            const literal: Tokenizer.StringLiteral = .{ .text = wrapped };
+            var aw: std.Io.Writer.Allocating = .init(vm.agent.gc_allocator);
+            errdefer aw.deinit();
+            const valid = literal.value(&aw.writer) catch return error.OutOfMemory;
+            std.debug.assert(valid);
+            break :blk try String.fromWtf8(vm.agent, try aw.toOwnedSlice());
+        },
         .literal => try String.fromUtf8(
             vm.agent,
             try vm.agent.gc_allocator.dupe(u8, utf8),

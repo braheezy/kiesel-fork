@@ -92,8 +92,10 @@ pub fn performEval(
     // 11. Perform the following substeps in an implementation-defined order, possibly interleaving
     //     parsing and error detection:
 
+    const source_utf8 = try source.asString().toUtf8(gpa);
+    defer gpa.free(source_utf8);
     // Stored in ExecutionContext.origin, must be GC'd
-    const source_text = try source.asString().toUtf8(agent.gc_allocator);
+    const source_text = try agent.gc_allocator.dupeSentinel(u8, source_utf8, 0);
 
     var diagnostics = Diagnostics.init(gpa);
     defer diagnostics.deinit();

@@ -24,6 +24,8 @@ const Script = kiesel.language.Script;
 const ScriptOrModule = kiesel.execution.ScriptOrModule;
 const SourceTextModule = kiesel.language.SourceTextModule;
 const String = kiesel.types.String;
+const Token = kiesel.language.Token;
+const Tokenizer = kiesel.language.Tokenizer;
 const Value = kiesel.types.Value;
 const createTextModule = kiesel.language.createTextModule;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
@@ -881,75 +883,67 @@ fn repl(
             defer self.editor.allocator.free(line);
 
             // NOTE: zigline always returns valid UTF-8.
-            var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
-            const change = kiesel.utils.temporaryChange(
-                &kiesel.language.tokenizer.state,
-                .{
-                    .tokenizer = &tokenizer,
-                    // Workaround to ensure the tokenizer generates template literal middle and
-                    // tail tokens even though there is no parser setting this.
-                    .parsing_template_literal = true,
-                },
-            );
-            defer change.restore();
+            const source = self.editor.allocator.dupeSentinel(u8, line, 0) catch return;
+            defer self.editor.allocator.free(source);
+
+            var tokenizer: Tokenizer = .init(self.editor.allocator, source);
+            defer tokenizer.deinit();
 
             while (tokenizer.next() catch null) |token| {
                 self.editor.stylize(
-                    .{
-                        .begin = tokenizer.offset - token.text.len,
-                        .end = tokenizer.offset,
-                    },
-                    switch (token.type) {
-                        .await,
-                        .@"break",
-                        .@"catch",
-                        .class,
-                        .@"const",
-                        .@"continue",
-                        .debugger,
-                        .default,
-                        .delete,
-                        .@"enum",
-                        .@"export",
-                        .extends,
-                        .function,
-                        .hashbang_comment,
-                        .import,
-                        .in,
-                        .instanceof,
-                        .new,
-                        .@"return",
-                        .super,
-                        .this,
-                        .typeof,
-                        .@"var",
-                        .void,
+                    .{ .begin = @backingInt(token.start), .end = @backingInt(token.end) },
+                    switch (token.tag) {
+                        .keyword_await,
+                        .keyword_break,
+                        .keyword_catch,
+                        .keyword_class,
+                        .keyword_const,
+                        .keyword_continue,
+                        .keyword_debugger,
+                        .keyword_default,
+                        .keyword_delete,
+                        .keyword_enum,
+                        .keyword_export,
+                        .keyword_extends,
+                        .keyword_function,
+                        .keyword_import,
+                        .keyword_in,
+                        .keyword_instanceof,
+                        .keyword_new,
+                        .keyword_return,
+                        .keyword_super,
+                        .keyword_this,
+                        .keyword_typeof,
+                        .keyword_var,
+                        .keyword_void,
                         => .{ .foreground = .{ .xterm = .blue }, .bold = true },
 
-                        .case,
-                        .comment,
-                        .do,
-                        .@"else",
-                        .finally,
-                        .@"for",
-                        .@"if",
-                        .@"switch",
-                        .throw,
-                        .@"try",
-                        .@"while",
-                        .with,
-                        .yield,
+                        .line_comment,
+                        .multiline_comment,
+                        .hashbang_comment,
+                        .keyword_case,
+                        .keyword_do,
+                        .keyword_else,
+                        .keyword_finally,
+                        .keyword_for,
+                        .keyword_if,
+                        .keyword_switch,
+                        .keyword_throw,
+                        .keyword_try,
+                        .keyword_while,
+                        .keyword_with,
+                        .keyword_yield,
                         => .{ .foreground = .{ .xterm = .cyan } },
 
-                        .false, .true => .{ .foreground = .{ .xterm = .blue } },
-                        .null => .{ .foreground = .{ .xterm = .yellow } },
-                        .numeric => .{ .foreground = .{ .xterm = .magenta } },
-                        .regular_expression,
-                        .string,
-                        .template,
-                        .template_head,
-                        .template_middle,
-                        .template_tail,
+                        .keyword_false, .keyword_true => .{ .foreground = .{ .xterm = .blue } },
+                        .keyword_null => .{ .foreground = .{ .xterm = .yellow } },
+                        .number_literal, .bigint_literal => .{ .foreground = .{ .xterm = .magenta } },
+                        .regexp_literal,
+                        .string_literal,
+                        .template_literal,
+                        .template_literal_head,
+                        .template_literal_middle,
+                        .template_literal_tail,
                         => .{ .foreground = .{ .xterm = .green } },
                         else => .{},
                     },
@@ -967,20 +961,18 @@ fn repl(
             defer self.editor.allocator.free(line);
 
             // NOTE: zigline always returns valid UTF-8.
-            var tokenizer = kiesel.language.tokenizer.Tokenizer.init(line, null);
-            const change = kiesel.utils.temporaryChange(
-                &kiesel.language.tokenizer.state,
-                .{
-                    .tokenizer = &tokenizer,
-                    // Workaround to ensure the tokenizer generates template literal middle and
-                    // tail tokens even though there is no parser setting this.
-                    .parsing_template_literal = true,
-                },
-            );
-            defer change.restore();
+            const source = self.editor.allocator.dupeSentinel(u8, line, 0) catch return &.{};
+            defer self.editor.allocator.free(source);
 
-            var token_window: [3]?kiesel.language.tokenizer.Tokenizer.Token = .{ null, null, null };
+            var tokenizer: Tokenizer = .init(self.editor.allocator, source);
+            defer tokenizer.deinit();
+
+            var token_window: [3]?Token = .{ null, null, null };
             while (tokenizer.next() catch null) |token| {
+                switch (token.tag) {
+                    .line_comment, .multiline_comment, .hashbang_comment => continue,
+                    else => {},
+                }
                 // Shift tokens in the window to the left
                 token_window[0] = token_window[1];
                 token_window[1] = token_window[2];
@@ -988,7 +980,7 @@ fn repl(
             }
 
             if (token_window[2] == null)
-                token_window[2] = .{ .type = .identifier, .text = "", .location = .{ .line = 0, .column = 0 } };
+                token_window[2] = .{ .tag = .identifier, .start = @fromBackingInt(0), .end = @fromBackingInt(0) };
 
             if (self.completion_buffer == null)
                 self.completion_buffer = try self.editor.allocator.alloc(Editor.CompletionSuggestion, 256);
@@ -999,12 +991,12 @@ fn repl(
 
             // (k1)(.)(prop) OR (_)(k1)(.) -> complete property names of k1, starting with prop (if present)
             // (_)(_)(ident) -> complete global object property names starting with ident.
-            const is_property_completion_partial = token_window[2].?.type == .@"." and token_window[1] != null and token_window[1].?.type == .identifier;
-            const is_property_completion_full = token_window[2].?.type == .identifier and token_window[1] != null and token_window[1].?.type == .@"." and token_window[0] != null and token_window[0].?.type == .identifier;
-            const is_global_object_property_completion = token_window[2].?.type == .identifier and (token_window[1] == null or token_window[1].?.type != .@".");
+            const is_property_completion_partial = token_window[2].?.tag == .period and token_window[1] != null and token_window[1].?.tag == .identifier;
+            const is_property_completion_full = token_window[2].?.tag == .identifier and token_window[1] != null and token_window[1].?.tag == .period and token_window[0] != null and token_window[0].?.tag == .identifier;
+            const is_global_object_property_completion = token_window[2].?.tag == .identifier and (token_window[1] == null or token_window[1].?.tag != .period);
 
             const object = if (is_property_completion_partial or is_property_completion_full) b: {
-                const object_name = if (is_property_completion_partial) token_window[1].?.text else token_window[0].?.text;
+                const object_name = if (is_property_completion_partial) token_window[1].?.text(source) else token_window[0].?.text(source);
                 const object_name_string = String.fromUtf8(self.realm.agent, object_name) catch return &.{};
                 if (!(self.realm.global_env.hasBinding(self.realm.agent, object_name_string) catch false)) return &.{};
 
@@ -1013,7 +1005,7 @@ fn repl(
                 break :b object_value.asObject();
             } else if (is_global_object_property_completion) self.realm.global_object else return &.{};
 
-            const prefix_utf8 = if (token_window[2].?.type == .identifier) token_window[2].?.text else "";
+            const prefix_utf8 = if (token_window[2].?.tag == .identifier) token_window[2].?.text(source) else "";
             const prefix = String.fromUtf8(self.realm.agent, prefix_utf8) catch return &.{};
 
             for (object.shape.properties.keys()) |key| {

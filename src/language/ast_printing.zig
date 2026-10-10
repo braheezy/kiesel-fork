@@ -204,7 +204,7 @@ pub fn printTemplateLiteral(node: ast.TemplateLiteral, writer: *std.Io.Writer, i
     try print("TemplateLiteral", writer, indentation);
     for (node.spans) |span| switch (span) {
         .expression => |expression| try printExpression(expression, writer, indentation + 1),
-        .text => |text| try print(text, writer, indentation + 1),
+        .template => |template| try print(template.text, writer, indentation + 1),
     };
 }
 

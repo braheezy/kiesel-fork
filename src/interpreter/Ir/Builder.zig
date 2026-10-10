@@ -3746,7 +3746,7 @@ fn lowerRegularExpressionLiteral(b: *Builder, regexp_lit: *const ast.RegularExpr
 fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) Error!Ir.Inst.Ref {
     var result: Ir.Inst.Ref = .none;
     for (template_lit.spans, 0..) |span, i| {
-        std.debug.assert(if (i % 2 == 0) span == .text else span == .expression);
+        std.debug.assert(if (i % 2 == 0) span == .template else span == .expression);
         const span_ref: Ir.Inst.Ref = switch (span) {
             .expression => |expr| blk: {
                 const expr_ref = try b.lowerExpression(&expr);
@@ -3755,19 +3755,13 @@ fn lowerTemplateLiteral(b: *Builder, template_lit: *const ast.TemplateLiteral) E
                     .data = .{ .ref = expr_ref },
                 });
             },
-            .text => blk: {
-                const chars = span.templateCharacters();
-                if (chars.len == 0) continue;
-                const normalized = try std.mem.replaceOwned(
-                    u8,
-                    b.gpa,
-                    chars,
-                    "\r\n",
-                    "\n",
-                );
-                defer b.gpa.free(normalized);
-                _ = std.mem.replaceScalar(u8, normalized, '\r', '\n');
-                const string_index = try b.internString(normalized, .escaped);
+            .template => |template| blk: {
+                var aw: std.Io.Writer.Allocating = .init(b.gpa);
+                defer aw.deinit();
+                const valid = template.rawValue(&aw.writer) catch return error.OutOfMemory;
+                std.debug.assert(valid);
+                if (aw.written().len == 0) continue;
+                const string_index = try b.internString(aw.written(), .escaped);
                 break :blk try b.addInst(.{
                     .tag = .string,
                     .data = .{ .string = string_index },
@@ -5427,7 +5421,7 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
 
     var raw_indices: std.ArrayList(Ir.StringIndex) = .empty;
     defer raw_indices.deinit(b.gpa);
-    var cooked_indices: std.ArrayList(Ir.StringIndex) = .empty;
+    var cooked_indices: std.ArrayList(?Ir.StringIndex) = .empty;
     defer cooked_indices.deinit(b.gpa);
 
     for (template_literal.spans, 0..) |span, i| {
@@ -5436,13 +5430,21 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
             continue;
         }
 
-        const text = span.templateCharacters();
-        const normalized = try std.mem.replaceOwned(u8, b.gpa, text, "\r\n", "\n");
-        defer b.gpa.free(normalized);
-        _ = std.mem.replaceScalar(u8, normalized, '\r', '\n');
-
-        try raw_indices.append(b.gpa, try b.internString(normalized, .literal));
-        try cooked_indices.append(b.gpa, try b.internString(normalized, .escaped));
+        var aw: std.Io.Writer.Allocating = .init(b.gpa);
+        defer aw.deinit();
+        {
+            const valid = span.template.rawValue(&aw.writer) catch return error.OutOfMemory;
+            std.debug.assert(valid);
+            try raw_indices.append(b.gpa, try b.internString(aw.written(), .literal));
+        }
+        {
+            var dw: std.Io.Writer.Discarding = .init(&.{});
+            const valid = span.template.value(&dw.writer) catch unreachable;
+            if (valid)
+                try cooked_indices.append(b.gpa, try b.internString(aw.written(), .escaped))
+            else
+                try cooked_indices.append(b.gpa, null);
+        }
     }
 
     const raw_array = blk: {
@@ -5476,11 +5478,17 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
                 .has_spread = false,
             } },
         });
-        for (cooked_indices.items) |string_index| {
-            const ref = try b.addInst(.{
-                .tag = .string,
-                .data = .{ .string = string_index },
-            });
+        for (cooked_indices.items) |maybe_string_index| {
+            const ref = if (maybe_string_index) |string_index|
+                try b.addInst(.{
+                    .tag = .string,
+                    .data = .{ .string = string_index },
+                })
+            else
+                try b.addInst(.{
+                    .tag = .undefined,
+                    .data = .{ .none = {} },
+                });
             _ = try b.addInst(.{
                 .tag = .array_push,
                 .data = .{ .binary = .{
@@ -5512,7 +5520,7 @@ fn lowerTaggedTemplate(b: *Builder, tagged_template: *const ast.TaggedTemplate) 
 
     for (template_literal.spans, 0..) |span, i| {
         if (i % 2 == 0) {
-            std.debug.assert(span == .text);
+            std.debug.assert(span == .template);
             continue;
         }
         const expr_ref = try b.lowerExpression(&span.expression);

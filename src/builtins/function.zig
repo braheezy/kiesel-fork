@@ -288,20 +288,23 @@ pub fn createDynamicFunction(
         }
     }
 
-    const parameters_string = try (try result.build(agent)).toUtf8(gpa);
+    const parameters_utf8 = try (try result.build(agent)).toUtf8(gpa);
+    defer gpa.free(parameters_utf8);
+    const parameters_string = try gpa.dupeSentinel(u8, parameters_utf8, 0);
     defer gpa.free(parameters_string);
 
     // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
     //     0x000A (LINE FEED).
-    const body_parse_string = try gpa.print("\n{f}\n", .{body_string.fmtRaw()});
+    const body_parse_string = try gpa.printSentinel("\n{f}\n", .{body_string.fmtRaw()}, 0);
     defer gpa.free(body_parse_string);
 
     // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", paramString,
     //     0x000A (LINE FEED), ") {", bodyParseString, and "}".
     // 16. Let sourceText be StringToCodePoints(sourceString).
-    const source_text = try agent.gc_allocator.print(
+    const source_text = try agent.gc_allocator.printSentinel(
         "{[prefix]s} anonymous({[parameters_string]s}\n) {{{[body_parse_string]s}}}",
         .{ .prefix = prefix, .parameters_string = parameters_string, .body_parse_string = body_parse_string },
+        0,
     );
 
     var diagnostics = Diagnostics.init(gpa);

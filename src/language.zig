@@ -1,9 +1,7 @@
 const module = @import("language/module.zig");
 
 pub const ast = @import("language/ast.zig");
-pub const literals = @import("language/literals.zig");
 pub const runtime = @import("language/runtime.zig");
-pub const tokenizer = @import("language/tokenizer.zig");
 
 pub const Diagnostics = @import("ptk").Diagnostics;
 pub const ExportEntry = SourceTextModule.ExportEntry;
@@ -20,6 +18,8 @@ pub const ResolvedBindingOrAmbiguous = module.ResolvedBindingOrAmbiguous;
 pub const Script = @import("language/Script.zig");
 pub const SourceTextModule = @import("language/SourceTextModule.zig");
 pub const SyntheticModule = @import("language/SyntheticModule.zig");
+pub const Token = @import("language/Token.zig");
+pub const Tokenizer = @import("language/Tokenizer.zig");
 pub const allImportAttributesSupported = module.allImportAttributesSupported;
 pub const continueModuleLoading = SourceTextModule.continueModuleLoading;
 pub const createDefaultExportSyntheticModule = SyntheticModule.createDefaultExportSyntheticModule;
@@ -41,6 +41,6 @@ test {
     _ = Script;
     _ = SourceTextModule;
     _ = SyntheticModule;
-    _ = literals;
-    _ = tokenizer;
+    _ = Token;
+    _ = Tokenizer;
 }

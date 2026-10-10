@@ -3,21 +3,16 @@ const std = @import("std");
 
 const build_options = @import("build-options");
 const ast = @import("ast.zig");
-const literals = @import("literals.zig");
-const tokenizer_ = @import("tokenizer.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
+const NewToken = @import("Token.zig");
+const NewTokenizer = @import("Tokenizer.zig");
 const String = types.String;
 const TemporaryChange = utils.TemporaryChange;
-const Tokenizer = tokenizer_.Tokenizer;
-const containsLineTerminator = tokenizer_.containsLineTerminator;
 const containsSlice = utils.containsSlice;
-const parseNumericLiteral = literals.parseNumericLiteral;
-const parseRegularExpressionLiteral = literals.parseRegularExpressionLiteral;
-const parseStringLiteral = literals.parseStringLiteral;
+const findLineTerminator = NewTokenizer.findLineTerminator;
 const temporaryChange = utils.temporaryChange;
-const reserved_words = tokenizer_.reserved_words;
 
 const Parser = @This();
 
@@ -47,8 +42,318 @@ pub const State = struct {
     arguments_disallowed: bool = false,
 };
 
+const Tokenizer = struct {
+    pub const Token = ptk.Tokenizer(TokenType, &.{}).Token;
+    pub const TokenType = enum {
+        @"--",
+        @"-",
+        @"-=",
+        @",",
+        @";",
+        @":",
+        @"!",
+        @"!=",
+        @"!==",
+        @"??",
+        @"??=",
+        @"?.",
+        @"?",
+        @".",
+        @"...",
+        @"(",
+        @")",
+        @"[",
+        @"]",
+        @"{",
+        @"}",
+        @"*",
+        @"**",
+        @"**=",
+        @"*=",
+        @"/",
+        @"/=",
+        @"&",
+        @"&&",
+        @"&&=",
+        @"&=",
+        @"#",
+        @"%",
+        @"%=",
+        @"^",
+        @"^=",
+        @"+",
+        @"++",
+        @"+=",
+        @"<",
+        @"<<",
+        @"<<=",
+        @"<=",
+        @"=",
+        @"==",
+        @"===",
+        @"=>",
+        @">",
+        @">=",
+        @">>",
+        @">>=",
+        @">>>",
+        @">>>=",
+        @"|",
+        @"|=",
+        @"||",
+        @"||=",
+        @"~",
+        await,
+        @"break",
+        case,
+        @"catch",
+        class,
+        @"const",
+        @"continue",
+        debugger,
+        default,
+        delete,
+        do,
+        @"else",
+        @"enum",
+        @"export",
+        extends,
+        false,
+        finally,
+        @"for",
+        function,
+        identifier,
+        private_identifier,
+        @"if",
+        import,
+        in,
+        instanceof,
+        new,
+        null,
+        numeric,
+        regular_expression,
+        @"return",
+        string,
+        super,
+        @"switch",
+        template,
+        template_head,
+        template_middle,
+        template_tail,
+        this,
+        throw,
+        true,
+        @"try",
+        typeof,
+        @"var",
+        void,
+        @"while",
+        with,
+        yield,
+        line_comment,
+        multiline_comment,
+        hashbang_comment,
+
+        pub fn fromTag(tag: NewToken.Tag) TokenType {
+            return switch (tag) {
+                .invalid => unreachable,
+                .identifier => .identifier,
+                .private_identifier => .private_identifier,
+                .keyword_await => .await,
+                .keyword_break => .@"break",
+                .keyword_case => .case,
+                .keyword_catch => .@"catch",
+                .keyword_class => .class,
+                .keyword_const => .@"const",
+                .keyword_continue => .@"continue",
+                .keyword_debugger => .debugger,
+                .keyword_default => .default,
+                .keyword_delete => .delete,
+                .keyword_do => .do,
+                .keyword_else => .@"else",
+                .keyword_enum => .@"enum",
+                .keyword_export => .@"export",
+                .keyword_extends => .extends,
+                .keyword_false => .false,
+                .keyword_finally => .finally,
+                .keyword_for => .@"for",
+                .keyword_function => .function,
+                .keyword_if => .@"if",
+                .keyword_import => .import,
+                .keyword_in => .in,
+                .keyword_instanceof => .instanceof,
+                .keyword_new => .new,
+                .keyword_null => .null,
+                .keyword_return => .@"return",
+                .keyword_super => .super,
+                .keyword_switch => .@"switch",
+                .keyword_this => .this,
+                .keyword_throw => .throw,
+                .keyword_true => .true,
+                .keyword_try => .@"try",
+                .keyword_typeof => .typeof,
+                .keyword_var => .@"var",
+                .keyword_void => .void,
+                .keyword_while => .@"while",
+                .keyword_with => .with,
+                .keyword_yield => .yield,
+                .question_mark_period => .@"?.",
+                .left_curly_bracket => .@"{",
+                .right_curly_bracket => .@"}",
+                .left_parenthesis => .@"(",
+                .right_parenthesis => .@")",
+                .left_square_bracket => .@"[",
+                .right_square_bracket => .@"]",
+                .period => .@".",
+                .ellipsis => .@"...",
+                .semicolon => .@";",
+                .comma => .@",",
+                .less_than => .@"<",
+                .greater_than => .@">",
+                .less_than_equals => .@"<=",
+                .greater_than_equals => .@">=",
+                .double_equals => .@"==",
+                .exclamation_mark_equals => .@"!=",
+                .triple_equals => .@"===",
+                .exclamation_mark_double_equals => .@"!==",
+                .plus => .@"+",
+                .minus => .@"-",
+                .asterisk => .@"*",
+                .percent => .@"%",
+                .double_asterisk => .@"**",
+                .double_plus => .@"++",
+                .double_minus => .@"--",
+                .double_less_than => .@"<<",
+                .double_greater_than => .@">>",
+                .triple_greater_than => .@">>>",
+                .ampersand => .@"&",
+                .pipe => .@"|",
+                .caret => .@"^",
+                .exclamation_mark => .@"!",
+                .tilde => .@"~",
+                .double_ampersand => .@"&&",
+                .double_pipe => .@"||",
+                .double_question_mark => .@"??",
+                .question_mark => .@"?",
+                .colon => .@":",
+                .equals => .@"=",
+                .plus_equals => .@"+=",
+                .minus_equals => .@"-=",
+                .asterisk_equals => .@"*=",
+                .percent_equals => .@"%=",
+                .double_asterisk_equals => .@"**=",
+                .double_less_than_equals => .@"<<=",
+                .double_greater_than_equals => .@">>=",
+                .triple_greater_than_equals => .@">>>=",
+                .ampersand_equals => .@"&=",
+                .pipe_equals => .@"|=",
+                .caret_equals => .@"^=",
+                .double_ampersand_equals => .@"&&=",
+                .double_pipe_equals => .@"||=",
+                .double_question_mark_equals => .@"??=",
+                .equals_greater_than => .@"=>",
+                .slash => .@"/",
+                .slash_equals => .@"/=",
+                .number_literal, .bigint_literal => .numeric,
+                .string_literal => .string,
+                .regexp_literal => .regular_expression,
+                .template_literal => .template,
+                .template_literal_head => .template_head,
+                .template_literal_middle => .template_middle,
+                .template_literal_tail => .template_tail,
+                .line_comment => .line_comment,
+                .multiline_comment => .multiline_comment,
+                .hashbang_comment => .hashbang_comment,
+            };
+        }
+    };
+    pub const State = struct {
+        // ptk.Tokenizer.State fields
+        offset: usize,
+        location: ptk.Location,
+        // Everything else
+        index: u32,
+    };
+    pub const NextError = error{ UnexpectedCharacter, OutOfMemory };
+
+    const TokenList = std.MultiArrayList(NewToken);
+
+    // ptk.Tokenizer fields
+    source: []const u8,
+    offset: usize,
+    current_location: ptk.Location,
+    // Everything else
+    tokens_slice: TokenList.Slice,
+    index: u32,
+
+    pub fn init(gpa: std.mem.Allocator, source: [:0]const u8, file_name: ?[]const u8) std.mem.Allocator.Error!Tokenizer {
+        var tokens: TokenList = .empty;
+        errdefer tokens.deinit(gpa);
+        var tokenizer: NewTokenizer = .init(gpa, source);
+        defer tokenizer.deinit();
+        while (try tokenizer.next()) |token| {
+            switch (token.tag) {
+                .line_comment, .multiline_comment, .hashbang_comment => {},
+                else => try tokens.append(gpa, token),
+            }
+        }
+        var tokens_slice = tokens.toOwnedSlice();
+        errdefer tokens_slice.deinit(gpa);
+        return .{
+            .source = source,
+            .offset = 0,
+            .current_location = .{ .source = file_name, .line = 1, .column = 1 },
+            .tokens_slice = tokens_slice,
+            .index = 0,
+        };
+    }
+
+    pub fn deinit(t: *Tokenizer, gpa: std.mem.Allocator) void {
+        t.tokens_slice.deinit(gpa);
+    }
+
+    pub fn saveState(t: *Tokenizer) Tokenizer.State {
+        return .{
+            .offset = t.offset,
+            .location = t.current_location,
+            .index = t.index,
+        };
+    }
+
+    pub fn restoreState(t: *Tokenizer, state: Tokenizer.State) void {
+        t.offset = state.offset;
+        t.current_location = state.location;
+        t.index = state.index;
+    }
+
+    pub fn next(t: *Tokenizer) NextError!?Token {
+        if (t.index < t.tokens_slice.len) {
+            const token = t.tokens_slice.get(t.index);
+            t.index += 1;
+            t.current_location.advance(t.source[t.offset..@backingInt(token.start)]);
+            if (token.tag == .invalid) {
+                t.offset = @backingInt(token.start);
+                return error.UnexpectedCharacter;
+            }
+            t.offset = @backingInt(token.end);
+            const location = t.current_location;
+            t.current_location.advance(token.text(t.source));
+            return .{
+                .type = .fromTag(token.tag),
+                .text = token.text(t.source),
+                .location = location,
+            };
+        }
+        return null;
+    }
+};
+
 const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
-const ParserCore = ptk.ParserCore(Tokenizer, .{ .whitespace, .comment });
+const ParserCore = ptk.ParserCore(Tokenizer, .{
+    .line_comment,
+    .multiline_comment,
+    .hashbang_comment,
+});
 
 pub const AcceptError = std.mem.Allocator.Error || ParserCore.AcceptError;
 
@@ -231,7 +536,7 @@ fn getAssociativityAlt(flag: PrecedenceAndAssociativityAltFlag) ?Associativity {
 pub fn parse(
     comptime T: type,
     allocator: std.mem.Allocator,
-    source_text: []const u8,
+    source: [:0]const u8,
     options: Options,
 ) Error!T {
     if (T != ast.Script and T != ast.Module)
@@ -248,7 +553,7 @@ pub fn parse(
             }
         }.accept,
         allocator,
-        source_text,
+        source,
         options,
     );
 }
@@ -257,7 +562,7 @@ pub fn parseNode(
     comptime T: type,
     comptime acceptFn: fn (*Parser) anyerror!T,
     allocator: std.mem.Allocator,
-    source_text: []const u8,
+    source: [:0]const u8,
     options: Options,
 ) Error!T {
     var new_diagnostics: ptk.Diagnostics = undefined;
@@ -266,7 +571,8 @@ pub fn parseNode(
         new_diagnostics = .init(allocator);
         break :blk &new_diagnostics;
     };
-    var tokenizer = Tokenizer.init(source_text, options.file_name);
+    var tokenizer = try Tokenizer.init(allocator, source, options.file_name);
+    defer tokenizer.deinit(allocator);
     const core = ParserCore.init(&tokenizer);
     var parser: Parser = .{
         .allocator = allocator,
@@ -276,8 +582,6 @@ pub fn parseNode(
         .state = options.state,
     };
     defer parser.identifier_stack.deinit(allocator);
-    const tmp = temporaryChange(&tokenizer_.state, .{ .tokenizer = &tokenizer });
-    defer tmp.restore();
     const ast_node: ?T = acceptFn(&parser) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
         else => null,
@@ -294,7 +598,6 @@ pub fn parseNode(
         // 'good' position, which means we also have to re-consume any whitespace and other ignored
         // tokens preceding the invalid character.
         while (parser.core.tokenizer.next() catch null) |_| {}
-        const source = parser.core.tokenizer.source;
         const offset = parser.core.tokenizer.offset;
         std.debug.assert(offset < source.len);
         try parser.emitError("Invalid character '{s}'", .{source[offset .. offset + 1]});
@@ -323,35 +626,30 @@ fn emitErrorAt(
     try self.diagnostics.emit(location, .@"error", fmt, args);
 }
 
-fn utf8StringValue(
-    allocator: std.mem.Allocator,
-    text: []const u8,
-) std.mem.Allocator.Error!?[]const u8 {
-    // Only construct a full string if we need to unescape it.
+fn identifierNameValue(self: *Parser, text: []const u8) AcceptError![]const u8 {
     if (std.mem.findScalar(u8, text, '\\') == null) {
-        return try allocator.dupe(u8, text);
+        return self.allocator.dupe(u8, text);
     }
-    const string = try ast.stringValueImpl(allocator, text);
-    return switch (string.asAsciiOrUtf16()) {
-        .ascii => |ascii| ascii,
-        .utf16 => |utf16| std.unicode.utf16LeToUtf8Alloc(
-            allocator,
-            utf16,
-        ) catch |err| switch (err) {
-            error.OutOfMemory => |e| return e,
-            error.DanglingSurrogateHalf,
-            error.ExpectedSecondSurrogateHalf,
-            error.UnexpectedSecondSurrogateHalf,
-            => return null,
-        },
-    };
+    var aw: std.Io.Writer.Allocating = .init(self.allocator);
+    defer aw.deinit();
+    const literal: NewTokenizer.IdentifierName = .{ .text = text };
+    const valid = literal.value(&aw.writer) catch return error.OutOfMemory;
+    if (!valid) return error.UnexpectedToken;
+    return aw.toOwnedSlice();
 }
 
+/// 12.7.2 Keywords and Reserved Words
+/// https://tc39.es/ecma262/#sec-keywords-and-reserved-words
+const reserved_words = [_][]const u8{
+    "await",   "break",  "case",     "catch",  "class",  "const",  "continue",   "debugger",
+    "default", "delete", "do",       "else",   "enum",   "export", "extends",    "false",
+    "finally", "for",    "function", "if",     "import", "in",     "instanceof", "new",
+    "null",    "return", "super",    "switch", "this",   "throw",  "true",       "try",
+    "typeof",  "var",    "void",     "while",  "with",   "yield",
+};
+
 fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const u8 {
-    const string_value = (try utf8StringValue(
-        self.allocator,
-        token.text,
-    )) orelse return error.UnexpectedToken;
+    const string_value = try self.identifierNameValue(token.text);
     if (token.type == .identifier) {
         // It is a Syntax Error if the goal symbol of the syntactic grammar is Module and the
         // StringValue of IdentifierName is "await".
@@ -728,7 +1026,7 @@ fn followedByLineTerminator(self: *Parser) bool {
     const end_offset = self.core.tokenizer.offset - next_token.text.len;
     const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
-    return containsLineTerminator(whitespace_and_comments);
+    return findLineTerminator(whitespace_and_comments) != null;
 }
 
 /// 12.10 Automatic Semicolon Insertion
@@ -758,7 +1056,7 @@ pub fn acceptOrInsertSemicolon(self: *Parser) AcceptError!void {
     const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
     // Next token is separated by a newline, insert semicolon
-    if (containsLineTerminator(whitespace_and_comments)) return;
+    if (findLineTerminator(whitespace_and_comments)) |_| return;
 
     return error.UnexpectedToken;
 }
@@ -784,10 +1082,7 @@ pub fn acceptIdentifierName(self: *Parser) AcceptError!ast.Identifier {
         break :blk reserved_word_token_types;
     };
     const token = try self.core.accept(RuleSet.oneOf(.{.identifier} ++ reserved_word_token_types));
-    return (try utf8StringValue(
-        self.allocator,
-        token.text,
-    )) orelse return error.UnexpectedToken;
+    return self.identifierNameValue(token.text);
 }
 
 pub fn acceptIdentifierReference(self: *Parser) AcceptError!ast.IdentifierReference {
@@ -1098,25 +1393,19 @@ pub fn acceptPrivateIdentifier(self: *Parser) AcceptError!ast.PrivateIdentifier 
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const hash_token = try self.core.accept(RuleSet.is(.@"#"));
-    const identifier_token = try self.core.accept(RuleSet.oneOf(.{ .identifier, .yield, .await }));
-
-    if (identifier_token.location.line != hash_token.location.line or
-        identifier_token.location.column != hash_token.location.column + 1)
-    {
-        return error.UnexpectedToken;
-    }
+    const token = try self.core.accept(RuleSet.is(.private_identifier));
 
     if (!self.state.in_class_body) {
         try self.emitErrorAt(
-            hash_token.location,
+            token.location,
             "Private identifier is only allowed in class body",
             .{},
         );
         return error.UnexpectedToken;
     }
 
-    return self.unescapeIdentifier(identifier_token);
+    // Strip the leading '#'
+    return self.identifierNameValue(token.text[1..]);
 }
 
 pub fn acceptPrimaryExpression(self: *Parser) AcceptError!ast.PrimaryExpression {
@@ -1161,10 +1450,8 @@ pub fn acceptPrimaryExpression(self: *Parser) AcceptError!ast.PrimaryExpression 
         .@"[" => .{ .array_literal = try self.acceptArrayLiteral() },
         .@"{" => .{ .object_literal = try self.acceptObjectLiteral() },
         .numeric, .string, .null, .true, .false => .{ .literal = try self.acceptLiteral() },
-        // NOTE: .regular_expression is only emitted when tokenizer.state.parsing_regular_expression
-        //       is true, so here we check for .@"/" and .@"/="
-        .@"/", .@"/=" => .{ .regular_expression_literal = try self.acceptRegularExpressionLiteral() },
-        .template, .template_head => .{ .template_literal = try self.acceptTemplateLiteral() },
+        .regular_expression => .{ .regular_expression_literal = try self.acceptRegularExpressionLiteral() },
+        .template, .template_head => .{ .template_literal = try self.acceptTemplateLiteral(false) },
         else => error.UnexpectedToken,
     };
 }
@@ -1537,8 +1824,22 @@ pub fn acceptNumericLiteral(self: *Parser) AcceptError!ast.NumericLiteral {
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.is(.numeric));
-    var numeric_literal = parseNumericLiteral(token.text, .complete) catch unreachable;
-    numeric_literal.text = try self.allocator.dupe(u8, numeric_literal.text);
+    var consumed: u32 = undefined;
+    const literal = NewTokenizer.NumericLiteral.parse(token.text, &consumed).?;
+    const production: ast.NumericLiteral.Production = if (literal.base == .octal and
+        !(token.text.len >= 2 and (token.text[1] == 'o' or token.text[1] == 'O')))
+        .legacy_octal_integer_literal
+    else if (literal.base == .decimal and
+        token.text.len >= 2 and token.text[0] == '0' and std.ascii.isDigit(token.text[1]))
+        .non_octal_decimal_integer_literal
+    else
+        .regular;
+    const numeric_literal: ast.NumericLiteral = .{
+        .text = try self.allocator.dupe(u8, token.text),
+        .system = literal.base,
+        .production = production,
+        .type = literal.kind,
+    };
 
     switch (numeric_literal.production) {
         // DecimalIntegerLiteral :: NonOctalDecimalIntegerLiteral
@@ -1566,9 +1867,12 @@ pub fn acceptStringLiteral(self: *Parser) AcceptError!ast.StringLiteral {
     errdefer self.core.restoreState(state);
 
     const token = try self.core.accept(RuleSet.is(.string));
-    var string_literal = parseStringLiteral(token.text, .complete) catch unreachable;
-    string_literal.text = try self.allocator.dupe(u8, string_literal.text);
-    return string_literal;
+    const literal: NewTokenizer.StringLiteral = .{ .text = token.text };
+    if (!literal.validate()) {
+        try self.emitErrorAt(token.location, "Invalid escape sequence", .{});
+        return error.UnexpectedToken;
+    }
+    return .{ .text = try self.allocator.dupe(u8, token.text) };
 }
 
 pub fn acceptArrayLiteral(self: *Parser) AcceptError!ast.ArrayLiteral {
@@ -2058,7 +2362,7 @@ pub fn acceptTaggedTemplate(
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const template_literal = try self.acceptTemplateLiteral();
+    const template_literal = try self.acceptTemplateLiteral(true);
 
     // Defer heap allocation of expression until we know this is a TaggedTemplate
     const expression = try self.allocator.create(ast.Expression);
@@ -2092,7 +2396,7 @@ pub fn acceptExpression(self: *Parser, ctx: AcceptContext) AcceptError!ast.Expre
             .{ .meta_property = meta_property }
         else |_|
             return error.UnexpectedToken,
-        .@"#" => blk: {
+        .private_identifier => blk: {
             const private_identifier = try self.acceptPrivateIdentifier();
             break :blk .{
                 .relational_expression = try acceptRelationalExpression(
@@ -4561,13 +4865,14 @@ fn acceptRegularExpressionLiteral(self: *Parser) AcceptError!ast.RegularExpressi
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    const tmp = temporaryChange(&tokenizer_.state.parsing_regular_expression, true);
-    defer tmp.restore();
-
     const token = try self.core.accept(RuleSet.is(.regular_expression));
-    const regular_expression_literal = parseRegularExpressionLiteral(token.text, .complete) catch unreachable;
-    const pattern = regular_expression_literal.pattern;
-    const flags = regular_expression_literal.flags;
+    const literal = NewTokenizer.RegExpLiteral.parse(token.text).?;
+    const pattern = literal.pattern();
+    const flags = literal.flags();
+    const regular_expression_literal: ast.RegularExpressionLiteral = .{
+        .pattern = try self.allocator.dupe(u8, pattern),
+        .flags = try self.allocator.dupe(u8, flags),
+    };
     switch (try regular_expression_literal.isValidRegularExpressionLiteral(self.allocator)) {
         .invalid_pattern => |str| {
             try self.emitErrorAt(token.location, "Invalid RegExp pattern: {s}", .{str});
@@ -4581,35 +4886,46 @@ fn acceptRegularExpressionLiteral(self: *Parser) AcceptError!ast.RegularExpressi
         },
         .valid => {},
     }
-    return .{
-        .pattern = try self.allocator.dupe(u8, pattern),
-        .flags = try self.allocator.dupe(u8, flags),
-    };
+    return regular_expression_literal;
 }
 
-fn acceptTemplateLiteral(self: *Parser) AcceptError!ast.TemplateLiteral {
+fn acceptTemplateLiteral(self: *Parser, tagged: bool) AcceptError!ast.TemplateLiteral {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
-
-    const tmp = temporaryChange(&tokenizer_.state.parsing_template_literal, true);
-    defer tmp.restore();
 
     var spans: std.ArrayList(ast.TemplateLiteral.Span) = .empty;
     errdefer spans.deinit(self.allocator);
     if (self.core.accept(RuleSet.is(.template))) |template| {
-        try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template.text) });
+        try spans.append(self.allocator, .{ .template = .{
+            .text = try self.allocator.dupe(u8, template.text),
+        } });
     } else |_| if (self.core.accept(RuleSet.is(.template_head))) |template_head| {
-        try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template_head.text) });
+        try spans.append(self.allocator, .{ .template = .{
+            .text = try self.allocator.dupe(u8, template_head.text),
+        } });
         while (true) {
             const expression = try self.acceptExpression(.{});
             try spans.append(self.allocator, .{ .expression = expression });
             if (self.core.accept(RuleSet.is(.template_middle))) |template_middle| {
-                try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template_middle.text) });
+                try spans.append(self.allocator, .{ .template = .{
+                    .text = try self.allocator.dupe(u8, template_middle.text),
+                } });
             } else |_| break;
         }
         const template_tail = try self.core.accept(RuleSet.is(.template_tail));
-        try spans.append(self.allocator, .{ .text = try self.allocator.dupe(u8, template_tail.text) });
+        try spans.append(self.allocator, .{ .template = .{
+            .text = try self.allocator.dupe(u8, template_tail.text),
+        } });
     } else |_| return error.UnexpectedToken;
+
+    if (!tagged) for (spans.items) |span| switch (span) {
+        .template => |template| if (!template.validate()) {
+            try self.emitErrorAt(state.location, "Invalid escape sequence", .{});
+            return error.UnexpectedToken;
+        },
+        .expression => {},
+    };
+
     return .{ .spans = try spans.toOwnedSlice(self.allocator) };
 }
 
@@ -4880,7 +5196,6 @@ pub fn acceptScript(self: *Parser) AcceptError!ast.Script {
     const state = self.core.saveState();
     errdefer self.core.restoreState(state);
 
-    _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
     const statement_list = try self.acceptStatementList(.{ .update_strict_mode = true });
     const script: ast.Script = .{ .statement_list = statement_list };
 
@@ -4928,7 +5243,6 @@ pub fn acceptModule(self: *Parser) AcceptError!ast.Module {
     const tmp2 = temporaryChange(&self.state.in_strict_mode, true);
     defer tmp2.restore();
 
-    _ = self.core.accept(RuleSet.is(.hashbang_comment)) catch {};
     const module_item_list = try self.acceptModuleItemList();
     const module: ast.Module = .{ .module_item_list = module_item_list };
 
