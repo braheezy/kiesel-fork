@@ -16,7 +16,6 @@ const Object = types.Object;
 const PrivateName = types.PrivateName;
 const PropertyKey = types.PropertyKey;
 const String = types.String;
-const Tokenizer = language.Tokenizer;
 const Value = types.Value;
 
 const addDisposableResource = types.addDisposableResource;
@@ -523,34 +522,13 @@ fn load(vm: *Vm, reg: Bytecode.Reg, value: Value) void {
 }
 
 fn getString(vm: *Vm, index: Bytecode.StringIndex) std.mem.Allocator.Error!*const String {
-    const gpa = vm.agent.gpa;
     const cache_index = @backingInt(index);
     if (vm.cache_slots[cache_index]) |ptr| {
         @branchHint(.likely);
         return @ptrCast(ptr);
     }
-    const utf8 = index.slice(vm.frame.bytecode);
-    const kind = index.kind(vm.frame.bytecode);
-    const string = switch (kind) {
-        .escaped => blk: {
-            // TODO: Update bytecode to store something more convenient
-            const wrapped = try gpa.alloc(u8, utf8.len + 2);
-            defer gpa.free(wrapped);
-            wrapped[0] = '"';
-            @memcpy(wrapped[1 .. 1 + utf8.len], utf8);
-            wrapped[utf8.len + 1] = '"';
-            const literal: Tokenizer.StringLiteral = .{ .text = wrapped };
-            var aw: std.Io.Writer.Allocating = .init(vm.agent.gc_allocator);
-            errdefer aw.deinit();
-            const valid = literal.value(&aw.writer) catch return error.OutOfMemory;
-            std.debug.assert(valid);
-            break :blk try String.fromWtf8(vm.agent, try aw.toOwnedSlice());
-        },
-        .literal => try String.fromUtf8(
-            vm.agent,
-            try vm.agent.gc_allocator.dupe(u8, utf8),
-        ),
-    };
+    const wtf8 = index.slice(vm.frame.bytecode);
+    const string = try String.fromWtf8(vm.agent, try vm.agent.gc_allocator.dupe(u8, wtf8));
     vm.cache_slots[cache_index] = @ptrCast(@alignCast(string));
     return string;
 }

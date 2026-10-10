@@ -1,9 +1,11 @@
 const std = @import("std");
 
 const ast = @import("../../language/ast.zig");
+const language = @import("../../language.zig");
 const types = @import("../../types.zig");
 
 const Number = types.Number;
+const Tokenizer = language.Tokenizer;
 
 pub const Constant = union(enum) {
     undefined,
@@ -134,7 +136,14 @@ fn constantFoldLiteral(
                 } };
             }
         },
-        .string => |s| .{ .string = try gpa.dupe(u8, s.text[1 .. s.text.len - 1]) },
+        .string => |s| blk: {
+            const sl: Tokenizer.StringLiteral = .{ .text = s.text };
+            var aw: std.Io.Writer.Allocating = .init(gpa);
+            errdefer aw.deinit();
+            const valid = sl.value(&aw.writer) catch return error.OutOfMemory;
+            std.debug.assert(valid);
+            break :blk .{ .string = try aw.toOwnedSlice() };
+        },
     };
 }
 

@@ -13,7 +13,6 @@ get_property_computed_ic_count: u16,
 set_property_ic_count: u16,
 set_property_computed_ic_count: u16,
 strings: []const []const u8,
-string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
 classes: []const Class,
@@ -35,15 +34,6 @@ pub const StringIndex = enum(u32) {
     pub fn slice(index: StringIndex, bc: *const Bytecode) []const u8 {
         return bc.strings[@backingInt(index)];
     }
-
-    pub fn kind(index: StringIndex, bc: *const Bytecode) StringKind {
-        return bc.string_kinds[@backingInt(index)];
-    }
-};
-
-pub const StringKind = enum(u1) {
-    escaped,
-    literal,
 };
 
 pub const BigIntIndex = enum(u16) {
@@ -639,7 +629,6 @@ pub fn deinit(bc: *const Bytecode, gpa: std.mem.Allocator) void {
     gpa.free(bc.code);
     for (bc.strings) |string| gpa.free(string);
     gpa.free(bc.strings);
-    gpa.free(bc.string_kinds);
     for (bc.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(bc.big_ints);
     gpa.free(bc.functions);

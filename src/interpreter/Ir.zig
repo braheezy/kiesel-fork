@@ -9,7 +9,6 @@ name: []const u8,
 instructions: std.MultiArrayList(Inst).Slice,
 extra: []const u32,
 strings: []const []const u8,
-string_kinds: []const StringKind,
 big_ints: []const std.math.big.int.Const,
 functions: []const Function,
 classes: []const Class,
@@ -27,15 +26,6 @@ pub const StringIndex = enum(u32) {
     pub fn slice(index: StringIndex, ir: *const Ir) []const u8 {
         return ir.strings[@backingInt(index)];
     }
-
-    pub fn kind(index: StringIndex, ir: *const Ir) StringKind {
-        return ir.string_kinds[@backingInt(index)];
-    }
-};
-
-pub const StringKind = enum(u1) {
-    escaped,
-    literal,
 };
 
 pub const BigIntIndex = enum(u16) {
@@ -673,7 +663,6 @@ pub fn deinit(ir: *Ir, gpa: std.mem.Allocator) void {
     gpa.free(ir.extra);
     for (ir.strings) |string| gpa.free(string);
     gpa.free(ir.strings);
-    gpa.free(ir.string_kinds);
     for (ir.big_ints) |big_int| gpa.free(big_int.limbs);
     gpa.free(ir.big_ints);
     gpa.free(ir.functions);
