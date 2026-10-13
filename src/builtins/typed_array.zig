@@ -1729,8 +1729,9 @@ pub const prototype = struct {
 
         // 6. Let result be the empty String.
         // NOTE: This allocates the maximum needed capacity upfront
-        if (@backingInt(length_) > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@backingInt(length_) * 2) - 1));
+        const capacity = std.math.cast(u32, @as(u64, @backingInt(length_)) * 2 - 1) orelse
+            return error.OutOfMemory;
+        var result = try String.Builder.initCapacity(agent.gc_allocator, capacity);
         defer result.deinit(agent.gc_allocator);
 
         // 7. Let k be 0.
@@ -2740,8 +2741,9 @@ pub const prototype = struct {
 
         // 4. Let result be the empty String.
         // NOTE: This allocates the maximum needed capacity upfront
-        if (@backingInt(length_) > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@backingInt(length_) * 2) - 1));
+        const capacity = std.math.cast(u32, @as(u64, @backingInt(length_)) * 2 - 1) orelse
+            return error.OutOfMemory;
+        var result = try String.Builder.initCapacity(agent.gc_allocator, capacity);
         defer result.deinit(agent.gc_allocator);
 
         // 5. Let k be 0.
