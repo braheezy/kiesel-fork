@@ -72,14 +72,14 @@ fn toZeroPaddedDecimalString(buf: []u8, n: anytype, min_length: usize) []const u
 }
 
 /// https://howardhinnant.github.io/date_algorithms.html#days_from_civil
-fn daysFromCivil(y_: i64, m: i32, d: i32) i64 {
-    var y = y_;
-    if (m <= 2) y -= 1;
+fn daysFromCivil(y_: i32, m: u32, d: u32) i64 {
+    var y: i64 = y_;
+    y -= @intFromBool(m <= 2);
     const era = @divTrunc(if (y >= 0) y else y - 399, 400);
-    const yoe = y - era * 400;
-    const doy = @divTrunc(153 * (m + @as(i32, if (m > 2) -3 else 9)) + 2, 5 + d - 1);
-    const doe = yoe * 365 + @divTrunc(yoe, 4) - @divTrunc(yoe, 100) + doy;
-    return era * 146097 + doe - 719468;
+    const yoe: u32 = @intCast(y - era * 400); // [0, 399]
+    const doy: u32 = (153 * (if (m > 2) m - 3 else m + 9) + 2) / 5 + d - 1; // [0, 365]
+    const doe: u32 = yoe * 365 + yoe / 4 - yoe / 100 + doy; // [0, 146096]
+    return era * 146097 + @as(i64, @intCast(doe)) - 719468;
 }
 
 /// 21.4.1.3 Day ( tv )
@@ -441,10 +441,7 @@ pub fn makeDay(year: f64, month: f64, day_: f64) f64 {
     // 8. Find a finite time value tv such that YearFromTime(tv) = ℝ(balancedYear), MonthFromTime(
     //    tv) = balancedMonthMV, and DateFromTime(tv) = 1; but if this is not possible (because some
     //    argument is out of range), return NaN.
-    if (balanced_year < @as(f64, @floatFromInt(std.math.minInt(i64))) or
-        balanced_year > @as(f64, @floatFromInt(std.math.maxInt(i64))) or
-        (balanced_month_mv + 1) > std.math.maxInt(i32))
-    {
+    if (balanced_year < std.math.minInt(i32) or balanced_year > std.math.maxInt(i32)) {
         return std.math.nan(f64);
     }
     const tv = @as(f64, @floatFromInt(
