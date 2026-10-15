@@ -648,6 +648,12 @@ const reserved_words = [_][]const u8{
     "typeof",  "var",    "void",     "while",  "with",   "yield",
 };
 
+/// 12.7.2 Keywords and Reserved Words
+/// https://tc39.es/ecma262/#sec-keywords-and-reserved-words
+const strict_mode_reserved_words = [_][]const u8{
+    "let", "static", "implements", "interface", "package", "private", "protected", "public",
+};
+
 fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const u8 {
     const string_value = try self.identifierNameValue(token.text);
     if (token.type == .identifier) {
@@ -782,8 +788,10 @@ fn ensureAllowedIdentifier(
     value: []const u8,
     location: ptk.Location,
 ) std.mem.Allocator.Error!void {
-    if (std.mem.eql(u8, value, "eval") or
-        std.mem.eql(u8, value, "arguments"))
+    if (containsSlice(&strict_mode_reserved_words, value) or
+        // https://tc39.es/ecma262/#sec-keywords-and-reserved-words:~:text=code%2E-,Note%203
+        std.mem.eql(u8, value, "arguments") or
+        std.mem.eql(u8, value, "eval"))
     {
         switch (kind) {
             .binding_identifier => try self.emitErrorAt(
