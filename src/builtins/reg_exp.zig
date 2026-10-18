@@ -129,7 +129,19 @@ fn compileRegexp(
     // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
     const buf = switch (pattern.asAsciiOrUtf16()) {
         .ascii => |ascii| try gpa.dupeSentinel(u8, ascii, 0),
-        .utf16 => |utf16| try gpa.printSentinel("{f}", .{std.unicode.fmtUtf16Le(utf16)}, 0),
+        .utf16 => |utf16| blk: {
+            if (parsed_flags.u or parsed_flags.v) {
+                break :blk try std.unicode.wtf16LeToWtf8AllocZ(gpa, utf16);
+            }
+            var cesu8: std.ArrayList(u8) = .empty;
+            defer cesu8.deinit(gpa);
+            var encoded: [3]u8 = undefined;
+            for (utf16) |code_unit| {
+                const len = std.unicode.wtf8Encode(code_unit, &encoded) catch unreachable;
+                try cesu8.appendSlice(gpa, encoded[0..len]);
+            }
+            break :blk try cesu8.toOwnedSliceSentinel(gpa, 0);
+        },
     };
     defer gpa.free(buf);
 

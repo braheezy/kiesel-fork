@@ -336,7 +336,7 @@ const Kiesel = struct {
     fn evalScript(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const gpa = agent.gpa;
 
-        const source_text = try (try arguments.get(0).toString(agent)).toUtf8(gpa);
+        const source_text = try (try arguments.get(0).toString(agent)).toWtf8(gpa);
         defer gpa.free(source_text);
 
         // 1. Let hostDefined be any host-defined values for the provided sourceText (obtained in
@@ -1446,7 +1446,7 @@ pub fn main(init: std.process.Init) !u8 {
     if (maybe_path) |path| {
         const raw_source_text = try readFile(gpa, io, path);
         defer gpa.free(raw_source_text);
-        // The parser assumes valid UTF-8, replace invalid byte sequences with U+FFFD.
+        // Source is expected to be UTF-8, replace invalid byte sequences with U+FFFD.
         const source_text = try gpa.print("{f}", .{
             std.unicode.fmtUtf8(raw_source_text),
         });
@@ -1470,7 +1470,7 @@ pub fn main(init: std.process.Init) !u8 {
         }
     } else if (parsed_args.options.command) |raw_source_text| {
         std.debug.assert(!run_as_module);
-        // The parser assumes valid UTF-8, replace invalid byte sequences with U+FFFD.
+        // Source is expected to be UTF-8, replace invalid byte sequences with U+FFFD.
         const source_text = try gpa.print("{f}", .{
             std.unicode.fmtUtf8(raw_source_text),
         });

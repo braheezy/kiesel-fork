@@ -404,7 +404,28 @@ pub const RegularExpressionLiteral = struct {
         var re_bytecode_len: c_int = undefined;
         var error_msg: [64]u8 = undefined;
         // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
-        const buf = try allocator.dupeSentinel(u8, self.pattern, 0);
+        const buf = if (parsed_flags.u or parsed_flags.v)
+            try allocator.dupeSentinel(u8, self.pattern, 0)
+        else blk: {
+            var cesu8: std.ArrayList(u8) = try .initCapacity(allocator, self.pattern.len);
+            defer cesu8.deinit(allocator);
+            var encoded: [6]u8 = undefined;
+            var i: usize = 0;
+            while (i < self.pattern.len) {
+                const len = std.unicode.utf8ByteSequenceLength(self.pattern[i]) catch unreachable;
+                const code_point = std.unicode.wtf8Decode(self.pattern[i..][0..len]) catch unreachable;
+                if (code_point < 0x10000) {
+                    const encoded_len = std.unicode.wtf8Encode(code_point, &encoded) catch unreachable;
+                    try cesu8.appendSlice(allocator, encoded[0..encoded_len]);
+                } else {
+                    const high_len = std.unicode.wtf8Encode(0xd800 | ((code_point - 0x10000) >> 10), &encoded) catch unreachable;
+                    const low_len = std.unicode.wtf8Encode(0xdc00 | ((code_point - 0x10000) & 0x3ff), encoded[high_len..]) catch unreachable;
+                    try cesu8.appendSlice(allocator, encoded[0 .. high_len + low_len]);
+                }
+                i += len;
+            }
+            break :blk try cesu8.toOwnedSliceSentinel(allocator, 0);
+        };
         defer allocator.free(buf);
         var @"opaque": LreOpaque = .{ .allocator = allocator };
         // TODO: Plumb the resulting bytecode into the created RegExp object somehow.
@@ -4194,7 +4215,7 @@ pub const ImportClause = union(enum) {
                         .identifier => |identifier| identifier,
                         .string_literal => |string_literal| try (try string_literal.stringValue(
                             allocator,
-                        )).toUtf8(allocator),
+                        )).toWtf8(allocator),
                     };
 
                     // 2. Let localName be the StringValue of ImportedBinding.
@@ -4552,7 +4573,7 @@ pub const ExportFromClause = union(enum) {
                 // 1. Let exportName be the StringValue of ModuleExportName.
                 const export_name = switch (module_export_name) {
                     .identifier => |identifier| identifier,
-                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toWtf8(allocator),
                 };
 
                 // 2. Let entry be the ExportEntry Record { [[ModuleRequest]]: module,
@@ -4601,7 +4622,7 @@ pub const NamedExports = struct {
                 // 1. Let sourceName be the StringValue of ModuleExportName.
                 const source_name = switch (export_specifier.name) {
                     .identifier => |identifier| identifier,
-                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toWtf8(allocator),
                 };
 
                 // 2. If module is null, then
@@ -4631,13 +4652,13 @@ pub const NamedExports = struct {
                 // 1. Let sourceName be the StringValue of the first ModuleExportName.
                 const source_name = switch (export_specifier.name) {
                     .identifier => |identifier| identifier,
-                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toWtf8(allocator),
                 };
 
                 // 2. Let exportName be the StringValue of the second ModuleExportName.
                 const export_name = switch (export_specifier.alias.?) {
                     .identifier => |identifier| identifier,
-                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toWtf8(allocator),
                 };
 
                 // 3. If module is null, then

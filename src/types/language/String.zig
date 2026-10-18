@@ -465,6 +465,13 @@ pub fn toUtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocat
     };
 }
 
+pub fn toWtf8(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u8 {
+    return switch (self.asAsciiOrUtf16()) {
+        .ascii => |ascii| allocator.dupe(u8, ascii),
+        .utf16 => |utf16| std.unicode.wtf16LeToWtf8Alloc(allocator, utf16),
+    };
+}
+
 pub fn toUtf16(self: *const String, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u16 {
     return switch (self.asAsciiOrUtf16()) {
         .ascii => |ascii| blk: {

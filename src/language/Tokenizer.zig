@@ -842,7 +842,7 @@ fn parseCodePoint(source: []const u8) ?CodePoint {
         0x80...0xFF => |c| {
             const len = std.unicode.utf8ByteSequenceLength(c) catch return null;
             if (source.len < len) return null;
-            const code_point = std.unicode.utf8Decode(source[0..len]) catch return null;
+            const code_point = std.unicode.wtf8Decode(source[0..len]) catch return null;
             return .{ .code_point = code_point, .len = @intCast(len) };
         },
         else => |c| return .{ .code_point = c, .len = 1 },

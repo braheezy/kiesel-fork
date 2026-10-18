@@ -288,14 +288,16 @@ pub fn createDynamicFunction(
         }
     }
 
-    const parameters_utf8 = try (try result.build(agent)).toUtf8(gpa);
-    defer gpa.free(parameters_utf8);
-    const parameters_string = try gpa.dupeSentinel(u8, parameters_utf8, 0);
+    const parameters_wtf8 = try (try result.build(agent)).toWtf8(gpa);
+    defer gpa.free(parameters_wtf8);
+    const parameters_string = try gpa.dupeSentinel(u8, parameters_wtf8, 0);
     defer gpa.free(parameters_string);
 
     // 14. Let bodyParseString be the string-concatenation of 0x000A (LINE FEED), bodyString, and
     //     0x000A (LINE FEED).
-    const body_parse_string = try gpa.printSentinel("\n{f}\n", .{body_string.fmtRaw()}, 0);
+    const body_wtf8 = try body_string.toWtf8(gpa);
+    defer gpa.free(body_wtf8);
+    const body_parse_string = try gpa.printSentinel("\n{s}\n", .{body_wtf8}, 0);
     defer gpa.free(body_parse_string);
 
     // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", paramString,
@@ -376,7 +378,7 @@ pub fn createDynamicFunction(
 
     // 28. Let func be OrdinaryFunctionCreate(funcProto, sourceText, params, body, non-lexical-this,
     //     envRecord, privateEnv).
-    const source = try String.fromUtf8(agent, source_text);
+    const source = try String.fromWtf8(agent, source_text);
     const func = try ordinaryFunctionCreate(
         agent,
         func_proto,

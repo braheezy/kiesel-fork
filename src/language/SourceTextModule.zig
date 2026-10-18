@@ -1498,8 +1498,11 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         if (maybe_resolution) |resolution| switch (resolution) {
             .ambiguous => return agent.throwException(
                 .syntax_error,
-                "Ambiguous star export '{s}' in module '{f}'",
-                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtEscaped() },
+                "Ambiguous star export '{f}' in module '{f}'",
+                .{
+                    std.unicode.fmtUtf8(export_entry.export_name.?),
+                    export_entry.module_request.?.specifier.fmtEscaped(),
+                },
             ),
 
             // d. Assert: resolution is a ResolvedBinding Record.
@@ -1507,8 +1510,11 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         } else {
             return agent.throwException(
                 .syntax_error,
-                "No export named '{s}' in module '{f}'",
-                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtEscaped() },
+                "No export named '{f}' in module '{f}'",
+                .{
+                    std.unicode.fmtUtf8(export_entry.export_name.?),
+                    export_entry.module_request.?.specifier.fmtEscaped(),
+                },
             );
         }
     }
@@ -1532,7 +1538,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         // a. Let importedModule be GetImportedModule(module, importEntry.[[ModuleRequest]]).
         const imported_module = getImportedModule(self, import_entry.module_request);
 
-        const local_name = try String.fromUtf8(agent, import_entry.local_name);
+        const local_name = try String.fromWtf8(agent, import_entry.local_name);
 
         switch (import_entry.import_name.?) {
             // b. If importEntry.[[ImportName]] is namespace, then
@@ -1568,15 +1574,21 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                 const resolution = if (maybe_resolution) |resolution| switch (resolution) {
                     .ambiguous => return agent.throwException(
                         .syntax_error,
-                        "Ambiguous star export '{s}' in module '{f}'",
-                        .{ import_name, import_entry.module_request.specifier.fmtEscaped() },
+                        "Ambiguous star export '{f}' in module '{f}'",
+                        .{
+                            std.unicode.fmtUtf8(import_name),
+                            import_entry.module_request.specifier.fmtEscaped(),
+                        },
                     ),
                     .resolved_binding => |resolved_binding| resolved_binding,
                 } else {
                     return agent.throwException(
                         .syntax_error,
-                        "No export named '{s}' in module '{f}'",
-                        .{ import_name, import_entry.module_request.specifier.fmtEscaped() },
+                        "No export named '{f}' in module '{f}'",
+                        .{
+                            std.unicode.fmtUtf8(import_name),
+                            import_entry.module_request.specifier.fmtEscaped(),
+                        },
                     );
                 };
 
@@ -1610,7 +1622,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                             agent,
                             local_name,
                             resolution.module,
-                            try String.fromUtf8(agent, binding_name),
+                            try String.fromWtf8(agent, binding_name),
                         );
                     },
                 }
