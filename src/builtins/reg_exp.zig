@@ -558,11 +558,14 @@ pub fn regExpBuiltinExec(agent: *Agent, regexp: *RegExp, string: *const String) 
         );
 
         // e. If the ith capture of regexp was defined with a GroupName, then
-        if (group_name_ptr != null and group_name_ptr.* != 0) {
+        const maybe_group_name = blk: {
             // i. Let groupName be the CapturingGroupName of that GroupName.
+            if (group_name_ptr == null) break :blk null;
             const group_name = std.mem.span(group_name_ptr);
             group_name_ptr += group_name.len + libregexp.c.LRE_GROUP_NAME_TRAILER_LEN;
-
+            break :blk if (group_name.len == 0) null else group_name;
+        };
+        if (maybe_group_name) |group_name| {
             // ii. If matchedGroupNames contains groupName, then
             if (matched_group_names.contains(group_name)) {
                 // 1. Assert: capturedValue is undefined.

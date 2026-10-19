@@ -52099,7 +52099,7 @@
   "test/staging/built-ins/Object/seal/seal-variable-length-typed-arrays.js": "PASS",
   "test/staging/built-ins/Reflect/preventExtensions/preventExtensions-variable-length-typed-arrays.js": "PASS",
   "test/staging/built-ins/RegExp/escape/surrogate-pair.js": "PASS",
-  "test/staging/built-ins/RegExp/named-groups/duplicate-named-groups-replace.js": "FAIL",
+  "test/staging/built-ins/RegExp/named-groups/duplicate-named-groups-replace.js": "PASS",
   "test/staging/built-ins/RegExp/named-groups/duplicate-named-groups-search.js": "PASS",
   "test/staging/built-ins/RegExp/named-groups/duplicate-named-groups.js": "PASS",
   "test/staging/decorators/accessor-as-identifier.js": "PASS",
