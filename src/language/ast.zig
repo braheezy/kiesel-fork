@@ -3,7 +3,6 @@ const std = @import("std");
 const libregexp = @import("libregexp");
 
 const build_options = @import("build-options");
-const builtins = @import("../builtins.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -12,9 +11,7 @@ const BigInt = types.BigInt;
 const ImportAttribute = language.ImportAttribute;
 const ExportEntry = language.ExportEntry;
 const ImportEntry = language.ImportEntry;
-const LreOpaque = builtins.reg_exp.LreOpaque;
 const ModuleRequest = language.ModuleRequest;
-const ParsedFlags = builtins.reg_exp.ParsedFlags;
 const String = types.String;
 const Tokenizer = language.Tokenizer;
 const Value = types.Value;
@@ -388,7 +385,7 @@ pub const RegularExpressionLiteral = struct {
         // 2. If flags contains any code points other than `d`, `g`, `i`, `m`, `s`, `u`, `v`, or
         //    `y`, return false.
         // 3. If flags contains any code point more than once, return false.
-        const parsed_flags = ParsedFlags.from(self.flags) orelse return .invalid_flags;
+        const parsed_flags = libregexp.Flags.parse(self.flags) orelse return .invalid_flags;
 
         // 4. If flags contains `u`, let u be true; else let u be false.
         // 5. If flags contains `v`, let v be true; else let v be false.
@@ -401,10 +398,8 @@ pub const RegularExpressionLiteral = struct {
         // 8. Let parseResult be ParsePattern(patternText, u, v).
         // 9. If parseResult is a Parse Node, return true.
         // 10. Return false.
-        var re_bytecode_len: c_int = undefined;
-        var error_msg: [64]u8 = undefined;
         // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
-        const buf = if (parsed_flags.u or parsed_flags.v)
+        const buf = if (parsed_flags.unicode or parsed_flags.unicode_sets)
             try allocator.dupeSentinel(u8, self.pattern, 0)
         else blk: {
             var cesu8: std.ArrayList(u8) = try .initCapacity(allocator, self.pattern.len);
@@ -427,20 +422,13 @@ pub const RegularExpressionLiteral = struct {
             break :blk try cesu8.toOwnedSliceSentinel(allocator, 0);
         };
         defer allocator.free(buf);
-        var @"opaque": LreOpaque = .{ .allocator = allocator };
         // TODO: Plumb the resulting bytecode into the created RegExp object somehow.
-        _ = libregexp.c.lre_compile(
-            &re_bytecode_len,
-            &error_msg,
-            error_msg.len,
-            buf.ptr,
-            buf.len,
-            parsed_flags.asLreFlags(),
-            &@"opaque",
-        ) orelse {
-            const str = std.mem.span(@as([*:0]const u8, @ptrCast(&error_msg)));
-            if (std.mem.eql(u8, str, "out of memory")) return error.OutOfMemory;
-            return .{ .invalid_pattern = try allocator.dupe(u8, str) };
+        var error_msg: []const u8 = undefined;
+        _ = libregexp.compile(allocator, buf, parsed_flags, &error_msg) catch |err| switch (err) {
+            error.OutOfMemory => |e| return e,
+            error.LreError => {
+                return .{ .invalid_pattern = error_msg };
+            },
         };
         return .valid;
     }
