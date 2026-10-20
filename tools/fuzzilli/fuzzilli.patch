@@ -1,3 +1,16 @@
+diff --git a/Sources/Fuzzilli/Mutators/RuntimeAssistedMutator.swift b/Sources/Fuzzilli/Mutators/RuntimeAssistedMutator.swift
+index 71643067..396dd819 100644
+--- a/Sources/Fuzzilli/Mutators/RuntimeAssistedMutator.swift
++++ b/Sources/Fuzzilli/Mutators/RuntimeAssistedMutator.swift
+@@ -70,7 +70,7 @@ public class RuntimeAssistedMutator: Mutator {
+     // Helper function for use by child classes. This detects known types of runtime errors that are expected to some degree (e.g. stack exhaustion or OOM).
+     func isKnownRuntimeError(_ message: Substring) -> Bool {
+         let ignoredErrors = [
+-            "maximum call stack size exceeded", "out of memory", "too much recursion",
++            "maximum call stack size exceeded", "out of memory", "too much recursion", "stack overflow",
+         ]
+         for error in ignoredErrors {
+             if message.lowercased().contains(error) {
 diff --git a/Sources/Fuzzilli/Profiles/KieselProfile.swift b/Sources/Fuzzilli/Profiles/KieselProfile.swift
 new file mode 100644
 index 00000000..3bba2368
