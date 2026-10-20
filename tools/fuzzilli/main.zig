@@ -50,7 +50,6 @@ comptime {
 
 // https://github.com/googleprojectzero/fuzzilli/tree/main/Targets#adding-custom-fuzzilli-javascript-builtin
 fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
-    const gpa = agent.gpa;
     const io = agent.io;
     // Don't throw as the fuzzed code itself might call this function
     if (arguments.count() != 2) return .undefined;
@@ -65,9 +64,10 @@ fn fuzzilli(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         }
     } else if (operation.eql(String.fromLiteral("FUZZILLI_PRINT"))) {
         const str = try arguments.get(1).toString(agent);
-        const bytes = try str.toUtf8(gpa);
-        defer gpa.free(bytes);
-        reprl_data.out.writeStreamingAll(io, bytes) catch {};
+        var write_buffer: [4096]u8 = undefined;
+        var file_writer = reprl_data.out.writerStreaming(io, &write_buffer);
+        file_writer.interface.print("{f}\n", .{str.fmtRaw()}) catch {};
+        file_writer.flush() catch {};
     }
     return .undefined;
 }
