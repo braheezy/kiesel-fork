@@ -104,7 +104,7 @@ pub fn arrayCreate(agent: *Agent, length: u53, maybe_proto: ?*Object) Agent.Erro
     const realm = agent.currentRealm();
 
     // 1. If length > 2**32 - 1, throw a RangeError exception.
-    if (length >= std.math.maxInt(u32)) {
+    if (length > std.math.maxInt(u32)) {
         return agent.throwException(.range_error, "Invalid array length", .{});
     }
 
