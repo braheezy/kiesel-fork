@@ -505,7 +505,7 @@ pub const constructor = struct {
             } else blk: {
                 // b. Else,
                 // i. Let array be ! ArrayCreate(0).
-                const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+                const array = try arrayCreateFast(agent, 0);
                 break :blk &array.object;
             };
 
@@ -686,7 +686,7 @@ pub const constructor = struct {
             } else blk: {
                 // b. Else,
                 // i. Let array be ! ArrayCreate(0).
-                const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+                const array = try arrayCreateFast(agent, 0);
                 break :blk &array.object;
             };
 

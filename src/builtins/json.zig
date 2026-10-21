@@ -16,7 +16,7 @@ const PropertyKey = types.PropertyKey;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const arrayCreate = builtins.arrayCreate;
+const arrayCreateFast = builtins.arrayCreateFast;
 const noexcept = utils.noexcept;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const ordinaryObjectCreateWithType = builtins.ordinaryObjectCreateWithType;
@@ -38,7 +38,7 @@ fn convertJsonValue(agent: *Agent, value: std.json.Value) std.mem.Allocator.Erro
         ),
         .number_string => |x| Value.from(std.fmt.parseFloat(f64, x) catch unreachable),
         .array => |x| blk: {
-            const array = arrayCreate(agent, 0, null) catch |err| try noexcept(err);
+            const array = try arrayCreateFast(agent, 0);
             for (x.items, 0..) |value_i, i| {
                 try array.object.createDataPropertyDirect(
                     agent,
