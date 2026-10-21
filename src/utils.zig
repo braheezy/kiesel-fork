@@ -9,7 +9,15 @@ pub const float16 = @import("utils/float16.zig");
 ///
 /// '!' in the spec, ensures that the error is not a throw completion (`error.ExceptionThrown`).
 /// OOM is still propagated. The name is a nod to C++, of course :^)
-pub fn noexcept(err: error{ ExceptionThrown, OutOfMemory }) std.mem.Allocator.Error!noreturn {
+pub fn noexcept(err: anytype) std.mem.Allocator.Error!noreturn {
+    comptime {
+        // Using `err: error{ ExceptionThrown, OutOfMemory }` also permits `error{OutOfMemory}`,
+        // enforce an exact match
+        const error_set = @typeInfo(@TypeOf(err)).error_set;
+        std.debug.assert(error_set.error_names.?.len == 2);
+        std.debug.assert(containsSlice(error_set.error_names.?, "ExceptionThrown"));
+        std.debug.assert(containsSlice(error_set.error_names.?, "OutOfMemory"));
+    }
     switch (err) {
         error.ExceptionThrown => @panic("Throw completion was returned from '!' function call"),
         error.OutOfMemory => |e| return e,

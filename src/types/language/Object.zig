@@ -1027,7 +1027,7 @@ pub fn createNonEnumerableDataPropertyOrThrow(
     };
 
     // 3. Perform ! DefinePropertyOrThrow(obj, propertyKey, newDesc).
-    obj.definePropertyDirect(agent, property_key, new_desc) catch |err| try noexcept(err);
+    try obj.definePropertyDirect(agent, property_key, new_desc);
 
     // 4. Return unused.
 }

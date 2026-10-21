@@ -292,19 +292,19 @@ pub fn disposeResources(
                     );
 
                     // d. Perform CreateNonEnumerableDataPropertyOrThrow(error, "error", result).
-                    @"error".object.createNonEnumerableDataPropertyOrThrow(
+                    try @"error".object.createNonEnumerableDataPropertyOrThrow(
                         agent,
                         PropertyKey.from("error"),
                         result_value,
-                    ) catch |e| try noexcept(e);
+                    );
 
                     // e. Perform CreateNonEnumerableDataPropertyOrThrow(error, "suppressed",
                     //    suppressed).
-                    @"error".object.createNonEnumerableDataPropertyOrThrow(
+                    try @"error".object.createNonEnumerableDataPropertyOrThrow(
                         agent,
                         PropertyKey.from("suppressed"),
                         suppressed,
-                    ) catch |e| try noexcept(e);
+                    );
 
                     // f. Set outputCompletion to ThrowCompletion(error).
                     maybe_output_exception = .{

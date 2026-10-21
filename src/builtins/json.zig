@@ -338,11 +338,11 @@ fn internalizeJSONProperty(
                     agent,
                     try agent.gc_allocator.dupe(u8, source),
                 );
-                context.createDataPropertyDirect(
+                try context.createDataPropertyDirect(
                     agent,
                     PropertyKey.from("source"),
                     Value.from(source_text),
-                ) catch |err| try noexcept(err);
+                );
                 break :blk .none;
             },
 
@@ -975,7 +975,7 @@ pub const namespace = struct {
         const root_name = PropertyKey.from("");
 
         // 7. Perform ! CreateDataPropertyOrThrow(root, rootName, unfiltered).
-        root.createDataPropertyDirect(agent, root_name, unfiltered) catch |err| try noexcept(err);
+        try root.createDataPropertyDirect(agent, root_name, unfiltered);
 
         // 8. Let snapshot be CreateJSONParseRecord(parseResult.[[ParseNode]], rootName,
         //    unfiltered).
@@ -1025,11 +1025,11 @@ pub const namespace = struct {
         const raw_json = try ordinaryObjectCreateWithType(RawJSON, agent, null, {});
 
         // 9. Perform ! CreateDataPropertyOrThrow(obj, "rawJSON", jsonString).
-        raw_json.object.createDataPropertyDirect(
+        try raw_json.object.createDataPropertyDirect(
             agent,
             PropertyKey.from("rawJSON"),
             Value.from(json_string),
-        ) catch |err| try noexcept(err);
+        );
 
         // 10. Perform ! SetIntegrityLevel(obj, frozen).
         _ = raw_json.object.setIntegrityLevel(agent, .frozen) catch |err| try noexcept(err);

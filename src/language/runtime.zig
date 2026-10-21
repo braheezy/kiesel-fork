@@ -649,7 +649,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
@@ -1341,7 +1341,7 @@ pub fn instantiateGeneratorFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
@@ -1809,7 +1809,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
@@ -2158,11 +2158,7 @@ pub fn classDefinitionEvaluation(
     // 3. If classBinding is not undefined, then
     if (class_binding != null) {
         // a. Perform ! classEnv.CreateImmutableBinding(classBinding, true).
-        class_env.createImmutableBinding(
-            agent,
-            class_binding.?,
-            true,
-        ) catch |err| try noexcept(err);
+        try class_env.createImmutableBinding(agent, class_binding.?, true);
     }
 
     // 4. Let outerPrivateEnv be the running execution context's PrivateEnvironment.
@@ -2702,7 +2698,7 @@ pub fn instantiateAsyncFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
