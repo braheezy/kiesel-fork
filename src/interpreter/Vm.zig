@@ -795,11 +795,8 @@ fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Reg, value_reg: Bytec
     const proto = vm.store(value_reg);
 
     if (proto.isObject() or proto.isNull()) {
-        _ = object.internalMethods().setPrototypeOf(
-            vm.agent,
-            object,
-            if (proto.isObject()) proto.asObject() else null,
-        ) catch |err| try noexcept(err);
+        std.debug.assert(object.internalMethods().flags.contains(.ordinary_set_prototype_of));
+        try object.setPrototype(vm.agent, if (proto.isObject()) proto.asObject() else null);
     }
 }
 
@@ -2451,7 +2448,7 @@ fn executeSuperCall(
 fn executeGetSuperProperty(vm: *Vm, dest: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
-    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base = env.function_environment.getSuperBase();
     const base_value: Value = switch (base) {
         .undefined => .undefined,
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
@@ -2466,7 +2463,7 @@ fn executeGetSuperPropertyComputed(vm: *Vm, dest: Bytecode.Reg, property_reg: By
     const property_value = vm.store(property_reg);
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
-    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base = env.function_environment.getSuperBase();
     const base_value: Value = switch (base) {
         .undefined => .undefined,
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
@@ -2481,7 +2478,7 @@ fn executeSetSuperProperty(vm: *Vm, value_reg: Bytecode.Reg, name_index: Bytecod
     const value = vm.store(value_reg);
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
-    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base = env.function_environment.getSuperBase();
     const base_value: Value = switch (base) {
         .undefined => .undefined,
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
@@ -2500,7 +2497,7 @@ fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Reg, value_re
     const value = vm.store(value_reg);
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
-    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base = env.function_environment.getSuperBase();
     const base_value: Value = switch (base) {
         .undefined => .undefined,
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,

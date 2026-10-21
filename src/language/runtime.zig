@@ -172,7 +172,7 @@ pub fn evaluateSuperCall(agent: *Agent, arg_list: []const Value) Agent.Error!Val
     std.debug.assert(new_target.?.internalMethods().construct != null);
 
     // 3. Let superCtor be GetSuperConstructor().
-    const super_ctor = try getSuperConstructor(agent);
+    const super_ctor = getSuperConstructor(agent);
     const super_ctor_value: Value = if (super_ctor) |f| Value.from(f) else .null;
 
     // 4. Let argList be ? ArgumentListEvaluation of Arguments.
@@ -209,7 +209,7 @@ pub fn evaluateSuperCall(agent: *Agent, arg_list: []const Value) Agent.Error!Val
 
 /// 13.3.7.2 GetSuperConstructor ( )
 /// https://tc39.es/ecma262/#sec-getsuperconstructor
-pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!?*Object {
+pub fn getSuperConstructor(agent: *Agent) ?*Object {
     // 1. Let envRecord be GetThisEnvironment().
     const env = agent.getThisEnvironment();
 
@@ -217,14 +217,13 @@ pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!?*Object {
     std.debug.assert(env == .function_environment);
 
     // 3. Let activeFunc be envRecord.[[FunctionObject]].
-    // 4. Assert: activeFunc is an ECMAScript function object.
     const active_func = &env.function_environment.function_object.object;
 
+    // 4. Assert: activeFunc is an ECMAScript function object.
+    std.debug.assert(active_func.is(builtins.ECMAScriptFunction));
+
     // 5. Let superCtor be ! activeFunc.[[GetPrototypeOf]]().
-    const super_ctor = active_func.internalMethods().getPrototypeOf(
-        agent,
-        active_func,
-    ) catch |err| try noexcept(err);
+    const super_ctor = active_func.prototype();
 
     // 6. Return superCtor.
     return super_ctor;
@@ -2283,10 +2282,8 @@ pub fn classDefinitionEvaluation(
                     //    not.
 
                     // 2. Let func be ! ctorFunc.[[GetPrototypeOf]]().
-                    const proto_func = ctor_func.internalMethods().getPrototypeOf(
-                        agent_,
-                        ctor_func,
-                    ) catch |err| try noexcept(err);
+                    std.debug.assert(ctor_func.internalMethods().flags.contains(.ordinary_get_prototype_of));
+                    const proto_func = ctor_func.prototype();
 
                     // 3. If IsConstructor(func) is false, throw a TypeError exception.
                     if (proto_func == null or !Value.from(proto_func.?).isConstructor()) {

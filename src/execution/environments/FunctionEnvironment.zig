@@ -6,14 +6,12 @@ const std = @import("std");
 const builtins = @import("../../builtins.zig");
 const execution = @import("../../execution.zig");
 const types = @import("../../types.zig");
-const utils = @import("../../utils.zig");
 
 const Agent = execution.Agent;
 const DeclarativeEnvironment = execution.DeclarativeEnvironment;
 const ECMAScriptFunction = builtins.ECMAScriptFunction;
 const Object = types.Object;
 const Value = types.Value;
-const noexcept = utils.noexcept;
 
 const FunctionEnvironment = @This();
 
@@ -113,7 +111,7 @@ pub const SuperBase = union(enum) {
 
 /// 9.1.1.3.5 GetSuperBase ( envRecord )
 /// https://tc39.es/ecma262/#sec-getsuperbase
-pub fn getSuperBase(self: *const FunctionEnvironment, agent: *Agent) std.mem.Allocator.Error!SuperBase {
+pub fn getSuperBase(self: *const FunctionEnvironment) SuperBase {
     // 1. Let home be envRecord.[[FunctionObject]].[[HomeObject]].
     const home = self.function_object.fields.home_object orelse {
         // 2. If home is undefined, return undefined.
@@ -121,11 +119,8 @@ pub fn getSuperBase(self: *const FunctionEnvironment, agent: *Agent) std.mem.All
     };
 
     // 3. Assert: home is an ordinary object.
+    std.debug.assert(home.internalMethods().flags.contains(.ordinary_get_prototype_of));
+
     // 4. Return ! home.[[GetPrototypeOf]]().
-    return .{
-        .object = home.internalMethods().getPrototypeOf(
-            agent,
-            home,
-        ) catch |err| try noexcept(err),
-    };
+    return .{ .object = home.prototype() };
 }
