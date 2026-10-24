@@ -920,6 +920,8 @@ fn repl(
 
                         .line_comment,
                         .multiline_comment,
+                        .html_open_comment,
+                        .html_close_comment,
                         .hashbang_comment,
                         .keyword_case,
                         .keyword_do,
@@ -970,7 +972,12 @@ fn repl(
             var token_window: [3]?Token = .{ null, null, null };
             while (tokenizer.next() catch null) |token| {
                 switch (token.tag) {
-                    .line_comment, .multiline_comment, .hashbang_comment => continue,
+                    .line_comment,
+                    .multiline_comment,
+                    .html_open_comment,
+                    .html_close_comment,
+                    .hashbang_comment,
+                    => continue,
                     else => {},
                 }
                 // Shift tokens in the window to the left

@@ -80,6 +80,8 @@ pub fn next(t: *Tokenizer) std.mem.Allocator.Error!?Token {
         line_comment,
         multiline_comment,
         multiline_comment_asterisk,
+        html_open_comment,
+        html_close_comment,
         hashbang_comment,
         hash,
         private_identifier,
@@ -260,6 +262,15 @@ pub fn next(t: *Tokenizer) std.mem.Allocator.Error!?Token {
                     t.index += 1;
                     tag = .less_than_equals;
                 },
+                '!' => {
+                    if (t.source[t.index + 1] == '-' and
+                        t.source[t.index + 2] == '-')
+                    {
+                        t.index += 2;
+                        continue :state .html_open_comment;
+                    }
+                    tag = .less_than;
+                },
                 else => tag = .less_than,
             }
         },
@@ -361,6 +372,14 @@ pub fn next(t: *Tokenizer) std.mem.Allocator.Error!?Token {
             t.index += 1;
             switch (t.source[t.index]) {
                 '-' => {
+                    if (t.source[t.index + 1] == '>') blk: {
+                        if (t.token_window[1]) |prev_token| {
+                            const trivia = t.source[@backingInt(prev_token.end)..t.index];
+                            if (findLineTerminator(trivia) == null) break :blk;
+                        }
+                        t.index += 1;
+                        continue :state .html_close_comment;
+                    }
                     t.index += 1;
                     tag = .double_minus;
                 },
@@ -472,12 +491,22 @@ pub fn next(t: *Tokenizer) std.mem.Allocator.Error!?Token {
                 else => tag = .slash,
             }
         },
-        .line_comment => {
+        .line_comment,
+        .html_open_comment,
+        .html_close_comment,
+        .hashbang_comment,
+        => |state| {
             t.index += 1;
             if (lineTerminatorLen(t.source[t.index..]) != null or t.index == t.source.len) {
-                tag = .line_comment;
+                tag = switch (state) {
+                    .line_comment => .line_comment,
+                    .html_open_comment => .html_open_comment,
+                    .html_close_comment => .html_close_comment,
+                    .hashbang_comment => .hashbang_comment,
+                    else => unreachable,
+                };
             } else {
-                continue :state .line_comment;
+                continue :state state;
             }
         },
         .multiline_comment => {
@@ -498,14 +527,6 @@ pub fn next(t: *Tokenizer) std.mem.Allocator.Error!?Token {
                 tag = .multiline_comment;
             } else {
                 continue :state .multiline_comment;
-            }
-        },
-        .hashbang_comment => {
-            t.index += 1;
-            if (lineTerminatorLen(t.source[t.index..]) != null or t.index == t.source.len) {
-                tag = .hashbang_comment;
-            } else {
-                continue :state .hashbang_comment;
             }
         },
         .hash => {
@@ -659,7 +680,12 @@ pub fn next(t: *Tokenizer) std.mem.Allocator.Error!?Token {
         .end = @fromBackingInt(t.index),
     };
     switch (tag) {
-        .line_comment, .multiline_comment, .hashbang_comment => {},
+        .line_comment,
+        .multiline_comment,
+        .html_open_comment,
+        .html_close_comment,
+        .hashbang_comment,
+        => {},
         else => try t.updateState(token),
     }
     return token;
@@ -1756,14 +1782,38 @@ test "comments" {
     try testTokenizer("//", &.{
         .{ .tag = .line_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(2) },
     });
-    try testTokenizer("/**/", &.{
-        .{ .tag = .multiline_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(4) },
-    });
     try testTokenizer("// foo", &.{
         .{ .tag = .line_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(6) },
     });
+    try testTokenizer("foo // foo", &.{
+        .{ .tag = .identifier, .start = @fromBackingInt(0), .end = @fromBackingInt(3) },
+        .{ .tag = .line_comment, .start = @fromBackingInt(4), .end = @fromBackingInt(10) },
+    });
+    try testTokenizer("/**/", &.{
+        .{ .tag = .multiline_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(4) },
+    });
     try testTokenizer("/* foo */", &.{
         .{ .tag = .multiline_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(9) },
+    });
+    try testTokenizer("foo /* foo */", &.{
+        .{ .tag = .identifier, .start = @fromBackingInt(0), .end = @fromBackingInt(3) },
+        .{ .tag = .multiline_comment, .start = @fromBackingInt(4), .end = @fromBackingInt(13) },
+    });
+    try testTokenizer("<!--", &.{
+        .{ .tag = .html_open_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(4) },
+    });
+    try testTokenizer("<!-- foo", &.{
+        .{ .tag = .html_open_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(8) },
+    });
+    try testTokenizer("foo <!-- foo", &.{
+        .{ .tag = .identifier, .start = @fromBackingInt(0), .end = @fromBackingInt(3) },
+        .{ .tag = .html_open_comment, .start = @fromBackingInt(4), .end = @fromBackingInt(12) },
+    });
+    try testTokenizer("\n-->", &.{
+        .{ .tag = .html_close_comment, .start = @fromBackingInt(1), .end = @fromBackingInt(4) },
+    });
+    try testTokenizer("\n--> foo", &.{
+        .{ .tag = .html_close_comment, .start = @fromBackingInt(1), .end = @fromBackingInt(8) },
     });
     try testTokenizer("#!/usr/bin/env kiesel", &.{
         .{ .tag = .hashbang_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(21) },
@@ -1781,6 +1831,22 @@ test "comments" {
         .{ .tag = .line_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(6) },
         .{ .tag = .identifier, .start = @fromBackingInt(9), .end = @fromBackingInt(12) },
     });
+    try testTokenizer("<!-- foo\nbar", &.{
+        .{ .tag = .html_open_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(8) },
+        .{ .tag = .identifier, .start = @fromBackingInt(9), .end = @fromBackingInt(12) },
+    });
+    try testTokenizer("<!-- foo\u{2028}bar", &.{
+        .{ .tag = .html_open_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(8) },
+        .{ .tag = .identifier, .start = @fromBackingInt(11), .end = @fromBackingInt(14) },
+    });
+    try testTokenizer("\n--> foo\nbar", &.{
+        .{ .tag = .html_close_comment, .start = @fromBackingInt(1), .end = @fromBackingInt(8) },
+        .{ .tag = .identifier, .start = @fromBackingInt(9), .end = @fromBackingInt(12) },
+    });
+    try testTokenizer("\n-->foo\u{2028}bar", &.{
+        .{ .tag = .html_close_comment, .start = @fromBackingInt(1), .end = @fromBackingInt(7) },
+        .{ .tag = .identifier, .start = @fromBackingInt(10), .end = @fromBackingInt(13) },
+    });
     // An embedded null byte that is not the terminator must not end the comment
     try testTokenizer("/* \x00 */", &.{
         .{ .tag = .multiline_comment, .start = @fromBackingInt(0), .end = @fromBackingInt(7) },
@@ -1794,6 +1860,18 @@ test "comments" {
     });
     try testTokenizer("/*/", &.{
         .{ .tag = .invalid, .start = @fromBackingInt(0), .end = @fromBackingInt(3) },
+    });
+    // A HTML close comment requires a line terminator before it
+    try testTokenizer("foo -->", &.{
+        .{ .tag = .identifier, .start = @fromBackingInt(0), .end = @fromBackingInt(3) },
+        .{ .tag = .double_minus, .start = @fromBackingInt(4), .end = @fromBackingInt(6) },
+        .{ .tag = .greater_than, .start = @fromBackingInt(6), .end = @fromBackingInt(7) },
+    });
+    try testTokenizer("foo /* */-->", &.{
+        .{ .tag = .identifier, .start = @fromBackingInt(0), .end = @fromBackingInt(3) },
+        .{ .tag = .multiline_comment, .start = @fromBackingInt(4), .end = @fromBackingInt(9) },
+        .{ .tag = .double_minus, .start = @fromBackingInt(9), .end = @fromBackingInt(11) },
+        .{ .tag = .greater_than, .start = @fromBackingInt(11), .end = @fromBackingInt(12) },
     });
     // Only valid at the very start of the source
     try testTokenizer(" #!", &.{

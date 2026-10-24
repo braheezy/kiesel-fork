@@ -152,6 +152,8 @@ const Tokenizer = struct {
         yield,
         line_comment,
         multiline_comment,
+        html_open_comment,
+        html_close_comment,
         hashbang_comment,
 
         pub fn fromTag(tag: NewToken.Tag) TokenType {
@@ -263,6 +265,8 @@ const Tokenizer = struct {
                 .template_literal_tail => .template_tail,
                 .line_comment => .line_comment,
                 .multiline_comment => .multiline_comment,
+                .html_open_comment => .html_open_comment,
+                .html_close_comment => .html_close_comment,
                 .hashbang_comment => .hashbang_comment,
             };
         }
@@ -286,7 +290,13 @@ const Tokenizer = struct {
     tokens_slice: TokenList.Slice,
     index: u32,
 
-    pub fn init(gpa: std.mem.Allocator, source: [:0]const u8, file_name: ?[]const u8) std.mem.Allocator.Error!Tokenizer {
+    pub fn init(
+        gpa: std.mem.Allocator,
+        source: [:0]const u8,
+        file_name: ?[]const u8,
+        diagnostics: *ptk.Diagnostics,
+        is_module: bool,
+    ) std.mem.Allocator.Error!Tokenizer {
         var tokens: TokenList = .empty;
         errdefer tokens.deinit(gpa);
         var tokenizer: NewTokenizer = .init(gpa, source);
@@ -294,6 +304,15 @@ const Tokenizer = struct {
         while (try tokenizer.next()) |token| {
             switch (token.tag) {
                 .line_comment, .multiline_comment, .hashbang_comment => {},
+                .html_open_comment, .html_close_comment => if (is_module or !build_options.enable_annex_b) {
+                    var location: ptk.Location = .{ .source = file_name, .line = 1, .column = 1 };
+                    location.advance(source[0..@backingInt(token.start)]);
+                    if (is_module) {
+                        try diagnostics.emit(location, .@"error", "HTML-like comments are not allowed in module code", .{});
+                    } else {
+                        try diagnostics.emit(location, .@"error", "HTML-like comments are not enabled", .{});
+                    }
+                },
                 else => try tokens.append(gpa, token),
             }
         }
@@ -352,6 +371,8 @@ const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{
     .line_comment,
     .multiline_comment,
+    .html_open_comment,
+    .html_close_comment,
     .hashbang_comment,
 });
 
@@ -571,7 +592,13 @@ pub fn parseNode(
         new_diagnostics = .init(allocator);
         break :blk &new_diagnostics;
     };
-    var tokenizer = try Tokenizer.init(allocator, source, options.file_name);
+    var tokenizer = try Tokenizer.init(
+        allocator,
+        source,
+        options.file_name,
+        diagnostics,
+        T == ast.Module,
+    );
     defer tokenizer.deinit(allocator);
     const core = ParserCore.init(&tokenizer);
     var parser: Parser = .{
