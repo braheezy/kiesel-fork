@@ -123,6 +123,7 @@ pub const ECMAScriptFunction = MakeObject(.{
         flags: Flags,
         class_data: ?*ClassData,
         cached_bytecode: ?*const interpreter.Bytecode = null,
+        initial_name: ?*const String,
 
         pub fn ensureClassData(self: *@This(), agent: *Agent) std.mem.Allocator.Error!*ClassData {
             if (self.class_data) |class_data| return class_data;
@@ -142,9 +143,7 @@ pub const ECMAScriptFunction = MakeObject(.{
 
             const gpa = agent.gpa;
             const func: *ECMAScriptFunction = @alignCast(@fieldParentPtr("fields", self));
-            const obj = &func.object;
-            const name_value = obj.getPropertyValueDirect(PropertyKey.from("name"));
-            const name = try name_value.asString().toUtf8(gpa);
+            const name = try (self.initial_name orelse unreachable).toUtf8(gpa);
             defer gpa.free(name);
 
             if (func.fields.flags.this_mode == .lexical) {
@@ -720,6 +719,8 @@ pub fn ordinaryFunctionCreate(
             // 19. Set func.[[PrivateMethods]] to a new empty List.
             // 20. Set func.[[ClassFieldInitializerName]] to empty.
             .class_data = null,
+
+            .initial_name = null,
         },
     });
 
@@ -767,6 +768,7 @@ pub fn ordinaryFunctionCreateFast(
             .realm = realm,
             .home_object = null,
             .class_data = null,
+            .initial_name = name,
         },
     });
 
@@ -1042,6 +1044,8 @@ pub fn setFunctionName(
     // 6. If func has an [[InitialName]] internal slot, set func.[[InitialName]] to initialName.
     if (func.cast(BuiltinFunction)) |builtin_function| {
         builtin_function.fields.initial_name = initial_name;
+    } else if (func.cast(ECMAScriptFunction)) |ecmascript_function| {
+        ecmascript_function.fields.initial_name = initial_name;
     }
 
     // 7. Perform ! DefinePropertyOrThrow(func, "name", PropertyDescriptor { [[Value]]: name,
