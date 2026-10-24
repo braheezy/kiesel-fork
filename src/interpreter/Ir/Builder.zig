@@ -2449,7 +2449,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
 
         if (try_stmt.catch_parameter) |catch_parameter| {
             _ = try b.addInst(.{
-                .tag = .push_scope,
+                .tag = .push_catch_scope,
                 .data = .{ .none = {} },
             });
             b.scope_depth += 1;

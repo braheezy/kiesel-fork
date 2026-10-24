@@ -235,6 +235,7 @@ pub fn newDeclarativeEnvironment(
         .disposable_resource_stack = .empty,
 
         .bindings = .empty,
+        .is_catch_env = false,
     };
 
     // 4. Return envRecord.
@@ -298,6 +299,7 @@ pub fn newFunctionEnvironment(
             .disposable_resource_stack = .empty,
 
             .bindings = .empty,
+            .is_catch_env = false,
         },
 
         .this_value = .undefined,
@@ -357,6 +359,7 @@ pub fn newModuleEnvironment(
             .disposable_resource_stack = .empty,
 
             .bindings = .empty,
+            .is_catch_env = false,
         },
 
         .indirect_bindings = .empty,

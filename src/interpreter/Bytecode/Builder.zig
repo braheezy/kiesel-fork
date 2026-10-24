@@ -261,6 +261,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .eq_strict => try b.lowerEqStrict(data.binary, dest),
             .not_eq_strict => try b.lowerNotEqStrict(data.binary, dest),
             .push_scope => try b.lowerPushScope(),
+            .push_catch_scope => try b.lowerPushCatchScope(),
             .push_var_scope => try b.lowerPushVarScope(),
             .push_with_scope => try b.lowerPushWithScope(data.ref),
             .pop_scope => try b.lowerPopScope(),
@@ -1270,6 +1271,13 @@ fn lowerNotEqStrict(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!
 fn lowerPushScope(b: *Builder) Error!void {
     try b.emit(.{
         .tag = .push_scope,
+        .data = .{ .none = {} },
+    });
+}
+
+fn lowerPushCatchScope(b: *Builder) Error!void {
+    try b.emit(.{
+        .tag = .push_catch_scope,
         .data = .{ .none = {} },
     });
 }

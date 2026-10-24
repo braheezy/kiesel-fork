@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const build_options = @import("build-options");
+
 const ast = @import("../language/ast.zig");
 const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
@@ -312,7 +314,16 @@ fn evalDeclarationInstantiation(
                         //        a SyntaxError exception.
                         // ii. Else,
                         //     1. Throw a SyntaxError exception.
-                        return agent.throwException(.syntax_error, "idk", .{});
+                        if (!build_options.enable_annex_b or
+                            this_env != .declarative_environment or
+                            !this_env.declarative_environment.is_catch_env)
+                        {
+                            return agent.throwException(
+                                .syntax_error,
+                                "Var declaration '{f}' is also lexically declared",
+                                .{name.fmtRaw()},
+                            );
+                        }
                     }
 
                     // b. NOTE: A direct eval will not hoist var declaration over a like-named

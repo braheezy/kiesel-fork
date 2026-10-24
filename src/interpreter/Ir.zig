@@ -158,6 +158,7 @@ pub const Inst = struct {
         not_eq_strict,
 
         push_scope,
+        push_catch_scope,
         push_var_scope,
         push_with_scope,
         pop_scope,
@@ -430,6 +431,7 @@ pub const Inst = struct {
         .eq_strict = .binary,
         .not_eq_strict = .binary,
         .push_scope = .none,
+        .push_catch_scope = .none,
         .push_var_scope = .none,
         .push_with_scope = .ref,
         .pop_scope = .none,

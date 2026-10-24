@@ -893,6 +893,7 @@ fn ensureUniqueCatchParameterNames(
     lexically_declared_names: []const ast.Identifier,
     var_declared_names: []const ast.Identifier,
     location: ptk.Location,
+    allows_var_redeclaration: bool,
 ) std.mem.Allocator.Error!void {
     var seen: std.StringHashMapUnmanaged(void) = .empty;
     defer seen.deinit(self.allocator);
@@ -921,7 +922,7 @@ fn ensureUniqueCatchParameterNames(
             );
         }
 
-        if (var_names_set.contains(name)) {
+        if (!allows_var_redeclaration and var_names_set.contains(name)) {
             try self.emitErrorAt(
                 location,
                 "Catch parameter '{s}' is also var-declared",
@@ -3845,10 +3846,10 @@ pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
         return error.UnexpectedToken;
     }
 
-    if (catch_parameter != null) {
+    if (catch_parameter) |param| {
         var bound_names = IdentifierStackRange.open(self);
         defer bound_names.deinit();
-        try catch_parameter.?.collectBoundNames(self.allocator, &self.identifier_stack);
+        try param.collectBoundNames(self.allocator, &self.identifier_stack);
         bound_names.close();
 
         var lexically_declared_names = IdentifierStackRange.open(self);
@@ -3868,11 +3869,14 @@ pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
         // - It is a Syntax Error if any element of the BoundNames of CatchParameter also occurs in
         //   the VarDeclaredNames of Block, unless CatchParameter is CatchParameter : BindingIdentifier
         //   and the host is a web browser or otherwise supports VariableStatements in Catch Blocks.
+        const allows_var_redeclaration = build_options.enable_annex_b and
+            param == .binding_identifier;
         try self.ensureUniqueCatchParameterNames(
             bound_names.slice(),
             lexically_declared_names.slice(),
             var_declared_names.slice(),
             catch_parameter_location,
+            allows_var_redeclaration,
         );
     }
 

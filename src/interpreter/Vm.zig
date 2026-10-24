@@ -259,6 +259,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .push_scope => vm.executePushScope(),
+                .push_catch_scope => vm.executePushCatchScope(),
                 .push_var_scope => vm.executePushVarScope(),
                 .push_with_scope => vm.executePushWithScope(data.reg),
                 .pop_scope => vm.executePopScope(),
@@ -1364,6 +1365,15 @@ fn executePushScope(vm: *Vm) std.mem.Allocator.Error!void {
     const old_env = execution_context.ecmascript_code.lexical_environment;
     const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+    vm.frame.scope_depth += 1;
+}
+
+fn executePushCatchScope(vm: *Vm) std.mem.Allocator.Error!void {
+    const execution_context = vm.agent.runningExecutionContext();
+    const old_env = execution_context.ecmascript_code.lexical_environment;
+    const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
+    execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+    env.is_catch_env = true;
     vm.frame.scope_depth += 1;
 }
 
