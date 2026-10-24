@@ -232,6 +232,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .negate => vm.executeNegate(data.reg_reg[0], data.reg_reg[1]),
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
                 .logical_not => vm.executeLogicalNot(data.reg_reg[0], data.reg_reg[1]),
+                .is_nullish => vm.executeIsNullish(data.reg_reg[0], data.reg_reg[1]),
                 .typeof => vm.executeTypeof(data.reg_reg[0], data.reg_reg[1]),
                 .typeof_local => vm.executeTypeofLocal(data.reg_local[0], data.reg_local[1]),
                 .typeof_binding => vm.executeTypeofBinding(data.reg_string[0], data.reg_string[1]),
@@ -919,6 +920,11 @@ fn executeBitwiseNot(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!
 fn executeLogicalNot(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
     const value = vm.store(src);
     vm.load(dst, Value.from(!value.toBoolean()));
+}
+
+fn executeIsNullish(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
+    const value = vm.store(src);
+    vm.load(dst, Value.from(value.isNull() or value.isUndefined()));
 }
 
 fn executeTypeof(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {

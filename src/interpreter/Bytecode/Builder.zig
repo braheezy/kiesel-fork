@@ -234,6 +234,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .negate => try b.lowerNegate(data.ref, dest),
             .bitwise_not => try b.lowerBitwiseNot(data.ref, dest),
             .logical_not => try b.lowerLogicalNot(data.ref, dest),
+            .is_nullish => try b.lowerIsNullish(data.ref, dest),
             .typeof => try b.lowerTypeof(data.ref, dest),
             .typeof_binding => try b.lowerTypeofBinding(data.string, dest),
             .spread => try b.lowerSpread(data.ref, dest),
@@ -1142,6 +1143,10 @@ fn lowerBitwiseNot(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!voi
 
 fn lowerLogicalNot(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
     try b.emitUnaryOp(.logical_not, value, dest);
+}
+
+fn lowerIsNullish(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.is_nullish, value, dest);
 }
 
 fn lowerTypeof(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {

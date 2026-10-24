@@ -1723,16 +1723,9 @@ fn lowerForInOfHeadEvaluation(
     // 10. Return ? GetIterator(exprValue, iteratorKind).
     var skip_br_cond: ?Deferred = null;
     if (iteration_kind == .enumerate) {
-        const null_ref = try b.addInst(.{
-            .tag = .null,
-            .data = .{ .none = {} },
-        });
         const is_nullish = try b.addInst(.{
-            .tag = .eq,
-            .data = .{ .binary = .{
-                .lhs = expr_value,
-                .rhs = null_ref,
-            } },
+            .tag = .is_nullish,
+            .data = .{ .ref = expr_value },
         });
         skip_br_cond = try b.addInstDeferred(.br_cond);
         const setup_label = try b.addLabel();
@@ -3980,16 +3973,9 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
         else => try b.lowerExpression(opt_expr.expression),
     };
 
-    const null_ref = try b.addInst(.{
-        .tag = .null,
-        .data = .{ .none = {} },
-    });
     const is_nullish = try b.addInst(.{
-        .tag = .eq,
-        .data = .{ .binary = .{
-            .lhs = base,
-            .rhs = null_ref,
-        } },
+        .tag = .is_nullish,
+        .data = .{ .ref = base },
     });
     const nullish_br = try b.addInstDeferred(.br_cond);
 
@@ -4529,20 +4515,10 @@ fn lowerLogicalExpression(b: *Builder, log_expr: *const ast.LogicalExpression) E
             .tag = .to_boolean,
             .data = .{ .ref = lhs },
         }), false },
-        .@"??" => blk: {
-            const null_ref = try b.addInst(.{
-                .tag = .null,
-                .data = .{ .none = {} },
-            });
-            const is_nullish = try b.addInst(.{
-                .tag = .eq,
-                .data = .{ .binary = .{
-                    .lhs = lhs,
-                    .rhs = null_ref,
-                } },
-            });
-            break :blk .{ is_nullish, true };
-        },
+        .@"??" => .{ try b.addInst(.{
+            .tag = .is_nullish,
+            .data = .{ .ref = lhs },
+        }), true },
     };
     const br_cond = try b.addInstDeferred(.br_cond);
 
@@ -5169,20 +5145,10 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
             .tag = .to_boolean,
             .data = .{ .ref = current_value },
         }), false },
-        .@"??=" => blk: {
-            const null_ref = try b.addInst(.{
-                .tag = .null,
-                .data = .{ .none = {} },
-            });
-            const is_nullish = try b.addInst(.{
-                .tag = .eq,
-                .data = .{ .binary = .{
-                    .lhs = current_value,
-                    .rhs = null_ref,
-                } },
-            });
-            break :blk .{ is_nullish, true };
-        },
+        .@"??=" => .{ try b.addInst(.{
+            .tag = .is_nullish,
+            .data = .{ .ref = current_value },
+        }), true },
         else => unreachable,
     };
     const br_cond = try b.addInstDeferred(.br_cond);
