@@ -29,8 +29,6 @@ const Tokenizer = kiesel.language.Tokenizer;
 const Value = kiesel.types.Value;
 const createTextModule = kiesel.language.createTextModule;
 const finishLoadingImportedModule = kiesel.language.finishLoadingImportedModule;
-const fmtParseError = kiesel.language.fmtParseError;
-const fmtParseErrorHint = kiesel.language.fmtParseErrorHint;
 const noexcept = kiesel.utils.noexcept;
 const ordinaryObjectCreate = kiesel.builtins.ordinaryObjectCreate;
 const parseJSONModule = kiesel.language.parseJSONModule;
@@ -352,22 +350,24 @@ const Kiesel = struct {
         // 2. Let realm be the current Realm Record.
         const realm = agent.currentRealm();
 
-        var diagnostics = Diagnostics.init(gpa);
+        var diagnostics: Diagnostics = .init(gpa, .{
+            .source = source_text,
+            .file_name = "evalScript",
+        });
         defer diagnostics.deinit();
 
         // 3. Let s be ParseScript(sourceText, realm, hostDefined).
         const script = Script.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
-            .file_name = "evalScript",
         }) catch |err| switch (err) {
             error.OutOfMemory => |e| return e,
             // 4. If s is a List of errors, then
             error.ParseError => {
                 // a. Let error be the first element of s.
-                const parse_error = diagnostics.errors.items[0];
+                const parse_error = diagnostics.first().?;
 
                 // b. Return Completion{[[Type]]: throw, [[Value]]: error, [[Target]]: empty}.
-                return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
+                return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
             },
         };
 
@@ -595,43 +595,44 @@ fn run(gpa: std.mem.Allocator, realm: *Realm, source_text: []const u8, options: 
     const host_defined = try agent.gc_allocator.create(ScriptOrModuleHostDefined);
     host_defined.* = .{ .base_dir = options.base_dir };
 
-    var diagnostics = Diagnostics.init(gpa);
-    defer diagnostics.deinit();
-
     const file_name: []const u8 = switch (options.origin) {
         .repl => "repl",
         .command => "command",
         .path => |path| path,
     };
 
+    var diagnostics: Diagnostics = .init(gpa, .{
+        .source = source_text,
+        .file_name = file_name,
+    });
+    defer diagnostics.deinit();
+
     const parse_result: error{ ParseError, OutOfMemory }!ScriptOrModule = if (options.module) blk: {
         break :blk if (SourceTextModule.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
-            .file_name = file_name,
         })) |source_text_module| .{
             .module = .{ .source_text_module = source_text_module },
         } else |err| err;
     } else blk: {
         break :blk if (Script.parse(source_text, realm, host_defined, .{
             .diagnostics = &diagnostics,
-            .file_name = file_name,
         })) |script| .{ .script = script } else |err| err;
     };
 
     const script_or_module = parse_result catch |err| switch (err) {
         error.ParseError => {
-            const parse_error = diagnostics.errors.items[0];
+            const parse_error = diagnostics.first().?;
             const syntax_error = try agent.createErrorObject(
                 .syntax_error,
                 "{f}",
-                .{fmtParseError(parse_error)},
+                .{parse_error.fmt(&diagnostics)},
             );
             const exception: Agent.Exception = .{
                 .value = Value.from(&syntax_error.object),
                 .stack_trace = &.{},
             };
             try stderr.print("{f}\nUncaught exception: {f}\n", .{
-                fmtParseErrorHint(parse_error, source_text),
+                parse_error.fmtHint(&diagnostics),
                 exception.fmtPretty(agent, null),
             });
             try stderr.flush();
@@ -1393,20 +1394,22 @@ pub fn main(init: std.process.Init) !u8 {
             const host_defined = try agent_.gc_allocator.create(ScriptOrModuleHostDefined);
             host_defined.* = .{ .base_dir = std.Io.Dir.path.dirname(module_path).? };
 
-            var diagnostics = Diagnostics.init(gpa_);
+            var diagnostics: Diagnostics = .init(gpa_, .{
+                .source = source_text,
+                .file_name = std.Io.Dir.path.basename(module_path),
+            });
             defer diagnostics.deinit();
 
             const source_text_module = SourceTextModule.parse(source_text, realm, host_defined, .{
                 .diagnostics = &diagnostics,
-                .file_name = std.Io.Dir.path.basename(module_path),
             }) catch |err| switch (err) {
                 error.OutOfMemory => |e| return e,
                 error.ParseError => {
-                    const parse_error = diagnostics.errors.items[0];
+                    const parse_error = diagnostics.first().?;
                     return agent_.throwException(
                         .syntax_error,
                         "{f}",
-                        .{fmtParseError(parse_error)},
+                        .{parse_error.fmt(&diagnostics)},
                     );
                 },
             };

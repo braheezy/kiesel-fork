@@ -24,7 +24,6 @@ const Value = types.Value;
 const boundFunctionCreate = builtins.boundFunctionCreate;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getPrototypeFromConstructor = builtins.getPrototypeFromConstructor;
-const fmtParseError = language.fmtParseError;
 const makeConstructor = builtins.makeConstructor;
 const ordinaryFunctionCreate = builtins.ordinaryFunctionCreate;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
@@ -309,9 +308,6 @@ pub fn createDynamicFunction(
         0,
     );
 
-    var diagnostics = Diagnostics.init(gpa);
-    defer diagnostics.deinit();
-
     const state: Parser.State = switch (kind) {
         .normal => .{},
         .generator => .{ .in_generator_function = true },
@@ -320,31 +316,45 @@ pub fn createDynamicFunction(
     };
 
     // 17. Let params be ParseText(paramString, paramGrammar).
-    const params = Parser.parseNode(param_grammar.type, param_grammar.acceptFn, agent.gc_allocator, parameters_string, .{
-        .diagnostics = &diagnostics,
-        .file_name = "Function",
-        .state = state,
-    }) catch |err| switch (err) {
-        error.OutOfMemory => |e| return e,
-        error.ParseError => {
-            // 18. If params is a List of errors, throw a SyntaxError exception.
-            const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
-        },
+    const params = blk: {
+        var diagnostics: Diagnostics = .init(gpa, .{
+            .source = parameters_string,
+            .file_name = "Function",
+        });
+        defer diagnostics.deinit();
+
+        break :blk Parser.parseNode(param_grammar.type, param_grammar.acceptFn, agent.gc_allocator, parameters_string, .{
+            .diagnostics = &diagnostics,
+            .state = state,
+        }) catch |err| switch (err) {
+            error.OutOfMemory => |e| return e,
+            error.ParseError => {
+                // 18. If params is a List of errors, throw a SyntaxError exception.
+                const parse_error = diagnostics.first().?;
+                return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
+            },
+        };
     };
 
     // 19. Let body be ParseText(bodyParseString, bodyGrammar).
-    const body = Parser.parseNode(body_grammar.type, body_grammar.acceptFn, agent.gc_allocator, body_parse_string, .{
-        .diagnostics = &diagnostics,
-        .file_name = "Function",
-        .state = state,
-    }) catch |err| switch (err) {
-        error.OutOfMemory => |e| return e,
-        error.ParseError => {
-            // 20. If body is a List of errors, throw a SyntaxError exception.
-            const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
-        },
+    const body = blk: {
+        var diagnostics: Diagnostics = .init(gpa, .{
+            .source = body_parse_string,
+            .file_name = "Function",
+        });
+        defer diagnostics.deinit();
+
+        break :blk Parser.parseNode(body_grammar.type, body_grammar.acceptFn, agent.gc_allocator, body_parse_string, .{
+            .diagnostics = &diagnostics,
+            .state = state,
+        }) catch |err| switch (err) {
+            error.OutOfMemory => |e| return e,
+            error.ParseError => {
+                // 20. If body is a List of errors, throw a SyntaxError exception.
+                const parse_error = diagnostics.first().?;
+                return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
+            },
+        };
     };
 
     // 21. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
@@ -355,17 +365,24 @@ pub fn createDynamicFunction(
     //     any Early Error rules which apply to exprGrammar directly.
 
     // 23. Let expr be ParseText(sourceText, exprGrammar).
-    _ = Parser.parseNode(expr_grammar.type, expr_grammar.acceptFn, agent.gc_allocator, source_text, .{
-        .diagnostics = &diagnostics,
-        .file_name = "Function",
-    }) catch |err| switch (err) {
-        error.OutOfMemory => |e| return e,
-        error.ParseError => {
-            // 24. If expr is a List of errors, throw a SyntaxError exception.
-            const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
-        },
-    };
+    {
+        var diagnostics: Diagnostics = .init(gpa, .{
+            .source = source_text,
+            .file_name = "Function",
+        });
+        defer diagnostics.deinit();
+
+        _ = Parser.parseNode(expr_grammar.type, expr_grammar.acceptFn, agent.gc_allocator, source_text, .{
+            .diagnostics = &diagnostics,
+        }) catch |err| switch (err) {
+            error.OutOfMemory => |e| return e,
+            error.ParseError => {
+                // 24. If expr is a List of errors, throw a SyntaxError exception.
+                const parse_error = diagnostics.first().?;
+                return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
+            },
+        };
+    }
 
     // 25. Let funcProto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
     const func_proto = try getPrototypeFromConstructor(agent, new_target, fallback_proto);

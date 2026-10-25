@@ -17,7 +17,6 @@ const Parser = language.Parser;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const String = types.String;
 const Value = types.Value;
-const fmtParseError = language.fmtParseError;
 const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
 const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
 const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
@@ -99,13 +98,15 @@ pub fn performEval(
     // Stored in ExecutionContext.origin, must be GC'd
     const source_text = try agent.gc_allocator.dupeSentinel(u8, source_wtf8, 0);
 
-    var diagnostics = Diagnostics.init(gpa);
+    var diagnostics: Diagnostics = .init(gpa, .{
+        .source = source_text,
+        .file_name = "eval",
+    });
     defer diagnostics.deinit();
 
     // a. Let script be ParseText(source, Script).
     const script = Parser.parse(ast.Script, agent.gc_allocator, source_text, .{
         .diagnostics = &diagnostics,
-        .file_name = "eval",
         .state = .{
             // e-g.
             .in_strict_mode = strict_caller,
@@ -121,8 +122,8 @@ pub fn performEval(
         error.OutOfMemory => |e| return e,
         error.ParseError => {
             // b. If script is a List of errors, throw a SyntaxError exception.
-            const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
+            const parse_error = diagnostics.first().?;
+            return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
         },
     };
 

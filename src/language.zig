@@ -3,7 +3,7 @@ const module = @import("language/module.zig");
 pub const ast = @import("language/ast.zig");
 pub const runtime = @import("language/runtime.zig");
 
-pub const Diagnostics = @import("ptk").Diagnostics;
+pub const Diagnostics = @import("language/Diagnostics.zig");
 pub const ExportEntry = SourceTextModule.ExportEntry;
 pub const GraphLoadingState = module.GraphLoadingState;
 pub const ImportAttribute = module.ImportAttribute;
@@ -25,8 +25,6 @@ pub const continueModuleLoading = SourceTextModule.continueModuleLoading;
 pub const createDefaultExportSyntheticModule = SyntheticModule.createDefaultExportSyntheticModule;
 pub const createTextModule = SyntheticModule.createTextModule;
 pub const finishLoadingImportedModule = module.finishLoadingImportedModule;
-pub const fmtParseError = Parser.fmtParseError;
-pub const fmtParseErrorHint = Parser.fmtParseErrorHint;
 pub const getImportedModule = module.getImportedModule;
 pub const getModuleNamespace = module.getModuleNamespace;
 pub const instantiateAsyncFunctionObject = runtime.instantiateAsyncFunctionObject;
@@ -38,6 +36,7 @@ pub const parseJSONModule = SyntheticModule.parseJSONModule;
 test {
     _ = module;
 
+    _ = Diagnostics;
     _ = Script;
     _ = SourceTextModule;
     _ = SyntheticModule;
