@@ -1463,47 +1463,22 @@ pub fn privateElementFind(obj: *const Object, private_name: PrivateName) ?*Priva
 
 /// 7.3.27 PrivateFieldAdd ( obj, privateName, value )
 /// https://tc39.es/ecma262/#sec-privatefieldadd
+/// https://tc39.es/proposal-nonextensible-applies-to-private/#sec-privatefieldadd
 pub fn privateFieldAdd(obj: *Object, agent: *Agent, private_name: PrivateName, value: Value) Agent.Error!void {
     // 1. If the host is a web browser, then
     //     a. Perform ? HostEnsureCanAddPrivateElement(obj).
     try agent.host_hooks.hostEnsureCanAddPrivateElement(agent, obj);
 
-    // 2. Let entry be PrivateElementFind(obj, privateName).
-    const entry = obj.privateElementFind(private_name);
-
-    // 3. If entry is not empty, throw a TypeError exception.
-    if (entry != null) {
+    // 2. If ? IsExtensible(O) is false, throw a TypeError exception.
+    if (!try obj.isExtensible(agent)) {
         return agent.throwException(
             .type_error,
-            "Private element '{f}' already exists",
-            .{private_name},
+            "{f} is not extensible",
+            .{obj},
         );
     }
 
-    // 4. Append PrivateElement { [[Key]]: privateName, [[Kind]]: field, [[Value]]: value } to
-    //    obj.[[PrivateElements]].
-    const extra_data = try obj.ensureExtraData(agent.gc_allocator);
-    try extra_data.private_elements.putNoClobber(agent.gc_allocator, private_name, .{ .field = value });
-
-    // 5. Return unused.
-}
-
-/// 7.3.28 PrivateMethodOrAccessorAdd ( obj, method )
-/// https://tc39.es/ecma262/#sec-privatemethodoraccessoradd
-pub fn privateMethodOrAccessorAdd(
-    obj: *Object,
-    agent: *Agent,
-    private_name: PrivateName,
-    method: PrivateElement,
-) Agent.Error!void {
-    // 1. Assert: method.[[Kind]] is either method or accessor.
-    std.debug.assert(method == .method or method == .accessor);
-
-    // 2. If the host is a web browser, then
-    //     a. Perform ? HostEnsureCanAddPrivateElement(obj).
-    try agent.host_hooks.hostEnsureCanAddPrivateElement(agent, obj);
-
-    // 3. Let entry be PrivateElementFind(obj, method.[[Key]]).
+    // 3. Let entry be PrivateElementFind(obj, privateName).
     const entry = obj.privateElementFind(private_name);
 
     // 4. If entry is not empty, throw a TypeError exception.
@@ -1515,11 +1490,43 @@ pub fn privateMethodOrAccessorAdd(
         );
     }
 
-    // 5. Append method to obj.[[PrivateElements]].
+    // 5. Append PrivateElement { [[Key]]: privateName, [[Kind]]: field, [[Value]]: value } to
+    //    obj.[[PrivateElements]].
+    const extra_data = try obj.ensureExtraData(agent.gc_allocator);
+    try extra_data.private_elements.putNoClobber(agent.gc_allocator, private_name, .{ .field = value });
+
+    // 6. Return unused.
+}
+
+/// 7.3.28 PrivateMethodOrAccessorAdd ( obj, method )
+/// https://tc39.es/ecma262/#sec-privatemethodoraccessoradd
+/// https://tc39.es/proposal-nonextensible-applies-to-private/#sec-privatemethodoraccessoradd
+pub fn privateMethodOrAccessorAdd(
+    obj: *Object,
+    agent: *Agent,
+    private_name: PrivateName,
+    method: PrivateElement,
+) Agent.Error!void {
+    // 1. Assert: method.[[Kind]] is either method or accessor.
+    std.debug.assert(method == .method or method == .accessor);
+
+    // 2. Let entry be PrivateElementFind(obj, method.[[Key]]).
+    const entry = obj.privateElementFind(private_name);
+
+    // 3. If entry is not empty, throw a TypeError exception.
+    if (entry != null) {
+        return agent.throwException(
+            .type_error,
+            "Private element '{f}' already exists",
+            .{private_name},
+        );
+    }
+
+    // 4. Append method to obj.[[PrivateElements]].
     const extra_data = try obj.ensureExtraData(agent.gc_allocator);
     try extra_data.private_elements.putNoClobber(agent.gc_allocator, private_name, method);
 
-    // 6. Return unused.
+    // 5. Return unused.
 }
 
 /// 7.3.30 PrivateGet ( obj, privateName )
@@ -1644,6 +1651,7 @@ pub fn defineField(receiver: *Object, agent: *Agent, field: ClassFieldDefinition
 
 /// 7.3.33 InitializeInstanceElements ( obj, ctor )
 /// https://tc39.es/ecma262/#sec-initializeinstanceelements
+/// https://tc39.es/proposal-nonextensible-applies-to-private/#sec-initializeinstanceelements
 pub fn initializeInstanceElements(
     obj: *Object,
     agent: *Agent,
@@ -1660,13 +1668,29 @@ pub fn initializeInstanceElements(
         break :blk class_constructor_fields.private_methods;
     } else unreachable;
 
-    // 2. For each PrivateElement method of methods, do
+    // 2. If methods is not empty, then
+    if (methods.len != 0) {
+        // a. If the host is a web browser, then
+        //     i. Perform ? HostEnsureCanAddPrivateElement(obj).
+        try agent.host_hooks.hostEnsureCanAddPrivateElement(agent, obj);
+
+        // b. If ? IsExtensible(obj) is false, throw a TypeError exception.
+        if (!try obj.isExtensible(agent)) {
+            return agent.throwException(
+                .type_error,
+                "Object '{f}' is not extensible",
+                .{obj},
+            );
+        }
+    }
+
+    // 3. For each PrivateElement method of methods, do
     for (methods) |method| {
         // a. Perform ? PrivateMethodOrAccessorAdd(obj, method).
         try obj.privateMethodOrAccessorAdd(agent, method.private_name, method.private_element);
     }
 
-    // 3. Let fields be ctor.[[Fields]].
+    // 4. Let fields be ctor.[[Fields]].
     const fields = if (ctor.cast(builtins.ECMAScriptFunction)) |ecmascript_function| blk: {
         break :blk if (ecmascript_function.fields.class_data) |class_data|
             class_data.fields
@@ -1677,13 +1701,13 @@ pub fn initializeInstanceElements(
         break :blk class_constructor_fields.fields;
     } else unreachable;
 
-    // 4. For each element fieldRecord of fields, do
+    // 5. For each element fieldRecord of fields, do
     for (fields) |field| {
         // a. Perform ? DefineField(obj, fieldRecord).
         try obj.defineField(agent, field);
     }
 
-    // 5. Return unused.
+    // 6. Return unused.
 }
 
 pub const OptionType = enum {
