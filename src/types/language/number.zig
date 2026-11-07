@@ -376,19 +376,11 @@ pub const Number = union(enum) {
         std.debug.assert(denominator.isFinite() and denominator.asFloat() != 0);
 
         // 7. Let quotient be ℝ(numerator) / ℝ(denominator).
-        const quotient = numerator.asFloat() / denominator.asFloat();
-
         // 8. Let truncatedQuotient be truncate(quotient).
-        const truncated_quotient = @trunc(quotient);
-
         // 9. Let remainder be ℝ(numerator) - (ℝ(denominator) × truncatedQuotient).
-        const remainder_ = numerator.asFloat() - (denominator.asFloat() * truncated_quotient);
-
         // 10. If remainder = 0 and numerator < -0𝔽, return -0𝔽.
-        if (remainder_ == 0 and numerator.asFloat() < 0) return .{ .f64 = -0.0 };
-
         // 11. Return 𝔽(remainder).
-        return from(remainder_);
+        return from(@rem(numerator.asFloat(), denominator.asFloat()));
     }
 
     /// 6.1.6.1.7 Number::add ( x, y )
