@@ -8826,7 +8826,7 @@
   "test/built-ins/Number/prototype/toFixed/S15.7.4.5_A1.1_T02.js": "PASS",
   "test/built-ins/Number/prototype/toFixed/S15.7.4.5_A1.3_T01.js": "PASS",
   "test/built-ins/Number/prototype/toFixed/S15.7.4.5_A1.3_T02.js": "PASS",
-  "test/built-ins/Number/prototype/toFixed/S15.7.4.5_A1.4_T01.js": "FAIL",
+  "test/built-ins/Number/prototype/toFixed/S15.7.4.5_A1.4_T01.js": "PASS",
   "test/built-ins/Number/prototype/toFixed/S15.7.4.5_A2_T01.js": "PASS",
   "test/built-ins/Number/prototype/toFixed/exactness.js": "FAIL",
   "test/built-ins/Number/prototype/toFixed/length.js": "PASS",

@@ -392,7 +392,7 @@ pub const prototype = struct {
         }
 
         // 10. If number ≥ 10**21, then
-        if (number_f64 >= 10e21) {
+        if (number_f64 >= 1e21) {
             // a. Let digitString be ! ToString(𝔽(number)).
             return Value.from(Value.from(number_f64).toString(agent) catch |err| try noexcept(err));
         }
