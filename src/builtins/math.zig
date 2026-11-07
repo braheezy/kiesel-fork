@@ -413,7 +413,7 @@ pub const namespace = struct {
         // 4. Let exp be the exponential function of ℝ(n).
         // 5. Return an implementation-approximated Number value representing exp - 1.
         if (n.isNegativeZero()) return Value.from(n);
-        return Value.from(@exp(n.asFloat()) - 1);
+        return Value.from(std.math.expm1(n.asFloat()));
     }
 
     /// 21.3.2.16 Math.floor ( x )
@@ -572,7 +572,7 @@ pub const namespace = struct {
         // 4. If n < -1𝔽, return NaN.
         // 5. Return an implementation-approximated Number value representing ln(1 + ℝ(n)).
         if (n.isNegativeZero()) return Value.from(n);
-        return Value.from(@log(1 + n.asFloat()));
+        return Value.from(std.math.log1p(n.asFloat()));
     }
 
     /// 21.3.2.23 Math.log10 ( x )
