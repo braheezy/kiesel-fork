@@ -105,7 +105,6 @@ pub const empty = fromLiteral("");
 
 pub const Builder = @import("String/Builder.zig");
 pub const Cache = @import("String/Cache.zig");
-pub const CodeUnitIterator = @import("String/CodeUnitIterator.zig");
 
 data: Data,
 length: u32,
@@ -483,8 +482,35 @@ pub fn toUtf16(self: *const String, allocator: std.mem.Allocator) std.mem.Alloca
     };
 }
 
-pub fn codeUnitIterator(self: *const String) CodeUnitIterator {
-    return .{ .index = 0, .string = self };
+pub const CodeUnitIterator = struct {
+    index: u32,
+    string: *const String,
+
+    pub fn next(it: *CodeUnitIterator) ?u16 {
+        if (it.index >= it.string.length) return null;
+        defer it.index += 1;
+        return it.string.codeUnitAt(it.index);
+    }
+};
+
+pub fn codeUnitIterator(string: *const String) CodeUnitIterator {
+    return .{ .index = 0, .string = string };
+}
+
+pub const CodePointIterator = struct {
+    index: u32,
+    string: *const String,
+
+    pub fn next(it: *CodePointIterator) ?CodePoint {
+        if (it.index >= it.string.length) return null;
+        const code_point = it.string.codePointAt(it.index);
+        it.index += code_point.code_unit_count;
+        return code_point;
+    }
+};
+
+pub fn codePointIterator(string: *const String) CodePointIterator {
+    return .{ .index = 0, .string = string };
 }
 
 pub fn eql(self: *const String, other: *const String) bool {
@@ -665,21 +691,15 @@ pub fn isWellFormedUnicode(self: *const String) bool {
     if (self.isAscii()) return true;
 
     // 1. Let length be the length of string.
-    const length = self.length;
-
     // 2. Let k be 0.
-    var k: u32 = 0;
-
     // 3. Repeat, while k < length,
-    while (k < length) {
-        // a. Let codePoint be CodePointAt(string, k).
-        const code_point = self.codePointAt(k);
-
+    //     a. Let codePoint be CodePointAt(string, k).
+    var it = self.codePointIterator();
+    while (it.next()) |code_point| {
         // b. If codePoint.[[IsUnpairedSurrogate]] is true, return false.
         if (code_point.is_unpaired_surrogate) return false;
 
         // c. Set k to k + codePoint.[[CodeUnitCount]].
-        k += code_point.code_unit_count;
     }
 
     // 4. Return true.

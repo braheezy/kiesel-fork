@@ -781,14 +781,13 @@ pub const constructor = struct {
 
         // 3. Let codePointList be StringToCodePoints(string).
         // 4. For each code point codePoint of codePointList, do
-        var position: u32 = 0;
-        while (position < string.length) {
-            const code_point = string.codePointAt(position);
-            defer position += code_point.code_unit_count;
-
+        var it = string.codePointIterator();
+        while (it.next()) |code_point| {
             // a. If escaped is the empty String and codePoint is matched by either DecimalDigit or
             //    AsciiLetter, then
-            if (position == 0 and std.ascii.isAlphanumeric(std.math.cast(u8, code_point.code_point) orelse 0)) {
+            if (escaped.segments.items.len == 0 and
+                std.ascii.isAlphanumeric(std.math.cast(u8, code_point.code_point) orelse 0))
+            {
                 // i. NOTE: Escaping a leading digit ensures that output corresponds with pattern
                 //    text which may be used after a `\0` character escape or a DecimalEscape such
                 //    as `\1` and still match string rather than be interpreted as an extension of

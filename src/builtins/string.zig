@@ -2319,7 +2319,6 @@ pub const prototype = struct {
         if (string_length == 0) return Value.from(types.String.empty);
 
         // 5. Let k be 0.
-        var k: u32 = 0;
 
         // 6. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
@@ -2328,10 +2327,9 @@ pub const prototype = struct {
         defer result.deinit(gpa);
 
         // 7. Repeat, while k < stringLength,
-        while (k < string_length) {
-            // a. Let codePoint be CodePointAt(string, k).
-            const code_point = string.codePointAt(k);
-
+        //     a. Let codePoint be CodePointAt(string, k).
+        var it = string.codePointIterator();
+        while (it.next()) |code_point| {
             // b. If codePoint.[[IsUnpairedSurrogate]] is true, then
             if (code_point.is_unpaired_surrogate) {
                 // i. Set result to the string-concatenation of result and 0xFFFD (REPLACEMENT
@@ -2345,7 +2343,6 @@ pub const prototype = struct {
             }
 
             // d. Set k to k + codePoint.[[CodeUnitCount]].
-            k += code_point.code_unit_count;
         }
 
         // 8. Return result.
