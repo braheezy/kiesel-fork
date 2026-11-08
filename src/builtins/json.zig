@@ -608,65 +608,79 @@ fn serializeJSONProperty(
 /// 25.5.4.3 QuoteJSONString ( value )
 /// https://tc39.es/ecma262/#sec-quotejsonstring
 fn quoteJSONString(agent: *Agent, value: *const String) std.mem.Allocator.Error!*const String {
+    const gpa = agent.gpa;
+
+    // SAFETY: This builder can use a GPA as it only stores u8/u21 char/code point segments.
+    var result: String.Builder = .empty;
+    defer result.deinit(gpa);
+
     // 1. Let product be the String value consisting solely of the code unit 0x0022 (QUOTATION
     //    MARK).
-    var product: std.ArrayList(u8) = .empty;
-    try product.append(agent.gc_allocator, '"');
+    try result.appendChar(gpa, '"');
 
     // 2. For each code point codePoint of StringToCodePoints(value), do
-    var it = value.codeUnitIterator();
+    var it = value.codePointIterator();
     while (it.next()) |code_point| {
-        // a. If codePoint is listed in the “Code Point” column of Table 78, then
-        if (code_point == 0x08 or
-            code_point == 0x09 or
-            code_point == 0x0A or
-            code_point == 0x0C or
-            code_point == 0x0D or
-            code_point == 0x22 or
-            code_point == 0x5C)
-        {
-            // i. Set product to the string-concatenation of product and the escape sequence for
-            //    codePoint as specified in the “Escape Sequence” column of the corresponding row.
-            switch (code_point) {
-                0x08 => try product.appendSlice(agent.gc_allocator, "\\b"),
-                0x09 => try product.appendSlice(agent.gc_allocator, "\\t"),
-                0x0A => try product.appendSlice(agent.gc_allocator, "\\n"),
-                0x0C => try product.appendSlice(agent.gc_allocator, "\\f"),
-                0x0D => try product.appendSlice(agent.gc_allocator, "\\r"),
-                0x22 => try product.appendSlice(agent.gc_allocator, "\\\""),
-                0x5C => try product.appendSlice(agent.gc_allocator, "\\\\"),
-                else => unreachable,
-            }
-        }
-        // b. Else if codePoint has a numeric value less than 0x0020 (SPACE) or codePoint has the
-        //    same numeric value as a leading surrogate or trailing surrogate, then
-        else if (code_point < 0x20 or std.unicode.utf16IsLowSurrogate(code_point) or std.unicode.utf16IsHighSurrogate(code_point)) {
-            // i. Let unit be the code unit whose numeric value is the numeric value of codePoint.
-            // ii. Set product to the string-concatenation of product and UnicodeEscape(unit).
-            try product.appendSlice(agent.gc_allocator, try unicodeEscape(agent, code_point));
-        } else {
-            // c. Else,
-            // i. Set product to the string-concatenation of product and UTF16EncodeCodePoint(
-            //    codePoint).
-            try product.appendSlice(
-                agent.gc_allocator,
-                std.unicode.utf16LeToUtf8Alloc(agent.gc_allocator, &.{code_point}) catch |err| switch (err) {
-                    error.OutOfMemory => |e| return e,
-                    error.DanglingSurrogateHalf,
-                    error.ExpectedSecondSurrogateHalf,
-                    error.UnexpectedSecondSurrogateHalf,
-                    => unreachable,
-                },
-            );
+        switch (code_point.code_point) {
+            // a. If codePoint is listed in the “Code Point” column of Table 78, then
+            //     i. Set product to the string-concatenation of product and the escape sequence for
+            //        codePoint as specified in the “Escape Sequence” column of the corresponding
+            //        row.
+            0x08 => {
+                try result.appendChar(gpa, '\\');
+                try result.appendChar(gpa, 'b');
+            },
+            0x09 => {
+                try result.appendChar(gpa, '\\');
+                try result.appendChar(gpa, 't');
+            },
+            0x0A => {
+                try result.appendChar(gpa, '\\');
+                try result.appendChar(gpa, 'n');
+            },
+            0x0C => {
+                try result.appendChar(gpa, '\\');
+                try result.appendChar(gpa, 'f');
+            },
+            0x0D => {
+                try result.appendChar(gpa, '\\');
+                try result.appendChar(gpa, 'r');
+            },
+            0x22 => {
+                try result.appendChar(gpa, '\\');
+                try result.appendChar(gpa, '"');
+            },
+            0x5C => {
+                try result.appendChar(gpa, '\\');
+                try result.appendChar(gpa, '\\');
+            },
+
+            else => {
+                // b. Else if codePoint has a numeric value less than 0x0020 (SPACE) or codePoint
+                //    has the same numeric value as a leading surrogate or trailing surrogate, then
+                if (code_point.code_point < 0x20 or code_point.is_unpaired_surrogate) {
+                    // i. Let unit be the code unit whose numeric value is the numeric value of
+                    //    codePoint.
+                    // ii. Set product to the string-concatenation of product and UnicodeEscape(
+                    //     unit).
+                    const escaped = try unicodeEscape(agent, @intCast(code_point.code_point));
+                    for (escaped) |c| try result.appendChar(gpa, c);
+                } else {
+                    // c. Else,
+                    // i. Set product to the string-concatenation of product and
+                    //    UTF16EncodeCodePoint(codePoint).
+                    try result.appendCodePoint(gpa, code_point.code_point);
+                }
+            },
         }
     }
 
     // 3. Set product to the string-concatenation of product and the code unit 0x0022 (QUOTATION
     //    MARK).
-    try product.append(agent.gc_allocator, '"');
+    try result.appendChar(gpa, '"');
 
     // 4. Return product.
-    return String.fromUtf8(agent, try product.toOwnedSlice(agent.gc_allocator));
+    return result.build(agent);
 }
 
 /// 25.5.4.4 UnicodeEscape ( codeUnit )

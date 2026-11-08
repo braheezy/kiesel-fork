@@ -8006,7 +8006,7 @@
   "test/built-ins/JSON/stringify/value-object-proxy.js": "PASS",
   "test/built-ins/JSON/stringify/value-primitive-top-level.js": "PASS",
   "test/built-ins/JSON/stringify/value-string-escape-ascii.js": "PASS",
-  "test/built-ins/JSON/stringify/value-string-escape-unicode.js": "FAIL",
+  "test/built-ins/JSON/stringify/value-string-escape-unicode.js": "PASS",
   "test/built-ins/JSON/stringify/value-string-object.js": "PASS",
   "test/built-ins/JSON/stringify/value-symbol.js": "PASS",
   "test/built-ins/JSON/stringify/value-tojson-abrupt.js": "PASS",
