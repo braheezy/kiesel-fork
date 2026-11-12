@@ -28,7 +28,7 @@ jobs:
           version: 0.17.0
           cache-size-limit: 10240 # 10 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@stable
+        uses: https://github.com/dtolnay/rust-toolchain@1.100.0
         with:
           targets: aarch64-unknown-linux-musl,arm-unknown-linux-musleabihf,i686-unknown-linux-musl,loongarch64-unknown-linux-musl,powerpc64-unknown-linux-musl,riscv64gc-unknown-linux-musl,x86_64-unknown-linux-musl
       - name: Build kiesel-linux-aarch64
@@ -112,7 +112,7 @@ jobs:
           version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@stable
+        uses: https://github.com/dtolnay/rust-toolchain@1.100.0
         with:
           targets: aarch64-apple-darwin,x86_64-apple-darwin
       - name: Build kiesel-macos-aarch64
@@ -148,7 +148,7 @@ jobs:
           version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@stable
+        uses: https://github.com/dtolnay/rust-toolchain@1.100.0
         with:
           targets: aarch64-pc-windows-gnullvm,i686-pc-windows-gnu,x86_64-pc-windows-gnu
       - name: Install dependencies
@@ -192,7 +192,7 @@ jobs:
           version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@stable
+        uses: https://github.com/dtolnay/rust-toolchain@1.100.0
         with:
           targets: x86_64-unknown-freebsd
       - name: Build kiesel-freebsd-aarch64
@@ -225,7 +225,7 @@ jobs:
           version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@stable
+        uses: https://github.com/dtolnay/rust-toolchain@1.100.0
         with:
           targets: x86_64-unknown-netbsd
       - name: Build kiesel-netbsd-aarch64
@@ -298,7 +298,7 @@ jobs:
           version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@stable
+        uses: https://github.com/dtolnay/rust-toolchain@1.100.0
         with:
           targets: wasm32-wasip1
       - name: Build kiesel.wasm
@@ -359,7 +359,7 @@ jobs:
           version: 0.17.0
           cache-size-limit: 4096 # 4 GiB
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@stable
+        uses: https://github.com/dtolnay/rust-toolchain@1.100.0
       - name: Install dependencies
         run: |
           sudo apt-get update
@@ -464,7 +464,7 @@ jobs:
         with:
           version: 0.17.0
       - name: Install Rust
-        uses: https://github.com/dtolnay/rust-toolchain@stable
+        uses: https://github.com/dtolnay/rust-toolchain@1.100.0
       - name: Install Node.js
         uses: https://github.com/actions/setup-node@v6
       - name: Install dependencies
