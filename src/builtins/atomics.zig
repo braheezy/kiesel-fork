@@ -139,8 +139,15 @@ fn revalidateAtomicAccess(
     // 3. Assert: byteIndexInBuffer ≥ ta.[[ByteOffset]].
     std.debug.assert(byte_index_in_buffer >= @backingInt(typed_array.fields.byte_offset));
 
-    // 4. If byteIndexInBuffer ≥ taRecord.[[CachedBufferByteLength]], throw a RangeError exception.
-    if (byte_index_in_buffer >= @backingInt(ta.cached_buffer_byte_length)) {
+    // 4. Let elementSize be TypedArrayElementSize(ta).
+    const element_size = typedArrayElementSize(typed_array);
+
+    // 5. Let elementLastByteIndex be byteIndexInBuffer + elementSize - 1.
+    const element_last_byte_index = byte_index_in_buffer + element_size - 1;
+
+    // 6. If elementLastByteIndex ≥ taRecord.[[CachedBufferByteLength]], throw a RangeError
+    //    exception.
+    if (element_last_byte_index >= @backingInt(ta.cached_buffer_byte_length)) {
         return agent.throwException(
             .range_error,
             "Invalid index {d} for buffer with byte length {d}",
@@ -148,7 +155,7 @@ fn revalidateAtomicAccess(
         );
     }
 
-    // 5. Return unused.
+    // 7. Return unused.
 }
 
 /// 25.4.3.14 DoWait ( mode, ta, index, value, timeout )
@@ -687,9 +694,10 @@ pub const namespace = struct {
         // 5. Let buffer be ta.[[ViewedArrayBuffer]].
         const buffer = typed_array.fields.viewed_array_buffer;
 
-        // 6. Let block be buffer.[[ArrayBufferData]].
-        // 7. If IsSharedArrayBuffer(buffer) is false, return +0𝔽.
+        // 6. If IsSharedArrayBuffer(buffer) is false, return +0𝔽.
         if (!isSharedArrayBuffer(buffer)) return Value.from(0);
+
+        // 7. Let block be buffer.[[ArrayBufferData]].
         const block = buffer.fields.data_block.?;
 
         // TODO: 8. Let waiterList be GetWaiterList(block, byteIndexInBuffer).
