@@ -526,10 +526,8 @@ pub const prototype = struct {
         // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(obj, seq-cst).
         const view = makeDataViewWithBufferWitnessRecord(data_view, .seq_cst);
 
-        // 5. If IsViewOutOfBounds(viewRecord) is true, throw a TypeError exception.
-        if (isViewOutOfBounds(view)) {
-            return agent.throwException(.type_error, "DataView is out of bounds", .{});
-        }
+        // 5. If IsViewOutOfBounds(viewRecord) is true, return +0𝔽.
+        if (isViewOutOfBounds(view)) return Value.from(0);
 
         // 6. Let size be GetViewByteLength(viewRecord).
         const size = getViewByteLength(view);
@@ -549,10 +547,8 @@ pub const prototype = struct {
         // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(obj, seq-cst).
         const view = makeDataViewWithBufferWitnessRecord(data_view, .seq_cst);
 
-        // 5. If IsViewOutOfBounds(viewRecord) is true, throw a TypeError exception.
-        if (isViewOutOfBounds(view)) {
-            return agent.throwException(.type_error, "DataView is out of bounds", .{});
-        }
+        // 5. If IsViewOutOfBounds(viewRecord) is true, return +0𝔽.
+        if (isViewOutOfBounds(view)) return Value.from(0);
 
         // 6. Let offset be obj.[[ByteOffset]].
         const offset = data_view.fields.byte_offset;
