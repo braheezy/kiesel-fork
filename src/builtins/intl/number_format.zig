@@ -627,10 +627,10 @@ pub const constructor = struct {
             intl_obj.fields.maximum_fraction_digits = 0;
 
             // c. Set intlObj.[[MinimumSignificantDigits]] to 1.
-            intl_obj.fields.minimum_significant_digits = 0;
+            intl_obj.fields.minimum_significant_digits = 1;
 
             // d. Set intlObj.[[MaximumSignificantDigits]] to 2.
-            intl_obj.fields.maximum_significant_digits = 0;
+            intl_obj.fields.maximum_significant_digits = 2;
 
             // e. Set intlObj.[[RoundingType]] to more-precision.
             intl_obj.fields.rounding_type = .more_precision;
