@@ -3531,62 +3531,53 @@ fn initializeTypedArrayFromArrayBuffer(
     // 12. Return unused.
 }
 
-/// 23.2.5.1.4 InitializeTypedArrayFromList ( obj, values )
-/// https://tc39.es/ecma262/#sec-initializetypedarrayfromlist
-fn initializeTypedArrayFromList(
+/// 23.2.5.1.4 InitializeTypedArrayFromElements ( obj, source )
+/// https://tc39.es/ecma262/#sec-initializetypedarrayfromelements
+fn initializeTypedArrayFromElements(
     agent: *Agent,
     typed_array: *TypedArray,
-    values: []const Value,
+    source: *Object,
 ) Agent.Error!void {
-    // 1. Let length be the number of elements in values.
-    // NOTE: allocateTypedArrayBuffer() will throw a nice error if this is too large, so truncating is fine
-    const length: ArrayLength = @fromBackingInt(@intCast(values.len));
+    // 1. Let usingIterator be ? GetMethod(source, %Symbol.iterator%).
+    const using_iterator = try source.getMethod(
+        agent,
+        PropertyKey.from(agent.well_known_symbols.iterator),
+    );
 
-    // 2. Perform ? AllocateTypedArrayBuffer(obj, length).
+    // 2. If usingIterator is not undefined, then
+    const maybe_list: ?[]const Value = if (using_iterator != null) blk: {
+        // a. Let list be ? IteratorToList(? GetIteratorFromMethod(source, usingIterator)).
+        var iterator = try getIteratorFromMethod(agent, Value.from(source), using_iterator.?);
+        break :blk try iterator.toList(agent);
+    } else null;
+    defer if (maybe_list) |list| agent.gc_allocator.free(list);
+
+    // b. Let length be the number of elements in list.
+    // 3. Else,
+    //    a. NOTE: source is not iterable, so assume it is an array-like object.
+    //    b. Let length be ? LengthOfArrayLike(source).
+    const length: ArrayLength = if (maybe_list) |list|
+        @fromBackingInt(@intCast(list.len))
+    else
+        @fromBackingInt(try source.lengthOfArrayLike(agent));
+
+    // 4. Perform ? AllocateTypedArrayBuffer(obj, length).
     try allocateTypedArrayBuffer(agent, typed_array, length);
 
-    // 3. Let k be 0.
-    // 4. Repeat, while k < length,
-    for (values, 0..) |k_value, k| {
-        // a. Let kValue be values[k].
-
-        // b. Perform ? TypedArraySetElement(obj, 𝔽(k), kValue).
-        try typedArraySetElement(
-            agent,
-            typed_array,
-            .{ .integer_index = @intCast(k) },
-            k_value,
-        );
-
-        // c. Set k to k + 1.
-    }
-
-    // 5. Return unused.
-}
-
-/// 23.2.5.1.5 InitializeTypedArrayFromArrayLike ( obj, arrayLike )
-/// https://tc39.es/ecma262/#sec-initializetypedarrayfromarraylike
-fn initializeTypedArrayFromArrayLike(
-    agent: *Agent,
-    typed_array: *TypedArray,
-    array_like: *Object,
-) Agent.Error!void {
-    // 1. Let length be ? LengthOfArrayLike(arrayLike).
-    const length: ArrayLength = @fromBackingInt(try array_like.lengthOfArrayLike(agent));
-
-    // 2. Perform ? AllocateTypedArrayBuffer(obj, length).
-    try allocateTypedArrayBuffer(agent, typed_array, length);
-
-    // 3. Let k be 0.
+    // 5. Let k be 0.
     var k: u53 = 0;
 
-    // 4. Repeat, while k < length,
+    // 6. Repeat, while k < length,
     while (k < @backingInt(length)) : (k += 1) {
-        // a. Let propertyKey be ! ToString(𝔽(k)).
-        const property_key = PropertyKey.from(k);
-
-        // b. Let kValue be ? Get(arrayLike, propertyKey).
-        const k_value = try array_like.get(agent, property_key);
+        // a. If usingIterator is not undefined, then
+        //     i. Let kValue be list[k].
+        // b. Else,
+        //     i. Let propertyKey be ! ToString(𝔽(k)).
+        //     ii. Let kValue be ? Get(source, propertyKey).
+        const k_value = if (maybe_list) |list|
+            list[@intCast(k)]
+        else
+            try source.get(agent, PropertyKey.from(k));
 
         // c. Perform ? TypedArraySetElement(obj, 𝔽(k), kValue).
         try typedArraySetElement(agent, typed_array, .{ .integer_index = k }, k_value);
@@ -3594,10 +3585,10 @@ fn initializeTypedArrayFromArrayLike(
         // d. Set k to k + 1.
     }
 
-    // 5. Return unused.
+    // 7. Return unused.
 }
 
-/// 23.2.5.1.6 AllocateTypedArrayBuffer ( obj, length )
+/// 23.2.5.1.5 AllocateTypedArrayBuffer ( obj, length )
 /// https://tc39.es/ecma262/#sec-allocatetypedarraybuffer
 fn allocateTypedArrayBuffer(
     agent: *Agent,
@@ -4029,37 +4020,12 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                             !first_arg.asObject().is(builtins.ArrayBuffer),
                     );
 
-                    // ii. Let usingIterator be ? GetMethod(firstArg, %Symbol.iterator%).
-                    const using_iterator = try first_arg.getMethod(
+                    // ii. Perform ? InitializeTypedArrayFromElements(obj, firstArg).
+                    try initializeTypedArrayFromElements(
                         agent,
-                        PropertyKey.from(agent.well_known_symbols.iterator),
+                        typed_array,
+                        first_arg.asObject(),
                     );
-
-                    // iii. If usingIterator is not undefined, then
-                    if (using_iterator != null) {
-                        // 1. Let values be ? IteratorToList(? GetIteratorFromMethod(firstArg,
-                        //    usingIterator)).
-                        var iterator = try getIteratorFromMethod(
-                            agent,
-                            first_arg,
-                            using_iterator.?,
-                        );
-                        const values = try iterator.toList(agent);
-                        defer agent.gc_allocator.free(values);
-
-                        // 2. Perform ? InitializeTypedArrayFromList(obj, values).
-                        try initializeTypedArrayFromList(agent, typed_array, values);
-                    } else {
-                        // iv. Else,
-                        // 1. NOTE: firstArg is not an iterable object, so assume it is already an
-                        //    array-like object.
-                        // 2. Perform ? InitializeTypedArrayFromArrayLike(obj, firstArg).
-                        try initializeTypedArrayFromArrayLike(
-                            agent,
-                            typed_array,
-                            first_arg.asObject(),
-                        );
-                    }
                 }
 
                 // e. Return obj.

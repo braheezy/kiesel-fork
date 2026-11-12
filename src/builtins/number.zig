@@ -183,14 +183,9 @@ pub const constructor = struct {
     fn isFinite(_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
         const number = arguments.get(0);
 
-        // 1. If number is not a Number, return false.
-        if (!number.isNumber()) return .false;
-
-        // 2. If number is not finite, return false.
-        if (!number.asNumber().isFinite()) return .false;
-
-        // 3. Return true.
-        return .true;
+        // 1. If number is a finite Number, return true.
+        // 2. Return false.
+        return Value.from(number.isNumber() and number.asNumber().isFinite());
     }
 
     /// 21.1.2.3 Number.isInteger ( number )
@@ -295,48 +290,50 @@ pub const prototype = struct {
     fn toExponential(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const fraction_digits_value = arguments.get(0);
 
-        // 1. Let x be ? ThisNumberValue(this value).
-        const x_number = try thisNumberValue(agent, this_value);
+        // 1. Let number be ? ThisNumberValue(this value).
+        const number = try thisNumberValue(agent, this_value);
 
-        // 2. Let f be ? ToIntegerOrInfinity(fractionDigits).
-        // 3. Assert: If fractionDigits is undefined, then f is 0.
-        const fraction_digits_f64 = try fraction_digits_value.toIntegerOrInfinity(agent);
+        // 2. Let fractionCount be ? ToIntegerOrInfinity(fractionDigits).
+        // 3. Assert: If fractionDigits is undefined, then fractionCount is 0.
+        const fraction_count_f64 = try fraction_digits_value.toIntegerOrInfinity(agent);
 
-        // 4. If x is not finite, return Number::toString(x, 10).
-        if (!x_number.isFinite()) {
-            return Value.from(try x_number.toString(agent, 10));
+        // 4. If number is not a finite Number, return Number::toString(number, 10).
+        if (!number.isFinite()) {
+            return Value.from(try number.toString(agent, 10));
         }
 
-        // 5. If f < 0 or f > 100, throw a RangeError exception.
-        if (!std.math.isFinite(fraction_digits_f64)) {
+        // 5. If fractionCount is not an integer, throw a RangeError exception.
+        if (!std.math.isFinite(fraction_count_f64)) {
             return agent.throwException(.range_error, "Fraction digits must be a finite number", .{});
         }
-        if (fraction_digits_f64 < 0 or fraction_digits_f64 > 100) {
+
+        // 6. If fractionCount < 0 or fractionCount > 100, throw a RangeError exception.
+        if (fraction_count_f64 < 0 or fraction_count_f64 > 100) {
             return agent.throwException(.range_error, "Fraction digits must be in range 0-100", .{});
         }
-        const fraction_digits: usize = @intFromFloat(fraction_digits_f64);
+        const fraction_count: usize = @intFromFloat(fraction_count_f64);
 
-        // 6. Set x to ℝ(x).
-        var x = x_number.asFloat();
-        if (std.math.isNegativeZero(x)) x = 0;
+        // 7. Set number to ℝ(number).
+        var number_f64 = number.asFloat();
+        if (std.math.isNegativeZero(number_f64)) number_f64 = 0;
 
-        // 7. Let s be the empty String.
+        // 8. Let sign be the empty String.
         var sign: []const u8 = "";
 
-        // 8. If x < 0, then
-        if (x < 0) {
-            // a. Set s to "-".
+        // 9. If number < 0, then
+        if (number_f64 < 0) {
+            // a. Set sign to "-".
             sign = "-";
 
-            // b. Set x to -x.
-            x = -x;
+            // b. Set number to -number.
+            number_f64 = -number_f64;
         }
 
-        // 9-15.
+        // 10-16.
         var formatted = if (fraction_digits_value.isUndefined())
-            try agent.gc_allocator.print("{s}{e}", .{ sign, x })
+            try agent.gc_allocator.print("{s}{e}", .{ sign, number_f64 })
         else
-            try agent.gc_allocator.print("{s}{e:.[2]}", .{ sign, x, fraction_digits });
+            try agent.gc_allocator.print("{s}{e:.[2]}", .{ sign, number_f64, fraction_count });
         // Zig omits the '+' for positive exponents, so we need to add it ourselves
         if (std.mem.find(u8, formatted, "e-") == null) {
             const index = std.mem.find(u8, formatted, "e").?;
@@ -360,7 +357,7 @@ pub const prototype = struct {
         // 3. Assert: If fractionDigits is undefined, then fractionCount is 0.
         const fraction_digits_f64 = try fraction_digits_value.toIntegerOrInfinity(agent);
 
-        // 4. If fractionCount is not finite, throw a RangeError exception.
+        // 4. If fractionCount is not an integer, throw a RangeError exception.
         if (!std.math.isFinite(fraction_digits_f64)) {
             return agent.throwException(.range_error, "Fraction digits must be a finite number", .{});
         }
@@ -371,7 +368,7 @@ pub const prototype = struct {
         }
         const fraction_digits: usize = @intFromFloat(fraction_digits_f64);
 
-        // 6. If number is not finite, return Number::toString(number, 10).
+        // 6. If number is not a finite Number, return Number::toString(number, 10).
         if (!number.isFinite()) {
             return Value.from(try number.toString(agent, 10));
         }
@@ -449,24 +446,29 @@ pub const prototype = struct {
         // 3. Let precisionCount be ? ToIntegerOrInfinity(precision).
         const precision_count = try precision_value.toIntegerOrInfinity(agent);
 
-        // 4. If number is not finite, return Number::toString(number, 10).
+        // 4. If number is not a finite Number, return Number::toString(number, 10).
         if (!number.isFinite()) {
             return Value.from(try number.toString(agent, 10));
         }
 
-        // 5. If precisionCount < 1 or precisionCount > 100, throw a RangeError exception.
+        // 5. If precisionCount is not an integer, throw a RangeError exception.
+        if (!std.math.isFinite(precision_count)) {
+            return agent.throwException(.range_error, "Precision must be a finite number", .{});
+        }
+
+        // 6. If precisionCount < 1 or precisionCount > 100, throw a RangeError exception.
         if (precision_count < 1 or precision_count > 100) {
             return agent.throwException(.range_error, "Precision must be in range 1-100", .{});
         }
         const precision: usize = @intFromFloat(precision_count);
 
-        // 6. Set number to ℝ(number).
+        // 7. Set number to ℝ(number).
         var number_f64 = number.asFloat();
 
-        // 7. Let sign be the empty String.
+        // 8. Let sign be the empty String.
         var sign: []const u8 = "";
 
-        // 8. If number < 0, then
+        // 9. If number < 0, then
         if (number_f64 < 0) {
             // a. Set sign to the code unit 0x002D (HYPHEN-MINUS).
             sign = "-";
@@ -478,7 +480,7 @@ pub const prototype = struct {
         var exponent: i64 = undefined;
         var significand: []const u8 = undefined;
 
-        // 9. If number = 0, then
+        // 10. If number = 0, then
         if (number_f64 == 0) {
             // a. Let significand be the String value consisting of precisionCount occurrences of
             //    the code unit 0x0030 (DIGIT ZERO).
@@ -487,7 +489,7 @@ pub const prototype = struct {
             // b. Let exponent be 0.
             exponent = 0;
         } else {
-            // 10. Else,
+            // 11. Else,
             // a. Let exponent and intSignificand be integers such that
             //    10**(precisionCount - 1) ≤ intSignificand < 10**precisionCount and for which
             //    intSignificand × 10**(exponent - precisionCount + 1) - number is as close to zero
@@ -560,7 +562,7 @@ pub const prototype = struct {
             }
         }
 
-        // 11. If exponent = precisionCount - 1, return the string-concatenation of sign and
+        // 12. If exponent = precisionCount - 1, return the string-concatenation of sign and
         //     significand.
         if (exponent == precision - 1) {
             return Value.from(
@@ -571,7 +573,7 @@ pub const prototype = struct {
             );
         }
 
-        // 12. If exponent ≥ 0, then
+        // 13. If exponent ≥ 0, then
         if (exponent >= 0) {
             // a. Set significand to the string-concatenation of the first exponent + 1 code units
             //    of significand, the code unit 0x002E (FULL STOP), and the remaining
@@ -581,7 +583,7 @@ pub const prototype = struct {
                 .{ significand[0..@intCast(exponent + 1)], significand[@intCast(exponent + 1)..] },
             );
         } else {
-            // 13. Else,
+            // 14. Else,
             // a. Set significand to the string-concatenation of the code unit 0x0030 (DIGIT ZERO),
             //    the code unit 0x002E (FULL STOP), -(exponent + 1) occurrences of the code unit
             //    0x0030 (DIGIT ZERO), and the String significand.
@@ -591,7 +593,7 @@ pub const prototype = struct {
             );
         }
 
-        // 14. Return the string-concatenation of sign and significand.
+        // 15. Return the string-concatenation of sign and significand.
         return Value.from(
             try String.fromAscii(agent, try agent.gc_allocator.print(
                 "{s}{s}",

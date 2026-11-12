@@ -278,7 +278,7 @@ pub fn equal(x: *const BigInt, y: *const BigInt) bool {
     return x.managed.eql(y.managed);
 }
 
-/// 6.1.6.2.18 BigInt::bitwiseAND ( x, y )
+/// 6.1.6.2.15 BigInt::bitwiseAND ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseAND
 pub fn bitwiseAND(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allocator.Error!*const BigInt {
     // 1. Return BigIntBitwiseOp(`&`, x, y).
@@ -287,7 +287,7 @@ pub fn bitwiseAND(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.All
     return fromManaged(agent, result);
 }
 
-/// 6.1.6.2.19 BigInt::bitwiseXOR ( x, y )
+/// 6.1.6.2.16 BigInt::bitwiseXOR ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseXOR
 pub fn bitwiseXOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allocator.Error!*const BigInt {
     // 1. Return BigIntBitwiseOp(`^`, x, y).
@@ -296,7 +296,7 @@ pub fn bitwiseXOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.All
     return fromManaged(agent, result);
 }
 
-/// 6.1.6.2.20 BigInt::bitwiseOR ( x, y )
+/// 6.1.6.2.17 BigInt::bitwiseOR ( x, y )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-bitwiseOR
 pub fn bitwiseOR(x: *const BigInt, agent: *Agent, y: *const BigInt) std.mem.Allocator.Error!*const BigInt {
     // 1. Return BigIntBitwiseOp(`|`, x, y).
@@ -318,7 +318,7 @@ pub fn toString(
     return String.fromAscii(agent, try aw.toOwnedSlice());
 }
 
-/// 6.1.6.2.21 BigInt::toString ( x, radix )
+/// 6.1.6.2.18 BigInt::toString ( x, radix )
 /// https://tc39.es/ecma262/#sec-numeric-types-bigint-tostring
 fn toStringImpl(
     self: *const BigInt,

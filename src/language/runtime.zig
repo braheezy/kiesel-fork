@@ -576,9 +576,9 @@ pub fn applyStringOrNumericBinaryOperator(
     // 8. Return operation(leftNumber, rightNumber).
 }
 
-/// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
-/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
-pub fn instantiateOrdinaryFunctionObject(
+/// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionDeclaration
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctiondeclaration
+pub fn instantiateOrdinaryFunctionDeclaration(
     agent: *Agent,
     function_declaration: ast.FunctionDeclaration,
     env: Environment,
@@ -1204,9 +1204,9 @@ pub fn methodDefinitionEvaluation(
     }
 }
 
-/// 15.5.3 Runtime Semantics: InstantiateGeneratorFunctionObject
-/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiategeneratorfunctionobject
-pub fn instantiateGeneratorFunctionObject(
+/// 15.5.3 Runtime Semantics: InstantiateGeneratorDeclaration
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiategeneratordeclaration
+pub fn instantiateGeneratorDeclaration(
     agent: *Agent,
     generator_declaration: ast.GeneratorDeclaration,
     env: Environment,
@@ -1673,9 +1673,9 @@ pub fn evaluateYieldStar(
     }
 }
 
-/// 15.6.3 Runtime Semantics: InstantiateAsyncGeneratorFunctionObject
-/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratorfunctionobject
-pub fn instantiateAsyncGeneratorFunctionObject(
+/// 15.6.3 Runtime Semantics: InstantiateAsyncGeneratorDeclaration
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratordeclaration
+pub fn instantiateAsyncGeneratorDeclaration(
     agent: *Agent,
     async_generator_declaration: ast.AsyncGeneratorDeclaration,
     env: Environment,
@@ -2603,9 +2603,9 @@ pub fn classDefinitionEvaluation(
     return ctor_func;
 }
 
-/// 15.8.2 Runtime Semantics: InstantiateAsyncFunctionObject
-/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctionobject
-pub fn instantiateAsyncFunctionObject(
+/// 15.8.2 Runtime Semantics: InstantiateAsyncFunctionDeclaration
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctiondeclaration
+pub fn instantiateAsyncFunctionDeclaration(
     agent: *Agent,
     async_function_declaration: ast.AsyncFunctionDeclaration,
     env: Environment,

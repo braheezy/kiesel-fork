@@ -33,10 +33,10 @@ const containsSlice = utils.containsSlice;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getImportedModule = language.getImportedModule;
 const getModuleNamespace = language.getModuleNamespace;
-const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
-const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
-const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
-const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
+const instantiateAsyncFunctionDeclaration = language.instantiateAsyncFunctionDeclaration;
+const instantiateAsyncGeneratorDeclaration = language.instantiateAsyncGeneratorDeclaration;
+const instantiateGeneratorDeclaration = language.instantiateGeneratorDeclaration;
+const instantiateOrdinaryFunctionDeclaration = language.instantiateOrdinaryFunctionDeclaration;
 const newModuleEnvironment = execution.newModuleEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
@@ -1737,13 +1737,13 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
             if (lexical_decl == .hoistable_declaration) {
                 const hoistable_decl = lexical_decl.hoistable_declaration;
 
-                // 1. Let funcObj be InstantiateFunctionObject of lexicalDecl with arguments
+                // 1. Let funcObj be InstantiateFunctionDeclaration of lexicalDecl with arguments
                 //    envRecord and privateEnv.
                 const func_obj = try switch (hoistable_decl) {
-                    .function_declaration => |func_decl| instantiateOrdinaryFunctionObject(agent, func_decl, env, private_env, self.source),
-                    .generator_declaration => |gen_decl| instantiateGeneratorFunctionObject(agent, gen_decl, env, private_env, self.source),
-                    .async_function_declaration => |async_func_decl| instantiateAsyncFunctionObject(agent, async_func_decl, env, private_env, self.source),
-                    .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorFunctionObject(agent, async_gen_decl, env, private_env, self.source),
+                    .function_declaration => |func_decl| instantiateOrdinaryFunctionDeclaration(agent, func_decl, env, private_env, self.source),
+                    .generator_declaration => |gen_decl| instantiateGeneratorDeclaration(agent, gen_decl, env, private_env, self.source),
+                    .async_function_declaration => |async_func_decl| instantiateAsyncFunctionDeclaration(agent, async_func_decl, env, private_env, self.source),
+                    .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorDeclaration(agent, async_gen_decl, env, private_env, self.source),
                 };
 
                 // 2. Perform ! envRecord.InitializeBinding(name, funcObj).

@@ -1605,7 +1605,7 @@ pub const Template = struct {
     }
 
     /// 12.9.6.1 Static Semantics: TV
-    /// https://tc39.es/ecma262/#sec-template-literal-lexical-components
+    /// https://tc39.es/ecma262/#sec-static-semantics-tv
     ///
     /// Writes WTF-8 encoded bytes.
     pub fn value(t: *const Template, w: *std.Io.Writer) std.Io.Writer.Error!bool {

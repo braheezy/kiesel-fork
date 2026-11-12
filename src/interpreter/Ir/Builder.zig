@@ -1007,8 +1007,8 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // 37. For each Parse Node funcDecl of funcsToInitialize, do
     for (funcs_to_initialize.items) |hoistable_decl| {
         // a. Let funcName be the sole element of the BoundNames of funcDecl.
-        // b. Let funcObj be InstantiateFunctionObject of funcDecl with arguments lexicalEnv and
-        //    privateEnv.
+        // b. Let funcObj be InstantiateFunctionDeclaration of funcDecl with arguments lexicalEnv
+        //    and privateEnv.
         const string_index, const func_ref = switch (hoistable_decl) {
             inline else => |func_decl, tag| blk: {
                 const string_index = try b.internString(func_decl.identifier.?);
@@ -1098,8 +1098,8 @@ fn lowerBlockDeclarationInstantiation(
             const hoistable_decl = decl.hoistable_declaration;
 
             // i. Let funcName be the sole element of the BoundNames of decl.
-            // ii. Let funcObj be InstantiateFunctionObject of decl with arguments envRecord and
-            //     privateEnv.
+            // ii. Let funcObj be InstantiateFunctionDeclaration of decl with arguments envRecord
+            //     and privateEnv.
             // iii. If the host is a web browser or otherwise supports Block-Level Function
             //      Declarations Web Legacy Compatibility Semantics, then
             //      [...]

@@ -145,124 +145,127 @@ pub fn dayWithinYear(tv: f64) DayWithinYear {
     return @intFromFloat(day(tv) - dayFromYear(yearFromTime(tv)));
 }
 
-/// 21.4.1.9 InLeapYear ( tv )
-/// https://tc39.es/ecma262/#sec-inleapyear
-pub fn inLeapYear(tv: f64) bool {
-    // 1. Let y be YearFromTime(tv).
-    const year = yearFromTime(tv);
-
-    // 2. If (y modulo 400) = 0, return 1.
+/// 21.4.1.9 IsLeapYear ( y )
+/// https://tc39.es/ecma262/#sec-isleapyear
+pub fn isLeapYear(year: Year) bool {
+    // 1. If (y modulo 400) = 0, return true.
     if (@mod(year, 400) == 0) return true;
 
-    // 3. If (y modulo 100) = 0, return 0.
+    // 2. If (y modulo 100) = 0, return false.
     if (@mod(year, 100) == 0) return false;
 
-    // 4. If (y modulo 4) = 0, return 1.
+    // 3. If (y modulo 4) = 0, return true.
     if (@mod(year, 4) == 0) return true;
 
-    // 5. Return 0.
+    // 4. Return false.
     return false;
 }
 
 /// 21.4.1.10 MonthFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-monthfromtime
 pub fn monthFromTime(tv: f64) Month {
-    // 1. Let inLeapYear be InLeapYear(tv).
-    const in_leap_year: DayWithinYear = @intFromBool(inLeapYear(tv));
+    // 1. Let y be YearFromTime(tv).
+    const year = yearFromTime(tv);
 
-    // 2. Let dayWithinYear be DayWithinYear(tv).
+    // 2. If IsLeapYear(y) is true, let leapYearOffset be 1; else let leapYearOffset be 0.
+    const leap_year_offset: DayWithinYear = if (isLeapYear(year)) 1 else 0;
+
+    // 3. Let dayWithinYear be DayWithinYear(tv).
     const day_within_year = dayWithinYear(tv);
 
-    // 3. If dayWithinYear < 31, return 0.
+    // 4. If dayWithinYear < 31, return 0.
     if (day_within_year < 31) return 0;
 
-    // 4. If dayWithinYear < 59 + inLeapYear, return 1.
-    if (day_within_year < 59 + in_leap_year) return 1;
+    // 5. If dayWithinYear < 59 + leapYearOffset, return 1.
+    if (day_within_year < 59 + leap_year_offset) return 1;
 
-    // 5. If dayWithinYear < 90 + inLeapYear, return 2.
-    if (day_within_year < 90 + in_leap_year) return 2;
+    // 6. If dayWithinYear < 90 + leapYearOffset, return 2.
+    if (day_within_year < 90 + leap_year_offset) return 2;
 
-    // 6. If dayWithinYear < 120 + inLeapYear, return 3.
-    if (day_within_year < 120 + in_leap_year) return 3;
+    // 7. If dayWithinYear < 120 + leapYearOffset, return 3.
+    if (day_within_year < 120 + leap_year_offset) return 3;
 
-    // 7. If dayWithinYear < 151 + inLeapYear, return 4.
-    if (day_within_year < 151 + in_leap_year) return 4;
+    // 8. If dayWithinYear < 151 + leapYearOffset, return 4.
+    if (day_within_year < 151 + leap_year_offset) return 4;
 
-    // 8. If dayWithinYear < 181 + inLeapYear, return 5.
-    if (day_within_year < 181 + in_leap_year) return 5;
+    // 9. If dayWithinYear < 181 + leapYearOffset, return 5.
+    if (day_within_year < 181 + leap_year_offset) return 5;
 
-    // 9. If dayWithinYear < 212 + inLeapYear, return 6.
-    if (day_within_year < 212 + in_leap_year) return 6;
+    // 10. If dayWithinYear < 212 + leapYearOffset, return 6.
+    if (day_within_year < 212 + leap_year_offset) return 6;
 
-    // 10. If dayWithinYear < 243 + inLeapYear, return 7.
-    if (day_within_year < 243 + in_leap_year) return 7;
+    // 11. If dayWithinYear < 243 + leapYearOffset, return 7.
+    if (day_within_year < 243 + leap_year_offset) return 7;
 
-    // 11. If dayWithinYear < 273 + inLeapYear, return 8.
-    if (day_within_year < 273 + in_leap_year) return 8;
+    // 12. If dayWithinYear < 273 + leapYearOffset, return 8.
+    if (day_within_year < 273 + leap_year_offset) return 8;
 
-    // 12. If dayWithinYear < 304 + inLeapYear, return 9.
-    if (day_within_year < 304 + in_leap_year) return 9;
+    // 13. If dayWithinYear < 304 + leapYearOffset, return 9.
+    if (day_within_year < 304 + leap_year_offset) return 9;
 
-    // 13. If dayWithinYear < 334 + inLeapYear, return 10.
-    if (day_within_year < 334 + in_leap_year) return 10;
+    // 14. If dayWithinYear < 334 + leapYearOffset, return 10.
+    if (day_within_year < 334 + leap_year_offset) return 10;
 
-    // 14. Assert: dayWithinYear < 365 + inLeapYear.
-    std.debug.assert(day_within_year < 365 + in_leap_year);
+    // 15. Assert: dayWithinYear < 365 + leapYearOffset.
+    std.debug.assert(day_within_year < 365 + leap_year_offset);
 
-    // 15. Return 11.
+    // 16. Return 11.
     return 11;
 }
 
 /// 21.4.1.11 DateFromTime ( tv )
 /// https://tc39.es/ecma262/#sec-datefromtime
 pub fn dateFromTime(tv: f64) Date_ {
-    // 1. Let inLeapYear be InLeapYear(tv).
-    const in_leap_year: DayWithinYear = @intFromBool(inLeapYear(tv));
+    // 1. Let y be YearFromTime(tv).
+    const year = yearFromTime(tv);
 
-    // 2. Let dayWithinYear be DayWithinYear(tv).
+    // 2. If IsLeapYear(y) is true, let leapYearOffset be 1; else let leapYearOffset be 0.
+    const leap_year_offset: DayWithinYear = if (isLeapYear(year)) 1 else 0;
+
+    // 3. Let dayWithinYear be DayWithinYear(tv).
     const day_within_year = dayWithinYear(tv);
 
-    // 3. Let month be MonthFromTime(tv).
+    // 4. Let month be MonthFromTime(tv).
     const month = monthFromTime(tv);
 
-    // 4. If month = 0, return dayWithinYear + 1.
+    // 5. If month = 0, return dayWithinYear + 1.
     if (month == 0) return @intCast(day_within_year + 1);
 
-    // 5. If month = 1, return dayWithinYear - 30.
+    // 6. If month = 1, return dayWithinYear - 30.
     if (month == 1) return @intCast(day_within_year - 30);
 
-    // 6. If month = 2, return dayWithinYear - 58 - inLeapYear.
-    if (month == 2) return @intCast(day_within_year - 58 - in_leap_year);
+    // 7. If month = 2, return dayWithinYear - 58 - leapYearOffset.
+    if (month == 2) return @intCast(day_within_year - 58 - leap_year_offset);
 
-    // 7. If month = 3, return dayWithinYear - 89 - inLeapYear.
-    if (month == 3) return @intCast(day_within_year - 89 - in_leap_year);
+    // 8. If month = 3, return dayWithinYear - 89 - leapYearOffset.
+    if (month == 3) return @intCast(day_within_year - 89 - leap_year_offset);
 
-    // 8. If month = 4, return dayWithinYear - 119 - inLeapYear.
-    if (month == 4) return @intCast(day_within_year - 119 - in_leap_year);
+    // 9. If month = 4, return dayWithinYear - 119 - leapYearOffset.
+    if (month == 4) return @intCast(day_within_year - 119 - leap_year_offset);
 
-    // 9. If month = 5, return dayWithinYear - 150 - inLeapYear.
-    if (month == 5) return @intCast(day_within_year - 150 - in_leap_year);
+    // 10. If month = 5, return dayWithinYear - 150 - leapYearOffset.
+    if (month == 5) return @intCast(day_within_year - 150 - leap_year_offset);
 
-    // 10. If month = 6, return dayWithinYear - 180 - inLeapYear.
-    if (month == 6) return @intCast(day_within_year - 180 - in_leap_year);
+    // 11. If month = 6, return dayWithinYear - 180 - leapYearOffset.
+    if (month == 6) return @intCast(day_within_year - 180 - leap_year_offset);
 
-    // 11. If month = 7, return dayWithinYear - 211 - inLeapYear.
-    if (month == 7) return @intCast(day_within_year - 211 - in_leap_year);
+    // 12. If month = 7, return dayWithinYear - 211 - leapYearOffset.
+    if (month == 7) return @intCast(day_within_year - 211 - leap_year_offset);
 
-    // 12. If month = 8, return dayWithinYear - 242 - inLeapYear.
-    if (month == 8) return @intCast(day_within_year - 242 - in_leap_year);
+    // 13. If month = 8, return dayWithinYear - 242 - leapYearOffset.
+    if (month == 8) return @intCast(day_within_year - 242 - leap_year_offset);
 
-    // 13. If month = 9, return dayWithinYear - 272 - inLeapYear.
-    if (month == 9) return @intCast(day_within_year - 272 - in_leap_year);
+    // 14. If month = 9, return dayWithinYear - 272 - leapYearOffset.
+    if (month == 9) return @intCast(day_within_year - 272 - leap_year_offset);
 
-    // 14. If month = 10, return dayWithinYear - 303 - inLeapYear.
-    if (month == 10) return @intCast(day_within_year - 303 - in_leap_year);
+    // 15. If month = 10, return dayWithinYear - 303 - leapYearOffset.
+    if (month == 10) return @intCast(day_within_year - 303 - leap_year_offset);
 
-    // 15. Assert: month = 11.
+    // 16. Assert: month = 11.
     std.debug.assert(month == 11);
 
-    // 16. Return dayWithinYear - 333 - inLeapYear.
-    return @intCast(day_within_year - 333 - in_leap_year);
+    // 17. Return dayWithinYear - 333 - leapYearOffset.
+    return @intCast(day_within_year - 333 - leap_year_offset);
 }
 
 /// 21.4.1.12 WeekDay ( tv )
@@ -356,7 +359,7 @@ pub fn localTime(platform: *const Agent.Platform, tv: f64) f64 {
 /// 21.4.1.26 UTC ( t )
 /// https://tc39.es/ecma262/#sec-utc-t
 pub fn utc(platform: *const Agent.Platform, t: f64) f64 {
-    // 1. If t is not finite, return NaN.
+    // 1. If t is not a finite Number, return NaN.
     if (!std.math.isFinite(t)) return std.math.nan(f64);
 
     // 2. Let systemTimeZoneIdentifier be SystemTimeZoneIdentifier().
@@ -385,8 +388,8 @@ pub fn utc(platform: *const Agent.Platform, t: f64) f64 {
 /// 21.4.1.27 MakeTime ( hour, minute, second, millisecond )
 /// https://tc39.es/ecma262/#sec-maketime
 pub fn makeTime(hour: f64, minute: f64, second: f64, millisecond: f64) f64 {
-    // 1. If hour is not finite, minute is not finite, second is not finite, or millisecond is not
-    //    finite, return NaN.
+    // 1. If hour is not a finite Number, minute is not a finite Number, second is not a finite
+    //    Number, or millisecond is not a finite Number, return NaN.
     if (!std.math.isFinite(hour) or
         !std.math.isFinite(minute) or
         !std.math.isFinite(second) or
@@ -415,7 +418,8 @@ pub fn makeTime(hour: f64, minute: f64, second: f64, millisecond: f64) f64 {
 /// 21.4.1.28 MakeDay ( year, month, day )
 /// https://tc39.es/ecma262/#sec-makeday
 pub fn makeDay(year: f64, month: f64, day_: f64) f64 {
-    // 1. If year is not finite, month is not finite, or day is not finite, return NaN.
+    // 1. If year is not a finite Number, month is not a finite Number, or day is not a finite
+    //    Number, return NaN.
     if (!std.math.isFinite(year) or !std.math.isFinite(month) or !std.math.isFinite(day_)) {
         return std.math.nan(f64);
     }
@@ -432,7 +436,7 @@ pub fn makeDay(year: f64, month: f64, day_: f64) f64 {
     // 5. Let balancedYear be 𝔽(yearMV) + 𝔽(floor(monthMV / 12)).
     const balanced_year = year_mv + std.math.floor(month_mv / 12);
 
-    // 6. If balancedYear is not finite, return NaN.
+    // 6. If balancedYear is not a finite Number, return NaN.
     if (!std.math.isFinite(balanced_year)) return std.math.nan(f64);
 
     // 7. Let balancedMonthMV be monthMV modulo 12.
@@ -459,13 +463,13 @@ pub fn makeDay(year: f64, month: f64, day_: f64) f64 {
 /// 21.4.1.29 MakeDate ( day, time )
 /// https://tc39.es/ecma262/#sec-makedate
 pub fn makeDate(day_: f64, time: f64) f64 {
-    // 1. If day is not finite or time is not finite, return NaN.
+    // 1. If day is not a finite Number or time is not a finite Number, return NaN.
     if (!std.math.isFinite(day_) or !std.math.isFinite(time)) return std.math.nan(f64);
 
     // 2. Let tv be day × 𝔽(MillisecondsPerDay) + time.
     const time_value = day_ * std.time.ms_per_day + time;
 
-    // 3. If tv is not finite, return NaN.
+    // 3. If tv is not a finite Number, return NaN.
     if (!std.math.isFinite(time_value)) return std.math.nan(f64);
 
     // 4. Return tv.
@@ -491,7 +495,7 @@ pub fn makeFullYear(year: f64) f64 {
 /// 21.4.1.31 TimeClip ( time )
 /// https://tc39.es/ecma262/#sec-timeclip
 pub fn timeClip(time: f64) f64 {
-    // 1. If time is not finite, return NaN.
+    // 1. If time is not a finite Number, return NaN.
     if (!std.math.isFinite(time)) return std.math.nan(f64);
 
     // 2. If abs(ℝ(time)) > 8.64 × 10**15, return NaN.
@@ -2259,7 +2263,7 @@ pub const prototype = struct {
         // 2. Let tv be ? ToPrimitive(obj, number).
         const tv = try Value.from(obj).toPrimitive(agent, .number);
 
-        // 3. If tv is a Number and tv is not finite, return null.
+        // 3. If tv is a Number and tv is not a finite Number, return null.
         if (tv.isNumber() and !tv.asNumber().isFinite()) return .null;
 
         // 4. Return ? Invoke(obj, "toISOString").

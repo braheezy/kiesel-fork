@@ -1606,12 +1606,12 @@ pub const prototype = struct {
         return escaped_pattern;
     }
 
-    /// 22.2.6.14 RegExp.prototype [ %Symbol.split% ] ( string, limit )
+    /// 22.2.6.14 RegExp.prototype [ %Symbol.split% ] ( string, substringLimit )
     /// https://tc39.es/ecma262/#sec-regexp.prototype-%symbol.split%
     fn @"Symbol.split"(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const string_value = arguments.get(0);
-        const limit_value = arguments.get(1);
+        const substring_limit = arguments.get(1);
 
         // 1. Let regexp be the this value.
         // 2. If regexp is not an Object, throw a TypeError exception.
@@ -1657,14 +1657,15 @@ pub const prototype = struct {
         // 12. Let lengthA be 0.
         var length_array: u32 = 0;
 
-        // 13. If limit is undefined, let lim be 2**32 - 1; else let lim be ℝ(? ToUint32(limit)).
-        const limit = if (limit_value.isUndefined())
+        // 13. If substringLimit is undefined, let substringLimitInt be 2**32 - 1; else let
+        //     substringLimitInt be ℝ(? ToUint32(substringLimit)).
+        const substring_limit_int = if (substring_limit.isUndefined())
             std.math.maxInt(u32)
         else
-            try limit_value.toUint32(agent);
+            try substring_limit.toUint32(agent);
 
-        // 14. If lim = 0, return array.
-        if (limit == 0) return Value.from(&array.object);
+        // 14. If substringLimitInt = 0, return array.
+        if (substring_limit_int == 0) return Value.from(&array.object);
 
         // 15. If string is the empty String, then
         if (string.isEmpty()) {
@@ -1737,8 +1738,8 @@ pub const prototype = struct {
                     // 3. Set lengthA to lengthA + 1.
                     length_array += 1;
 
-                    // 4. If lengthA = lim, return array.
-                    if (length_array == limit) return Value.from(&array.object);
+                    // 4. If lengthA = substringLimitInt, return array.
+                    if (length_array == substring_limit_int) return Value.from(&array.object);
 
                     // 5. Set lastMatchEnd to matchEnd.
                     last_match_end = match_end;
@@ -1770,8 +1771,8 @@ pub const prototype = struct {
                         // d. Set lengthA to lengthA + 1.
                         length_array += 1;
 
-                        // e. If lengthA = lim, return array.
-                        if (length_array == limit) return Value.from(&array.object);
+                        // e. If lengthA = substringLimitInt, return array.
+                        if (length_array == substring_limit_int) return Value.from(&array.object);
                     }
 
                     // 10. Set searchIndex to lastMatchEnd.

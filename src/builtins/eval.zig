@@ -18,10 +18,10 @@ const Parser = language.Parser;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const String = types.String;
 const Value = types.Value;
-const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
-const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
-const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
-const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
+const instantiateAsyncFunctionDeclaration = language.instantiateAsyncFunctionDeclaration;
+const instantiateAsyncGeneratorDeclaration = language.instantiateAsyncGeneratorDeclaration;
+const instantiateGeneratorDeclaration = language.instantiateGeneratorDeclaration;
+const instantiateOrdinaryFunctionDeclaration = language.instantiateOrdinaryFunctionDeclaration;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const noexcept = utils.noexcept;
 
@@ -488,12 +488,20 @@ fn evalDeclarationInstantiation(
 
             // i. If IsConstantDeclaration of lexicalDecl is true, then
             if (lexical_decl.isConstantDeclaration()) {
-                // 1. Perform ? lexicalEnv.CreateImmutableBinding(name, true).
-                try lexical_env.createImmutableBinding(agent, name, true);
+                // 1. Perform ! lexicalEnv.CreateImmutableBinding(name, true).
+                lexical_env.createImmutableBinding(
+                    agent,
+                    name,
+                    true,
+                ) catch |err| try noexcept(err);
             } else {
                 // ii. Else,
-                // 1. Perform ? lexicalEnv.CreateMutableBinding(name, false).
-                try lexical_env.createMutableBinding(agent, name, false);
+                // 1. Perform ! lexicalEnv.CreateMutableBinding(name, false).
+                lexical_env.createMutableBinding(
+                    agent,
+                    name,
+                    false,
+                ) catch |err| try noexcept(err);
             }
         }
     }
@@ -505,13 +513,13 @@ fn evalDeclarationInstantiation(
             inline else => |func_decl| try String.fromUtf8(agent, func_decl.identifier.?),
         };
 
-        // b. Let funcObj be InstantiateFunctionObject of funcDecl with arguments lexicalEnv and
-        //    privateEnv.
+        // b. Let funcObj be InstantiateFunctionDeclaration of funcDecl with arguments lexicalEnv
+        //    and privateEnv.
         const func_obj = try switch (hoistable_decl) {
-            .function_declaration => |func_decl| instantiateOrdinaryFunctionObject(agent, func_decl, lexical_env, private_env, source),
-            .generator_declaration => |gen_decl| instantiateGeneratorFunctionObject(agent, gen_decl, lexical_env, private_env, source),
-            .async_function_declaration => |async_func_decl| instantiateAsyncFunctionObject(agent, async_func_decl, lexical_env, private_env, source),
-            .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorFunctionObject(agent, async_gen_decl, lexical_env, private_env, source),
+            .function_declaration => |func_decl| instantiateOrdinaryFunctionDeclaration(agent, func_decl, lexical_env, private_env, source),
+            .generator_declaration => |gen_decl| instantiateGeneratorDeclaration(agent, gen_decl, lexical_env, private_env, source),
+            .async_function_declaration => |async_func_decl| instantiateAsyncFunctionDeclaration(agent, async_func_decl, lexical_env, private_env, source),
+            .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorDeclaration(agent, async_gen_decl, lexical_env, private_env, source),
         };
 
         // c. If variableEnv is a Global Environment Record, then

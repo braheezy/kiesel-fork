@@ -573,7 +573,7 @@ fn serializeJSONProperty(
 
         // 9. If value is a Number, then
         .number => {
-            // a. If value is finite, return ! ToString(value).
+            // a. If value is a finite Number, return ! ToString(value).
             if (value.asNumber().isFinite()) return try value.asNumber().toString(agent, 10);
 
             // b. Return "null".

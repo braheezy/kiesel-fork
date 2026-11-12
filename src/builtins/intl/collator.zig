@@ -307,50 +307,40 @@ pub const prototype = struct {
 
         // 3. If collator.[[BoundCompare]] is undefined, then
         if (collator.fields.bound_compare == null) {
-            // a. Let func be a new built-in function object as defined in 10.3.3.1.
-            // b. Set func.[[Collator]] to collator.
             const Captures = struct {
                 collator: *Collator,
             };
             const captures = try agent.gc_allocator.create(Captures);
             captures.* = .{ .collator = collator };
 
-            const collator_compare_function = struct {
-                /// 10.3.3.1 Collator Compare Functions
-                /// https://tc39.es/ecma402/#sec-collator-compare-functions
+            // a. Let closure be a new Abstract Closure with parameters (x, y) that captures
+            //    collator and performs the following steps when called:
+            const closure = struct {
                 fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
+                    const collator_ = captures_.collator;
                     const x = arguments.get(0);
                     const y = arguments.get(1);
 
-                    // 1. Let collator be func.[[Collator]].
-                    // 2. Assert: collator is an Object and collator has an [[InitializedCollator]]
-                    //    internal slot.
-                    const collator_ = captures_.collator;
-
-                    // 3. If x is not provided, let x be undefined.
-                    // 4. If y is not provided, let y be undefined.
-                    // 5. Let xString be ? ToString(x).
-                    // 6. Let yString be ? ToString(y).
+                    // i. Let xString be ? ToString(x).
+                    // ii. Let yString be ? ToString(y).
                     const x_string = try x.toString(agent_);
                     const y_string = try y.toString(agent_);
 
-                    // 7. Return CompareStrings(collator, xString, yString).
+                    // iii. Return CompareStrings(collator, xString, yString).
                     return compareStrings(agent_.gc_allocator, collator_, x_string, y_string);
                 }
             }.func;
 
-            const func = try createBuiltinFunction(
+            // b. Set collator.[[BoundCompare]] to CreateBuiltinFunction(closure, 2, "", « »).
+            collator.fields.bound_compare = try createBuiltinFunction(
                 agent,
-                .{ .function = collator_compare_function },
+                .{ .function = closure },
                 2,
                 "",
                 .{ .additional_fields = captures },
             );
-
-            // c. Set collator.[[BoundCompare]] to func.
-            collator.fields.bound_compare = func;
         }
 
         // 4. Return collator.[[BoundCompare]].
@@ -358,7 +348,7 @@ pub const prototype = struct {
     }
 };
 
-/// 10.3.3.2 CompareStrings ( collator, x, y )
+/// 10.3.3.1 CompareStrings ( collator, x, y )
 /// https://tc39.es/ecma402/#sec-collator-comparestrings
 pub fn compareStrings(
     allocator: std.mem.Allocator,

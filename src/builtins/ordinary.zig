@@ -942,19 +942,15 @@ pub fn getPrototypeFromConstructor(
     // 2. Let proto be ? Get(ctor, "prototype").
     const proto_value = try ctor.get(agent, PropertyKey.from("prototype"));
 
-    const proto = switch (proto_value.type()) {
-        .object => proto_value.asObject(),
+    // 3. If proto is an Object, return proto.
+    if (proto_value.isObject()) return proto_value.asObject();
 
-        // 3. If proto is not an Object, then
-        else => blk: {
-            // a. Let realm be ? GetFunctionRealm(ctor).
-            const realm = try ctor.getFunctionRealm(agent);
+    // 4. NOTE: A fallback value obtained from ctor's realm is independent of the running execution
+    //    context.
+    // 5. Let realm be ? GetFunctionRealm(ctor).
+    const realm = try ctor.getFunctionRealm(agent);
 
-            // b. Set proto to realm's intrinsic object named intrinsicDefaultProto.
-            break :blk try realm.intrinsic(intrinsic_default_proto);
-        },
-    };
-
-    // 4. Return proto.
-    return proto;
+    // 6. Return the value in realm.[[Intrinsics]] for the field identified by
+    //    intrinsicDefaultProto.
+    return realm.intrinsic(intrinsic_default_proto);
 }

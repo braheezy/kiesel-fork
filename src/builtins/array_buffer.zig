@@ -74,7 +74,7 @@ pub fn allocateArrayBuffer(
         .{
             .data_block = undefined,
             .byte_length = undefined,
-            .detach_key = .undefined,
+            .detach_key = undefined,
             .max_byte_length = .none,
         },
     );
@@ -88,7 +88,10 @@ pub fn allocateArrayBuffer(
     // 7. Set obj.[[ArrayBufferByteLength]] to byteLength.
     array_buffer.fields.byte_length = byte_length;
 
-    // 8. If allocatingResizableBuffer is true, then
+    // 8. Set obj.[[ArrayBufferDetachKey]] to empty.
+    array_buffer.fields.detach_key = null;
+
+    // 9. If allocatingResizableBuffer is true, then
     if (allocating_resizable_buffer) {
         // a. If it is not possible to create a Data Block block consisting of maxByteLength bytes,
         //    throw a RangeError exception.
@@ -99,7 +102,7 @@ pub fn allocateArrayBuffer(
         array_buffer.fields.max_byte_length = max_byte_length;
     }
 
-    // 9. Return obj.
+    // 10. Return obj.
     return array_buffer;
 }
 
@@ -178,8 +181,8 @@ pub fn arrayBufferCopyAndDetach(
         break :blk .none;
     };
 
-    // 8. If arrayBuffer.[[ArrayBufferDetachKey]] is not undefined, throw a TypeError exception.
-    if (!array_buffer.fields.detach_key.isUndefined()) {
+    // 8. If arrayBuffer.[[ArrayBufferDetachKey]] is not empty, throw a TypeError exception.
+    if (array_buffer.fields.detach_key) |_| {
         return agent.throwException(.type_error, "ArrayBuffer detach key does not match", .{});
     }
 
@@ -235,24 +238,32 @@ pub fn detachArrayBuffer(
     // 1. Assert: IsSharedArrayBuffer(arrayBuffer) is false.
     std.debug.assert(!isSharedArrayBuffer(array_buffer));
 
-    // 2. If key is not present, set key to undefined.
-    const key: Value = maybe_key orelse .undefined;
+    // 2. Let expectedKey be arrayBuffer.[[ArrayBufferDetachKey]].
+    const expected_key = array_buffer.fields.detach_key;
 
-    // 3. If arrayBuffer.[[ArrayBufferDetachKey]] is not key, throw a TypeError exception.
-    if (!sameValue(array_buffer.fields.detach_key, key)) {
+    // 3. If key is present, then
+    //     a. If expectedKey is empty or SameValue(key, expectedKey) is false, throw a TypeError
+    //        exception.
+    // 4. Else,
+    //     a. If expectedKey is not empty, throw a TypeError exception.
+    const mismatch = if (maybe_key) |key|
+        expected_key == null or !sameValue(key, expected_key.?)
+    else
+        expected_key != null;
+    if (mismatch) {
         return agent.throwException(.type_error, "ArrayBuffer detach key does not match", .{});
     }
 
-    // 4. Set arrayBuffer.[[ArrayBufferData]] to null.
+    // 5. Set arrayBuffer.[[ArrayBufferData]] to null.
     if (array_buffer.fields.data_block) |data_block| {
         agent.gc_allocator.free(data_block.bytes);
         array_buffer.fields.data_block = null;
     }
 
-    // 5. Set arrayBuffer.[[ArrayBufferByteLength]] to 0.
+    // 6. Set arrayBuffer.[[ArrayBufferByteLength]] to 0.
     array_buffer.fields.byte_length = .zero;
 
-    // 6. Return unused.
+    // 7. Return unused.
 }
 
 /// 25.1.3.6 CloneArrayBuffer ( sourceBuffer, sourceByteOffset, sourceLength )
@@ -1071,7 +1082,7 @@ pub const ArrayBuffer = MakeObject(.{
         byte_length: ByteLength,
 
         /// [[ArrayBufferDetachKey]]
-        detach_key: Value,
+        detach_key: ?Value,
 
         /// [[ArrayBufferMaxByteLength]]
         max_byte_length: OptionalByteLength,

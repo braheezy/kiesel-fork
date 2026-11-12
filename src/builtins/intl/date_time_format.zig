@@ -190,14 +190,13 @@ pub fn createDateTimeFormat(
     const hour_cycle_24_default: DateTimeFormat.Fields.HourCycle = .h23;
     const hour_cycle_default: DateTimeFormat.Fields.HourCycle = hour_cycle_12_default;
 
-    // 13. If hour12 is true, then
-    //     a. Let hc be resolvedLocaleData.[[hourCycle12]].
-    // 14. Else if hour12 is false, then
-    //     a. Let hc be resolvedLocaleData.[[hourCycle24]].
-    // 15. Else,
-    //     a. Assert: hour12 is undefined.
-    //     b. Let hc be resolvedLocale.[[hc]].
-    //     c. If hc is null, set hc to resolvedLocaleData.[[hourCycle]].
+    // 13. Let hc be resolvedLocale.[[hc]].
+    // 14. If hour12 is true, then
+    //     a. Set hc to resolvedLocaleData.[[hourCycle12]].
+    // 15. Else if hour12 is false, then
+    //     a. Set hc to resolvedLocaleData.[[hourCycle24]].
+    // 16. Else if hc is null, then
+    //     a. Set hc to resolvedLocaleData.[[hourCycle]].
     const hc: DateTimeFormat.Fields.HourCycle = if (hour12) |b|
         if (b) hour_cycle_12_default else hour_cycle_24_default
     else blk: {
@@ -214,14 +213,11 @@ pub fn createDateTimeFormat(
         }).get(hc_from_locale.asAscii()).?;
     };
 
-    // 16. Let timeZone be ? Get(options, "timeZone").
-    const time_zone_value = try options.get(agent, PropertyKey.from("timeZone"));
+    // 17. Let timeZone be ? GetOption(options, "timeZone", string, empty,
+    //     SystemTimeZoneIdentifier()).
+    const maybe_time_zone_string = try options.getOption(agent, "timeZone", .string, null, null);
 
-    // 17. If timeZone is undefined, then
-    //     a. Set timeZone to SystemTimeZoneIdentifier().
-    // 18. Else,
-    //     a. Set timeZone to ? ToString(timeZone).
-    // 19. If IsTimeZoneOffsetString(timeZone) is true, then
+    // 18. If IsTimeZoneOffsetString(timeZone) is true, then
     //     a. Let parseResult be ParseText(StringToCodePoints(timeZone), UTCOffset).
     //     b. Assert: parseResult is a Parse Node.
     //     c. If parseResult contains more than one MinuteSecond Parse Node, throw a RangeError
@@ -230,12 +226,12 @@ pub fn createDateTimeFormat(
     //     e. Let offsetMinutes be offsetNanoseconds / (6 × 10**10).
     //     f. Assert: offsetMinutes is an integer.
     //     g. Set timeZone to FormatOffsetTimeZoneIdentifier(offsetMinutes).
-    // 20. Else,
+    // 19. Else,
     //     a. Let timeZoneIdentifierRecord be GetAvailableNamedTimeZoneIdentifier(timeZone).
     //     b. If timeZoneIdentifierRecord is empty, throw a RangeError exception.
     //     c. Set timeZone to timeZoneIdentifierRecord.[[PrimaryIdentifier]].
     const time_zone, const time_zone_string = if (build_options.enable_temporal) blk: {
-        if (time_zone_value.isUndefined()) {
+        const time_zone_string = maybe_time_zone_string orelse {
             const time_zone = systemTimeZoneIdentifier(agent.platform);
             const primary = temporal_rs.success(
                 temporal_rs.c.temporal_rs_TimeZone_primary_identifier(time_zone),
@@ -245,9 +241,8 @@ pub fn createDateTimeFormat(
             temporal_rs.c.temporal_rs_TimeZone_identifier(primary, &write.inner);
             const time_zone_string = try String.fromAscii(agent, try write.toOwnedSlice());
             break :blk .{ time_zone, time_zone_string };
-        }
+        };
 
-        const time_zone_string = try time_zone_value.toString(agent);
         const time_zone_utf8 = try time_zone_string.toUtf8(gpa);
         defer gpa.free(time_zone_utf8);
 
@@ -284,13 +279,12 @@ pub fn createDateTimeFormat(
         }
         return agent.throwException(.range_error, "Invalid time zone", .{});
     } else blk: {
-        if (time_zone_value.isUndefined()) {
+        const time_zone_string = maybe_time_zone_string orelse {
             const time_zone = icu4zig.UtcOffset.fromSeconds(0) catch unreachable;
             const time_zone_string = String.fromLiteral("UTC");
             break :blk .{ time_zone, time_zone_string };
-        }
+        };
 
-        const time_zone_string = try time_zone_value.toString(agent);
         const time_zone_utf8 = try time_zone_string.toUtf8(gpa);
         defer gpa.free(time_zone_utf8);
 
@@ -316,19 +310,19 @@ pub fn createDateTimeFormat(
         return agent.throwException(.range_error, "Invalid time zone", .{});
     };
 
-    // 21. Set dateTimeFormat.[[TimeZone]] to timeZone.
+    // 20. Set dateTimeFormat.[[TimeZone]] to timeZone.
     date_time_format.fields.time_zone = time_zone;
     date_time_format.fields.time_zone_string = time_zone_string;
 
-    // TODO: 22. Let formatOptions be a new Record.
-    // TODO: 23. Set formatOptions.[[hourCycle]] to hc.
+    // TODO: 21. Let formatOptions be a new Record.
+    // TODO: 22. Set formatOptions.[[hourCycle]] to hc.
 
-    // 24. Let hasExplicitFormatComponents be false.
+    // 23. Let hasExplicitFormatComponents be false.
     var has_explicit_format_components = false;
 
     var has_hour = false;
 
-    // 25. For each row of Table 16, except the header row, in table order, do
+    // 24. For each row of Table 16, except the header row, in table order, do
     inline for (comptime .{
         .{ "weekday", &.{
             String.fromLiteral("narrow"),
@@ -410,9 +404,8 @@ pub fn createDateTimeFormat(
 
         // TODO: d. Set formatOptions.[[<propertyKey>]] to value.
 
-        // e. If value is not undefined, then
+        // e. If value is not undefined, set hasExplicitFormatComponents to true.
         if (value != null) {
-            // i. Set hasExplicitFormatComponents to true.
             has_explicit_format_components = true;
 
             if (comptime std.mem.eql(u8, property_key, "hour")) {
@@ -421,7 +414,7 @@ pub fn createDateTimeFormat(
         }
     }
 
-    // 26. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic",
+    // 25. Let formatMatcher be ? GetOption(options, "formatMatcher", string, « "basic",
     //     "best fit" », "best fit").
     const format_matcher = try options.getOption(
         agent,
@@ -431,7 +424,7 @@ pub fn createDateTimeFormat(
         String.fromLiteral("best fit"),
     );
 
-    // 27. Let dateStyle be ? GetOption(options, "dateStyle", string, « "full", "long", "medium",
+    // 26. Let dateStyle be ? GetOption(options, "dateStyle", string, « "full", "long", "medium",
     //     "short" », undefined).
     const maybe_date_style_string = try options.getOption(
         agent,
@@ -455,10 +448,10 @@ pub fn createDateTimeFormat(
     else
         null;
 
-    // 28. Set dateTimeFormat.[[DateStyle]] to dateStyle.
+    // 27. Set dateTimeFormat.[[DateStyle]] to dateStyle.
     date_time_format.fields.date_style = date_style;
 
-    // 29. Let timeStyle be ? GetOption(options, "timeStyle", string, « "full", "long", "medium",
+    // 28. Let timeStyle be ? GetOption(options, "timeStyle", string, « "full", "long", "medium",
     //     "short" », undefined).
     const maybe_time_style_string = try options.getOption(
         agent,
@@ -484,14 +477,13 @@ pub fn createDateTimeFormat(
 
     if (time_style != null) has_hour = true;
 
-    // 30. Set dateTimeFormat.[[TimeStyle]] to timeStyle.
+    // 29. Set dateTimeFormat.[[TimeStyle]] to timeStyle.
     date_time_format.fields.time_style = time_style;
 
-    // 31. If dateStyle is not undefined or timeStyle is not undefined, then
+    // 30. If dateStyle is not undefined or timeStyle is not undefined, then
     if (date_style != null or time_style != null) {
-        // a. If hasExplicitFormatComponents is true, then
+        // a. If hasExplicitFormatComponents is true, throw a TypeError exception.
         if (has_explicit_format_components) {
-            // i. Throw a TypeError exception.
             return agent.throwException(
                 .type_error,
                 "Option 'dateStyle'/'timeStyle' must not be used with explicit format components",
@@ -499,9 +491,8 @@ pub fn createDateTimeFormat(
             );
         }
 
-        // b. If required is date and timeStyle is not undefined, then
+        // b. If required is date and timeStyle is not undefined, throw a TypeError exception.
         if (required == .date and time_style != null) {
-            // i. Throw a TypeError exception.
             return agent.throwException(
                 .type_error,
                 "Option 'timeStyle' must not be used for date-only formatting",
@@ -509,9 +500,8 @@ pub fn createDateTimeFormat(
             );
         }
 
-        // c. If required is time and dateStyle is not undefined, then
+        // c. If required is time and dateStyle is not undefined, throw a TypeError exception.
         if (required == .time and date_style != null) {
-            // i. Throw a TypeError exception.
             return agent.throwException(
                 .type_error,
                 "Option 'dateStyle' must not be used for time-only formatting",
@@ -522,26 +512,18 @@ pub fn createDateTimeFormat(
         // TODO: d. Let styles be resolvedLocaleData.[[styles]].[[<resolvedCalendar>]].
         // TODO: e. Let bestFormat be DateTimeStyleFormat(dateStyle, timeStyle, styles).
     } else {
-        // 32. Else,
-        // TODO: a-f.
+        // 31. Else,
+        // TODO: a-h.
         _ = defaults;
-
-        // g. If formatMatcher is "basic", then
-        if (format_matcher.eql(String.fromLiteral("basic"))) {
-            // TODO: i. Let bestFormat be BasicFormatMatcher(formatOptions, formats).
-        } else {
-            // h. Else,
-            // TODO: i. Let bestFormat be BestFitFormatMatcher(formatOptions, formats).
-        }
+        _ = format_matcher;
     }
 
-    // TODO: 33. Set dateTimeFormat.[[DateTimeFormat]] to bestFormat.
+    // TODO: 32. Set dateTimeFormat.[[DateTimeFormat]] to bestFormat.
 
-    // 34. If bestFormat has a field [[hour]], then
-    //     a. Set dateTimeFormat.[[HourCycle]] to hc.
+    // 33. If bestFormat has a field [[hour]], set dateTimeFormat.[[HourCycle]] to hc.
     date_time_format.fields.hour_cycle = if (has_hour) hc else null;
 
-    // 35. Return dateTimeFormat.
+    // 34. Return dateTimeFormat.
     return date_time_format;
 }
 
@@ -790,55 +772,44 @@ pub const prototype = struct {
 
         // 4. If dtf.[[BoundFormat]] is undefined, then
         if (date_time_format.fields.bound_format == null) {
-            // a. Let func be a new built-in function object as defined in DateTime Format Functions
-            //    (11.5.4).
-            // b. Set func.[[DateTimeFormat]] to dtf.
             const Captures = struct {
                 date_time_format: *DateTimeFormat,
             };
             const captures = try agent.gc_allocator.create(Captures);
             captures.* = .{ .date_time_format = date_time_format };
 
-            const dateTimeFormatFunction = struct {
-                /// 11.5.4 DateTime Format Functions
-                /// https://tc39.es/ecma402/#sec-datetime-format-functions
+            // a. Let closure be a new Abstract Closure with parameters (date) that captures dtf and
+            //    performs the following steps when called:
+            const closure = struct {
                 fn func(agent_: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
                     const io = agent_.io;
                     const function = agent_.activeFunctionObject();
                     const captures_ = function.as(builtins.BuiltinFunction).fields.additionalFieldsAs(Captures);
+                    const date_time_format_ = captures_.date_time_format;
                     const date = arguments.get(0);
 
-                    // 1. Let dtf be func.[[DateTimeFormat]].
-                    // 2. Assert: dtf is an Object and dtf has an [[InitializedDateTimeFormat]]
-                    //    internal slot.
-                    const date_time_format_ = captures_.date_time_format;
-
-                    // 3. If date is not provided or is undefined, then
+                    // i. If date is undefined, let x be ! Call(%Date.now%, undefined); else let x
+                    //    be ? ToNumber(date).
                     const x = if (date.isUndefined()) blk: {
-                        // a. Let x be ! Call(%Date.now%, undefined).
                         const timestamp: std.Io.Timestamp = .now(io, .real);
                         break :blk @as(f64, @floatFromInt(timestamp.toMilliseconds()));
                     } else blk: {
-                        // 4. Else,
-                        // a. Let x be ? ToNumber(date).
                         break :blk (try date.toNumber(agent_)).asFloat();
                     };
 
-                    // 5. Return ? FormatDateTime(dtf, x).
+                    // ii. Return ? FormatDateTime(dtf, x).
                     return formatDateTime(agent_, date_time_format_, x);
                 }
             }.func;
 
-            const bound_format = try createBuiltinFunction(
+            // b. Set dtf.[[BoundFormat]] to CreateBuiltinFunction(closure, 1, "", « »).
+            date_time_format.fields.bound_format = try createBuiltinFunction(
                 agent,
-                .{ .function = dateTimeFormatFunction },
+                .{ .function = closure },
                 1,
                 "",
                 .{ .additional_fields = captures },
             );
-
-            // c. Set dtf.[[BoundFormat]] to func.
-            date_time_format.fields.bound_format = bound_format;
         }
 
         // 5. Return dtf.[[BoundFormat]].
@@ -964,7 +935,7 @@ pub const DateTimeFormat = MakeObject(.{
     .display_name = "Intl.DateTimeFormat",
 });
 
-/// 11.5.7 FormatDateTime ( dateTimeFormat, x )
+/// 11.5.6 FormatDateTime ( dateTimeFormat, x )
 /// https://tc39.es/ecma402/#sec-formatdatetime
 pub fn formatDateTime(
     agent: *Agent,
@@ -1084,7 +1055,7 @@ fn formatDateTimeImpl(
     }
 }
 
-/// 11.5.10 FormatDateTimeRange ( dateTimeFormat, x, y )
+/// 11.5.9 FormatDateTimeRange ( dateTimeFormat, x, y )
 /// https://tc39.es/ecma402/#sec-formatdatetimerange
 pub fn formatDateTimeRange(
     agent: *Agent,
@@ -1182,7 +1153,7 @@ fn formatDateTimeRangeImpl(
     }
 }
 
-/// 11.5.13 ToLocalTime Records
+/// 11.5.12 ToLocalTime Records
 /// https://tc39.es/ecma402/#sec-datetimeformat-tolocaltime-records
 const ToLocalTimeResult = struct {
     iso_date: icu4zig.IsoDate,
@@ -1201,7 +1172,7 @@ const ToLocalTimeError =
     icu4zig.CalendarError ||
     icu4zig.Rfc9557ParseError;
 
-/// 11.5.12 ToLocalTime ( epochNs, calendar, timeZoneIdentifier )
+/// 11.5.11 ToLocalTime ( epochNs, calendar, timeZoneIdentifier )
 /// https://tc39.es/ecma402/#sec-tolocaltime
 fn toLocalTime(
     epoch_nanoseconds: i128,
@@ -1259,7 +1230,7 @@ fn toLocalTime(
     };
 }
 
-/// 11.5.14 UnwrapDateTimeFormat ( dtf )
+/// 11.5.13 UnwrapDateTimeFormat ( dtf )
 /// https://tc39.es/ecma402/#sec-unwrapdatetimeformat
 fn unwrapDateTimeFormat(agent: *Agent, date_time_format_value: Value) Agent.Error!Value {
     const realm = agent.currentRealm();

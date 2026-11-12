@@ -358,7 +358,7 @@ fn isFinite(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 1. Let number be ? ToNumber(value).
     const number = try value.toNumber(agent);
 
-    // 2. If number is finite, return true.
+    // 2. If number is a finite Number, return true.
     // 3. Return false.
     return Value.from(number.isFinite());
 }

@@ -16,7 +16,6 @@ pub const PropertyDescriptor = @import("spec/PropertyDescriptor.zig");
 pub const addDisposableResource = disposable.addDisposableResource;
 pub const copyDataBlockBytes = data_block.copyDataBlockBytes;
 pub const createByteDataBlock = data_block.createByteDataBlock;
-pub const createDisposableResource = disposable.createDisposableResource;
 pub const createIteratorResultObject = iterator.createIteratorResultObject;
 pub const createSharedByteDataBlock = data_block.createSharedByteDataBlock;
 pub const disposeResources = disposable.disposeResources;

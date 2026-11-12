@@ -1619,7 +1619,7 @@ pub fn call(
 }
 
 const ValidElementTypes = enum {
-    all,
+    any,
     property_key,
 };
 
@@ -1630,8 +1630,8 @@ pub fn createListFromArrayLike(
     agent: *Agent,
     maybe_valid_element_types: ?ValidElementTypes,
 ) Agent.Error![]Value {
-    // 1. If validElementTypes is not present, set validElementTypes to all.
-    const valid_element_types = maybe_valid_element_types orelse .all;
+    // 1. If validElementTypes is not present, set validElementTypes to any.
+    const valid_element_types = maybe_valid_element_types orelse .any;
 
     // 2. If obj is not an Object, throw a TypeError exception.
     if (!value.isObject()) {
@@ -2411,15 +2411,15 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
         return isLooselyEqual(agent, try x.toPrimitive(agent, null), y) catch unreachable;
     }
 
-    // 13. If x is a BigInt and y is a Number, or if x is a Number and y is a BigInt, then
+    // 13. If x is a BigInt and y is a finite Number, or if x is a finite Number and y is a BigInt,
+    //     then
     if ((x.isBigInt() and y.isNumber()) or (x.isNumber() and y.isBigInt())) {
         const gpa = agent.gpa;
         const number = if (x.isNumber()) x.asNumber() else y.asNumber();
         const big_int = if (x.isBigInt()) x.asBigInt() else y.asBigInt();
 
-        // a. If x is not finite or y is not finite, return false.
-        // b. If ℝ(x) = ℝ(y), return true.
-        // c. Return false.
+        // a. If ℝ(x) = ℝ(y), return true.
+        // b. Return false.
         if (!number.isIntegral()) return false;
         return (try big_int.orderWithFloat(gpa, number.asFloat(), .nearest_even)) == .eq;
     }

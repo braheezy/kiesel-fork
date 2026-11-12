@@ -1007,7 +1007,7 @@ fn ensureUniqueConstructorMethod(
     }
 }
 
-/// 5.1.5.8 [no LineTerminator here]
+/// 5.1.6.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
 fn followedByLineTerminator(self: *Parser) bool {
     // Same as peek() but without immediately restoring the state; we need to look at what's

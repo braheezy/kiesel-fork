@@ -27,10 +27,10 @@ pub const createTextModule = SyntheticModule.createTextModule;
 pub const finishLoadingImportedModule = module.finishLoadingImportedModule;
 pub const getImportedModule = module.getImportedModule;
 pub const getModuleNamespace = module.getModuleNamespace;
-pub const instantiateAsyncFunctionObject = runtime.instantiateAsyncFunctionObject;
-pub const instantiateAsyncGeneratorFunctionObject = runtime.instantiateAsyncGeneratorFunctionObject;
-pub const instantiateGeneratorFunctionObject = runtime.instantiateGeneratorFunctionObject;
-pub const instantiateOrdinaryFunctionObject = runtime.instantiateOrdinaryFunctionObject;
+pub const instantiateAsyncFunctionDeclaration = runtime.instantiateAsyncFunctionDeclaration;
+pub const instantiateAsyncGeneratorDeclaration = runtime.instantiateAsyncGeneratorDeclaration;
+pub const instantiateGeneratorDeclaration = runtime.instantiateGeneratorDeclaration;
+pub const instantiateOrdinaryFunctionDeclaration = runtime.instantiateOrdinaryFunctionDeclaration;
 pub const parseJSONModule = SyntheticModule.parseJSONModule;
 
 test {

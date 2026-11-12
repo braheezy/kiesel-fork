@@ -29,7 +29,6 @@ pub const copyDataBlockBytes = spec.copyDataBlockBytes;
 pub const createArrayFromList = language.createArrayFromList;
 pub const createArrayFromListMapToValue = language.createArrayFromListMapToValue;
 pub const createByteDataBlock = spec.createByteDataBlock;
-pub const createDisposableResource = spec.createDisposableResource;
 pub const createIteratorResultObject = spec.createIteratorResultObject;
 pub const createSharedByteDataBlock = spec.createSharedByteDataBlock;
 pub const disposeResources = spec.disposeResources;
