@@ -2381,22 +2381,22 @@ pub fn isLooselyEqual(agent: *Agent, x: Value, y: Value) Agent.Error!bool {
     // 8. If x is a String and y is a BigInt, return ! IsLooselyEqual(y, x).
     if (x.isString() and y.isBigInt()) return isLooselyEqual(agent, y, x) catch unreachable;
 
-    // 9. If x is a Boolean, return ! IsLooselyEqual(! ToNumber(x), y).
+    // 9. If x is a Boolean, return ? IsLooselyEqual(! ToNumber(x), y).
     if (x.isBoolean()) {
         return isLooselyEqual(
             agent,
             from(x.toNumber(agent) catch unreachable),
             y,
-        ) catch unreachable;
+        );
     }
 
-    // 10. If y is a Boolean, return ! IsLooselyEqual(x, ! ToNumber(y)).
+    // 10. If y is a Boolean, return ? IsLooselyEqual(x, ! ToNumber(y)).
     if (y.isBoolean()) {
         return isLooselyEqual(
             agent,
             x,
             from(y.toNumber(agent) catch unreachable),
-        ) catch unreachable;
+        );
     }
 
     // 11. If x is either a String, a Number, a BigInt, or a Symbol and y is an Object, return

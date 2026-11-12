@@ -1448,15 +1448,18 @@ pub const prototype = struct {
         // 10. Let n be 0.
         // 11. For each element element of kept, do
         for (kept.items, 0..) |element, n| {
-            // a. Perform ! TypedArraySetElement(result, 𝔽(n), element).
-            typedArraySetElement(
+            // a. NOTE: element may be undefined if invoking callback detaches or shrinks the buffer
+            //    backing obj.
+
+            // b. Perform ? TypedArraySetElement(result, 𝔽(n), element).
+            try typedArraySetElement(
                 agent,
                 result_array,
                 .{ .integer_index = @intCast(n) },
                 element,
-            ) catch |err| try noexcept(err);
+            );
 
-            // b. Set n to n + 1.
+            // c. Set n to n + 1.
         }
 
         // 12. Return result.
@@ -2926,15 +2929,19 @@ pub const prototype = struct {
             else
                 try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // c. Perform ! TypedArraySetElement(resultArray, 𝔽(k), fromValue).
-            typedArraySetElement(
+            // c. NOTE: fromValue may be undefined if either index or value is an object that runs
+            //    code when coerced to a Number or a BigInt and that code shrinks the buffer backing
+            //    obj.
+
+            // d. Perform ? TypedArraySetElement(resultArray, 𝔽(k), fromValue).
+            try typedArraySetElement(
                 agent,
                 result_array,
                 .{ .integer_index = k },
                 from_value,
-            ) catch |err| try noexcept(err);
+            );
 
-            // d. Set k to k + 1.
+            // e. Set k to k + 1.
         }
 
         // 11. Return resultArray.
