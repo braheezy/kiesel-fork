@@ -3,6 +3,7 @@
 
 const std = @import("std");
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -39,6 +40,8 @@ const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const isSharedArrayBuffer = builtins.isSharedArrayBuffer;
 const isStrictlyEqual = types.isStrictlyEqual;
+const joinIndexedProperties = builtins.joinIndexedProperties;
+const localizedListSeparator = builtins.localizedListSeparator;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
 const ordinaryDelete = builtins.ordinaryDelete;
@@ -1717,48 +1720,22 @@ pub const prototype = struct {
         // 3. Let length be TypedArrayLength(taRecord).
         const length_ = typedArrayLength(ta_record);
 
-        // 4. If separator is undefined, let separatorString be ",".
-        // 5. Else, let separatorString be ? ToString(separator).
-        const separator_string: String.Builder.Segment = if (separator.isUndefined())
-            .{ .char = ',' }
+        // 4. If separator is undefined, let separatorString be ","; else let separatorString be
+        //    ? ToString(separator).
+        const separator_string = if (separator.isUndefined())
+            String.fromLiteral(",")
         else
-            .{ .string = try separator.toString(agent) };
+            try separator.toString(agent);
 
-        // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (length_ == .zero) return Value.from(String.empty);
-
-        // 6. Let result be the empty String.
-        // NOTE: This allocates the maximum needed capacity upfront
-        const capacity = std.math.cast(u32, @as(u64, @backingInt(length_)) * 2 - 1) orelse
-            return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, capacity);
-        defer result.deinit(agent.gc_allocator);
-
-        // 7. Let k be 0.
-        var k: u53 = 0;
-
-        // 8. Repeat, while k < length,
-        while (k < @backingInt(length_)) : (k += 1) {
-            // a. If k > 0, set result to the string-concatenation of result and separatorString.
-            if (k > 0) result.appendSegmentAssumeCapacity(separator_string);
-
-            // b. Let element be TypedArrayGetElement(obj, 𝔽(k)).
-            const element = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
-
-            // c. If element is not undefined, then
-            if (!element.isUndefined()) {
-                // i. Let elementString be ! ToString(element).
-                const element_string = element.toString(agent) catch |err| try noexcept(err);
-
-                // ii. Set result to the string-concatenation of result and elementString.
-                result.appendStringAssumeCapacity(element_string);
-            }
-
-            // d. Set k to k + 1.
-        }
-
-        // 9. Return result.
-        return Value.from(try result.build(agent));
+        // 5. Return ? JoinIndexedProperties(obj, length, separatorString).
+        return Value.from(try joinIndexedProperties(
+            agent,
+            &typed_array.object,
+            @backingInt(length_),
+            separator_string,
+            null,
+            null,
+        ));
     }
 
     /// 23.2.3.19 %TypedArray%.prototype.keys ( )
@@ -2724,57 +2701,55 @@ pub const prototype = struct {
 
     /// 23.2.3.31 %TypedArray%.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.tolocalestring
-    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let array be ? ToObject(this value).
-        const ta_record = try validateTypedArray(agent, this_value, .seq_cst);
-        const array = this_value.asObject();
-
-        // 2. Let length be ? LengthOfArrayLike(array).
-        const length_ = typedArrayLength(ta_record);
-
-        // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (length_ == .zero) return Value.from(String.empty);
-
-        // 3. Let separator be the implementation-defined list-separator String value appropriate
-        //    for the host environment's current locale (such as ", ").
-        const separator = String.fromLiteral(", ");
-
-        // 4. Let result be the empty String.
-        // NOTE: This allocates the maximum needed capacity upfront
-        const capacity = std.math.cast(u32, @as(u64, @backingInt(length_)) * 2 - 1) orelse
-            return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, capacity);
-        defer result.deinit(agent.gc_allocator);
-
-        // 5. Let k be 0.
-        var k: u53 = 0;
-
-        // 6. Repeat, while k < length,
-        while (k < @backingInt(length_)) : (k += 1) {
-            // a. If k > 0, set R to the string-concatenation of R and separator.
-            if (k > 0) result.appendStringAssumeCapacity(separator);
-
-            // b. Let element be ? Get(array, ! ToString(𝔽(k))).
-            const element = array.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
-
-            // c. If element is neither undefined nor null, then
-            if (!element.isUndefined() and !element.isNull()) {
-                // i. Let elementString be ? ToString(? Invoke(element, "toLocaleString")).
-                const string = try (try element.invoke(
-                    agent,
-                    PropertyKey.from("toLocaleString"),
-                    &.{},
-                )).toString(agent);
-
-                // ii. Set result to the string-concatenation of result and elementString.
-                result.appendStringAssumeCapacity(string);
-            }
-
-            // d. Set k to k + 1.
+    fn toLocaleString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return toLocaleStringIntl(agent, this_value, arguments);
         }
 
-        // 7. Return result.
-        return Value.from(try result.build(agent));
+        // 1. Let obj be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(obj, seq-cst).
+        const ta_record = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta_record.object;
+
+        // 3. Let length be TypedArrayLength(taRecord).
+        const length_ = typedArrayLength(ta_record);
+
+        // 4. Return ? JoinIndexedProperties(obj, length, LocalizedListSeparator(),
+        //    "toLocaleString").
+        return Value.from(try joinIndexedProperties(
+            agent,
+            &typed_array.object,
+            @backingInt(length_),
+            localizedListSeparator(),
+            PropertyKey.from("toLocaleString"),
+            null,
+        ));
+    }
+
+    /// 20.6.1 %TypedArray%.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/ecma402/#sup-%typedarray%.prototype.tolocalestring
+    fn toLocaleStringIntl(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const locales = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let obj be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(obj, seq-cst).
+        const ta_record = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta_record.object;
+
+        // 3. Let length be TypedArrayLength(taRecord).
+        const length_ = typedArrayLength(ta_record);
+
+        // 4. Return ? JoinIndexedProperties(obj, length, LocalizedListSeparator(),
+        //    "toLocaleString", « locales, options »).
+        return Value.from(try joinIndexedProperties(
+            agent,
+            &typed_array.object,
+            @backingInt(length_),
+            localizedListSeparator(),
+            PropertyKey.from("toLocaleString"),
+            &.{ locales, options },
+        ));
     }
 
     /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )

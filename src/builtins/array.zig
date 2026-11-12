@@ -1890,48 +1890,22 @@ pub const prototype = struct {
         // 2. Let length be ? LengthOfArrayLike(obj).
         const length = try obj.lengthOfArrayLike(agent);
 
-        // 3. If separator is undefined, let separatorString be ",".
-        // 4. Else, let separatorString be ? ToString(separator).
-        const separator_string: String.Builder.Segment = if (separator.isUndefined())
-            .{ .char = ',' }
+        // 3. If separator is undefined, let separatorString be ","; else let separatorString be
+        //    ? ToString(separator).
+        const separator_string = if (separator.isUndefined())
+            String.fromLiteral(",")
         else
-            .{ .string = try separator.toString(agent) };
+            try separator.toString(agent);
 
-        // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (length == 0) return Value.from(String.empty);
-
-        // 5. Let result be the empty String.
-        // NOTE: This allocates the maximum needed capacity upfront
-        const capacity = std.math.cast(u32, @as(u64, length) * 2 - 1) orelse
-            return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, capacity);
-        defer result.deinit(agent.gc_allocator);
-
-        // 6. Let k be 0.
-        var k: u53 = 0;
-
-        // 7. Repeat, while k < length,
-        while (k < length) : (k += 1) {
-            // a. If k > 0, set result to the string-concatenation of result and separatorString.
-            if (k > 0) result.appendSegmentAssumeCapacity(separator_string);
-
-            // b. Let element be ? Get(obj, ! ToString(𝔽(k))).
-            const element = try obj.get(agent, PropertyKey.from(k));
-
-            // c. If element is neither undefined nor null, then
-            if (!element.isUndefined() and !element.isNull()) {
-                // i. Let elementString be ? ToString(element).
-                const element_string = try element.toString(agent);
-
-                // ii. Set result to the string-concatenation of result and elementString.
-                result.appendStringAssumeCapacity(element_string);
-            }
-
-            // d. Set k to k + 1.
-        }
-
-        // 8. Return result.
-        return Value.from(try result.build(agent));
+        // 4. Return ? JoinIndexedProperties(obj, length, separatorString).
+        return Value.from(try joinIndexedProperties(
+            agent,
+            obj,
+            length,
+            separator_string,
+            null,
+            null,
+        ));
     }
 
     /// 23.1.3.19 Array.prototype.keys ( )
@@ -2865,49 +2839,16 @@ pub const prototype = struct {
         // 2. Let length be ? LengthOfArrayLike(array).
         const length = try array.lengthOfArrayLike(agent);
 
-        // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (length == 0) return Value.from(String.empty);
-
-        // 3. Let separator be the implementation-defined list-separator String value appropriate
-        //    for the host environment's current locale (such as ", ").
-        const separator = String.fromLiteral(", ");
-
-        // 4. Let result be the empty String.
-        // NOTE: This allocates the maximum needed capacity upfront
-        const capacity = std.math.cast(u32, @as(u64, length) * 2 - 1) orelse
-            return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, capacity);
-        defer result.deinit(agent.gc_allocator);
-
-        // 5. Let k be 0.
-        var k: u53 = 0;
-
-        // 6. Repeat, while k < length,
-        while (k < length) : (k += 1) {
-            // a. If k > 0, set result to the string-concatenation of result and separator.
-            if (k > 0) result.appendStringAssumeCapacity(separator);
-
-            // b. Let element be ? Get(array, ! ToString(𝔽(k))).
-            const element = try array.get(agent, PropertyKey.from(k));
-
-            // c. If element is neither undefined nor null, then
-            if (!element.isUndefined() and !element.isNull()) {
-                // i. Let elementString be ? ToString(? Invoke(element, "toLocaleString")).
-                const element_string = try (try element.invoke(
-                    agent,
-                    PropertyKey.from("toLocaleString"),
-                    &.{},
-                )).toString(agent);
-
-                // ii. Set result to the string-concatenation of result and elementString.
-                result.appendStringAssumeCapacity(element_string);
-            }
-
-            // d. Set k to k + 1.
-        }
-
-        // 7. Return result.
-        return Value.from(try result.build(agent));
+        // 3. Return ? JoinIndexedProperties(array, length, LocalizedListSeparator(),
+        //    "toLocaleString").
+        return Value.from(try joinIndexedProperties(
+            agent,
+            array,
+            length,
+            localizedListSeparator(),
+            PropertyKey.from("toLocaleString"),
+            null,
+        ));
     }
 
     /// 20.5.1 Array.prototype.toLocaleString ( [ locales [ , options ] ] )
@@ -2922,54 +2863,16 @@ pub const prototype = struct {
         // 2. Let length be ? LengthOfArrayLike(array).
         const length = try array.lengthOfArrayLike(agent);
 
-        // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (length == 0) return Value.from(String.empty);
-
-        // 3. Let separator be the implementation-defined list-separator String value appropriate
-        //    for the host environment's current locale (such as ", ").
-        const separator = String.fromLiteral(", ");
-
-        // 4. Let result be the empty String.
-        // NOTE: This allocates the maximum needed capacity upfront
-        const capacity = std.math.cast(u32, @as(u64, length) * 2 - 1) orelse
-            return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, capacity);
-        defer result.deinit(agent.gc_allocator);
-
-        // 5. Let k be 0.
-        var k: u53 = 0;
-
-        // 6. Repeat, while k < length,
-        while (k < length) : (k += 1) {
-
-            // a. If k > 0, then
-            if (k > 0) {
-                // i. Set result to the string-concatenation of result and separator.
-                result.appendStringAssumeCapacity(separator);
-            }
-
-            // b. Let element be ? Get(array, ! ToString(𝔽(k))).
-            const element = try array.get(agent, PropertyKey.from(k));
-
-            // c. If element is neither undefined nor null, then
-            if (!element.isUndefined() and !element.isNull()) {
-                // i. Let elementString be ? ToString(? Invoke(element, "toLocaleString", « locales,
-                //    options »)).
-                const element_string = try (try element.invoke(
-                    agent,
-                    PropertyKey.from("toLocaleString"),
-                    &.{ locales, options },
-                )).toString(agent);
-
-                // ii. Set result to the string-concatenation of result and elementString.
-                result.appendStringAssumeCapacity(element_string);
-            }
-
-            // d. Set k to k + 1.
-        }
-
-        // 7. Return result.
-        return Value.from(try result.build(agent));
+        // 3. Return ? JoinIndexedProperties(array, length, LocalizedListSeparator(),
+        //    "toLocaleString", « locales, options »).
+        return Value.from(try joinIndexedProperties(
+            agent,
+            array,
+            length,
+            localizedListSeparator(),
+            PropertyKey.from("toLocaleString"),
+            &.{ locales, options },
+        ));
     }
 
     /// 23.1.3.33 Array.prototype.toReversed ( )
@@ -3408,6 +3311,72 @@ pub fn findViaPredicate(
     return .{ .index = Value.from(-1), .value = .undefined };
 }
 
+/// 23.1.3.18.1 JoinIndexedProperties ( obj, length, separator [ , methodName [ , methodArgs ] ] )
+/// https://tc39.es/ecma262/#sec-joinindexedproperties
+pub fn joinIndexedProperties(
+    agent: *Agent,
+    obj: *Object,
+    length: u53,
+    separator: *const String,
+    maybe_method_name: ?PropertyKey,
+    maybe_method_args: ?[]const Value,
+) Agent.Error!*const String {
+    // 1. If methodName is present and methodArgs is not present, set methodArgs to a new empty
+    //    List.
+    const method_args = maybe_method_args orelse &.{};
+
+    // OPTIMIZATION: If there are no indexed properties, the result will be an empty string.
+    if (length == 0) return .empty;
+
+    // 2. Let result be the empty String.
+    // NOTE: This allocates the maximum needed capacity upfront.
+    const capacity = std.math.cast(u32, @as(u64, length) * 2 - 1) orelse
+        return error.OutOfMemory;
+    var result = try String.Builder.initCapacity(agent.gc_allocator, capacity);
+    defer result.deinit(agent.gc_allocator);
+
+    // 3. Let k be 0.
+    var k: u53 = 0;
+
+    // 4. Repeat, while k < length,
+    while (k < length) : (k += 1) {
+        // a. If k > 0, set result to the string-concatenation of result and separator.
+        if (k > 0) result.appendStringAssumeCapacity(separator);
+
+        // b. NOTE: If obj is a TypedArray, the following invocation of Get will return a normal
+        //    completion.
+        // c. Let element be ? Get(obj, ! ToString(𝔽(k))).
+        const element = try obj.get(agent, PropertyKey.from(k));
+
+        // d. If element is neither undefined nor null, then
+        if (!element.isUndefined() and !element.isNull()) {
+            // i. If methodName is present, then
+            const element_string = if (maybe_method_name) |method_name| blk: {
+                // 1. Let elementString be ? ToString(? Invoke(element, methodName, methodArgs)).
+                break :blk try (try element.invoke(
+                    agent,
+                    method_name,
+                    method_args,
+                )).toString(agent);
+            } else blk: {
+                // ii. Else,
+                // 1. NOTE: If obj is a TypedArray, the following invocation of ToString will return
+                //    a normal completion.
+                // 2. Let elementString be ? ToString(element).
+                break :blk try element.toString(agent);
+            };
+
+            // iii. Set result to the string-concatenation of result and elementString.
+            result.appendStringAssumeCapacity(element_string);
+        }
+
+        // e. Set k to k + 1.
+    }
+
+    // 5. Return result.
+    return result.build(agent);
+}
+
 const SortCompare = struct {
     impl: *const fn (
         agent: *Agent,
@@ -3550,6 +3519,14 @@ pub fn compareArrayElements(
 
     // 11. Return +0𝔽.
     return .eq;
+}
+
+/// 23.1.3.32.1 LocalizedListSeparator ( )
+/// https://tc39.es/ecma262/#sec-localizedlistseparator
+pub fn localizedListSeparator() *const String {
+    // 1. Return an implementation-defined String appropriate for use as a list separator in the
+    //    host environment's current locale (such as ", ").
+    return String.fromLiteral(", ");
 }
 
 /// 23.1.4 Properties of Array Instances
