@@ -138,15 +138,28 @@ pub fn hostGetSupportedImportAttributes(
     return .empty;
 }
 
-/// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm, paramStrings, bodyString, direct )
+/// 19.2.1.2 HostEnsureCanCompileStrings ( calleeRealm, paramStrings, bodyString, codeString, compilationType, paramArgs, bodyArg )
 /// https://tc39.es/ecma262/#sec-hostensurecancompilestrings
 pub fn hostEnsureCanCompileStrings(
     _: *Realm,
     _: []const *const String,
     _: *const String,
-    _: bool,
+    _: *const String,
+    _: HostHooks.CompilationType,
+    _: []const Value,
+    _: Value,
 ) error{}!void {
-    // The default implementation of HostEnsureCanCompileStrings is to return NormalCompletion(unused).
+    // The default implementation of HostEnsureCanCompileStrings performs the following steps when
+    // called:
+
+    // 1. Return unused.
+}
+
+/// 19.2.1.3 HostGetCodeForEval ( arg )
+/// https://tc39.es/ecma262/#sec-hostgetcodeforeval
+pub fn hostGetCodeForEval(_: *Object) ?*const String {
+    // The default implementation of HostGetCodeForEval is to return no-code.
+    return null;
 }
 
 /// 20.2.5 HostHasSourceTextAvailable ( func )

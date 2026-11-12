@@ -346,8 +346,8 @@ else
 fn eval(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const source = arguments.get(0);
 
-    // 1. Return ? PerformEval(source, false, false).
-    return performEval(agent, source, false, false);
+    // 1. Return ? PerformEval(source, false, indirect-eval).
+    return performEval(agent, source, false, .indirect_eval);
 }
 
 /// 19.2.2 isFinite ( value )

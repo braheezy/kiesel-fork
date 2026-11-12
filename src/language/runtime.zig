@@ -472,8 +472,8 @@ pub fn directEval(agent: *Agent, arguments: []const Value, strict: bool) Agent.E
     //     strictCaller be false.
     const strict_caller = strict;
 
-    // v. Return ? PerformEval(evalArg, strictCaller, true).
-    return performEval(agent, eval_arg, strict_caller, true);
+    // v. Return ? PerformEval(evalArg, strictCaller, direct-eval).
+    return performEval(agent, eval_arg, strict_caller, .direct_eval);
 }
 
 /// 13.15.3 ApplyStringOrNumericBinaryOperator ( leftValue, opText, rightValue )

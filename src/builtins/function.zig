@@ -255,31 +255,45 @@ pub fn createDynamicFunction(
 
     // 8. For each element arg of paramArgs, do
     for (param_args) |arg| {
-        // a. Append ? ToString(arg) to paramStrings.
-        param_strings.appendAssumeCapacity(try arg.toString(agent));
+        // a. If arg is an Object, let paramString be HostGetCodeForEval(arg); else let paramString
+        //    be no-code.
+        const maybe_param_string: ?*const String = if (arg.isObject())
+            agent.host_hooks.hostGetCodeForEval(arg.asObject())
+        else
+            null;
+
+        // b. If paramString is no-code, set paramString to ? ToString(arg).
+        const param_string = maybe_param_string orelse try arg.toString(agent);
+
+        // c. Append paramString to paramStrings.
+        param_strings.appendAssumeCapacity(param_string);
     }
 
-    // 9. Let bodyString be ? ToString(bodyArg).
-    const body_string = try body_arg.toString(agent);
+    // 9. If bodyArg is an Object, let bodyString be HostGetCodeForEval(bodyArg); else let
+    //    bodyString be no-code.
+    const maybe_body_string: ?*const String = if (body_arg.isObject())
+        agent.host_hooks.hostGetCodeForEval(body_arg.asObject())
+    else
+        null;
 
-    // 10. Let currentRealm be the current Realm Record.
+    // 10. If bodyString is no-code, set bodyString to ? ToString(bodyArg).
+    const body_string = maybe_body_string orelse try body_arg.toString(agent);
+
+    // 11. Let currentRealm be the current Realm Record.
     const current_realm = realm;
 
-    // 11. Perform ? HostEnsureCanCompileStrings(currentRealm, paramStrings, bodyString, false).
-    try agent.host_hooks.hostEnsureCanCompileStrings(current_realm, param_strings.items, body_string, false);
-
-    // 12. Let paramString be the empty String.
+    // 12. Let joinedParamsString be the empty String.
     var result: String.Builder = .empty;
     defer result.deinit(agent.gc_allocator);
 
     // 13. If argCount > 0, then
     if (arg_count > 0) {
-        // a. Set paramString to paramStrings[0].
+        // a. Set joinedParamsString to paramStrings[0].
         // b. Let k be 1.
         // c. Repeat, while k < argCount,
         //     i. Let nextArgString be paramStrings[k].
-        //     ii. Set paramString to the string-concatenation of paramString, "," (a comma), and
-        //         nextArgString.
+        //     ii. Set joinedParamsString to the string-concatenation of joinedParamsString, "," (a
+        //         comma), and nextArgString.
         //     iii. Set k to k + 1.
         for (param_strings.items, 0..) |next_arg_string, k| {
             if (k > 0) try result.appendChar(agent.gc_allocator, ',');
@@ -299,14 +313,28 @@ pub fn createDynamicFunction(
     const body_parse_string = try gpa.printSentinel("\n{s}\n", .{body_wtf8}, 0);
     defer gpa.free(body_parse_string);
 
-    // 15. Let sourceString be the string-concatenation of prefix, " anonymous(", paramString,
-    //     0x000A (LINE FEED), ") {", bodyParseString, and "}".
-    // 16. Let sourceText be StringToCodePoints(sourceString).
+    // 15. Let sourceString be the string-concatenation of prefix, " anonymous(",
+    //     joinedParamsString, 0x000A (LINE FEED), ") {", bodyParseString, and "}".
     const source_text = try agent.gc_allocator.printSentinel(
         "{[prefix]s} anonymous({[parameters_string]s}\n) {{{[body_parse_string]s}}}",
         .{ .prefix = prefix, .parameters_string = parameters_string, .body_parse_string = body_parse_string },
         0,
     );
+    const source_string = try String.fromWtf8(agent, source_text);
+
+    // 16. Perform ? HostEnsureCanCompileStrings(currentRealm, paramStrings, bodyString,
+    //     sourceString, function, paramArgs, bodyArg).
+    try agent.host_hooks.hostEnsureCanCompileStrings(
+        current_realm,
+        param_strings.items,
+        body_string,
+        source_string,
+        .function,
+        param_args,
+        body_arg,
+    );
+
+    // 17. Let sourceText be StringToCodePoints(sourceString).
 
     const state: Parser.State = switch (kind) {
         .normal => .{},
@@ -315,7 +343,7 @@ pub fn createDynamicFunction(
         .async_generator => .{ .in_async_function = true, .in_generator_function = true },
     };
 
-    // 17. Let params be ParseText(paramString, paramGrammar).
+    // 18. Let params be ParseText(joinedParamsString, paramGrammar).
     const params = blk: {
         var diagnostics: Diagnostics = .init(gpa, .{
             .source = parameters_string,
@@ -329,14 +357,14 @@ pub fn createDynamicFunction(
         }) catch |err| switch (err) {
             error.OutOfMemory => |e| return e,
             error.ParseError => {
-                // 18. If params is a List of errors, throw a SyntaxError exception.
+                // 19. If params is a List of errors, throw a SyntaxError exception.
                 const parse_error = diagnostics.first().?;
                 return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
             },
         };
     };
 
-    // 19. Let body be ParseText(bodyParseString, bodyGrammar).
+    // 20. Let body be ParseText(bodyParseString, bodyGrammar).
     const body = blk: {
         var diagnostics: Diagnostics = .init(gpa, .{
             .source = body_parse_string,
@@ -350,21 +378,21 @@ pub fn createDynamicFunction(
         }) catch |err| switch (err) {
             error.OutOfMemory => |e| return e,
             error.ParseError => {
-                // 20. If body is a List of errors, throw a SyntaxError exception.
+                // 21. If body is a List of errors, throw a SyntaxError exception.
                 const parse_error = diagnostics.first().?;
                 return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
             },
         };
     };
 
-    // 21. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
+    // 22. NOTE: The parameters and body are parsed separately to ensure that each is valid alone.
     //     For example, `new Function("/*", "*/ ) {")` does not evaluate to a function.
 
-    // 22. NOTE: If this step is reached, sourceText must have the syntax of exprGrammar (although
+    // 23. NOTE: If this step is reached, sourceText must have the syntax of exprGrammar (although
     //     the reverse implication does not hold). The purpose of the next two steps is to enforce
     //     any Early Error rules which apply to exprGrammar directly.
 
-    // 23. Let expr be ParseText(sourceText, exprGrammar).
+    // 24. Let expr be ParseText(sourceText, exprGrammar).
     {
         var diagnostics: Diagnostics = .init(gpa, .{
             .source = source_text,
@@ -377,29 +405,28 @@ pub fn createDynamicFunction(
         }) catch |err| switch (err) {
             error.OutOfMemory => |e| return e,
             error.ParseError => {
-                // 24. If expr is a List of errors, throw a SyntaxError exception.
+                // 25. If expr is a List of errors, throw a SyntaxError exception.
                 const parse_error = diagnostics.first().?;
                 return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
             },
         };
     }
 
-    // 25. Let funcProto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
+    // 26. Let funcProto be ? GetPrototypeFromConstructor(newTarget, fallbackProto).
     const func_proto = try getPrototypeFromConstructor(agent, new_target, fallback_proto);
 
-    // 26. Let envRecord be currentRealm.[[GlobalEnv]].
+    // 27. Let envRecord be currentRealm.[[GlobalEnv]].
     const env = current_realm.global_env;
 
-    // 27. Let privateEnv be null.
+    // 28. Let privateEnv be null.
     const private_env = null;
 
-    // 28. Let func be OrdinaryFunctionCreate(funcProto, sourceText, params, body, non-lexical-this,
+    // 29. Let func be OrdinaryFunctionCreate(funcProto, sourceText, params, body, non-lexical-this,
     //     envRecord, privateEnv).
-    const source = try String.fromWtf8(agent, source_text);
     const func = try ordinaryFunctionCreate(
         agent,
         func_proto,
-        .{ .string = source },
+        .{ .string = source_string },
         params,
         body,
         .non_lexical_this,
@@ -407,11 +434,11 @@ pub fn createDynamicFunction(
         private_env,
     );
 
-    // 29. Perform SetFunctionName(func, "anonymous").
+    // 30. Perform SetFunctionName(func, "anonymous").
     try setFunctionName(agent, &func.object, PropertyKey.from("anonymous"), null);
 
     switch (kind) {
-        // 30. If kind is generator, then
+        // 31. If kind is generator, then
         .generator => {
             // a. Let protoProto be OrdinaryObjectCreate(%GeneratorPrototype%).
             const proto_proto = try ordinaryObjectCreate(
@@ -434,7 +461,7 @@ pub fn createDynamicFunction(
             });
         },
 
-        // 31. Else if kind is async-generator, then
+        // 32. Else if kind is async-generator, then
         .async_generator => {
             // a. Let protoProto be OrdinaryObjectCreate(%AsyncGeneratorPrototype%).
             const proto_proto = try ordinaryObjectCreate(
@@ -457,18 +484,18 @@ pub fn createDynamicFunction(
             });
         },
 
-        // 32. Else if kind is normal, then
+        // 33. Else if kind is normal, then
         .normal => {
             // a. Perform MakeConstructor(func).
             try makeConstructor(agent, &func.object, .{});
         },
 
-        // 33. NOTE: Functions whose kind is async are not constructable and do not have a
+        // 34. NOTE: Functions whose kind is async are not constructable and do not have a
         //     [[Construct]] internal method or a "prototype" property.
         .async => {},
     }
 
-    // 34. Return func.
+    // 35. Return func.
     return func;
 }
 
