@@ -1104,7 +1104,7 @@ pub const prototype = struct {
             const bound_format = try createBuiltinFunction(
                 agent,
                 .{ .function = number_format_function },
-                2,
+                1,
                 "",
                 .{ .additional_fields = captures },
             );

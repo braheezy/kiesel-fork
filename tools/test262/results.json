@@ -25985,7 +25985,7 @@
   "test/intl402/NumberFormat/prototype/format/format-fraction-digits-precision.js": "FAIL",
   "test/intl402/NumberFormat/prototype/format/format-fraction-digits.js": "FAIL",
   "test/intl402/NumberFormat/prototype/format/format-function-builtin.js": "PASS",
-  "test/intl402/NumberFormat/prototype/format/format-function-length.js": "FAIL",
+  "test/intl402/NumberFormat/prototype/format/format-function-length.js": "PASS",
   "test/intl402/NumberFormat/prototype/format/format-function-name.js": "PASS",
   "test/intl402/NumberFormat/prototype/format/format-function-property-order.js": "PASS",
   "test/intl402/NumberFormat/prototype/format/format-max-min-fraction-significant-digits.js": "FAIL",
