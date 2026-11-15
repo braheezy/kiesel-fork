@@ -251,17 +251,14 @@ pub fn asyncBlockStart(
     //    that execution context, closure will be called with no arguments.
 
     // 3. Let result be ! RunSuspendedContext(asyncContext, NormalCompletion(empty)).
-    const running_context = agent.runningExecutionContext();
-    try agent.execution_context_stack.append(agent.gc_allocator, async_context);
-    const result = closure(agent, promise_capability, async_body);
-    std.debug.assert(running_context == agent.runningExecutionContext());
-
     // 4. Assert: result is unused.
     // 5. NOTE: The possible sources of result values are Await or, if the async function doesn't
     //    await anything, step 1.j above.
-    result catch |err| try noexcept(err);
-
     // 6. Return unused.
+    const running_context = agent.runningExecutionContext();
+    try agent.execution_context_stack.append(agent.gc_allocator, async_context);
+    try closure(agent, promise_capability, async_body);
+    std.debug.assert(running_context == agent.runningExecutionContext());
 }
 
 /// 27.10.5.3 Await ( arg )

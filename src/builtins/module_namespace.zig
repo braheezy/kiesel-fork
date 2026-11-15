@@ -72,7 +72,7 @@ fn getOwnProperty(agent: *Agent, obj: *Object, property_key: PropertyKey) Agent.
     // 2. Let exports be obj.[[Exports]].
     const exports = obj.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(gpa);
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toWtf8(gpa);
     defer gpa.free(property_key_string);
 
     // 3. If exports does not contain propertyKey, return undefined.
@@ -148,7 +148,7 @@ fn hasProperty(
     // 2. Let exports be obj.[[Exports]].
     const exports = obj.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(gpa);
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toWtf8(gpa);
     defer gpa.free(property_key_string);
 
     // 3. If exports contains propertyKey, return true.
@@ -179,7 +179,7 @@ fn get(
     // 2. Let exports be obj.[[Exports]].
     const exports = obj.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(gpa);
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toWtf8(gpa);
     defer gpa.free(property_key_string);
 
     // 3. If exports does not contain propertyKey, return undefined.
@@ -218,7 +218,7 @@ fn get(
     };
 
     // 12. Return ? targetEnv.GetBindingValue(binding.[[BindingName]], true).
-    const binding_name = try String.fromUtf8(agent, binding.binding_name.string);
+    const binding_name = try String.fromWtf8(agent, binding.binding_name.string);
     return target_env.getBindingValue(agent, binding_name, true);
 }
 
@@ -243,7 +243,7 @@ fn delete(agent: *Agent, obj: *Object, property_key: PropertyKey) std.mem.Alloca
     // 2. Let exports be obj.[[Exports]].
     const exports = obj.as(ModuleNamespace).fields.exports;
 
-    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toUtf8(gpa);
+    const property_key_string = try (try property_key.toStringOrSymbol(agent)).string.toWtf8(gpa);
     defer gpa.free(property_key_string);
 
     // 3. If exports contains propertyKey, return false.
@@ -271,7 +271,7 @@ fn ownPropertyKeys(agent: *Agent, obj: *Object) std.mem.Allocator.Error![]Proper
         exports.len + symbol_keys.len,
     );
     for (exports) |name| {
-        const property_key = PropertyKey.from(try String.fromUtf8(agent, name));
+        const property_key = PropertyKey.from(try String.fromWtf8(agent, name));
         keys.appendAssumeCapacity(property_key);
     }
     keys.appendSliceAssumeCapacity(symbol_keys);

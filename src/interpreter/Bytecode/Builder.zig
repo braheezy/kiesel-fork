@@ -234,6 +234,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .negate => try b.lowerNegate(data.ref, dest),
             .bitwise_not => try b.lowerBitwiseNot(data.ref, dest),
             .logical_not => try b.lowerLogicalNot(data.ref, dest),
+            .is_nullish => try b.lowerIsNullish(data.ref, dest),
             .typeof => try b.lowerTypeof(data.ref, dest),
             .typeof_binding => try b.lowerTypeofBinding(data.string, dest),
             .spread => try b.lowerSpread(data.ref, dest),
@@ -260,6 +261,7 @@ pub fn build(b: *Builder) Error!Bytecode {
             .eq_strict => try b.lowerEqStrict(data.binary, dest),
             .not_eq_strict => try b.lowerNotEqStrict(data.binary, dest),
             .push_scope => try b.lowerPushScope(),
+            .push_catch_scope => try b.lowerPushCatchScope(),
             .push_var_scope => try b.lowerPushVarScope(),
             .push_with_scope => try b.lowerPushWithScope(data.ref),
             .pop_scope => try b.lowerPopScope(),
@@ -1144,6 +1146,10 @@ fn lowerLogicalNot(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!voi
     try b.emitUnaryOp(.logical_not, value, dest);
 }
 
+fn lowerIsNullish(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
+    try b.emitUnaryOp(.is_nullish, value, dest);
+}
+
 fn lowerTypeof(b: *Builder, value: Ir.Inst.Ref, dest: Ir.Inst.Ref) Error!void {
     try b.emitUnaryOp(.typeof, value, dest);
 }
@@ -1265,6 +1271,13 @@ fn lowerNotEqStrict(b: *Builder, data: Ir.Inst.Binary, dest: Ir.Inst.Ref) Error!
 fn lowerPushScope(b: *Builder) Error!void {
     try b.emit(.{
         .tag = .push_scope,
+        .data = .{ .none = {} },
+    });
+}
+
+fn lowerPushCatchScope(b: *Builder) Error!void {
+    try b.emit(.{
+        .tag = .push_catch_scope,
         .data = .{ .none = {} },
     });
 }

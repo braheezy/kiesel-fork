@@ -172,7 +172,7 @@ pub fn evaluateSuperCall(agent: *Agent, arg_list: []const Value) Agent.Error!Val
     std.debug.assert(new_target.?.internalMethods().construct != null);
 
     // 3. Let superCtor be GetSuperConstructor().
-    const super_ctor = try getSuperConstructor(agent);
+    const super_ctor = getSuperConstructor(agent);
     const super_ctor_value: Value = if (super_ctor) |f| Value.from(f) else .null;
 
     // 4. Let argList be ? ArgumentListEvaluation of Arguments.
@@ -209,7 +209,7 @@ pub fn evaluateSuperCall(agent: *Agent, arg_list: []const Value) Agent.Error!Val
 
 /// 13.3.7.2 GetSuperConstructor ( )
 /// https://tc39.es/ecma262/#sec-getsuperconstructor
-pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!?*Object {
+pub fn getSuperConstructor(agent: *Agent) ?*Object {
     // 1. Let envRecord be GetThisEnvironment().
     const env = agent.getThisEnvironment();
 
@@ -217,14 +217,13 @@ pub fn getSuperConstructor(agent: *Agent) std.mem.Allocator.Error!?*Object {
     std.debug.assert(env == .function_environment);
 
     // 3. Let activeFunc be envRecord.[[FunctionObject]].
-    // 4. Assert: activeFunc is an ECMAScript function object.
     const active_func = &env.function_environment.function_object.object;
 
+    // 4. Assert: activeFunc is an ECMAScript function object.
+    std.debug.assert(active_func.is(builtins.ECMAScriptFunction));
+
     // 5. Let superCtor be ! activeFunc.[[GetPrototypeOf]]().
-    const super_ctor = active_func.internalMethods().getPrototypeOf(
-        agent,
-        active_func,
-    ) catch |err| try noexcept(err);
+    const super_ctor = active_func.prototype();
 
     // 6. Return superCtor.
     return super_ctor;
@@ -473,8 +472,8 @@ pub fn directEval(agent: *Agent, arguments: []const Value, strict: bool) Agent.E
     //     strictCaller be false.
     const strict_caller = strict;
 
-    // v. Return ? PerformEval(evalArg, strictCaller, true).
-    return performEval(agent, eval_arg, strict_caller, true);
+    // v. Return ? PerformEval(evalArg, strictCaller, direct-eval).
+    return performEval(agent, eval_arg, strict_caller, .direct_eval);
 }
 
 /// 13.15.3 ApplyStringOrNumericBinaryOperator ( leftValue, opText, rightValue )
@@ -577,9 +576,9 @@ pub fn applyStringOrNumericBinaryOperator(
     // 8. Return operation(leftNumber, rightNumber).
 }
 
-/// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionObject
-/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctionobject
-pub fn instantiateOrdinaryFunctionObject(
+/// 15.2.4 Runtime Semantics: InstantiateOrdinaryFunctionDeclaration
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateordinaryfunctiondeclaration
+pub fn instantiateOrdinaryFunctionDeclaration(
     agent: *Agent,
     function_declaration: ast.FunctionDeclaration,
     env: Environment,
@@ -650,7 +649,7 @@ pub fn instantiateOrdinaryFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
@@ -1205,9 +1204,9 @@ pub fn methodDefinitionEvaluation(
     }
 }
 
-/// 15.5.3 Runtime Semantics: InstantiateGeneratorFunctionObject
-/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiategeneratorfunctionobject
-pub fn instantiateGeneratorFunctionObject(
+/// 15.5.3 Runtime Semantics: InstantiateGeneratorDeclaration
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiategeneratordeclaration
+pub fn instantiateGeneratorDeclaration(
     agent: *Agent,
     generator_declaration: ast.GeneratorDeclaration,
     env: Environment,
@@ -1342,7 +1341,7 @@ pub fn instantiateGeneratorFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
@@ -1674,9 +1673,9 @@ pub fn evaluateYieldStar(
     }
 }
 
-/// 15.6.3 Runtime Semantics: InstantiateAsyncGeneratorFunctionObject
-/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratorfunctionobject
-pub fn instantiateAsyncGeneratorFunctionObject(
+/// 15.6.3 Runtime Semantics: InstantiateAsyncGeneratorDeclaration
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncgeneratordeclaration
+pub fn instantiateAsyncGeneratorDeclaration(
     agent: *Agent,
     async_generator_declaration: ast.AsyncGeneratorDeclaration,
     env: Environment,
@@ -1810,7 +1809,7 @@ pub fn instantiateAsyncGeneratorFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;
@@ -2138,6 +2137,7 @@ fn classElementEvaluation(
 
 /// 15.7.14 Runtime Semantics: ClassDefinitionEvaluation
 /// https://tc39.es/ecma262/#sec-runtime-semantics-classdefinitionevaluation
+/// https://tc39.es/proposal-nonextensible-applies-to-private/#sec-runtime-semantics-classdefinitionevaluation
 pub fn classDefinitionEvaluation(
     agent: *Agent,
     class_tail: ast.ClassTail,
@@ -2159,11 +2159,7 @@ pub fn classDefinitionEvaluation(
     // 3. If classBinding is not undefined, then
     if (class_binding != null) {
         // a. Perform ! classEnv.CreateImmutableBinding(classBinding, true).
-        class_env.createImmutableBinding(
-            agent,
-            class_binding.?,
-            true,
-        ) catch |err| try noexcept(err);
+        try class_env.createImmutableBinding(agent, class_binding.?, true);
     }
 
     // 4. Let outerPrivateEnv be the running execution context's PrivateEnvironment.
@@ -2283,10 +2279,8 @@ pub fn classDefinitionEvaluation(
                     //    not.
 
                     // 2. Let func be ! ctorFunc.[[GetPrototypeOf]]().
-                    const proto_func = ctor_func.internalMethods().getPrototypeOf(
-                        agent_,
-                        ctor_func,
-                    ) catch |err| try noexcept(err);
+                    std.debug.assert(ctor_func.internalMethods().flags.contains(.ordinary_get_prototype_of));
+                    const proto_func = ctor_func.prototype();
 
                     // 3. If IsConstructor(func) is false, throw a TypeError exception.
                     if (proto_func == null or !Value.from(proto_func.?).isConstructor()) {
@@ -2562,7 +2556,12 @@ pub fn classDefinitionEvaluation(
         class_constructor_fields.fields = try instance_fields.toOwnedSlice(agent.gc_allocator);
     } else unreachable;
 
-    // 31. For each PrivateElement method of staticPrivateMethods, do
+    // 31. Assert: ctorFunc.[[Extensible]] is true.
+    // 32. NOTE: ctorFunc is freshly created and has not been exposed to user code, so it is always
+    //     extensible when installing static private methods.
+    std.debug.assert(ctor_func.extensible());
+
+    // 33. For each PrivateElement method of staticPrivateMethods, do
     for (static_private_methods.items) |method| {
         // a. Perform ! PrivateMethodOrAccessorAdd(ctorFunc, method).
         ctor_func.privateMethodOrAccessorAdd(
@@ -2572,7 +2571,7 @@ pub fn classDefinitionEvaluation(
         ) catch |err| try noexcept(err);
     }
 
-    // 32. For each element elementRecord of staticElements, do
+    // 34. For each element elementRecord of staticElements, do
     for (static_elements.items) |element| {
         const result = switch (element) {
             // a. If elementRecord is a ClassFieldDefinition Record, then
@@ -2603,16 +2602,16 @@ pub fn classDefinitionEvaluation(
         };
     }
 
-    // 33. Set the running execution context's PrivateEnvironment to outerPrivateEnv.
+    // 35. Set the running execution context's PrivateEnvironment to outerPrivateEnv.
     // NOTE: This is handled via the generated bytecode.
 
-    // 34. Return ctorFunc.
+    // 36. Return ctorFunc.
     return ctor_func;
 }
 
-/// 15.8.2 Runtime Semantics: InstantiateAsyncFunctionObject
-/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctionobject
-pub fn instantiateAsyncFunctionObject(
+/// 15.8.2 Runtime Semantics: InstantiateAsyncFunctionDeclaration
+/// https://tc39.es/ecma262/#sec-runtime-semantics-instantiateasyncfunctiondeclaration
+pub fn instantiateAsyncFunctionDeclaration(
     agent: *Agent,
     async_function_declaration: ast.AsyncFunctionDeclaration,
     env: Environment,
@@ -2705,7 +2704,7 @@ pub fn instantiateAsyncFunctionExpression(
         const func_env = try newDeclarativeEnvironment(agent.gc_allocator, outer_env);
 
         // 5. Perform ! funcEnv.CreateImmutableBinding(name, false).
-        func_env.createImmutableBinding(agent, name, false) catch |err| try noexcept(err);
+        try func_env.createImmutableBinding(agent, name, false);
 
         // 6. Let privateEnv be the running execution context's PrivateEnvironment.
         const private_env = agent.runningExecutionContext().ecmascript_code.private_environment;

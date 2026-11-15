@@ -6,7 +6,6 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
-const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -17,7 +16,6 @@ const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
 const createBuiltinFunction = builtins.createBuiltinFunction;
-const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -80,28 +78,28 @@ pub const constructor = struct {
             const message_string = try message.toString(agent);
 
             // b. Perform CreateNonEnumerableDataPropertyOrThrow(obj, "message", messageString).
-            suppressed_error.object.createNonEnumerableDataPropertyOrThrow(
+            try suppressed_error.object.createNonEnumerableDataPropertyOrThrow(
                 agent,
                 PropertyKey.from("message"),
                 Value.from(message_string),
-            ) catch |err| try noexcept(err);
+            );
 
             suppressed_error.fields.message = message_string;
         }
 
         // 4. Perform CreateNonEnumerableDataPropertyOrThrow(obj, "error", error).
-        suppressed_error.object.createNonEnumerableDataPropertyOrThrow(
+        try suppressed_error.object.createNonEnumerableDataPropertyOrThrow(
             agent,
             PropertyKey.from("error"),
             @"error",
-        ) catch |err| try noexcept(err);
+        );
 
         // 5. Perform CreateNonEnumerableDataPropertyOrThrow(obj, "suppressed", suppressed).
-        suppressed_error.object.createNonEnumerableDataPropertyOrThrow(
+        try suppressed_error.object.createNonEnumerableDataPropertyOrThrow(
             agent,
             PropertyKey.from("suppressed"),
             suppressed,
-        ) catch |err| try noexcept(err);
+        );
 
         // 6. Return obj.
         return Value.from(&suppressed_error.object);

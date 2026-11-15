@@ -14,6 +14,11 @@ pub const Tag = enum {
     line_comment,
     multiline_comment,
 
+    // B.1.1 HTML-like Comments
+    // https://tc39.es/ecma262/#sec-html-like-comments
+    html_open_comment,
+    html_close_comment,
+
     // 12.5 Hashbang Comments
     // https://tc39.es/ecma262/#sec-hashbang
     hashbang_comment,

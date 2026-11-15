@@ -33,10 +33,10 @@ const containsSlice = utils.containsSlice;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getImportedModule = language.getImportedModule;
 const getModuleNamespace = language.getModuleNamespace;
-const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
-const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
-const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
-const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
+const instantiateAsyncFunctionDeclaration = language.instantiateAsyncFunctionDeclaration;
+const instantiateAsyncGeneratorDeclaration = language.instantiateAsyncGeneratorDeclaration;
+const instantiateGeneratorDeclaration = language.instantiateGeneratorDeclaration;
+const instantiateOrdinaryFunctionDeclaration = language.instantiateOrdinaryFunctionDeclaration;
 const newModuleEnvironment = execution.newModuleEnvironment;
 const newPromiseCapability = builtins.newPromiseCapability;
 const noexcept = utils.noexcept;
@@ -1498,8 +1498,11 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         if (maybe_resolution) |resolution| switch (resolution) {
             .ambiguous => return agent.throwException(
                 .syntax_error,
-                "Ambiguous star export '{s}' in module '{f}'",
-                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtEscaped() },
+                "Ambiguous star export '{f}' in module '{f}'",
+                .{
+                    std.unicode.fmtUtf8(export_entry.export_name.?),
+                    export_entry.module_request.?.specifier.fmtEscaped(),
+                },
             ),
 
             // d. Assert: resolution is a ResolvedBinding Record.
@@ -1507,8 +1510,11 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         } else {
             return agent.throwException(
                 .syntax_error,
-                "No export named '{s}' in module '{f}'",
-                .{ export_entry.export_name.?, export_entry.module_request.?.specifier.fmtEscaped() },
+                "No export named '{f}' in module '{f}'",
+                .{
+                    std.unicode.fmtUtf8(export_entry.export_name.?),
+                    export_entry.module_request.?.specifier.fmtEscaped(),
+                },
             );
         }
     }
@@ -1532,7 +1538,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
         // a. Let importedModule be GetImportedModule(module, importEntry.[[ModuleRequest]]).
         const imported_module = getImportedModule(self, import_entry.module_request);
 
-        const local_name = try String.fromUtf8(agent, import_entry.local_name);
+        const local_name = try String.fromWtf8(agent, import_entry.local_name);
 
         switch (import_entry.import_name.?) {
             // b. If importEntry.[[ImportName]] is namespace, then
@@ -1568,15 +1574,21 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                 const resolution = if (maybe_resolution) |resolution| switch (resolution) {
                     .ambiguous => return agent.throwException(
                         .syntax_error,
-                        "Ambiguous star export '{s}' in module '{f}'",
-                        .{ import_name, import_entry.module_request.specifier.fmtEscaped() },
+                        "Ambiguous star export '{f}' in module '{f}'",
+                        .{
+                            std.unicode.fmtUtf8(import_name),
+                            import_entry.module_request.specifier.fmtEscaped(),
+                        },
                     ),
                     .resolved_binding => |resolved_binding| resolved_binding,
                 } else {
                     return agent.throwException(
                         .syntax_error,
-                        "No export named '{s}' in module '{f}'",
-                        .{ import_name, import_entry.module_request.specifier.fmtEscaped() },
+                        "No export named '{f}' in module '{f}'",
+                        .{
+                            std.unicode.fmtUtf8(import_name),
+                            import_entry.module_request.specifier.fmtEscaped(),
+                        },
                     );
                 };
 
@@ -1610,7 +1622,7 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
                             agent,
                             local_name,
                             resolution.module,
-                            try String.fromUtf8(agent, binding_name),
+                            try String.fromWtf8(agent, binding_name),
                         );
                     },
                 }
@@ -1725,13 +1737,13 @@ fn initializeEnvironment(self: *SourceTextModule, agent: *Agent) Agent.Error!voi
             if (lexical_decl == .hoistable_declaration) {
                 const hoistable_decl = lexical_decl.hoistable_declaration;
 
-                // 1. Let funcObj be InstantiateFunctionObject of lexicalDecl with arguments
+                // 1. Let funcObj be InstantiateFunctionDeclaration of lexicalDecl with arguments
                 //    envRecord and privateEnv.
                 const func_obj = try switch (hoistable_decl) {
-                    .function_declaration => |func_decl| instantiateOrdinaryFunctionObject(agent, func_decl, env, private_env, self.source),
-                    .generator_declaration => |gen_decl| instantiateGeneratorFunctionObject(agent, gen_decl, env, private_env, self.source),
-                    .async_function_declaration => |async_func_decl| instantiateAsyncFunctionObject(agent, async_func_decl, env, private_env, self.source),
-                    .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorFunctionObject(agent, async_gen_decl, env, private_env, self.source),
+                    .function_declaration => |func_decl| instantiateOrdinaryFunctionDeclaration(agent, func_decl, env, private_env, self.source),
+                    .generator_declaration => |gen_decl| instantiateGeneratorDeclaration(agent, gen_decl, env, private_env, self.source),
+                    .async_function_declaration => |async_func_decl| instantiateAsyncFunctionDeclaration(agent, async_func_decl, env, private_env, self.source),
+                    .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorDeclaration(agent, async_gen_decl, env, private_env, self.source),
                 };
 
                 // 2. Perform ! envRecord.InitializeBinding(name, funcObj).

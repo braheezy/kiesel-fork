@@ -1,5 +1,7 @@
 const std = @import("std");
 
+const build_options = @import("build-options");
+
 const ast = @import("../language/ast.zig");
 const execution = @import("../execution.zig");
 const interpreter = @import("../interpreter.zig");
@@ -11,15 +13,15 @@ const Agent = execution.Agent;
 const Diagnostics = language.Diagnostics;
 const Environment = execution.Environment;
 const ExecutionContext = execution.ExecutionContext;
+const HostHooks = execution.HostHooks;
 const Parser = language.Parser;
 const PrivateEnvironment = execution.PrivateEnvironment;
 const String = types.String;
 const Value = types.Value;
-const fmtParseError = language.fmtParseError;
-const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
-const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
-const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
-const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
+const instantiateAsyncFunctionDeclaration = language.instantiateAsyncFunctionDeclaration;
+const instantiateAsyncGeneratorDeclaration = language.instantiateAsyncGeneratorDeclaration;
+const instantiateGeneratorDeclaration = language.instantiateGeneratorDeclaration;
+const instantiateOrdinaryFunctionDeclaration = language.instantiateOrdinaryFunctionDeclaration;
 const newDeclarativeEnvironment = execution.newDeclarativeEnvironment;
 const noexcept = utils.noexcept;
 
@@ -29,38 +31,56 @@ pub fn performEval(
     agent: *Agent,
     source: Value,
     strict_caller: bool,
-    direct: bool,
+    direct: HostHooks.CompilationType,
 ) Agent.Error!Value {
     const gpa = agent.gpa;
 
-    // 1. Assert: If direct is false, then strictCaller is also false.
-    if (!direct) std.debug.assert(!strict_caller);
+    // 1. Assert: If direct is indirect-eval, then strictCaller is false.
+    if (direct == .indirect_eval) std.debug.assert(!strict_caller);
 
-    // 2. If source is not a String, return source.
-    if (!source.isString()) return source;
+    // 2. If source is an Object, let sourceString be HostGetCodeForEval(source); else let
+    //    sourceString be source.
+    const maybe_source_string: ?*const String = if (source.isObject())
+        agent.host_hooks.hostGetCodeForEval(source.asObject())
+    else if (source.isString())
+        source.asString()
+    else
+        null;
 
-    // 3. Let evalRealm be the current Realm Record.
-    // 4. NOTE: In the case of a direct eval, evalRealm is the realm of both the caller of `eval`
+    // 3. If sourceString is not a String, return source.
+    const source_string = maybe_source_string orelse return source;
+
+    // 4. Let evalRealm be the current Realm Record.
+    // 5. NOTE: In the case of a direct eval, evalRealm is the realm of both the caller of `eval`
     //    and of the `eval` function itself.
     const eval_realm = agent.currentRealm();
 
-    // 5. Perform ? HostEnsureCanCompileStrings(evalRealm, « », source, direct).
-    try agent.host_hooks.hostEnsureCanCompileStrings(eval_realm, &.{}, source.asString(), direct);
+    // 6. Perform ? HostEnsureCanCompileStrings(evalRealm, « », sourceString, sourceString, direct,
+    //    « », source).
+    try agent.host_hooks.hostEnsureCanCompileStrings(
+        eval_realm,
+        &.{},
+        source_string,
+        source_string,
+        direct,
+        &.{},
+        source,
+    );
 
-    // 6. Let inFunc be false.
+    // 7. Let inFunc be false.
     var in_func = false;
 
-    // 7. Let inMethod be false.
+    // 8. Let inMethod be false.
     var in_method = false;
 
-    // 8. Let inDerivedCtor be false.
+    // 9. Let inDerivedCtor be false.
     var in_derived_ctor = false;
 
-    // 9. Let inClassFieldInitializer be false.
+    // 10. Let inClassFieldInitializer be false.
     var in_class_field_initializer = false;
 
-    // 10. If direct is true, then
-    if (direct) {
+    // 11. If direct is direct-eval, then
+    if (direct == .direct_eval) {
         // a. Let thisEnvRecord be GetThisEnvironment().
         const this_env = agent.getThisEnvironment();
 
@@ -89,21 +109,23 @@ pub fn performEval(
         }
     }
 
-    // 11. Perform the following substeps in an implementation-defined order, possibly interleaving
+    // 12. Perform the following substeps in an implementation-defined order, possibly interleaving
     //     parsing and error detection:
 
-    const source_utf8 = try source.asString().toUtf8(gpa);
-    defer gpa.free(source_utf8);
+    const source_wtf8 = try source_string.toWtf8(gpa);
+    defer gpa.free(source_wtf8);
     // Stored in ExecutionContext.origin, must be GC'd
-    const source_text = try agent.gc_allocator.dupeSentinel(u8, source_utf8, 0);
+    const source_text = try agent.gc_allocator.dupeSentinel(u8, source_wtf8, 0);
 
-    var diagnostics = Diagnostics.init(gpa);
+    var diagnostics: Diagnostics = .init(gpa, .{
+        .source = source_text,
+        .file_name = "eval",
+    });
     defer diagnostics.deinit();
 
-    // a. Let script be ParseText(source, Script).
+    // a. Let script be ParseText(sourceString, Script).
     const script = Parser.parse(ast.Script, agent.gc_allocator, source_text, .{
         .diagnostics = &diagnostics,
-        .file_name = "eval",
         .state = .{
             // e-g.
             .in_strict_mode = strict_caller,
@@ -111,16 +133,16 @@ pub fn performEval(
             .in_method_definition = in_method,
             // TODO: The state should track whether we're in a *derived* constructor
             .in_class_constructor = in_derived_ctor,
-            // h. If inClassFieldInitializer is true and ContainsArguments of body is true, throw
-            //    a SyntaxError exception.
+            // h. If inClassFieldInitializer is true and ContainsArguments of body is true, throw a
+            //    SyntaxError exception.
             .arguments_disallowed = in_class_field_initializer,
         },
     }) catch |err| switch (err) {
         error.OutOfMemory => |e| return e,
         error.ParseError => {
             // b. If script is a List of errors, throw a SyntaxError exception.
-            const parse_error = diagnostics.errors.items[0];
-            return agent.throwException(.syntax_error, "{f}", .{fmtParseError(parse_error)});
+            const parse_error = diagnostics.first().?;
+            return agent.throwException(.syntax_error, "{f}", .{parse_error.fmt(&diagnostics)});
         },
     };
 
@@ -130,22 +152,22 @@ pub fn performEval(
     // d. Let body be the ScriptBody of script.
     const body = script;
 
-    // 12. If strictCaller is true, let strictEval be true.
-    // 13. Else, let strictEval be ScriptIsStrict of script.
+    // 13. If strictCaller is true, let strictEval be true.
+    // 14. Else, let strictEval be ScriptIsStrict of script.
     const strict_eval = strict_caller or script.scriptIsStrict();
 
-    // 14. Let runningContext be the running execution context.
-    // 15. NOTE: If direct is true, runningContext will be the execution context that performed the
-    //     direct eval. If direct is false, runningContext will be the execution context for the
-    //     invocation of the `eval` function.
+    // 15. Let runningContext be the running execution context.
+    // 16. NOTE: If direct is direct-eval, runningContext will be the execution context that
+    //     performed the direct eval. If direct is indirect-eval, runningContext will be the
+    //     execution context for the invocation of the `eval` function.
     const running_context = agent.runningExecutionContext();
 
     var lexical_env: Environment = undefined;
     var variable_env: Environment = undefined;
     var private_env: ?*PrivateEnvironment = undefined;
 
-    // 16. If direct is true, then
-    if (direct) {
+    // 17. If direct is direct-eval, then
+    if (direct == .direct_eval) {
         // a. Let lexicalEnv be NewDeclarativeEnvironment(runningContext's LexicalEnvironment).
         lexical_env = .{
             .declarative_environment = try newDeclarativeEnvironment(
@@ -160,7 +182,7 @@ pub fn performEval(
         // c. Let privateEnv be runningContext's PrivateEnvironment.
         private_env = running_context.ecmascript_code.private_environment;
     } else {
-        // 17. Else,
+        // 18. Else,
         // a. Let lexicalEnv be NewDeclarativeEnvironment(evalRealm.[[GlobalEnv]]).
         lexical_env = .{
             .declarative_environment = try newDeclarativeEnvironment(
@@ -176,39 +198,39 @@ pub fn performEval(
         private_env = null;
     }
 
-    // 18. If strictEval is true, set variableEnv to lexicalEnv.
+    // 19. If strictEval is true, set variableEnv to lexicalEnv.
     if (strict_eval) variable_env = lexical_env;
 
-    // 19. If runningContext is not already suspended, suspend runningContext.
+    // 20. If runningContext is not already suspended, suspend runningContext.
 
-    // 20. Let evalContext be a new ECMAScript code execution context.
+    // 21. Let evalContext be a new ECMAScript code execution context.
     var eval_context: ExecutionContext = .{
-        // 21. Set evalContext's Function to null.
+        // 22. Set evalContext's Function to null.
         .origin = .{ .eval = source_text },
 
-        // 22. Set evalContext's Realm to evalRealm.
+        // 23. Set evalContext's Realm to evalRealm.
         .realm = eval_realm,
 
-        // 23. Set evalContext's ScriptOrModule to runningContext's ScriptOrModule.
+        // 24. Set evalContext's ScriptOrModule to runningContext's ScriptOrModule.
         .script_or_module = running_context.script_or_module,
 
         .ecmascript_code = .{
-            // 24. Set evalContext's VariableEnvironment to variableEnv.
+            // 25. Set evalContext's VariableEnvironment to variableEnv.
             .variable_environment = variable_env,
 
-            // 25. Set evalContext's LexicalEnvironment to lexicalEnv.
+            // 26. Set evalContext's LexicalEnvironment to lexicalEnv.
             .lexical_environment = lexical_env,
 
-            // 26. Set evalContext's PrivateEnvironment to privateEnv.
+            // 27. Set evalContext's PrivateEnvironment to privateEnv.
             .private_environment = private_env,
         },
     };
 
-    // 27. Push evalContext onto the execution context stack; evalContext is now the running
+    // 28. Push evalContext onto the execution context stack; evalContext is now the running
     //     execution context.
     try agent.execution_context_stack.append(agent.gc_allocator, &eval_context);
 
-    // 28. Let result be Completion(EvalDeclarationInstantiation(body, variableEnv, lexicalEnv,
+    // 29. Let result be Completion(EvalDeclarationInstantiation(body, variableEnv, lexicalEnv,
     //     privateEnv, strictEval)).
     const result_no_value = evalDeclarationInstantiation(
         agent,
@@ -220,10 +242,10 @@ pub fn performEval(
         source_text,
     );
 
-    // 29. If result is a normal completion, then
+    // 30. If result is a normal completion, then
     const result: Agent.Error!Value = if (result_no_value) |_| blk: {
         // a. Set result to Completion(Evaluation of body).
-        // 30. If result is a normal completion and result.[[Value]] is empty, then
+        // 31. If result is a normal completion and result.[[Value]] is empty, then
         if (interpreter.compileAndRun(
             agent,
             .{ .eval = .{ .script = &body, .strict = strict_eval } },
@@ -235,17 +257,17 @@ pub fn performEval(
             break :blk err;
     } else |err| err;
 
-    // 31. Suspend evalContext and remove it from the execution context stack.
+    // 32. Suspend evalContext and remove it from the execution context stack.
     _ = agent.execution_context_stack.pop().?;
 
-    // 32. Resume the context that is now on the top of the execution context stack as the running
+    // 33. Resume the context that is now on the top of the execution context stack as the running
     //     execution context.
 
-    // 33. Return ? result.
+    // 34. Return ? result.
     return result;
 }
 
-/// 19.2.1.3 EvalDeclarationInstantiation ( body, variableEnv, lexicalEnv, privateEnv, strict )
+/// 19.2.1.4 EvalDeclarationInstantiation ( body, variableEnv, lexicalEnv, privateEnv, strict )
 /// https://tc39.es/ecma262/#sec-evaldeclarationinstantiation
 fn evalDeclarationInstantiation(
     agent: *Agent,
@@ -312,7 +334,16 @@ fn evalDeclarationInstantiation(
                         //        a SyntaxError exception.
                         // ii. Else,
                         //     1. Throw a SyntaxError exception.
-                        return agent.throwException(.syntax_error, "idk", .{});
+                        if (!build_options.enable_annex_b or
+                            this_env != .declarative_environment or
+                            !this_env.declarative_environment.is_catch_env)
+                        {
+                            return agent.throwException(
+                                .syntax_error,
+                                "Var declaration '{f}' is also lexically declared",
+                                .{name.fmtRaw()},
+                            );
+                        }
                     }
 
                     // b. NOTE: A direct eval will not hoist var declaration over a like-named
@@ -457,12 +488,20 @@ fn evalDeclarationInstantiation(
 
             // i. If IsConstantDeclaration of lexicalDecl is true, then
             if (lexical_decl.isConstantDeclaration()) {
-                // 1. Perform ? lexicalEnv.CreateImmutableBinding(name, true).
-                try lexical_env.createImmutableBinding(agent, name, true);
+                // 1. Perform ! lexicalEnv.CreateImmutableBinding(name, true).
+                lexical_env.createImmutableBinding(
+                    agent,
+                    name,
+                    true,
+                ) catch |err| try noexcept(err);
             } else {
                 // ii. Else,
-                // 1. Perform ? lexicalEnv.CreateMutableBinding(name, false).
-                try lexical_env.createMutableBinding(agent, name, false);
+                // 1. Perform ! lexicalEnv.CreateMutableBinding(name, false).
+                lexical_env.createMutableBinding(
+                    agent,
+                    name,
+                    false,
+                ) catch |err| try noexcept(err);
             }
         }
     }
@@ -474,13 +513,13 @@ fn evalDeclarationInstantiation(
             inline else => |func_decl| try String.fromUtf8(agent, func_decl.identifier.?),
         };
 
-        // b. Let funcObj be InstantiateFunctionObject of funcDecl with arguments lexicalEnv and
-        //    privateEnv.
+        // b. Let funcObj be InstantiateFunctionDeclaration of funcDecl with arguments lexicalEnv
+        //    and privateEnv.
         const func_obj = try switch (hoistable_decl) {
-            .function_declaration => |func_decl| instantiateOrdinaryFunctionObject(agent, func_decl, lexical_env, private_env, source),
-            .generator_declaration => |gen_decl| instantiateGeneratorFunctionObject(agent, gen_decl, lexical_env, private_env, source),
-            .async_function_declaration => |async_func_decl| instantiateAsyncFunctionObject(agent, async_func_decl, lexical_env, private_env, source),
-            .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorFunctionObject(agent, async_gen_decl, lexical_env, private_env, source),
+            .function_declaration => |func_decl| instantiateOrdinaryFunctionDeclaration(agent, func_decl, lexical_env, private_env, source),
+            .generator_declaration => |gen_decl| instantiateGeneratorDeclaration(agent, gen_decl, lexical_env, private_env, source),
+            .async_function_declaration => |async_func_decl| instantiateAsyncFunctionDeclaration(agent, async_func_decl, lexical_env, private_env, source),
+            .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorDeclaration(agent, async_gen_decl, lexical_env, private_env, source),
         };
 
         // c. If variableEnv is a Global Environment Record, then

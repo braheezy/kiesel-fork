@@ -6,6 +6,7 @@ const ast = @import("ast.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
 
+const Diagnostics = @import("Diagnostics.zig");
 const NewToken = @import("Token.zig");
 const NewTokenizer = @import("Tokenizer.zig");
 const String = types.String;
@@ -18,7 +19,7 @@ const Parser = @This();
 
 allocator: std.mem.Allocator,
 core: ParserCore,
-diagnostics: *ptk.Diagnostics,
+diagnostics: *Diagnostics,
 state: State = .{},
 identifier_stack: std.ArrayList(ast.Identifier),
 
@@ -42,8 +43,16 @@ pub const State = struct {
     arguments_disallowed: bool = false,
 };
 
+const Location = struct {
+    offset: NewToken.ByteOffset,
+};
+
 const Tokenizer = struct {
-    pub const Token = ptk.Tokenizer(TokenType, &.{}).Token;
+    pub const Token = struct {
+        location: Location,
+        text: []const u8,
+        type: TokenType,
+    };
     pub const TokenType = enum {
         @"--",
         @"-",
@@ -152,6 +161,8 @@ const Tokenizer = struct {
         yield,
         line_comment,
         multiline_comment,
+        html_open_comment,
+        html_close_comment,
         hashbang_comment,
 
         pub fn fromTag(tag: NewToken.Tag) TokenType {
@@ -263,30 +274,32 @@ const Tokenizer = struct {
                 .template_literal_tail => .template_tail,
                 .line_comment => .line_comment,
                 .multiline_comment => .multiline_comment,
+                .html_open_comment => .html_open_comment,
+                .html_close_comment => .html_close_comment,
                 .hashbang_comment => .hashbang_comment,
             };
         }
     };
     pub const State = struct {
-        // ptk.Tokenizer.State fields
-        offset: usize,
-        location: ptk.Location,
-        // Everything else
-        index: u32,
+        location: Location,
+        token_index: u32,
     };
     pub const NextError = error{ UnexpectedCharacter, OutOfMemory };
 
     const TokenList = std.MultiArrayList(NewToken);
 
-    // ptk.Tokenizer fields
     source: []const u8,
-    offset: usize,
-    current_location: ptk.Location,
-    // Everything else
+    offset: u32,
+    current_location: Location,
     tokens_slice: TokenList.Slice,
-    index: u32,
+    token_index: u32,
 
-    pub fn init(gpa: std.mem.Allocator, source: [:0]const u8, file_name: ?[]const u8) std.mem.Allocator.Error!Tokenizer {
+    pub fn init(
+        gpa: std.mem.Allocator,
+        source: [:0]const u8,
+        diagnostics: *Diagnostics,
+        is_module: bool,
+    ) std.mem.Allocator.Error!Tokenizer {
         var tokens: TokenList = .empty;
         errdefer tokens.deinit(gpa);
         var tokenizer: NewTokenizer = .init(gpa, source);
@@ -294,6 +307,13 @@ const Tokenizer = struct {
         while (try tokenizer.next()) |token| {
             switch (token.tag) {
                 .line_comment, .multiline_comment, .hashbang_comment => {},
+                .html_open_comment, .html_close_comment => if (is_module or !build_options.enable_annex_b) {
+                    if (is_module) {
+                        try diagnostics.emit(@backingInt(token.start), "HTML-like comments are not allowed in module code", .{});
+                    } else {
+                        try diagnostics.emit(@backingInt(token.start), "HTML-like comments are not enabled", .{});
+                    }
+                },
                 else => try tokens.append(gpa, token),
             }
         }
@@ -302,9 +322,9 @@ const Tokenizer = struct {
         return .{
             .source = source,
             .offset = 0,
-            .current_location = .{ .source = file_name, .line = 1, .column = 1 },
+            .current_location = .{ .offset = @fromBackingInt(0) },
             .tokens_slice = tokens_slice,
-            .index = 0,
+            .token_index = 0,
         };
     }
 
@@ -314,34 +334,32 @@ const Tokenizer = struct {
 
     pub fn saveState(t: *Tokenizer) Tokenizer.State {
         return .{
-            .offset = t.offset,
             .location = t.current_location,
-            .index = t.index,
+            .token_index = t.token_index,
         };
     }
 
     pub fn restoreState(t: *Tokenizer, state: Tokenizer.State) void {
-        t.offset = state.offset;
+        t.offset = @backingInt(state.location.offset);
         t.current_location = state.location;
-        t.index = state.index;
+        t.token_index = state.token_index;
     }
 
     pub fn next(t: *Tokenizer) NextError!?Token {
-        if (t.index < t.tokens_slice.len) {
-            const token = t.tokens_slice.get(t.index);
-            t.index += 1;
-            t.current_location.advance(t.source[t.offset..@backingInt(token.start)]);
+        if (t.token_index < t.tokens_slice.len) {
+            const token = t.tokens_slice.get(t.token_index);
+            t.token_index += 1;
+            t.current_location = .{ .offset = token.start };
             if (token.tag == .invalid) {
                 t.offset = @backingInt(token.start);
                 return error.UnexpectedCharacter;
             }
             t.offset = @backingInt(token.end);
-            const location = t.current_location;
-            t.current_location.advance(token.text(t.source));
+            t.current_location = .{ .offset = token.end };
             return .{
                 .type = .fromTag(token.tag),
                 .text = token.text(t.source),
-                .location = location,
+                .location = .{ .offset = token.start },
             };
         }
         return null;
@@ -352,6 +370,8 @@ const RuleSet = ptk.RuleSet(Tokenizer.TokenType);
 const ParserCore = ptk.ParserCore(Tokenizer, .{
     .line_comment,
     .multiline_comment,
+    .html_open_comment,
+    .html_close_comment,
     .hashbang_comment,
 });
 
@@ -363,48 +383,9 @@ pub const Error = error{
 };
 
 pub const Options = struct {
-    diagnostics: ?*ptk.Diagnostics = null,
-    file_name: ?[]const u8 = null,
+    diagnostics: ?*Diagnostics = null,
     state: State = .{},
 };
-
-pub fn fmtParseError(parse_error: ptk.Error) std.fmt.Alt(ptk.Error, formatParseError) {
-    return .{ .data = parse_error };
-}
-
-fn formatParseError(parse_error: ptk.Error, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    try writer.print("{s} ({s}:{d}:{d})", .{
-        parse_error.message,
-        parse_error.location.source orelse "<unknown>",
-        parse_error.location.line,
-        parse_error.location.column,
-    });
-}
-
-pub fn fmtParseErrorHint(
-    parse_error: ptk.Error,
-    source_text: []const u8,
-) std.fmt.Alt(ParseErrorHintData, formatParseErrorHint) {
-    return .{ .data = .{ parse_error, source_text } };
-}
-
-const ParseErrorHintData = struct { ptk.Error, []const u8 };
-
-fn formatParseErrorHint(data: ParseErrorHintData, writer: *std.Io.Writer) std.Io.Writer.Error!void {
-    const parse_error, const source_text = data;
-    // NOTE: parse-toolkit only uses '\n' to advance the line counter - for \r\n newlines this
-    //       doesn't matter, and LS/PS are rare enough to not matter for now.
-    var line_iterator = std.mem.splitScalar(u8, source_text, '\n');
-    var i: usize = 0;
-    const source_line = while (line_iterator.next()) |source_line| : (i += 1) {
-        if (i == parse_error.location.line - 1) break source_line;
-    } else unreachable;
-    try writer.print("{s}\n{c: >[2]}", .{
-        source_line,
-        '^',
-        parse_error.location.column, // 1-indexed, which is fine as this means 'width' in this context
-    });
-}
 
 const AcceptContext = struct {
     precedence: Precedence = 0,
@@ -565,13 +546,18 @@ pub fn parseNode(
     source: [:0]const u8,
     options: Options,
 ) Error!T {
-    var new_diagnostics: ptk.Diagnostics = undefined;
+    var new_diagnostics: Diagnostics = undefined;
     defer if (options.diagnostics == null) new_diagnostics.deinit();
     const diagnostics = options.diagnostics orelse blk: {
-        new_diagnostics = .init(allocator);
+        new_diagnostics = .init(allocator, .{ .source = source, .file_name = null });
         break :blk &new_diagnostics;
     };
-    var tokenizer = try Tokenizer.init(allocator, source, options.file_name);
+    var tokenizer = try Tokenizer.init(
+        allocator,
+        source,
+        diagnostics,
+        T == ast.Module,
+    );
     defer tokenizer.deinit(allocator);
     const core = ParserCore.init(&tokenizer);
     var parser: Parser = .{
@@ -618,12 +604,12 @@ fn emitError(self: *Parser, comptime fmt: []const u8, args: anytype) std.mem.All
 /// Report a syntax error at a specific source location.
 fn emitErrorAt(
     self: *Parser,
-    location: ptk.Location,
+    location: Location,
     comptime fmt: []const u8,
     args: anytype,
 ) std.mem.Allocator.Error!void {
     @branchHint(.cold);
-    try self.diagnostics.emit(location, .@"error", fmt, args);
+    try self.diagnostics.emit(@backingInt(location.offset), fmt, args);
 }
 
 fn identifierNameValue(self: *Parser, text: []const u8) AcceptError![]const u8 {
@@ -646,6 +632,12 @@ const reserved_words = [_][]const u8{
     "finally", "for",    "function", "if",     "import", "in",     "instanceof", "new",
     "null",    "return", "super",    "switch", "this",   "throw",  "true",       "try",
     "typeof",  "var",    "void",     "while",  "with",   "yield",
+};
+
+/// 12.7.2 Keywords and Reserved Words
+/// https://tc39.es/ecma262/#sec-keywords-and-reserved-words
+const strict_mode_reserved_words = [_][]const u8{
+    "let", "static", "implements", "interface", "package", "private", "protected", "public",
 };
 
 fn unescapeIdentifier(self: *Parser, token: Tokenizer.Token) AcceptError![]const u8 {
@@ -710,7 +702,7 @@ const IdentifierStackRange = struct {
 fn ensureSimpleParameterList(
     self: *Parser,
     formal_parameters: ast.FormalParameters,
-    location: ptk.Location,
+    location: Location,
 ) std.mem.Allocator.Error!void {
     if (!formal_parameters.isSimpleParameterList()) {
         try self.emitErrorAt(
@@ -725,7 +717,7 @@ fn ensureUniqueParameterNames(
     self: *Parser,
     kind: enum { strict, arrow, method, non_simple },
     formal_parameters: ast.FormalParameters,
-    location: ptk.Location,
+    location: Location,
 ) std.mem.Allocator.Error!void {
     var bound_names = IdentifierStackRange.open(self);
     defer bound_names.deinit();
@@ -765,7 +757,7 @@ fn ensureUniqueParameterNames(
 fn ensureAllowedParameterNames(
     self: *Parser,
     formal_parameters: ast.FormalParameters,
-    location: ptk.Location,
+    location: Location,
 ) AcceptError!void {
     var bound_names = IdentifierStackRange.open(self);
     defer bound_names.deinit();
@@ -780,10 +772,12 @@ fn ensureAllowedIdentifier(
     self: *Parser,
     kind: enum { binding_identifier, identifier_reference, function_parameter },
     value: []const u8,
-    location: ptk.Location,
+    location: Location,
 ) std.mem.Allocator.Error!void {
-    if (std.mem.eql(u8, value, "eval") or
-        std.mem.eql(u8, value, "arguments"))
+    if (containsSlice(&strict_mode_reserved_words, value) or
+        // https://tc39.es/ecma262/#sec-keywords-and-reserved-words:~:text=code%2E-,Note%203
+        std.mem.eql(u8, value, "arguments") or
+        std.mem.eql(u8, value, "eval"))
     {
         switch (kind) {
             .binding_identifier => try self.emitErrorAt(
@@ -809,7 +803,7 @@ fn ensureUniqueLexicallyDeclaredNames(
     self: *Parser,
     lexically_declared_names: []const ast.Identifier,
     var_declared_names: []const ast.Identifier,
-    location: ptk.Location,
+    location: Location,
 ) std.mem.Allocator.Error!void {
     try self.ensureUniqueBoundNames(.lexical_declaration, lexically_declared_names, location);
 
@@ -825,7 +819,7 @@ fn ensureUniqueBoundNames(
     self: *Parser,
     kind: enum { lexical_declaration, for_declaration },
     bound_names: []const ast.Identifier,
-    location: ptk.Location,
+    location: Location,
 ) std.mem.Allocator.Error!void {
     var seen: std.StringHashMapUnmanaged(void) = .empty;
     defer seen.deinit(self.allocator);
@@ -854,7 +848,7 @@ fn ensureBoundNamesNotVarDeclared(
     kind: enum { lexical_declaration, for_declaration },
     bound_names: []const ast.Identifier,
     var_declared_names: []const ast.Identifier,
-    location: ptk.Location,
+    location: Location,
 ) std.mem.Allocator.Error!void {
     var var_names_set: std.StringHashMapUnmanaged(void) = .empty;
     try var_names_set.ensureUnusedCapacity(self.allocator, @intCast(var_declared_names.len));
@@ -884,7 +878,8 @@ fn ensureUniqueCatchParameterNames(
     bound_names: []const ast.Identifier,
     lexically_declared_names: []const ast.Identifier,
     var_declared_names: []const ast.Identifier,
-    location: ptk.Location,
+    location: Location,
+    allows_var_redeclaration: bool,
 ) std.mem.Allocator.Error!void {
     var seen: std.StringHashMapUnmanaged(void) = .empty;
     defer seen.deinit(self.allocator);
@@ -913,7 +908,7 @@ fn ensureUniqueCatchParameterNames(
             );
         }
 
-        if (var_names_set.contains(name)) {
+        if (!allows_var_redeclaration and var_names_set.contains(name)) {
             try self.emitErrorAt(
                 location,
                 "Catch parameter '{s}' is also var-declared",
@@ -926,7 +921,7 @@ fn ensureUniqueCatchParameterNames(
 fn ensureUniquePrivateClassElementNames(
     self: *Parser,
     class_body: ast.ClassBody,
-    location: ptk.Location,
+    location: Location,
 ) std.mem.Allocator.Error!void {
     const Kind = enum { getter, setter, other };
     const Seen = std.EnumSet(Kind);
@@ -994,7 +989,7 @@ fn ensureUniquePrivateClassElementNames(
 fn ensureUniqueConstructorMethod(
     self: *Parser,
     class_body: ast.ClassBody,
-    location: ptk.Location,
+    location: Location,
 ) std.mem.Allocator.Error!void {
     var seen = false;
     const duplicate = for (class_body.class_element_list.items) |class_element| {
@@ -1012,7 +1007,7 @@ fn ensureUniqueConstructorMethod(
     }
 }
 
-/// 5.1.5.8 [no LineTerminator here]
+/// 5.1.6.8 [no LineTerminator here]
 /// https://tc39.es/ecma262/#sec-no-lineterminator-here
 fn followedByLineTerminator(self: *Parser) bool {
     // Same as peek() but without immediately restoring the state; we need to look at what's
@@ -1022,7 +1017,7 @@ fn followedByLineTerminator(self: *Parser) bool {
 
     const next_token = (self.core.nextToken() catch return false) orelse return false;
 
-    const start_offset = state.offset;
+    const start_offset = @backingInt(state.location.offset);
     const end_offset = self.core.tokenizer.offset - next_token.text.len;
     const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
@@ -1051,7 +1046,7 @@ pub fn acceptOrInsertSemicolon(self: *Parser) AcceptError!void {
     // Next token is '}', insert semicolon
     if (next_token.type == .@"}") return;
 
-    const start_offset = state.offset;
+    const start_offset = @backingInt(state.location.offset);
     const end_offset = self.core.tokenizer.offset - next_token.text.len;
     const whitespace_and_comments = self.core.tokenizer.source[start_offset..end_offset];
 
@@ -1965,7 +1960,7 @@ pub fn acceptPropertyName(self: *Parser) AcceptError!ast.PropertyName {
 pub fn acceptPropertyNameAndExpression(
     self: *Parser,
     ctx: AcceptContext,
-    location: ptk.Location,
+    location: Location,
     has_proto_setter: *bool,
 ) AcceptError!ast.PropertyDefinition.PropertyNameAndExpression {
     const state = self.core.saveState();
@@ -3819,7 +3814,7 @@ pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
     _ = try self.core.accept(RuleSet.is(.@"try"));
     const try_block = try self.acceptBlock();
     var catch_parameter: ?ast.CatchParameter = null;
-    var catch_parameter_location: ptk.Location = undefined;
+    var catch_parameter_location: Location = undefined;
     const catch_block = if (self.core.accept(RuleSet.is(.@"catch"))) |_| blk: {
         if (self.core.accept(RuleSet.is(.@"("))) |_| {
             catch_parameter_location = (try self.peekToken()).location;
@@ -3837,10 +3832,10 @@ pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
         return error.UnexpectedToken;
     }
 
-    if (catch_parameter != null) {
+    if (catch_parameter) |param| {
         var bound_names = IdentifierStackRange.open(self);
         defer bound_names.deinit();
-        try catch_parameter.?.collectBoundNames(self.allocator, &self.identifier_stack);
+        try param.collectBoundNames(self.allocator, &self.identifier_stack);
         bound_names.close();
 
         var lexically_declared_names = IdentifierStackRange.open(self);
@@ -3860,11 +3855,14 @@ pub fn acceptTryStatement(self: *Parser) AcceptError!ast.TryStatement {
         // - It is a Syntax Error if any element of the BoundNames of CatchParameter also occurs in
         //   the VarDeclaredNames of Block, unless CatchParameter is CatchParameter : BindingIdentifier
         //   and the host is a web browser or otherwise supports VariableStatements in Catch Blocks.
+        const allows_var_redeclaration = build_options.enable_annex_b and
+            param == .binding_identifier;
         try self.ensureUniqueCatchParameterNames(
             bound_names.slice(),
             lexically_declared_names.slice(),
             var_declared_names.slice(),
             catch_parameter_location,
+            allows_var_redeclaration,
         );
     }
 
@@ -4880,7 +4878,7 @@ fn acceptRegularExpressionLiteral(self: *Parser) AcceptError!ast.RegularExpressi
         },
         .invalid_flags => {
             var flags_location = token.location;
-            flags_location.column += @intCast(pattern.len + 2);
+            flags_location.offset = @fromBackingInt(@backingInt(flags_location.offset) + @as(u32, @intCast(pattern.len + 2)));
             try self.emitErrorAt(flags_location, "Invalid RegExp flags '{s}'", .{flags});
             return error.UnexpectedToken;
         },

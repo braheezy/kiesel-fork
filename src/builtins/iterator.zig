@@ -897,13 +897,13 @@ pub const prototype = struct {
         try object.defineBuiltinFunction(agent, "Symbol.dispose", @"Symbol.dispose", 0, realm);
         try object.defineBuiltinFunction(agent, "Symbol.iterator", @"Symbol.iterator", 0, realm);
 
-        // 27.1.3.3.1 Iterator.prototype.constructor
+        // 27.1.3.3.2 Iterator.prototype.constructor
         // https://tc39.es/ecma262/#sec-iterator.prototype.constructor
         try object.defineBuiltinAccessor(
             agent,
             "constructor",
             struct {
-                /// 27.1.3.3.1.1 get Iterator.prototype.constructor
+                /// 27.1.3.3.2.1 get Iterator.prototype.constructor
                 /// https://tc39.es/ecma262/#sec-get-iterator.prototype.constructor
                 fn get(agent_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                     const realm_ = agent_.currentRealm();
@@ -913,7 +913,7 @@ pub const prototype = struct {
                 }
             }.get,
             struct {
-                /// 27.1.3.3.1.2 set Iterator.prototype.constructor
+                /// 27.1.3.3.2.2 set Iterator.prototype.constructor
                 /// https://tc39.es/ecma262/#sec-set-iterator.prototype.constructor
                 fn set(agent_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
                     const realm_ = agent_.currentRealm();
@@ -935,13 +935,13 @@ pub const prototype = struct {
             realm,
         );
 
-        // 27.1.3.3.15 Iterator.prototype [ %Symbol.toStringTag% ]
+        // 27.1.3.3.19 Iterator.prototype [ %Symbol.toStringTag% ]
         // https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.tostringtag%
         try object.defineBuiltinAccessor(
             agent,
             "Symbol.toStringTag",
             struct {
-                /// 27.1.3.3.15.1 get Iterator.prototype [ %Symbol.toStringTag% ]
+                /// 27.1.3.3.19.1 get Iterator.prototype [ %Symbol.toStringTag% ]
                 /// https://tc39.es/ecma262/#sec-get-iterator.prototype-%symbol.tostringtag%
                 fn get(_: *Agent, _: Value, _: Arguments) Agent.Error!Value {
                     // 1. Return "Iterator".
@@ -949,7 +949,7 @@ pub const prototype = struct {
                 }
             }.get,
             struct {
-                /// 27.1.3.3.15.2 set Iterator.prototype [ %Symbol.toStringTag% ]
+                /// 27.1.3.3.19.2 set Iterator.prototype [ %Symbol.toStringTag% ]
                 /// https://tc39.es/ecma262/#sec-set-iterator.prototype-%symbol.tostringtag%
                 fn set(agent_: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
                     const realm_ = agent_.currentRealm();
@@ -972,20 +972,20 @@ pub const prototype = struct {
         );
     }
 
-    /// 1 Iterator.prototype.chunks ( chunkSize )
-    /// https://tc39.es/proposal-iterator-chunking/#sec-iterator.prototype.chunks
+    /// 27.1.3.3.1 Iterator.prototype.chunks ( chunkSize )
+    /// https://tc39.es/ecma262/#sec-iterator.prototype.chunks
     fn chunks(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const chunk_size_value = arguments.get(0);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = obj,
@@ -1021,7 +1021,7 @@ pub const prototype = struct {
         }
         const chunk_size: u32 = @intFromFloat(chunk_size_float);
 
-        // 6. Set iterated to ? GetIteratorDirect(O).
+        // 6. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
@@ -1104,7 +1104,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.3.3.2 Iterator.prototype.drop ( limit )
+    /// 27.1.3.3.3 Iterator.prototype.drop ( limit )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.drop
     fn drop(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -1242,7 +1242,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.3.3.3 Iterator.prototype.every ( predicate )
+    /// 27.1.3.3.4 Iterator.prototype.every ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.every
     fn every(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate_value = arguments.get(0);
@@ -1309,7 +1309,7 @@ pub const prototype = struct {
         return .true;
     }
 
-    /// 27.1.3.3.4 Iterator.prototype.filter ( predicate )
+    /// 27.1.3.3.5 Iterator.prototype.filter ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.filter
     fn filter(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -1422,7 +1422,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.3.3.5 Iterator.prototype.find ( predicate )
+    /// 27.1.3.3.6 Iterator.prototype.find ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.find
     fn find(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate_value = arguments.get(0);
@@ -1489,8 +1489,8 @@ pub const prototype = struct {
         return .undefined;
     }
 
-    /// 1 Iterator.prototype.includes ( searchElement [ , skippedElements ] )
-    /// https://tc39.es/proposal-iterator-includes/#sec-iterator.prototype.includes
+    /// 27.1.3.3.9 Iterator.prototype.includes ( searchElement [ , skippedElements ] )
+    /// https://tc39.es/ecma262/#sec-iterator.prototype.includes
     fn includes(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const search_element = arguments.get(0);
         const skipped_elements = arguments.get(1);
@@ -1588,8 +1588,8 @@ pub const prototype = struct {
         return .false;
     }
 
-    /// 1 Iterator.prototype.join ( separator )
-    /// https://tc39.es/proposal-iterator-join/#sec-iterator.prototype.join
+    /// 27.1.3.3.10 Iterator.prototype.join ( separator )
+    /// https://tc39.es/ecma262/#sec-iterator.prototype.join
     fn join(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const separator = arguments.get(0);
 
@@ -1610,13 +1610,13 @@ pub const prototype = struct {
 
         // 4. If separator is undefined, then
         const separator_string: String.Builder.Segment = if (separator.isUndefined())
-            // a. Let sep be ",".
+            // a. Let separatorString be ",".
             .{ .char = ',' }
         else blk: {
             // 5. Else,
-            // a. Let sep be Completion(ToString(separator)).
+            // a. Let separatorString be Completion(ToString(separator)).
             const string = separator.toString(agent) catch |err| {
-                // b. IfAbruptCloseIterator(sep, iterated).
+                // b. IfAbruptCloseIterator(separatorString, iterated).
                 return iterated.close(agent, @as(Agent.Error!Value, err));
             };
             break :blk .{ .string = string };
@@ -1642,7 +1642,7 @@ pub const prototype = struct {
                 first = false;
             } else {
                 // d. Else,
-                // i. Set result to the string-concatenation of result and sep.
+                // i. Set result to the string-concatenation of result and separatorString.
                 try result.appendSegment(agent.gc_allocator, separator_string);
             }
 
@@ -1661,7 +1661,7 @@ pub const prototype = struct {
         return Value.from(try result.build(agent));
     }
 
-    /// 27.1.3.3.6 Iterator.prototype.flatMap ( mapper )
+    /// 27.1.3.3.7 Iterator.prototype.flatMap ( mapper )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.flatmap
     fn flatMap(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -1830,7 +1830,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.3.3.7 Iterator.prototype.forEach ( procedure )
+    /// 27.1.3.3.8 Iterator.prototype.forEach ( procedure )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.foreach
     fn forEach(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const procedure_value = arguments.get(0);
@@ -1887,7 +1887,7 @@ pub const prototype = struct {
         return .undefined;
     }
 
-    /// 27.1.3.3.8 Iterator.prototype.map ( mapper )
+    /// 27.1.3.3.11 Iterator.prototype.map ( mapper )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.map
     fn map(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -1996,7 +1996,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.3.3.9 Iterator.prototype.reduce ( reducer [ , initialValue ] )
+    /// 27.1.3.3.12 Iterator.prototype.reduce ( reducer [ , initialValue ] )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.reduce
     fn reduce(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const reducer_value = arguments.get(0);
@@ -2085,7 +2085,7 @@ pub const prototype = struct {
         return accumulator;
     }
 
-    /// 27.1.3.3.10 Iterator.prototype.some ( predicate )
+    /// 27.1.3.3.13 Iterator.prototype.some ( predicate )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.some
     fn some(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const predicate_value = arguments.get(0);
@@ -2152,7 +2152,7 @@ pub const prototype = struct {
         return .false;
     }
 
-    /// 27.1.3.3.11 Iterator.prototype.take ( limit )
+    /// 27.1.3.3.14 Iterator.prototype.take ( limit )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.take
     fn take(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
@@ -2289,7 +2289,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.3.3.12 Iterator.prototype.toArray ( )
+    /// 27.1.3.3.15 Iterator.prototype.toArray ( )
     /// https://tc39.es/ecma262/#sec-iterator.prototype.toarray
     fn toArray(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let obj be the this value.
@@ -2317,21 +2317,21 @@ pub const prototype = struct {
         return Value.from(&array.object);
     }
 
-    /// 2 Iterator.prototype.windows ( windowSize [ , undersized ] )
-    /// https://tc39.es/proposal-iterator-chunking/#sec-iterator.prototype.windows
+    /// 27.1.3.3.16 Iterator.prototype.windows ( windowSize [ , undersized ] )
+    /// https://tc39.es/ecma262/#sec-iterator.prototype.windows
     fn windows(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const realm = agent.currentRealm();
         const window_size_value = arguments.get(0);
         const undersized_value = arguments.get(1);
 
-        // 1. Let O be the this value.
-        // 2. If O is not an Object, throw a TypeError exception.
+        // 1. Let obj be the this value.
+        // 2. If obj is not an Object, throw a TypeError exception.
         if (!this_value.isObject()) {
             return agent.throwException(.type_error, "{f} is not an Object", .{this_value});
         }
         const obj = this_value.asObject();
 
-        // 3. Let iterated be the Iterator Record { [[Iterator]]: O, [[NextMethod]]: undefined,
+        // 3. Let iterated be the Iterator Record { [[Iterator]]: obj, [[NextMethod]]: undefined,
         //    [[Done]]: false }.
         var iterated: types.Iterator = .{
             .iterator = obj,
@@ -2389,7 +2389,7 @@ pub const prototype = struct {
             return iterated.close(agent, @as(Agent.Error!Value, @"error"));
         };
 
-        // 8. Set iterated to ? GetIteratorDirect(O).
+        // 8. Set iterated to ? GetIteratorDirect(obj).
         iterated = try getIteratorDirect(agent, obj);
 
         const iterated_list = try agent.gc_allocator.alloc(types.Iterator, 1);
@@ -2482,7 +2482,7 @@ pub const prototype = struct {
         return Value.from(&result.object);
     }
 
-    /// 27.1.3.3.13 Iterator.prototype [ %Symbol.dispose% ] ( )
+    /// 27.1.3.3.17 Iterator.prototype [ %Symbol.dispose% ] ( )
     /// https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.dispose%
     fn @"Symbol.dispose"(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Let obj be the this value.
@@ -2499,7 +2499,7 @@ pub const prototype = struct {
         return .undefined;
     }
 
-    /// 27.1.3.3.14 Iterator.prototype [ %Symbol.iterator% ] ( )
+    /// 27.1.3.3.18 Iterator.prototype [ %Symbol.iterator% ] ( )
     /// https://tc39.es/ecma262/#sec-iterator.prototype-%symbol.iterator%
     fn @"Symbol.iterator"(_: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
         // 1. Return the this value.

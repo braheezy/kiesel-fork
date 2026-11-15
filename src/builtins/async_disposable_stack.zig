@@ -6,6 +6,7 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -18,6 +19,7 @@ const Value = types.Value;
 const addDisposableResource = types.addDisposableResource;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const disposeResources = types.disposeResources;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 
@@ -183,15 +185,15 @@ pub const prototype = struct {
             .{ .additional_fields = captures },
         );
 
-        // 7. Perform ? AddDisposableResource(asyncDisposableStack.[[DisposableResourceStack]],
+        // 7. Perform ! AddDisposableResource(asyncDisposableStack.[[DisposableResourceStack]],
         //    undefined, async-dispose, func).
-        try addDisposableResource(
+        addDisposableResource(
             agent,
             disposable_resource_stack,
             .undefined,
             .async_dispose,
             &func.object,
-        );
+        ) catch |err| try noexcept(err);
 
         // 8. Return value.
         return value;
@@ -221,15 +223,15 @@ pub const prototype = struct {
             return agent.throwException(.type_error, "{f} is not callable", .{on_dispose_async});
         }
 
-        // 5. Perform ? AddDisposableResource(asyncDisposableStack.[[DisposableResourceStack]],
+        // 5. Perform ! AddDisposableResource(asyncDisposableStack.[[DisposableResourceStack]],
         //    undefined, async-dispose, onDisposeAsync).
-        try addDisposableResource(
+        addDisposableResource(
             agent,
             disposable_resource_stack,
             .undefined,
             .async_dispose,
             on_dispose_async.asObject(),
-        );
+        ) catch |err| try noexcept(err);
 
         // 6. Return undefined.
         return .undefined;
@@ -296,21 +298,17 @@ pub const prototype = struct {
             },
         };
 
-        // 4. Let newAsyncDisposableStack be ? OrdinaryCreateFromConstructor(%AsyncDisposableStack%,
-        //    "%AsyncDisposableStack.prototype%", « [[AsyncDisposableState]],
-        //    [[DisposableResourceStack]] »).
-        const new_async_disposable_stack = try ordinaryCreateFromConstructor(
-            AsyncDisposableStack,
-            agent,
-            try realm.intrinsic(.async_disposable_stack),
-            .async_disposable_stack_prototype,
-            .{
+        // 4. Let newAsyncDisposableStack be OrdinaryObjectCreate(%AsyncDisposableStack.prototype%,
+        //    « [[AsyncDisposableState]], [[DisposableResourceStack]] »).
+        const new_async_disposable_stack = try AsyncDisposableStack.create(agent, .{
+            .prototype = try realm.intrinsic(.async_disposable_stack_prototype),
+            .fields = .{
                 // 5. Set newAsyncDisposableStack.[[AsyncDisposableState]] to pending.
                 // 6. Set newAsyncDisposableStack.[[DisposableResourceStack]] to
                 //    asyncDisposableStack.[[DisposableResourceStack]].
                 .pending = disposable_resource_stack.*,
             },
-        );
+        });
 
         // 7. Set asyncDisposableStack.[[DisposableResourceStack]] to a new empty List.
         // 8. Set asyncDisposableStack.[[AsyncDisposableState]] to disposed.

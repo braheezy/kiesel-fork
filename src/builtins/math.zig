@@ -218,7 +218,7 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 2. If n is not a non-zero finite Number, return n.
         // 3. Return an implementation-approximated Number value representing the inverse hyperbolic
         //    sine of ℝ(n).
         return Value.from(std.math.asinh(n.asFloat()));
@@ -288,7 +288,7 @@ pub const namespace = struct {
         // 7. If ny is -0𝔽, then
         //     a. If nx > +0𝔽 or nx is +0𝔽, return -0𝔽.
         //     b. Return an implementation-approximated Number value representing -π.
-        // 8. Assert: ny is finite and is neither +0𝔽 nor -0𝔽.
+        // 8. Assert: ny is a non-zero finite Number.
         // 9. If ny > +0𝔽, then
         //     a. If nx is +∞𝔽, return +0𝔽.
         //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing π.
@@ -299,7 +299,7 @@ pub const namespace = struct {
         //     b. If nx is -∞𝔽, return an implementation-approximated Number value representing -π.
         //     c. If nx is either +0𝔽 or -0𝔽, return an implementation-approximated Number value
         //        representing -π / 2.
-        // 11. Assert: nx is finite and is neither +0𝔽 nor -0𝔽.
+        // 11. Assert: nx is a non-zero finite Number.
         // 12. Let result be the inverse tangent of abs(ℝ(ny) / ℝ(nx)).
         // 13. If nx < -0𝔽, then
         //     a. If ny > +0𝔽, set result to π - result.
@@ -318,7 +318,7 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 2. If n is not a non-zero finite Number, return n.
         // 3. Return an implementation-approximated Number value representing the cube root of ℝ(n).
         return Value.from(std.math.cbrt(n.asFloat()));
     }
@@ -331,7 +331,7 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 2. If n is not a non-zero finite Number, return n.
         // 3. If n < -0𝔽 and n > -1𝔽, return -0𝔽.
         // 4. If n is an integral Number, return n.
         // 5. Return the smallest (closest to -∞) integral Number value that is not less than n.
@@ -362,7 +362,7 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is not finite, return NaN.
+        // 2. If n is not a finite Number, return NaN.
         // 3. If n is either +0𝔽 or -0𝔽, return 1𝔽.
         // 4. Return an implementation-approximated Number value representing the cosine of ℝ(n).
         return Value.from(@cos(n.asFloat()));
@@ -413,7 +413,7 @@ pub const namespace = struct {
         // 4. Let exp be the exponential function of ℝ(n).
         // 5. Return an implementation-approximated Number value representing exp - 1.
         if (n.isNegativeZero()) return Value.from(n);
-        return Value.from(@exp(n.asFloat()) - 1);
+        return Value.from(std.math.expm1(n.asFloat()));
     }
 
     /// 21.3.2.16 Math.floor ( x )
@@ -424,7 +424,7 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 2. If n is not a non-zero finite Number, return n.
         // 3. If n < 1𝔽 and n > +0𝔽, return +0𝔽.
         // 4. If n is an integral Number, return n.
         // 5. Return the greatest (closest to +∞) integral Number value that is not greater than n.
@@ -572,7 +572,7 @@ pub const namespace = struct {
         // 4. If n < -1𝔽, return NaN.
         // 5. Return an implementation-approximated Number value representing ln(1 + ℝ(n)).
         if (n.isNegativeZero()) return Value.from(n);
-        return Value.from(@log(1 + n.asFloat()));
+        return Value.from(std.math.log1p(n.asFloat()));
     }
 
     /// 21.3.2.23 Math.log10 ( x )
@@ -719,7 +719,7 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is not finite or n is an integral Number, return n.
+        // 2. If n is not a finite Number or n is an integral Number, return n.
         // 3. If n < 0.5𝔽 and n > +0𝔽, return +0𝔽.
         // 4. If n < -0𝔽 and n ≥ -0.5𝔽, return -0𝔽.
         // 5. Return the integral Number closest to n, preferring the Number closer to +∞ in the
@@ -769,7 +769,7 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 2. If n is not a non-zero finite Number, return n.
         // 3. Return an implementation-approximated Number value representing the hyperbolic sine of
         //    ℝ(n).
         return Value.from(std.math.sinh(n.asFloat()));
@@ -1046,7 +1046,7 @@ pub const namespace = struct {
         // 1. Let n be ? ToNumber(x).
         const n = try x.toNumber(agent);
 
-        // 2. If n is not finite or n is either +0𝔽 or -0𝔽, return n.
+        // 2. If n is not a non-zero finite Number, return n.
         // 3. If n < 1𝔽 and n > +0𝔽, return +0𝔽.
         // 4. If n < -0𝔽 and n > -1𝔽, return -0𝔽.
         // 5. Return the integral Number nearest n in the direction of +0𝔽.

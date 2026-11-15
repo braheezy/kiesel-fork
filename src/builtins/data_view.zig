@@ -218,7 +218,7 @@ fn setViewValue(
     is_little_endian_value: Value,
     comptime @"type": ElementType,
     value: Value,
-) Agent.Error!Value {
+) Agent.Error!void {
     // 1. Perform ? RequireInternalSlot(view, [[DataView]]).
     // 2. Assert: view has a [[ViewedArrayBuffer]] internal slot.
     const data_view = try view_value.requireInternalSlot(agent, DataView);
@@ -280,8 +280,7 @@ fn setViewValue(
         is_little_endian,
     );
 
-    // 16. Return undefined.
-    return .undefined;
+    // 16. Return unused.
 }
 
 /// 25.3.3 Properties of the DataView Constructor
@@ -526,10 +525,8 @@ pub const prototype = struct {
         // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(obj, seq-cst).
         const view = makeDataViewWithBufferWitnessRecord(data_view, .seq_cst);
 
-        // 5. If IsViewOutOfBounds(viewRecord) is true, throw a TypeError exception.
-        if (isViewOutOfBounds(view)) {
-            return agent.throwException(.type_error, "DataView is out of bounds", .{});
-        }
+        // 5. If IsViewOutOfBounds(viewRecord) is true, return +0𝔽.
+        if (isViewOutOfBounds(view)) return Value.from(0);
 
         // 6. Let size be GetViewByteLength(viewRecord).
         const size = getViewByteLength(view);
@@ -549,10 +546,8 @@ pub const prototype = struct {
         // 4. Let viewRecord be MakeDataViewWithBufferWitnessRecord(obj, seq-cst).
         const view = makeDataViewWithBufferWitnessRecord(data_view, .seq_cst);
 
-        // 5. If IsViewOutOfBounds(viewRecord) is true, throw a TypeError exception.
-        if (isViewOutOfBounds(view)) {
-            return agent.throwException(.type_error, "DataView is out of bounds", .{});
-        }
+        // 5. If IsViewOutOfBounds(viewRecord) is true, return +0𝔽.
+        if (isViewOutOfBounds(view)) return Value.from(0);
 
         // 6. Let offset be obj.[[ByteOffset]].
         const offset = data_view.fields.byte_offset;
@@ -695,8 +690,11 @@ pub const prototype = struct {
         const little_endian = arguments.get(2);
 
         // 1. Let view be the this value.
-        // 2. Return ? SetViewValue(view, byteOffset, littleEndian, bigint64, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .bigint64, value);
+        // 2. Perform ? SetViewValue(view, byteOffset, littleEndian, bigint64, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .bigint64, value);
+
+        // 3. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.17 DataView.prototype.setBigUint64 ( byteOffset, value [ , littleEndian ] )
@@ -707,8 +705,11 @@ pub const prototype = struct {
         const little_endian = arguments.get(2);
 
         // 1. Let view be the this value.
-        // 2. Return ? SetViewValue(view, byteOffset, littleEndian, biguint64, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .biguint64, value);
+        // 2. Perform ? SetViewValue(view, byteOffset, littleEndian, biguint64, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .biguint64, value);
+
+        // 3. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.18 DataView.prototype.setFloat16 ( byteOffset, value [ , littleEndian ] )
@@ -720,8 +721,11 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, float16, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .float16, value);
+        // 3. Perform ? SetViewValue(view, byteOffset, littleEndian, float16, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .float16, value);
+
+        // 4. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.19 DataView.prototype.setFloat32 ( byteOffset, value [ , littleEndian ] )
@@ -733,8 +737,11 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, float32, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .float32, value);
+        // 3. Perform ? SetViewValue(view, byteOffset, littleEndian, float32, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .float32, value);
+
+        // 4. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.20 DataView.prototype.setFloat64 ( byteOffset, value [ , littleEndian ] )
@@ -746,8 +753,11 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, float64, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .float64, value);
+        // 3. Perform ? SetViewValue(view, byteOffset, littleEndian, float64, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .float64, value);
+
+        // 4. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.21 DataView.prototype.setInt8 ( byteOffset, value )
@@ -757,8 +767,11 @@ pub const prototype = struct {
         const value = arguments.get(1);
 
         // 1. Let view be the this value.
-        // 2. Return ? SetViewValue(view, byteOffset, true, int8, value).
-        return setViewValue(agent, this_value, byte_offset, .true, .int8, value);
+        // 2. Perform ? SetViewValue(view, byteOffset, true, int8, value).
+        try setViewValue(agent, this_value, byte_offset, .true, .int8, value);
+
+        // 3. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.22 DataView.prototype.setInt16 ( byteOffset, value [ , littleEndian ] )
@@ -770,8 +783,11 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, int16, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .int16, value);
+        // 3. Perform ? SetViewValue(view, byteOffset, littleEndian, int16, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .int16, value);
+
+        // 4. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.23 DataView.prototype.setInt32 ( byteOffset, value [ , littleEndian ] )
@@ -783,8 +799,11 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, int32, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .int32, value);
+        // 3. Perform ? SetViewValue(view, byteOffset, littleEndian, int32, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .int32, value);
+
+        // 4. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.24 DataView.prototype.setUint8 ( byteOffset, value )
@@ -794,8 +813,11 @@ pub const prototype = struct {
         const value = arguments.get(1);
 
         // 1. Let view be the this value.
-        // 2. Return ? SetViewValue(view, byteOffset, true, uint8, value).
-        return setViewValue(agent, this_value, byte_offset, .true, .uint8, value);
+        // 2. Perform ? SetViewValue(view, byteOffset, true, uint8, value).
+        try setViewValue(agent, this_value, byte_offset, .true, .uint8, value);
+
+        // 3. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.25 DataView.prototype.setUint16 ( byteOffset, value [ , littleEndian ] )
@@ -807,8 +829,11 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, uint16, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .uint16, value);
+        // 3. Perform ? SetViewValue(view, byteOffset, littleEndian, uint16, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .uint16, value);
+
+        // 4. Return undefined.
+        return .undefined;
     }
 
     /// 25.3.4.26 DataView.prototype.setUint32 ( byteOffset, value [ , littleEndian ] )
@@ -820,8 +845,11 @@ pub const prototype = struct {
 
         // 1. Let view be the this value.
         // 2. If littleEndian is not present, set littleEndian to false.
-        // 3. Return ? SetViewValue(view, byteOffset, littleEndian, uint32, value).
-        return setViewValue(agent, this_value, byte_offset, little_endian, .uint32, value);
+        // 3. Perform ? SetViewValue(view, byteOffset, littleEndian, uint32, value).
+        try setViewValue(agent, this_value, byte_offset, little_endian, .uint32, value);
+
+        // 4. Return undefined.
+        return .undefined;
     }
 };
 

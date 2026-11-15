@@ -3,6 +3,7 @@
 
 const std = @import("std");
 
+const build_options = @import("build-options");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
@@ -39,6 +40,8 @@ const isDetachedBuffer = builtins.isDetachedBuffer;
 const isFixedLengthArrayBuffer = builtins.isFixedLengthArrayBuffer;
 const isSharedArrayBuffer = builtins.isSharedArrayBuffer;
 const isStrictlyEqual = types.isStrictlyEqual;
+const joinIndexedProperties = builtins.joinIndexedProperties;
+const localizedListSeparator = builtins.localizedListSeparator;
 const noexcept = utils.noexcept;
 const ordinaryDefineOwnProperty = builtins.ordinaryDefineOwnProperty;
 const ordinaryDelete = builtins.ordinaryDelete;
@@ -1445,15 +1448,18 @@ pub const prototype = struct {
         // 10. Let n be 0.
         // 11. For each element element of kept, do
         for (kept.items, 0..) |element, n| {
-            // a. Perform ! TypedArraySetElement(result, 𝔽(n), element).
-            typedArraySetElement(
+            // a. NOTE: element may be undefined if invoking callback detaches or shrinks the buffer
+            //    backing obj.
+
+            // b. Perform ? TypedArraySetElement(result, 𝔽(n), element).
+            try typedArraySetElement(
                 agent,
                 result_array,
                 .{ .integer_index = @intCast(n) },
                 element,
-            ) catch |err| try noexcept(err);
+            );
 
-            // b. Set n to n + 1.
+            // c. Set n to n + 1.
         }
 
         // 12. Return result.
@@ -1717,47 +1723,22 @@ pub const prototype = struct {
         // 3. Let length be TypedArrayLength(taRecord).
         const length_ = typedArrayLength(ta_record);
 
-        // 4. If separator is undefined, let separatorString be ",".
-        // 5. Else, let separatorString be ? ToString(separator).
-        const separator_string: String.Builder.Segment = if (separator.isUndefined())
-            .{ .char = ',' }
+        // 4. If separator is undefined, let separatorString be ","; else let separatorString be
+        //    ? ToString(separator).
+        const separator_string = if (separator.isUndefined())
+            String.fromLiteral(",")
         else
-            .{ .string = try separator.toString(agent) };
+            try separator.toString(agent);
 
-        // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (length_ == .zero) return Value.from(String.empty);
-
-        // 6. Let result be the empty String.
-        // NOTE: This allocates the maximum needed capacity upfront
-        if (@backingInt(length_) > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@backingInt(length_) * 2) - 1));
-        defer result.deinit(agent.gc_allocator);
-
-        // 7. Let k be 0.
-        var k: u53 = 0;
-
-        // 8. Repeat, while k < length,
-        while (k < @backingInt(length_)) : (k += 1) {
-            // a. If k > 0, set result to the string-concatenation of result and separatorString.
-            if (k > 0) result.appendSegmentAssumeCapacity(separator_string);
-
-            // b. Let element be TypedArrayGetElement(obj, 𝔽(k)).
-            const element = try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
-
-            // c. If element is not undefined, then
-            if (!element.isUndefined()) {
-                // i. Let elementString be ! ToString(element).
-                const element_string = element.toString(agent) catch |err| try noexcept(err);
-
-                // ii. Set result to the string-concatenation of result and elementString.
-                result.appendStringAssumeCapacity(element_string);
-            }
-
-            // d. Set k to k + 1.
-        }
-
-        // 9. Return result.
-        return Value.from(try result.build(agent));
+        // 5. Return ? JoinIndexedProperties(obj, length, separatorString).
+        return Value.from(try joinIndexedProperties(
+            agent,
+            &typed_array.object,
+            @backingInt(length_),
+            separator_string,
+            null,
+            null,
+        ));
     }
 
     /// 23.2.3.19 %TypedArray%.prototype.keys ( )
@@ -2723,56 +2704,55 @@ pub const prototype = struct {
 
     /// 23.2.3.31 %TypedArray%.prototype.toLocaleString ( [ reserved1 [ , reserved2 ] ] )
     /// https://tc39.es/ecma262/#sec-%typedarray%.prototype.tolocalestring
-    fn toLocaleString(agent: *Agent, this_value: Value, _: Arguments) Agent.Error!Value {
-        // 1. Let array be ? ToObject(this value).
-        const ta_record = try validateTypedArray(agent, this_value, .seq_cst);
-        const array = this_value.asObject();
-
-        // 2. Let length be ? LengthOfArrayLike(array).
-        const length_ = typedArrayLength(ta_record);
-
-        // OPTIMIZATION: If the array is empty the result will be an empty string
-        if (length_ == .zero) return Value.from(String.empty);
-
-        // 3. Let separator be the implementation-defined list-separator String value appropriate
-        //    for the host environment's current locale (such as ", ").
-        const separator = String.fromLiteral(", ");
-
-        // 4. Let result be the empty String.
-        // NOTE: This allocates the maximum needed capacity upfront
-        if (@backingInt(length_) > std.math.maxInt(usize)) return error.OutOfMemory;
-        var result = try String.Builder.initCapacity(agent.gc_allocator, @intCast((@backingInt(length_) * 2) - 1));
-        defer result.deinit(agent.gc_allocator);
-
-        // 5. Let k be 0.
-        var k: u53 = 0;
-
-        // 6. Repeat, while k < length,
-        while (k < @backingInt(length_)) : (k += 1) {
-            // a. If k > 0, set R to the string-concatenation of R and separator.
-            if (k > 0) result.appendStringAssumeCapacity(separator);
-
-            // b. Let element be ? Get(array, ! ToString(𝔽(k))).
-            const element = array.get(agent, PropertyKey.from(k)) catch |err| try noexcept(err);
-
-            // c. If element is neither undefined nor null, then
-            if (!element.isUndefined() and !element.isNull()) {
-                // i. Let elementString be ? ToString(? Invoke(element, "toLocaleString")).
-                const string = try (try element.invoke(
-                    agent,
-                    PropertyKey.from("toLocaleString"),
-                    &.{},
-                )).toString(agent);
-
-                // ii. Set result to the string-concatenation of result and elementString.
-                result.appendStringAssumeCapacity(string);
-            }
-
-            // d. Set k to k + 1.
+    fn toLocaleString(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        if (build_options.enable_intl) {
+            return toLocaleStringIntl(agent, this_value, arguments);
         }
 
-        // 7. Return result.
-        return Value.from(try result.build(agent));
+        // 1. Let obj be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(obj, seq-cst).
+        const ta_record = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta_record.object;
+
+        // 3. Let length be TypedArrayLength(taRecord).
+        const length_ = typedArrayLength(ta_record);
+
+        // 4. Return ? JoinIndexedProperties(obj, length, LocalizedListSeparator(),
+        //    "toLocaleString").
+        return Value.from(try joinIndexedProperties(
+            agent,
+            &typed_array.object,
+            @backingInt(length_),
+            localizedListSeparator(),
+            PropertyKey.from("toLocaleString"),
+            null,
+        ));
+    }
+
+    /// 20.6.1 %TypedArray%.prototype.toLocaleString ( [ locales [ , options ] ] )
+    /// https://tc39.es/ecma402/#sup-%typedarray%.prototype.tolocalestring
+    fn toLocaleStringIntl(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
+        const locales = arguments.get(0);
+        const options = arguments.get(1);
+
+        // 1. Let obj be the this value.
+        // 2. Let taRecord be ? ValidateTypedArray(obj, seq-cst).
+        const ta_record = try validateTypedArray(agent, this_value, .seq_cst);
+        const typed_array = ta_record.object;
+
+        // 3. Let length be TypedArrayLength(taRecord).
+        const length_ = typedArrayLength(ta_record);
+
+        // 4. Return ? JoinIndexedProperties(obj, length, LocalizedListSeparator(),
+        //    "toLocaleString", « locales, options »).
+        return Value.from(try joinIndexedProperties(
+            agent,
+            &typed_array.object,
+            @backingInt(length_),
+            localizedListSeparator(),
+            PropertyKey.from("toLocaleString"),
+            &.{ locales, options },
+        ));
     }
 
     /// 23.2.3.32 %TypedArray%.prototype.toReversed ( )
@@ -2949,15 +2929,19 @@ pub const prototype = struct {
             else
                 try typedArrayGetElement(agent, typed_array, .{ .integer_index = k });
 
-            // c. Perform ! TypedArraySetElement(resultArray, 𝔽(k), fromValue).
-            typedArraySetElement(
+            // c. NOTE: fromValue may be undefined if either index or value is an object that runs
+            //    code when coerced to a Number or a BigInt and that code shrinks the buffer backing
+            //    obj.
+
+            // d. Perform ? TypedArraySetElement(resultArray, 𝔽(k), fromValue).
+            try typedArraySetElement(
                 agent,
                 result_array,
                 .{ .integer_index = k },
                 from_value,
-            ) catch |err| try noexcept(err);
+            );
 
-            // d. Set k to k + 1.
+            // e. Set k to k + 1.
         }
 
         // 11. Return resultArray.
@@ -3547,62 +3531,53 @@ fn initializeTypedArrayFromArrayBuffer(
     // 12. Return unused.
 }
 
-/// 23.2.5.1.4 InitializeTypedArrayFromList ( obj, values )
-/// https://tc39.es/ecma262/#sec-initializetypedarrayfromlist
-fn initializeTypedArrayFromList(
+/// 23.2.5.1.4 InitializeTypedArrayFromElements ( obj, source )
+/// https://tc39.es/ecma262/#sec-initializetypedarrayfromelements
+fn initializeTypedArrayFromElements(
     agent: *Agent,
     typed_array: *TypedArray,
-    values: []const Value,
+    source: *Object,
 ) Agent.Error!void {
-    // 1. Let length be the number of elements in values.
-    // NOTE: allocateTypedArrayBuffer() will throw a nice error if this is too large, so truncating is fine
-    const length: ArrayLength = @fromBackingInt(@intCast(values.len));
+    // 1. Let usingIterator be ? GetMethod(source, %Symbol.iterator%).
+    const using_iterator = try source.getMethod(
+        agent,
+        PropertyKey.from(agent.well_known_symbols.iterator),
+    );
 
-    // 2. Perform ? AllocateTypedArrayBuffer(obj, length).
+    // 2. If usingIterator is not undefined, then
+    const maybe_list: ?[]const Value = if (using_iterator != null) blk: {
+        // a. Let list be ? IteratorToList(? GetIteratorFromMethod(source, usingIterator)).
+        var iterator = try getIteratorFromMethod(agent, Value.from(source), using_iterator.?);
+        break :blk try iterator.toList(agent);
+    } else null;
+    defer if (maybe_list) |list| agent.gc_allocator.free(list);
+
+    // b. Let length be the number of elements in list.
+    // 3. Else,
+    //    a. NOTE: source is not iterable, so assume it is an array-like object.
+    //    b. Let length be ? LengthOfArrayLike(source).
+    const length: ArrayLength = if (maybe_list) |list|
+        @fromBackingInt(@intCast(list.len))
+    else
+        @fromBackingInt(try source.lengthOfArrayLike(agent));
+
+    // 4. Perform ? AllocateTypedArrayBuffer(obj, length).
     try allocateTypedArrayBuffer(agent, typed_array, length);
 
-    // 3. Let k be 0.
-    // 4. Repeat, while k < length,
-    for (values, 0..) |k_value, k| {
-        // a. Let kValue be values[k].
-
-        // b. Perform ? TypedArraySetElement(obj, 𝔽(k), kValue).
-        try typedArraySetElement(
-            agent,
-            typed_array,
-            .{ .integer_index = @intCast(k) },
-            k_value,
-        );
-
-        // c. Set k to k + 1.
-    }
-
-    // 5. Return unused.
-}
-
-/// 23.2.5.1.5 InitializeTypedArrayFromArrayLike ( obj, arrayLike )
-/// https://tc39.es/ecma262/#sec-initializetypedarrayfromarraylike
-fn initializeTypedArrayFromArrayLike(
-    agent: *Agent,
-    typed_array: *TypedArray,
-    array_like: *Object,
-) Agent.Error!void {
-    // 1. Let length be ? LengthOfArrayLike(arrayLike).
-    const length: ArrayLength = @fromBackingInt(try array_like.lengthOfArrayLike(agent));
-
-    // 2. Perform ? AllocateTypedArrayBuffer(obj, length).
-    try allocateTypedArrayBuffer(agent, typed_array, length);
-
-    // 3. Let k be 0.
+    // 5. Let k be 0.
     var k: u53 = 0;
 
-    // 4. Repeat, while k < length,
+    // 6. Repeat, while k < length,
     while (k < @backingInt(length)) : (k += 1) {
-        // a. Let propertyKey be ! ToString(𝔽(k)).
-        const property_key = PropertyKey.from(k);
-
-        // b. Let kValue be ? Get(arrayLike, propertyKey).
-        const k_value = try array_like.get(agent, property_key);
+        // a. If usingIterator is not undefined, then
+        //     i. Let kValue be list[k].
+        // b. Else,
+        //     i. Let propertyKey be ! ToString(𝔽(k)).
+        //     ii. Let kValue be ? Get(source, propertyKey).
+        const k_value = if (maybe_list) |list|
+            list[@intCast(k)]
+        else
+            try source.get(agent, PropertyKey.from(k));
 
         // c. Perform ? TypedArraySetElement(obj, 𝔽(k), kValue).
         try typedArraySetElement(agent, typed_array, .{ .integer_index = k }, k_value);
@@ -3610,10 +3585,10 @@ fn initializeTypedArrayFromArrayLike(
         // d. Set k to k + 1.
     }
 
-    // 5. Return unused.
+    // 7. Return unused.
 }
 
-/// 23.2.5.1.6 AllocateTypedArrayBuffer ( obj, length )
+/// 23.2.5.1.5 AllocateTypedArrayBuffer ( obj, length )
 /// https://tc39.es/ecma262/#sec-allocatetypedarraybuffer
 fn allocateTypedArrayBuffer(
     agent: *Agent,
@@ -4045,37 +4020,12 @@ fn MakeTypedArrayConstructor(comptime element_type: ElementType) type {
                             !first_arg.asObject().is(builtins.ArrayBuffer),
                     );
 
-                    // ii. Let usingIterator be ? GetMethod(firstArg, %Symbol.iterator%).
-                    const using_iterator = try first_arg.getMethod(
+                    // ii. Perform ? InitializeTypedArrayFromElements(obj, firstArg).
+                    try initializeTypedArrayFromElements(
                         agent,
-                        PropertyKey.from(agent.well_known_symbols.iterator),
+                        typed_array,
+                        first_arg.asObject(),
                     );
-
-                    // iii. If usingIterator is not undefined, then
-                    if (using_iterator != null) {
-                        // 1. Let values be ? IteratorToList(? GetIteratorFromMethod(firstArg,
-                        //    usingIterator)).
-                        var iterator = try getIteratorFromMethod(
-                            agent,
-                            first_arg,
-                            using_iterator.?,
-                        );
-                        const values = try iterator.toList(agent);
-                        defer agent.gc_allocator.free(values);
-
-                        // 2. Perform ? InitializeTypedArrayFromList(obj, values).
-                        try initializeTypedArrayFromList(agent, typed_array, values);
-                    } else {
-                        // iv. Else,
-                        // 1. NOTE: firstArg is not an iterable object, so assume it is already an
-                        //    array-like object.
-                        // 2. Perform ? InitializeTypedArrayFromArrayLike(obj, firstArg).
-                        try initializeTypedArrayFromArrayLike(
-                            agent,
-                            typed_array,
-                            first_arg.asObject(),
-                        );
-                    }
                 }
 
                 // e. Return obj.

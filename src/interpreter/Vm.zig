@@ -233,6 +233,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .negate => vm.executeNegate(data.reg_reg[0], data.reg_reg[1]),
                 .bitwise_not => vm.executeBitwiseNot(data.reg_reg[0], data.reg_reg[1]),
                 .logical_not => vm.executeLogicalNot(data.reg_reg[0], data.reg_reg[1]),
+                .is_nullish => vm.executeIsNullish(data.reg_reg[0], data.reg_reg[1]),
                 .typeof => vm.executeTypeof(data.reg_reg[0], data.reg_reg[1]),
                 .typeof_local => vm.executeTypeofLocal(data.reg_local[0], data.reg_local[1]),
                 .typeof_binding => vm.executeTypeofBinding(data.reg_string[0], data.reg_string[1]),
@@ -259,6 +260,7 @@ pub fn run(vm: *Vm, options: RunOptions) Agent.Error!RunResult {
                 .eq_strict => vm.executeEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .not_eq_strict => vm.executeNotEqStrict(data.reg_reg_reg[0], data.reg_reg_reg[1], data.reg_reg_reg[2]),
                 .push_scope => vm.executePushScope(),
+                .push_catch_scope => vm.executePushCatchScope(),
                 .push_var_scope => vm.executePushVarScope(),
                 .push_with_scope => vm.executePushWithScope(data.reg),
                 .pop_scope => vm.executePopScope(),
@@ -797,11 +799,8 @@ fn executeObjectSetPrototype(vm: *Vm, object_reg: Bytecode.Reg, value_reg: Bytec
     const proto = vm.store(value_reg);
 
     if (proto.isObject() or proto.isNull()) {
-        _ = object.internalMethods().setPrototypeOf(
-            vm.agent,
-            object,
-            if (proto.isObject()) proto.asObject() else null,
-        ) catch |err| try noexcept(err);
+        std.debug.assert(object.internalMethods().flags.contains(.ordinary_set_prototype_of));
+        try object.setPrototype(vm.agent, if (proto.isObject()) proto.asObject() else null);
     }
 }
 
@@ -924,6 +923,11 @@ fn executeBitwiseNot(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) Agent.Error!
 fn executeLogicalNot(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
     const value = vm.store(src);
     vm.load(dst, Value.from(!value.toBoolean()));
+}
+
+fn executeIsNullish(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
+    const value = vm.store(src);
+    vm.load(dst, Value.from(value.isNull() or value.isUndefined()));
 }
 
 fn executeTypeof(vm: *Vm, dst: Bytecode.Reg, src: Bytecode.Reg) void {
@@ -1363,6 +1367,15 @@ fn executePushScope(vm: *Vm) std.mem.Allocator.Error!void {
     const old_env = execution_context.ecmascript_code.lexical_environment;
     const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
     execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+    vm.frame.scope_depth += 1;
+}
+
+fn executePushCatchScope(vm: *Vm) std.mem.Allocator.Error!void {
+    const execution_context = vm.agent.runningExecutionContext();
+    const old_env = execution_context.ecmascript_code.lexical_environment;
+    const env = try newDeclarativeEnvironment(vm.agent.gc_allocator, old_env);
+    execution_context.ecmascript_code.lexical_environment = .{ .declarative_environment = env };
+    env.is_catch_env = true;
     vm.frame.scope_depth += 1;
 }
 
@@ -2453,7 +2466,7 @@ fn executeSuperCall(
 fn executeGetSuperProperty(vm: *Vm, dest: Bytecode.Reg, name_index: Bytecode.StringIndex) Agent.Error!void {
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
-    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base = env.function_environment.getSuperBase();
     const base_value: Value = switch (base) {
         .undefined => .undefined,
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
@@ -2468,7 +2481,7 @@ fn executeGetSuperPropertyComputed(vm: *Vm, dest: Bytecode.Reg, property_reg: By
     const property_value = vm.store(property_reg);
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
-    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base = env.function_environment.getSuperBase();
     const base_value: Value = switch (base) {
         .undefined => .undefined,
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
@@ -2483,7 +2496,7 @@ fn executeSetSuperProperty(vm: *Vm, value_reg: Bytecode.Reg, name_index: Bytecod
     const value = vm.store(value_reg);
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
-    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base = env.function_environment.getSuperBase();
     const base_value: Value = switch (base) {
         .undefined => .undefined,
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,
@@ -2502,7 +2515,7 @@ fn executeSetSuperPropertyComputed(vm: *Vm, property_reg: Bytecode.Reg, value_re
     const value = vm.store(value_reg);
     const env = vm.agent.getThisEnvironment();
     const actual_this = try env.getThisBinding(vm.agent);
-    const base = try env.function_environment.getSuperBase(vm.agent);
+    const base = env.function_environment.getSuperBase();
     const base_value: Value = switch (base) {
         .undefined => .undefined,
         .object => |maybe_object| if (maybe_object) |o| Value.from(o) else .null,

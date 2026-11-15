@@ -40,7 +40,7 @@ pub fn build(b: *std.Build) void {
         },
     );
 
-    const zement = b.addModule("zement", .{
+    const module = b.addModule("zement", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,
         .optimize = optimize,
@@ -60,16 +60,19 @@ pub fn build(b: *std.Build) void {
     // *-pc-windows-gnu, so we can hardcode the name here instead of using
     // `std.zig.binNameAlloc()` to select a target-dependent prefix and extension.
     // See: https://github.com/rust-lang/rust/pull/70937
-    zement.addObjectFile(build_dir.path(b, "libzement.a"));
+    module.addObjectFile(build_dir.path(b, "libzement.a"));
     // icu4zig provides its own copies of these symbols so we link them as a
     // static library which will only include them if needed.
-    zement.linkLibrary(unwind_stubs);
+    module.linkLibrary(unwind_stubs);
 
-    // NOTE: Empirically these are not needed in release builds, presumably due to LTO.
-    if (target.result.os.tag == .windows and optimize == .debug) {
-        // For GetUserProfileDirectoryW
-        zement.linkSystemLibrary("userenv", .{});
-        // For a bunch of networking APIs
-        zement.linkSystemLibrary("ws2_32", .{});
+    // NOTE: Rust links a handful of libraries on Windows that Zig doesn't link by default.
+    // https://github.com/rust-lang/rust/blob/8eb778d04094d3af4b26580cab327e0413eb1e02/library/windows_link/src/lib.rs#L45-L52
+    if (target.result.os.tag == .windows) {
+        // NOTE: Empirically these are not needed in release builds due to LTO.
+        if (optimize == .debug) {
+            module.linkSystemLibrary("userenv", .{});
+            module.linkSystemLibrary("ws2_32", .{});
+        }
+        module.linkSystemLibrary("api-ms-win-core-synch-l1-2-0", .{}); // "synchronization"
     }
 }

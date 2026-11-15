@@ -6,6 +6,7 @@ const std = @import("std");
 const builtins = @import("../builtins.zig");
 const execution = @import("../execution.zig");
 const types = @import("../types.zig");
+const utils = @import("../utils.zig");
 
 const Agent = execution.Agent;
 const Arguments = types.Arguments;
@@ -19,6 +20,7 @@ const Value = types.Value;
 const createArrayFromList = types.createArrayFromList;
 const createBuiltinFunction = builtins.createBuiltinFunction;
 const getIterator = types.getIterator;
+const noexcept = utils.noexcept;
 const ordinaryCreateFromConstructor = builtins.ordinaryCreateFromConstructor;
 const ordinaryObjectCreate = builtins.ordinaryObjectCreate;
 const sameValue = types.sameValue;
@@ -626,13 +628,13 @@ pub fn newPromiseResolveThenableJob(
                 error.ExceptionThrown => {
                     const exception = agent_.clearException();
 
-                    // i. Return ? Call(resolvingFuncs.[[Reject]], undefined,
+                    // i. Return ! Call(resolvingFuncs.[[Reject]], undefined,
                     //    « thenCallResult.[[Value]] »).
                     return resolving_funcs.reject.object.call(
                         agent_,
                         .undefined,
                         &.{exception.value},
-                    );
+                    ) catch |err_| try noexcept(err_);
                 },
             };
 
@@ -1873,9 +1875,13 @@ pub const constructor = struct {
             error.ExceptionThrown => {
                 const exception = agent.clearException();
 
-                // a. Perform ? Call(resolvingFuncs.[[Reject]], undefined,
+                // a. Perform ! Call(resolvingFuncs.[[Reject]], undefined,
                 //    « completion.[[Value]] »).
-                _ = try resolving_funcs.reject.object.call(agent, .undefined, &.{exception.value});
+                _ = resolving_funcs.reject.object.call(
+                    agent,
+                    .undefined,
+                    &.{exception.value},
+                ) catch |err_| try noexcept(err_);
             },
         };
 

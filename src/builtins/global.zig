@@ -346,8 +346,8 @@ else
 fn eval(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     const source = arguments.get(0);
 
-    // 1. Return ? PerformEval(source, false, false).
-    return performEval(agent, source, false, false);
+    // 1. Return ? PerformEval(source, false, indirect-eval).
+    return performEval(agent, source, false, .indirect_eval);
 }
 
 /// 19.2.2 isFinite ( value )
@@ -358,7 +358,7 @@ fn isFinite(agent: *Agent, _: Value, arguments: Arguments) Agent.Error!Value {
     // 1. Let number be ? ToNumber(value).
     const number = try value.toNumber(agent);
 
-    // 2. If number is finite, return true.
+    // 2. If number is a finite Number, return true.
     // 3. Return false.
     return Value.from(number.isFinite());
 }

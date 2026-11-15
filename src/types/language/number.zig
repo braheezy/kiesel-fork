@@ -295,7 +295,7 @@ pub const Number = union(enum) {
                 .{ .f64 = std.math.inf(f64) };
         }
 
-        // 8. Assert: base is finite and is neither +0𝔽 nor -0𝔽.
+        // 8. Assert: base is a non-zero finite Number.
         std.debug.assert(base.isFinite() and !base.isZero());
 
         // 9. If exponent is +∞𝔽, then
@@ -324,7 +324,7 @@ pub const Number = union(enum) {
                 .{ .f64 = std.math.inf(f64) };
         }
 
-        // 11. Assert: exponent is finite and is neither +0𝔽 nor -0𝔽.
+        // 11. Assert: exponent is a non-zero finite Number.
         std.debug.assert(exponent.isFinite() and !exponent.isZero());
 
         // 12. If base < -0𝔽 and exponent is not an integral Number, return NaN.
@@ -371,24 +371,16 @@ pub const Number = union(enum) {
         // 5. If numerator is either +0𝔽 or -0𝔽, return numerator.
         if (numerator.isZero()) return numerator;
 
-        // 6. Assert: numerator and denominator are finite and non-zero.
+        // 6. Assert: numerator and denominator are non-zero finite Numbers.
         std.debug.assert(numerator.isFinite() and numerator.asFloat() != 0);
         std.debug.assert(denominator.isFinite() and denominator.asFloat() != 0);
 
         // 7. Let quotient be ℝ(numerator) / ℝ(denominator).
-        const quotient = numerator.asFloat() / denominator.asFloat();
-
         // 8. Let truncatedQuotient be truncate(quotient).
-        const truncated_quotient = @trunc(quotient);
-
         // 9. Let remainder be ℝ(numerator) - (ℝ(denominator) × truncatedQuotient).
-        const remainder_ = numerator.asFloat() - (denominator.asFloat() * truncated_quotient);
-
         // 10. If remainder = 0 and numerator < -0𝔽, return -0𝔽.
-        if (remainder_ == 0 and numerator.asFloat() < 0) return .{ .f64 = -0.0 };
-
         // 11. Return 𝔽(remainder).
-        return from(remainder_);
+        return from(@rem(numerator.asFloat(), denominator.asFloat()));
     }
 
     /// 6.1.6.1.7 Number::add ( x, y )
@@ -494,7 +486,7 @@ pub const Number = union(enum) {
         // 9. If x is -∞𝔽, return true.
         if (x.isNegativeInf()) return true;
 
-        // 10. Assert: x and y are finite.
+        // 10. Assert: x and y are finite Numbers.
         std.debug.assert(std.math.isFinite(x.asFloat()) and std.math.isFinite(y.asFloat()));
 
         // 11. If ℝ(x) < ℝ(y), return true.
@@ -562,18 +554,18 @@ pub const Number = union(enum) {
 
         const result = switch (op) {
             // 5. If op is `&`, then
-            // a. Let result be the result of applying the bitwise AND operation to leftBits and
+            // a. Let result be the result of applying the bitwise `AND` operation to leftBits and
             //    rightBits.
             .@"&" => left_number & right_number,
 
             // 6. Else if op is `^`, then
-            // a. Let result be the result of applying the bitwise exclusive OR (XOR) operation to
+            // a. Let result be the result of applying the bitwise `XOR` (exclusive OR) operation to
             //    leftBits and rightBits.
             .@"^" => left_number ^ right_number,
 
             // 7. Else,
             // a. Assert: op is `|`.
-            // b. Let result be the result of applying the bitwise inclusive OR operation to
+            // b. Let result be the result of applying the bitwise `OR` (inclusive OR) operation to
             //    leftBits and rightBits.
             .@"|" => left_number | right_number,
         };
@@ -653,7 +645,8 @@ pub const Number = union(enum) {
             return;
         }
 
-        // TODO: Implement steps 5-12 according to spec!
+        // 5-12.
+        // TODO: Implement this according to spec!
         switch (self) {
             .f64 => |x| if (@abs(x) >= 1e-6 and @abs(x) < 1e21)
                 try writer.print("{d}", .{x})

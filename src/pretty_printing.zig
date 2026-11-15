@@ -10,7 +10,6 @@ const types = @import("types.zig");
 const Agent = execution.Agent;
 const BigInt = types.BigInt;
 const Object = types.Object;
-const PropertyKey = types.PropertyKey;
 const String = types.String;
 const Value = types.Value;
 const fmtToDateString = builtins.date.fmtToDateString;
@@ -1300,11 +1299,22 @@ fn prettyPrintFunction(
     object: *const Object,
     terminal: std.Io.Terminal,
 ) PrettyPrintError!void {
-    const name = object.getPropertyValueDirect(PropertyKey.from("name")).asString();
+    var target = object;
+    while (target.cast(builtins.BoundFunction)) |func| : (target = func.fields.bound_target_function) {}
+
+    const name = if (target.cast(builtins.ECMAScriptFunction)) |func|
+        func.fields.initial_name.?
+    else if (target.cast(builtins.BuiltinFunction)) |func|
+        func.fields.initial_name orelse String.empty
+    else
+        unreachable;
 
     try terminal.setColor(.bold);
     try terminal.setColor(.blue);
-    if (object.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
+    if (object.is(builtins.BoundFunction)) {
+        try terminal.writer.writeAll("bound ");
+    }
+    if (target.cast(builtins.ECMAScriptFunction)) |ecmascript_function| {
         const function_body = ecmascript_function.fields.ecmascript_code;
         switch (function_body.type) {
             .normal => try terminal.writer.writeAll("fn "),

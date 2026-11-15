@@ -3,7 +3,6 @@ const std = @import("std");
 const libregexp = @import("libregexp");
 
 const build_options = @import("build-options");
-const builtins = @import("../builtins.zig");
 const language = @import("../language.zig");
 const types = @import("../types.zig");
 const utils = @import("../utils.zig");
@@ -12,9 +11,7 @@ const BigInt = types.BigInt;
 const ImportAttribute = language.ImportAttribute;
 const ExportEntry = language.ExportEntry;
 const ImportEntry = language.ImportEntry;
-const LreOpaque = builtins.reg_exp.LreOpaque;
 const ModuleRequest = language.ModuleRequest;
-const ParsedFlags = builtins.reg_exp.ParsedFlags;
 const String = types.String;
 const Tokenizer = language.Tokenizer;
 const Value = types.Value;
@@ -388,7 +385,7 @@ pub const RegularExpressionLiteral = struct {
         // 2. If flags contains any code points other than `d`, `g`, `i`, `m`, `s`, `u`, `v`, or
         //    `y`, return false.
         // 3. If flags contains any code point more than once, return false.
-        const parsed_flags = ParsedFlags.from(self.flags) orelse return .invalid_flags;
+        const parsed_flags = libregexp.Flags.parse(self.flags) orelse return .invalid_flags;
 
         // 4. If flags contains `u`, let u be true; else let u be false.
         // 5. If flags contains `v`, let v be true; else let v be false.
@@ -401,25 +398,37 @@ pub const RegularExpressionLiteral = struct {
         // 8. Let parseResult be ParsePattern(patternText, u, v).
         // 9. If parseResult is a Parse Node, return true.
         // 10. Return false.
-        var re_bytecode_len: c_int = undefined;
-        var error_msg: [64]u8 = undefined;
         // NOTE: Despite passing in the buffer length below, this needs to be null-terminated.
-        const buf = try allocator.dupeSentinel(u8, self.pattern, 0);
+        const buf = if (parsed_flags.unicode or parsed_flags.unicode_sets)
+            try allocator.dupeSentinel(u8, self.pattern, 0)
+        else blk: {
+            var cesu8: std.ArrayList(u8) = try .initCapacity(allocator, self.pattern.len);
+            defer cesu8.deinit(allocator);
+            var encoded: [6]u8 = undefined;
+            var i: usize = 0;
+            while (i < self.pattern.len) {
+                const len = std.unicode.utf8ByteSequenceLength(self.pattern[i]) catch unreachable;
+                const code_point = std.unicode.wtf8Decode(self.pattern[i..][0..len]) catch unreachable;
+                if (code_point < 0x10000) {
+                    const encoded_len = std.unicode.wtf8Encode(code_point, &encoded) catch unreachable;
+                    try cesu8.appendSlice(allocator, encoded[0..encoded_len]);
+                } else {
+                    const high_len = std.unicode.wtf8Encode(0xd800 | ((code_point - 0x10000) >> 10), &encoded) catch unreachable;
+                    const low_len = std.unicode.wtf8Encode(0xdc00 | ((code_point - 0x10000) & 0x3ff), encoded[high_len..]) catch unreachable;
+                    try cesu8.appendSlice(allocator, encoded[0 .. high_len + low_len]);
+                }
+                i += len;
+            }
+            break :blk try cesu8.toOwnedSliceSentinel(allocator, 0);
+        };
         defer allocator.free(buf);
-        var @"opaque": LreOpaque = .{ .allocator = allocator };
         // TODO: Plumb the resulting bytecode into the created RegExp object somehow.
-        _ = libregexp.c.lre_compile(
-            &re_bytecode_len,
-            &error_msg,
-            error_msg.len,
-            buf.ptr,
-            buf.len,
-            parsed_flags.asLreFlags(),
-            &@"opaque",
-        ) orelse {
-            const str = std.mem.span(@as([*:0]const u8, @ptrCast(&error_msg)));
-            if (std.mem.eql(u8, str, "out of memory")) return error.OutOfMemory;
-            return .{ .invalid_pattern = try allocator.dupe(u8, str) };
+        var error_msg: []const u8 = undefined;
+        _ = libregexp.compile(allocator, buf, parsed_flags, &error_msg) catch |err| switch (err) {
+            error.OutOfMemory => |e| return e,
+            error.LreError => {
+                return .{ .invalid_pattern = error_msg };
+            },
         };
         return .valid;
     }
@@ -4194,7 +4203,7 @@ pub const ImportClause = union(enum) {
                         .identifier => |identifier| identifier,
                         .string_literal => |string_literal| try (try string_literal.stringValue(
                             allocator,
-                        )).toUtf8(allocator),
+                        )).toWtf8(allocator),
                     };
 
                     // 2. Let localName be the StringValue of ImportedBinding.
@@ -4552,7 +4561,7 @@ pub const ExportFromClause = union(enum) {
                 // 1. Let exportName be the StringValue of ModuleExportName.
                 const export_name = switch (module_export_name) {
                     .identifier => |identifier| identifier,
-                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toWtf8(allocator),
                 };
 
                 // 2. Let entry be the ExportEntry Record { [[ModuleRequest]]: module,
@@ -4601,7 +4610,7 @@ pub const NamedExports = struct {
                 // 1. Let sourceName be the StringValue of ModuleExportName.
                 const source_name = switch (export_specifier.name) {
                     .identifier => |identifier| identifier,
-                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toWtf8(allocator),
                 };
 
                 // 2. If module is null, then
@@ -4631,13 +4640,13 @@ pub const NamedExports = struct {
                 // 1. Let sourceName be the StringValue of the first ModuleExportName.
                 const source_name = switch (export_specifier.name) {
                     .identifier => |identifier| identifier,
-                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toWtf8(allocator),
                 };
 
                 // 2. Let exportName be the StringValue of the second ModuleExportName.
                 const export_name = switch (export_specifier.alias.?) {
                     .identifier => |identifier| identifier,
-                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toUtf8(allocator),
+                    .string_literal => |string_literal| try (try string_literal.stringValue(allocator)).toWtf8(allocator),
                 };
 
                 // 3. If module is null, then

@@ -48,71 +48,57 @@ pub fn addDisposableResource(
     maybe_method: ?*Object,
 ) Agent.Error!void {
     // 1. If method is present, then
-    const resource = if (maybe_method) |method| blk: {
+    const resource: DisposableResource = if (maybe_method) |method| blk: {
         // a. Assert: value is undefined.
         std.debug.assert(value.isUndefined());
 
-        // b. Let resource be ? CreateDisposableResource(undefined, kind, method).
-        break :blk try createDisposableResource(agent, .undefined, kind, method);
-    } else blk: {
-        // 2. Else,
-        // a. If value is either null or undefined and kind is sync-dispose, return unused.
+        // b. Let resource be the DisposableResource Record { [[ResourceValue]]: undefined,
+        //    [[Kind]]: kind, [[DisposeMethod]]: method }.
+        break :blk .{
+            .resource_value = null,
+            .kind = kind,
+            .dispose_method = method,
+        };
+    } else if (value.isNull() or value.isUndefined()) blk: {
+        // 2. Else if value is either null or undefined, then
+        //     a. If kind is sync-dispose, return unused.
+        if (kind == .sync_dispose) return;
+
         // b. NOTE: When value is either null or undefined and kind is async-dispose, we record that
         //    the resource was evaluated to ensure we will still perform an Await when resources are
         //    later disposed.
-        if ((value.isNull() or value.isUndefined()) and kind == .sync_dispose) {
-            return;
-        }
 
-        // c. Let resource be ? CreateDisposableResource(value, kind).
-        break :blk try createDisposableResource(agent, value, kind, null);
+        // c. Let resource be the DisposableResource Record { [[ResourceValue]]: undefined,
+        //    [[Kind]]: async-dispose, [[DisposeMethod]]: undefined }.
+        break :blk .{
+            .resource_value = null,
+            .kind = .async_dispose,
+            .dispose_method = null,
+        };
+    } else blk: {
+        // 3. Else,
+        //     a. Set method to ? GetDisposeMethod(value, kind).
+        const method = try getDisposeMethod(agent, value, kind) orelse {
+            // b. If method is undefined, throw a TypeError exception.
+            return agent.throwException(.type_error, "{f} is not disposable", .{value});
+        };
+
+        // c. Let resource be the DisposableResource Record { [[ResourceValue]]: value,
+        //    [[Kind]]: kind, [[DisposeMethod]]: method }.
+        break :blk .{
+            .resource_value = value.asObject(),
+            .kind = kind,
+            .dispose_method = method,
+        };
     };
 
-    // 3. Append resource to disposableResourceStack.
+    // 4. Append resource to disposableResourceStack.
     try disposable_resource_stack.append(agent.gc_allocator, resource);
 
-    // 4. Return unused.
+    // 5. Return unused.
 }
 
-/// 7.5.3 CreateDisposableResource ( value, kind [ , method ] )
-/// https://tc39.es/ecma262/#sec-createdisposableresource
-pub fn createDisposableResource(
-    agent: *Agent,
-    value: Value,
-    kind: DisposableResource.Kind,
-    maybe_method: ?*Object,
-) Agent.Error!DisposableResource {
-    // 1. If method is not present, then
-    const resource_value, const method = if (maybe_method) |method| blk: {
-        std.debug.assert(value.isUndefined());
-        break :blk .{ null, method };
-    } else blk: {
-        // a. If value is either null or undefined, then
-        if (value.isNull() or value.isUndefined()) {
-            // i. Set value to undefined.
-            // ii. Set method to undefined.
-            break :blk .{ null, null };
-        } else {
-            // b. Else,
-            // i. Set method to ? GetDisposeMethod(value, kind).
-            const method = try getDisposeMethod(agent, value, kind) orelse {
-                // ii. If method is undefined, throw a TypeError exception.
-                return agent.throwException(.type_error, "{f} is not disposable", .{value});
-            };
-            break :blk .{ value.asObject(), method };
-        }
-    };
-
-    // 2. Return the DisposableResource Record { [[ResourceValue]]: value, [[Kind]]: kind,
-    //    [[DisposeMethod]]: method }.
-    return .{
-        .resource_value = resource_value,
-        .kind = kind,
-        .dispose_method = method,
-    };
-}
-
-/// 7.5.4 GetDisposeMethod ( value, kind )
+/// 7.5.3 GetDisposeMethod ( value, kind )
 /// https://tc39.es/ecma262/#sec-getdisposemethod
 pub fn getDisposeMethod(
     agent: *Agent,
@@ -208,7 +194,7 @@ pub fn getDisposeMethod(
     return &func.object;
 }
 
-/// 7.5.5 DisposeResources ( disposableResourceStack, completion )
+/// 7.5.4 DisposeResources ( disposableResourceStack, completion )
 /// https://tc39.es/ecma262/#sec-disposeresources
 pub fn disposeResources(
     agent: *Agent,
@@ -292,19 +278,19 @@ pub fn disposeResources(
                     );
 
                     // d. Perform CreateNonEnumerableDataPropertyOrThrow(error, "error", result).
-                    @"error".object.createNonEnumerableDataPropertyOrThrow(
+                    try @"error".object.createNonEnumerableDataPropertyOrThrow(
                         agent,
                         PropertyKey.from("error"),
                         result_value,
-                    ) catch |e| try noexcept(e);
+                    );
 
                     // e. Perform CreateNonEnumerableDataPropertyOrThrow(error, "suppressed",
                     //    suppressed).
-                    @"error".object.createNonEnumerableDataPropertyOrThrow(
+                    try @"error".object.createNonEnumerableDataPropertyOrThrow(
                         agent,
                         PropertyKey.from("suppressed"),
                         suppressed,
-                    ) catch |e| try noexcept(e);
+                    );
 
                     // f. Set outputCompletion to ThrowCompletion(error).
                     maybe_output_exception = .{

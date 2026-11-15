@@ -19,10 +19,10 @@ const Parser = language.Parser;
 const Realm = execution.Realm;
 const String = types.String;
 const Value = types.Value;
-const instantiateAsyncFunctionObject = language.instantiateAsyncFunctionObject;
-const instantiateAsyncGeneratorFunctionObject = language.instantiateAsyncGeneratorFunctionObject;
-const instantiateGeneratorFunctionObject = language.instantiateGeneratorFunctionObject;
-const instantiateOrdinaryFunctionObject = language.instantiateOrdinaryFunctionObject;
+const instantiateAsyncFunctionDeclaration = language.instantiateAsyncFunctionDeclaration;
+const instantiateAsyncGeneratorDeclaration = language.instantiateAsyncGeneratorDeclaration;
+const instantiateGeneratorDeclaration = language.instantiateGeneratorDeclaration;
+const instantiateOrdinaryFunctionDeclaration = language.instantiateOrdinaryFunctionDeclaration;
 
 const Script = @This();
 
@@ -346,13 +346,13 @@ pub fn globalDeclarationInstantiation(
             inline else => |func_decl| try String.fromUtf8(agent, func_decl.identifier.?),
         };
 
-        // b. Let funcObj be InstantiateFunctionObject of funcDecl with arguments envRecord and
+        // b. Let funcObj be InstantiateFunctionDeclaration of funcDecl with arguments envRecord and
         //    privateEnv.
         const func_obj = try switch (hoistable_decl) {
-            .function_declaration => |func_decl| instantiateOrdinaryFunctionObject(agent, func_decl, .{ .global_environment = env }, private_env, source),
-            .generator_declaration => |gen_decl| instantiateGeneratorFunctionObject(agent, gen_decl, .{ .global_environment = env }, private_env, source),
-            .async_function_declaration => |async_func_decl| instantiateAsyncFunctionObject(agent, async_func_decl, .{ .global_environment = env }, private_env, source),
-            .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorFunctionObject(agent, async_gen_decl, .{ .global_environment = env }, private_env, source),
+            .function_declaration => |func_decl| instantiateOrdinaryFunctionDeclaration(agent, func_decl, .{ .global_environment = env }, private_env, source),
+            .generator_declaration => |gen_decl| instantiateGeneratorDeclaration(agent, gen_decl, .{ .global_environment = env }, private_env, source),
+            .async_function_declaration => |async_func_decl| instantiateAsyncFunctionDeclaration(agent, async_func_decl, .{ .global_environment = env }, private_env, source),
+            .async_generator_declaration => |async_gen_decl| instantiateAsyncGeneratorDeclaration(agent, async_gen_decl, .{ .global_environment = env }, private_env, source),
         };
 
         // c. Perform ? CreateGlobalFunctionBinding(envRecord, funcName, funcObj, false).

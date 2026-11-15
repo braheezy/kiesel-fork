@@ -1860,12 +1860,12 @@ pub const prototype = struct {
         return Value.from(try string.substring(agent, from, to));
     }
 
-    /// 22.1.3.23 String.prototype.split ( separator, limit )
+    /// 22.1.3.23 String.prototype.split ( separator, substringLimit )
     /// https://tc39.es/ecma262/#sec-string.prototype.split
     fn split(agent: *Agent, this_value: Value, arguments: Arguments) Agent.Error!Value {
         const gpa = agent.gpa;
-        const separator_value = arguments.get(0);
-        const limit_value = arguments.get(1);
+        const separator = arguments.get(0);
+        const substring_limit = arguments.get(1);
 
         // 1. Let thisValue be the this value.
 
@@ -1873,41 +1873,42 @@ pub const prototype = struct {
         try this_value.requireObjectCoercible(agent);
 
         // 3. If separator is an Object, then
-        if (separator_value.isObject()) {
+        if (separator.isObject()) {
             // a. Let splitter be ? GetMethod(separator, %Symbol.split%).
-            const maybe_splitter = try separator_value.getMethod(
+            const maybe_splitter = try separator.getMethod(
                 agent,
                 PropertyKey.from(agent.well_known_symbols.split),
             );
 
             // b. If splitter is not undefined, then
             if (maybe_splitter) |splitter| {
-                // i. Return ? Call(splitter, separator, « thisValue, limit »).
-                return splitter.call(agent, separator_value, &.{ this_value, limit_value });
+                // i. Return ? Call(splitter, separator, « thisValue, substringLimit »).
+                return splitter.call(agent, separator, &.{ this_value, substring_limit });
             }
         }
 
         // 4. Let string be ? ToString(thisValue).
         const string = try this_value.toString(agent);
 
-        // 5. If limit is undefined, let lim be 2**32 - 1; else let lim be ℝ(? ToUint32(limit)).
-        const limit = if (limit_value.isUndefined())
+        // 5. If substringLimit is undefined, let substringLimitInt be 2**32 - 1; else let
+        //    substringLimitInt be ℝ(? ToUint32(substringLimit)).
+        const substring_limit_int = if (substring_limit.isUndefined())
             std.math.maxInt(u32)
         else
-            try limit_value.toUint32(agent);
+            try substring_limit.toUint32(agent);
 
         // 6. Let separatorString be ? ToString(separator).
-        const separator_string = try separator_value.toString(agent);
+        const separator_string = try separator.toString(agent);
 
-        // 7. If lim = 0, then
-        if (limit == 0) {
+        // 7. If substringLimitInt = 0, then
+        if (substring_limit_int == 0) {
             // a. Return CreateArrayFromList(« »).
             const array = try createArrayFromList(agent, &.{});
             return Value.from(&array.object);
         }
 
         // 8. If separator is undefined, then
-        if (separator_value.isUndefined()) {
+        if (separator.isUndefined()) {
             // a. Return CreateArrayFromList(« string »).
             const array = try createArrayFromList(agent, &.{Value.from(string)});
             return Value.from(&array.object);
@@ -1921,8 +1922,9 @@ pub const prototype = struct {
             // a. Let stringLength be the length of string.
             const string_length = string.length;
 
-            // b. Let outLength be the result of clamping lim between 0 and stringLength.
-            const out_length = std.math.clamp(limit, 0, string_length);
+            // b. Let outLength be the result of clamping substringLimitInt between 0 and
+            //    stringLength.
+            const out_length = std.math.clamp(substring_limit_int, 0, string_length);
 
             // c. Let head be the substring of string from 0 to outLength.
             const head = try string.substring(agent, 0, out_length);
@@ -1974,9 +1976,9 @@ pub const prototype = struct {
             // b. Append substring to substrings.
             try substrings.append(agent.gc_allocator, substring_);
 
-            // c. If the number of elements in substrings is lim, return CreateArrayFromList(
-            //    substrings).
-            if (substrings.items.len == limit) {
+            // c. If the number of elements in substrings is substringLimitInt, return
+            //    CreateArrayFromList(substrings).
+            if (substrings.items.len == substring_limit_int) {
                 const array = try createArrayFromListMapToValue(agent, *const types.String, substrings.items, struct {
                     fn mapFn(_: *Agent, string_: *const types.String) std.mem.Allocator.Error!Value {
                         return Value.from(string_);
@@ -2319,7 +2321,6 @@ pub const prototype = struct {
         if (string_length == 0) return Value.from(types.String.empty);
 
         // 5. Let k be 0.
-        var k: u32 = 0;
 
         // 6. Let result be the empty String.
         // NOTE: This allocates the exact needed capacity upfront
@@ -2328,10 +2329,9 @@ pub const prototype = struct {
         defer result.deinit(gpa);
 
         // 7. Repeat, while k < stringLength,
-        while (k < string_length) {
-            // a. Let codePoint be CodePointAt(string, k).
-            const code_point = string.codePointAt(k);
-
+        //     a. Let codePoint be CodePointAt(string, k).
+        var it = string.codePointIterator();
+        while (it.next()) |code_point| {
             // b. If codePoint.[[IsUnpairedSurrogate]] is true, then
             if (code_point.is_unpaired_surrogate) {
                 // i. Set result to the string-concatenation of result and 0xFFFD (REPLACEMENT
@@ -2345,7 +2345,6 @@ pub const prototype = struct {
             }
 
             // d. Set k to k + codePoint.[[CodeUnitCount]].
-            k += code_point.code_unit_count;
         }
 
         // 8. Return result.

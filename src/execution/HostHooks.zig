@@ -26,6 +26,12 @@ const Value = types.Value;
 pub const ImportMetaProperties = PropertyKey.ArrayHashMap(Value);
 pub const SupportedImportAttributes = String.ArrayHashMap(void);
 
+pub const CompilationType = enum {
+    direct_eval,
+    indirect_eval,
+    function,
+};
+
 pub const ResizeArrayBufferHandled = enum {
     handled,
     unhandled,
@@ -72,12 +78,18 @@ hostEnsureCanCompileStrings: *const fn (
     callee_realm: *Realm,
     parameter_strings: []const *const String,
     body_string: *const String,
-    direct: bool,
+    code_string: *const String,
+    compilation_type: CompilationType,
+    param_args: []const Value,
+    body_arg: Value,
 ) Agent.Error!void = default_host_hooks.hostEnsureCanCompileStrings,
 hostFinalizeImportMeta: *const fn (
     import_meta: *Object,
     module: *SourceTextModule,
 ) void = default_host_hooks.hostFinalizeImportMeta,
+hostGetCodeForEval: *const fn (
+    arg: *Object,
+) ?*const String = default_host_hooks.hostGetCodeForEval,
 hostGetImportMetaProperties: *const fn (
     agent: *Agent,
     module: *SourceTextModule,

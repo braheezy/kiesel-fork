@@ -520,7 +520,7 @@ fn ResolutionOptions(comptime resolution_option_descriptors: anytype) type {
 
 const Matcher = enum { lookup, best_fit };
 
-/// 9.2.7 ResolveLocale ( availableLocales, requestedLocales, options, relevantExtensionKeys, localeData )
+/// 9.2.7 ResolveLocale ( availableLocales, requestedLocales, options, relevantExtensionKeys [ , localeData ] )
 /// https://tc39.es/ecma402/#sec-resolvelocale
 fn resolveLocale(
     agent: *Agent,
@@ -635,8 +635,9 @@ pub fn resolveOptions(
         resolution_options,
     );
 
-    // 9. Return the Record { [[Options]]: options, [[ResolvedLocale]]: resolution,
-    //    [[ResolutionOptions]]: opt }.
+    // 9. Assert: resolution.[[LocaleData]] is a Record.
+    // 10. Return the Record { [[Options]]: options, [[ResolvedLocale]]: resolution,
+    //     [[ResolutionOptions]]: opt }.
     return .{ .options = options, .resolved_locale = resolution };
 }
 
@@ -694,8 +695,8 @@ pub fn defaultNumberOption(
     // 2. Set value to ? ToNumber(value).
     const number = try value.toNumber(agent);
 
-    // 3. If value is not finite or ℝ(value) < minimum or ℝ(value) > maximum, throw a RangeError
-    //    exception.
+    // 3. If value is not a finite Number or ℝ(value) < minimum or ℝ(value) > maximum, throw a
+    //    RangeError exception.
     if (!number.isFinite() or
         number.asFloat() < @as(f64, @floatFromInt(minimum)) or
         number.asFloat() > @as(f64, @floatFromInt(maximum)))

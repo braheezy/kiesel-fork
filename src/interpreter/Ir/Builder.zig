@@ -1007,8 +1007,8 @@ fn lowerFunctionDeclarationInstantiation(b: *Builder, formal_parameters: *const 
     // 37. For each Parse Node funcDecl of funcsToInitialize, do
     for (funcs_to_initialize.items) |hoistable_decl| {
         // a. Let funcName be the sole element of the BoundNames of funcDecl.
-        // b. Let funcObj be InstantiateFunctionObject of funcDecl with arguments lexicalEnv and
-        //    privateEnv.
+        // b. Let funcObj be InstantiateFunctionDeclaration of funcDecl with arguments lexicalEnv
+        //    and privateEnv.
         const string_index, const func_ref = switch (hoistable_decl) {
             inline else => |func_decl, tag| blk: {
                 const string_index = try b.internString(func_decl.identifier.?);
@@ -1098,8 +1098,8 @@ fn lowerBlockDeclarationInstantiation(
             const hoistable_decl = decl.hoistable_declaration;
 
             // i. Let funcName be the sole element of the BoundNames of decl.
-            // ii. Let funcObj be InstantiateFunctionObject of decl with arguments envRecord and
-            //     privateEnv.
+            // ii. Let funcObj be InstantiateFunctionDeclaration of decl with arguments envRecord
+            //     and privateEnv.
             // iii. If the host is a web browser or otherwise supports Block-Level Function
             //      Declarations Web Legacy Compatibility Semantics, then
             //      [...]
@@ -1723,16 +1723,9 @@ fn lowerForInOfHeadEvaluation(
     // 10. Return ? GetIterator(exprValue, iteratorKind).
     var skip_br_cond: ?Deferred = null;
     if (iteration_kind == .enumerate) {
-        const null_ref = try b.addInst(.{
-            .tag = .null,
-            .data = .{ .none = {} },
-        });
         const is_nullish = try b.addInst(.{
-            .tag = .eq,
-            .data = .{ .binary = .{
-                .lhs = expr_value,
-                .rhs = null_ref,
-            } },
+            .tag = .is_nullish,
+            .data = .{ .ref = expr_value },
         });
         skip_br_cond = try b.addInstDeferred(.br_cond);
         const setup_label = try b.addLabel();
@@ -2456,7 +2449,7 @@ fn lowerTryStatement(b: *Builder, try_stmt: *const ast.TryStatement) Error!Ir.In
 
         if (try_stmt.catch_parameter) |catch_parameter| {
             _ = try b.addInst(.{
-                .tag = .push_scope,
+                .tag = .push_catch_scope,
                 .data = .{ .none = {} },
             });
             b.scope_depth += 1;
@@ -3980,16 +3973,9 @@ fn lowerOptionalExpression(b: *Builder, opt_expr: *const ast.OptionalExpression)
         else => try b.lowerExpression(opt_expr.expression),
     };
 
-    const null_ref = try b.addInst(.{
-        .tag = .null,
-        .data = .{ .none = {} },
-    });
     const is_nullish = try b.addInst(.{
-        .tag = .eq,
-        .data = .{ .binary = .{
-            .lhs = base,
-            .rhs = null_ref,
-        } },
+        .tag = .is_nullish,
+        .data = .{ .ref = base },
     });
     const nullish_br = try b.addInstDeferred(.br_cond);
 
@@ -4529,20 +4515,10 @@ fn lowerLogicalExpression(b: *Builder, log_expr: *const ast.LogicalExpression) E
             .tag = .to_boolean,
             .data = .{ .ref = lhs },
         }), false },
-        .@"??" => blk: {
-            const null_ref = try b.addInst(.{
-                .tag = .null,
-                .data = .{ .none = {} },
-            });
-            const is_nullish = try b.addInst(.{
-                .tag = .eq,
-                .data = .{ .binary = .{
-                    .lhs = lhs,
-                    .rhs = null_ref,
-                } },
-            });
-            break :blk .{ is_nullish, true };
-        },
+        .@"??" => .{ try b.addInst(.{
+            .tag = .is_nullish,
+            .data = .{ .ref = lhs },
+        }), true },
     };
     const br_cond = try b.addInstDeferred(.br_cond);
 
@@ -5169,20 +5145,10 @@ fn lowerLogicalCompoundAssignmentExpression(b: *Builder, assign_expr: *const ast
             .tag = .to_boolean,
             .data = .{ .ref = current_value },
         }), false },
-        .@"??=" => blk: {
-            const null_ref = try b.addInst(.{
-                .tag = .null,
-                .data = .{ .none = {} },
-            });
-            const is_nullish = try b.addInst(.{
-                .tag = .eq,
-                .data = .{ .binary = .{
-                    .lhs = current_value,
-                    .rhs = null_ref,
-                } },
-            });
-            break :blk .{ is_nullish, true };
-        },
+        .@"??=" => .{ try b.addInst(.{
+            .tag = .is_nullish,
+            .data = .{ .ref = current_value },
+        }), true },
         else => unreachable,
     };
     const br_cond = try b.addInstDeferred(.br_cond);

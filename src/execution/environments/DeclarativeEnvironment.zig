@@ -24,6 +24,7 @@ outer_env: ?Environment,
 disposable_resource_stack: std.ArrayList(DisposableResource),
 
 bindings: String.HashMap(Binding),
+is_catch_env: bool,
 
 pub const Binding = struct {
     value: Value,
